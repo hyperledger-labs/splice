@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_CreateBootstrapExternalPartyConfigStateInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_CreateBootstrapExternalPartyConfigStateInstruction
-import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.digitalasset.canton.tracing.TraceContext
@@ -23,7 +23,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class CreateBootstrapExternalPartyConfigStateInstructionTrigger(
     override protected val context: TriggerContext,
-    packageVersionSupport: PackageVersionSupport,
     dsoStore: SvDsoStore,
     connection: SpliceLedgerConnection,
 )(implicit
@@ -38,17 +37,10 @@ class CreateBootstrapExternalPartyConfigStateInstructionTrigger(
   override def retrieveTasks()(implicit tc: TraceContext): Future[Seq[Unit]] = {
     for {
       configStateExists <- dsoStore.existsExternalPartyConfigStateWithOffset()
-      supports24hSubmissionDelay <- packageVersionSupport
-        .supports24hSubmissionDelayDsoGovernance(
-          Seq(dsoStore.key.dsoParty, dsoStore.key.svParty),
-          context.clock.now,
-        )
       confirmations <- dsoStore.listCreateBootstrapExternalPartyConfigStateInstructionConfirmation(
         svParty
       )
-    } yield Seq(()).filter(_ =>
-      supports24hSubmissionDelay.supported && !configStateExists.value && confirmations.isEmpty
-    )
+    } yield Seq(()).filter(_ => !configStateExists.value && confirmations.isEmpty)
   }
 
   override def completeTask(

@@ -5,7 +5,7 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 
 import com.daml.tls.{TlsClientCertificate, TlsClientConfig}
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.CantonRequireTypes.String256M
+import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.config.RequireTypes.{ExistingFile, Port}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage.DbAction
@@ -19,6 +19,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PEndpointConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p.data.P2PEndpointsStore
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import slick.jdbc.GetResult
@@ -36,7 +37,7 @@ final class DbP2PEndpointsStore(
   import storage.api.*
   import storage.converters.*
 
-  private implicit val getConnectionConfigRowResult: GetResult[P2PEndpoint] =
+  private implicit val getP2PEndpointRowResult: GetResult[(P2PEndpoint, Option[BftNodeId])] =
     GetResult { r =>
       val address = r.nextString()
       val port = Port.tryCreate(r.nextInt())
@@ -58,7 +59,9 @@ final class DbP2PEndpointsStore(
           )
       }
 
-      if (transportSecurity) {
+      val nodeIdO = r.nextStringOption().map(BftNodeId(_))
+
+      val endpoint = if (transportSecurity) {
         P2PGrpcNetworking.TlsP2PEndpoint(
           P2PEndpointConfig(
             address,
@@ -75,13 +78,14 @@ final class DbP2PEndpointsStore(
       } else {
         P2PGrpcNetworking.PlainTextP2PEndpoint(address, port)
       }
+      endpoint -> nodeIdO
     }
 
   private val profile = storage.profile
 
   override def listEndpoints()(implicit
       traceContext: TraceContext
-  ): PekkoEnv#FutureUnlessShutdownT[Seq[P2PEndpoint]] =
+  ): PekkoEnv#FutureUnlessShutdownT[Seq[(P2PEndpoint, Option[BftNodeId])]] =
     queryUnlessShutdown(
       selectEndpoints,
       listEndpointsActionName,
@@ -93,6 +97,14 @@ final class DbP2PEndpointsStore(
     updateUnlessShutdown(insertEndpoint(endpoint), addEndpointActionName(endpoint)).map {
       logAndCheckChangeCount
     }
+
+  override def associate(existingEndpoint: P2PEndpoint, nodeId: BftNodeId)(implicit
+      traceContext: TraceContext
+  ): PekkoFutureUnlessShutdown[Boolean] =
+    updateUnlessShutdown(
+      associateExistingEndpoint(existingEndpoint, nodeId),
+      associateActionName(existingEndpoint, nodeId),
+    ).map(logAndCheckChangeCount)
 
   override def removeEndpoint(endpointId: P2PEndpoint.Id)(implicit
       traceContext: TraceContext
@@ -116,16 +128,17 @@ final class DbP2PEndpointsStore(
     changeCount > 0
   }
 
-  private def selectEndpoints: DbAction.ReadOnly[Seq[P2PEndpoint]] =
+  private def selectEndpoints: DbAction.ReadOnly[Seq[(P2PEndpoint, Option[BftNodeId])]] =
     sql"""select
             address, port, transport_security, custom_server_trust_certificates,
-            client_certificate_chain, client_private_key_file
-          from ord_p2p_endpoints"""
-      .as[P2PEndpoint]
+            client_certificate_chain, client_private_key_file, node_id
+          from ord_p2p_endpoints
+          order by address, port, transport_security"""
+      .as[(P2PEndpoint, Option[BftNodeId])]
 
   private def insertEndpoint(endpoint: P2PEndpoint): DbAction.WriteOnly[Int] = {
     val address =
-      String256M.tryCreate(endpoint.address) // URL host names are limited to 253 characters anyway
+      String255.tryCreate(endpoint.address) // URL host names are limited to 253 characters anyway
     val port = endpoint.port.unwrap
     val (customServerTrustCertificates, clientCertificateChain, clientPrivateKeyFile) =
       endpoint match {
@@ -171,9 +184,19 @@ final class DbP2PEndpointsStore(
   }
 
   private def deleteEndpoint(endpointId: P2PEndpoint.Id): DbAction.WriteOnly[Int] = {
-    val address256M = String256M.tryCreate(endpointId.address)
+    val address = String255.tryCreate(endpointId.address)
     sqlu"""delete from ord_p2p_endpoints
-           where address = $address256M and port = ${endpointId.port.unwrap} and transport_security = ${endpointId.transportSecurity}"""
+           where address = $address and port = ${endpointId.port.unwrap} and transport_security = ${endpointId.transportSecurity}"""
+  }
+
+  private def associateExistingEndpoint(
+      existingEndpoint: P2PEndpoint,
+      nodeId: BftNodeId,
+  ): DbAction.WriteOnly[Int] = {
+    val address = String255.tryCreate(existingEndpoint.address)
+    sqlu"""update ord_p2p_endpoints
+           set node_id = $nodeId
+           where address = $address and port = ${existingEndpoint.port.unwrap} and transport_security = ${existingEndpoint.transportSecurity}"""
   }
 
   private def clearEndpoints: DbAction.WriteOnly[Int] = sqlu"truncate table ord_p2p_endpoints"
@@ -188,8 +211,7 @@ final class DbP2PEndpointsStore(
       action: DBIOAction[X, NoStream, Effect.Write & Effect.Transactional],
       actionName: String,
   )(implicit
-      traceContext: TraceContext,
-      rowsAltered: DbStorage.RowsAltered[X],
+      traceContext: TraceContext
   ): PekkoFutureUnlessShutdown[X] =
     PekkoFutureUnlessShutdown(actionName, () => storage.update(action, actionName))
 
@@ -197,8 +219,7 @@ final class DbP2PEndpointsStore(
       action: DBIOAction[X, NoStream, Effect.Write & Effect.Transactional],
       actionName: String,
   )(implicit
-      traceContext: TraceContext,
-      rowsAltered: DbStorage.RowsAltered[X],
+      traceContext: TraceContext
   ): PekkoFutureUnlessShutdown[Unit] =
     updateUnlessShutdown(action, actionName).map(_ => ())
 }

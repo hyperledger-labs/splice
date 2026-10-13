@@ -112,7 +112,7 @@ groups:
             {{- end -}}
           summary: '{{ index $values "failure_pct" }}% fatal errors occurred in {{ index $labels "namespace" }} - {{ index $labels "trigger_name" }} automation trigger'
         labels:
-          gcloud_filter: 'resource.labels.namespace_name=%22{{ index $labels "namespace" }}%22%0A%22{{ index $labels "trigger_name" }}%22'
+          gcloud_filter: 'resource.labels.namespace_name=%22{{ index $$labels "namespace" }}%22%0A%22{{ index $$labels "trigger_name" }}%22'
         isPaused: false
       - uid: ady2ks9ehbw1sb
         title: Busy task-based automation
@@ -180,7 +180,7 @@ groups:
           summary: '{{ index $values "runs" }} trigger runs per second occurred in {{ index $labels "namespace" }} - {{ index $labels "trigger_name" }} automation trigger'
         labels:
           "": ""
-          gcloud_filter: resource.labels.namespace_name=%22{{ index  "namespace" }}%22%0A%22{{ index  "trigger_name" }}%22
+          gcloud_filter: resource.labels.namespace_name=%22{{ index $$labels "namespace" }}%22%0A%22{{ index $$labels "trigger_name" }}%22
         isPaused: false
       - uid: edz6eq1kc543ke
         title: Busy polling-based automation
@@ -248,7 +248,7 @@ groups:
           summary: '{{ index $values "runs" }} trigger runs per second occurred in {{ index $labels "namespace" }} - {{ index $labels "trigger_name" }} automation trigger'
         labels:
           "": ""
-          gcloud_filter: resource.labels.namespace_name=%22{{ index  "namespace" }}%22%0A%22{{ index  "trigger_name" }}%22
+          gcloud_filter: resource.labels.namespace_name=%22{{ index $$labels "namespace" }}%22%0A%22{{ index $$labels "trigger_name" }}%22
         isPaused: false
       - uid: fe12i7xur3eo0d
         title: Backfilling not progressing
@@ -613,5 +613,5 @@ groups:
           description: The {{ index $labels "automation_service" }} background service of the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace has been continuously reporting unhealthy for more than 5 minutes.
           summary: '{{ index $labels "namespace" }} - {{ index $labels "node_type" }} - {{ index $labels "automation_service" }} automation service is unhealthy'
         labels:
-          gcloud_filter: 'resource.labels.namespace_name=%22{{ index $labels "namespace" }}%22'
+          gcloud_filter: 'resource.labels.namespace_name=%22{{ index $$labels "namespace" }}%22'
         isPaused: false

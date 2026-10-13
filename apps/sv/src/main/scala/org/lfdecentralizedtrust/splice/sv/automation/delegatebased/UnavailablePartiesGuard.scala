@@ -42,7 +42,35 @@ trait UnavailablePartiesGuard extends NamedLogging {
           )
         )
     } else {
-      task.recoverWith(recoverUnresponsiveParties(ignoreUnresponsiveParties))
+      task
+        .flatMap(recoverUnavailableParties(stakeholders))
+        .recoverWith(recoverUnresponsiveParties(ignoreUnresponsiveParties))
+    }
+
+  /** Provisional retry reset: once a submission involving previously unavailable parties
+    * succeeds, they are removed from the store so that their backoff starts from the base
+    * duration again the next time they become unavailable.
+    */
+  private def recoverUnavailableParties(
+      stakeholders: Set[PartyId]
+  )(outcome: TaskOutcome)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[TaskOutcome] =
+    outcome match {
+      case _: TaskSuccess
+          if svConfig.parameters.enabledFeatures.enablePersistedUnavailableParties =>
+        val toRestore = withoutDsoParty(stakeholders)
+        unavailablePartiesStore
+          .removeParties(toRestore.toSeq)
+          .map { restored =>
+            if (restored.nonEmpty)
+              logger.info(
+                s"Submission succeeded, recovered ${restored.size} unavailable parties: $restored"
+              )
+            outcome
+          }
+      case _ => Future.successful(outcome)
     }
 
   protected def completeWithVettedAmuletVersion(

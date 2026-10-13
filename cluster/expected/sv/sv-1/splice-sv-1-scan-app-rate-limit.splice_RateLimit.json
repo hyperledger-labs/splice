@@ -1,0 +1,34 @@
+{
+  "custom": false,
+  "id": "",
+  "inputs": {
+    "appLabel": "scan-app",
+    "globalLimits": {
+      "fillInterval": "10s",
+      "maxTokens": 60000,
+      "tokensPerFill": 10000
+    },
+    "globalPerIpLimits": {
+      "fillInterval": "10s",
+      "maxTokens": 6000,
+      "overrides": {
+        "test": {
+          "fillInterval": "60s",
+          "ips": [
+            "192.68.78.50"
+          ],
+          "maxTokens": 250,
+          "tokensPerFill": 250
+        }
+      },
+      "tokensPerFill": 1000
+    },
+    "inboundPort": 5012,
+    "namespace": "sv-1",
+    "protocol": "http",
+    "xffNumTrustedHops": 2
+  },
+  "name": "splice-sv-1-scan-app-rate-limit",
+  "provider": "",
+  "type": "splice:RateLimit"
+}

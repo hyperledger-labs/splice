@@ -22,6 +22,7 @@ import Login from './Login';
 import LoginFailed from './LoginFailed';
 import PartyId from './PartyId';
 import { computeDiff, PrettyJsonDiff } from './PrettyJsonDiff';
+import QueryDevtools from './QueryDevtools';
 import RateDisplay from './RateDisplay';
 import TitledTable from './TitledTable';
 import { updateIdFromEventId, UpdateId } from './UpdateId';
@@ -69,6 +70,7 @@ export {
   LoginFailed,
   PartyId,
   PrettyJsonDiff,
+  QueryDevtools,
   RateDisplay,
   SubscriptionButton,
   TitledTable,

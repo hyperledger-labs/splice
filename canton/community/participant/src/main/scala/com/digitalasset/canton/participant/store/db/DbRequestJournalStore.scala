@@ -6,11 +6,11 @@ package com.digitalasset.canton.participant.store.db
 import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.RequestCounter
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{BatchAggregatorConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -26,7 +26,7 @@ import com.digitalasset.canton.store.db.DbBulkUpdateProcessor
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{BatchAggregator, ErrorUtil, TryUtil}
-import com.google.common.annotations.VisibleForTesting
+import com.digitalasset.nonempty.NonEmpty
 import slick.jdbc.*
 
 import java.util.ConcurrentModificationException
@@ -310,16 +310,17 @@ class DbRequestJournalStore(
     )
   }
 
-  @VisibleForTesting
-  private[store] override def pruneInternal(
+  override def prune(
       beforeInclusive: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+    logger.debug(s"Pruning request journal store up to $beforeInclusive")
     storage.update_(
       sqlu"""
         delete from par_journal_requests where request_timestamp <= $beforeInclusive and physical_synchronizer_idx = $physicalSynchronizerIdx
       """,
       functionFullName,
     )
+  }
 
   override def purge()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     storage.update_(

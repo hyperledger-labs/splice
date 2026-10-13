@@ -345,6 +345,10 @@ if [ $wallet_gateway -eq 1 ]; then
     _error_msg "LEDGER_API_AUTH_AUDIENCE and VALIDATOR_AUTH_AUDIENCE must be equal when deploying the wallet gateway with -g, set both to the same value in .env"
     exit 1
   fi
+  if [ $auth -eq 1 ] && [ -z "$(_env_var WALLET_GATEWAY_UI_CLIENT_ID)" ]; then
+    _error_msg "WALLET_GATEWAY_UI_CLIENT_ID must be set in .env when deploying the wallet gateway with authentication (-a -g)"
+    exit 1
+  fi
   extra_compose_files+=("-f" "${script_dir}/compose-wallet-gateway.yaml")
   if [ $auth -ne 1 ]; then
     extra_compose_files+=("-f" "${script_dir}/compose-wallet-gateway-disable-auth.yaml")

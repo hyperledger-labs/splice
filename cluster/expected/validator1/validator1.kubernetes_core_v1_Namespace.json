@@ -1,0 +1,17 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "kind": "Namespace",
+    "metadata": {
+      "labels": {
+        "istio-injection": "enabled"
+      },
+      "name": "validator1"
+    }
+  },
+  "name": "validator1",
+  "provider": "",
+  "type": "kubernetes:core/v1:Namespace"
+}

@@ -4,17 +4,18 @@
 package com.digitalasset.canton.participant.store.memory
 
 import cats.data.{EitherT, OptionT}
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.store.ContractStore.InternalContractId
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.nonempty.NonEmpty
 
 import java.util.concurrent.atomic.AtomicLong
 import scala.collection.concurrent.TrieMap
@@ -156,6 +157,15 @@ class InMemoryContractStore(
     val res = contracts.filter { case (cid, _) => ids.contains(cid) }.map {
       case (cid, PersistedContractInstance(_, c)) =>
         (cid, c.signatories)
+    }
+    EitherT.cond(res.sizeCompare(ids) == 0, res.toMap, UnknownContracts(ids -- res.keySet))
+  }
+
+  override def lookupMetadata(ids: Set[LfContractId])(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, UnknownContracts, Map[LfContractId, ContractMetadata]] = {
+    val res = contracts.filter { case (cid, _) => ids.contains(cid) }.map { case (cid, persisted) =>
+      (cid, persisted.asContractInstance.metadata)
     }
     EitherT.cond(res.sizeCompare(ids) == 0, res.toMap, UnknownContracts(ids -- res.keySet))
   }

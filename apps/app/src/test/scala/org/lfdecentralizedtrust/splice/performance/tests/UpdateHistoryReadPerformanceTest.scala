@@ -15,7 +15,10 @@ import org.lfdecentralizedtrust.splice.scan.admin.http.{
   ExternalHashInclusionPolicy,
   ScanHttpEncodings,
 }
-import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
+import org.lfdecentralizedtrust.splice.scan.config.{
+  AnalyzableTimeWindowConfig,
+  ScanAppBackendConfig,
+}
 import org.lfdecentralizedtrust.splice.store.db.InternedStringStore
 import org.lfdecentralizedtrust.splice.store.{
   HistoryMetrics,
@@ -68,6 +71,7 @@ class UpdateHistoryReadPerformanceTest(
         loggerFactory,
         NoOpMetricsFactory,
       ),
+      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
       loggerFactory = loggerFactory,
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = false,

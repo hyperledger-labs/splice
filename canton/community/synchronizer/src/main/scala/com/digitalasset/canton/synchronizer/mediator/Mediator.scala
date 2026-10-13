@@ -5,10 +5,8 @@ package com.digitalasset.canton.synchronizer.mediator
 
 import cats.data.EitherT
 import cats.implicits.toFoldableOps
-import cats.instances.future.*
 import cats.syntax.bifunctor.*
 import cats.syntax.functorFilter.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
@@ -16,6 +14,7 @@ import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.MetricsHelper
 import com.digitalasset.canton.protocol.messages.{
@@ -27,7 +26,14 @@ import com.digitalasset.canton.protocol.{DynamicSynchronizerParametersWithValidi
 import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.client.RichSequencerClient
 import com.digitalasset.canton.sequencing.handlers.DiscardIgnoredEvents
-import com.digitalasset.canton.sequencing.protocol.{ClosedEnvelope, OpenEnvelope, SequencedEvent}
+import com.digitalasset.canton.sequencing.protocol.{
+  Batch,
+  ClosedEnvelope,
+  Deliver,
+  DeliverError,
+  OpenEnvelope,
+  SequencedEvent,
+}
 import com.digitalasset.canton.store.CursorPrehead.SequencerCounterCursorPrehead
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
 import com.digitalasset.canton.store.{SequencedEventStore, SequencerCounterTrackerStore}
@@ -50,6 +56,7 @@ import com.digitalasset.canton.util.EitherUtil.RichEither
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{EitherTUtil, FutureUnlessShutdownUtil, FutureUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import io.opentelemetry.api.trace.Tracer
 
@@ -265,9 +272,8 @@ private[mediator] class Mediator(
         .right(sequencerCounterTrackerStore.preheadSequencerCounter)
       preHeadTsO = preHeadCounterO.map(_.timestamp)
       cleanTimestamp <- EitherT
-        .fromOption(preHeadTsO, PruningError.NoDataAvailableForPruning)
+        .fromOption[FutureUnlessShutdown](preHeadTsO, PruningError.NoDataAvailableForPruning)
         .leftWiden[PruningError]
-        .mapK(FutureUnlessShutdown.outcomeK)
 
       _ <- EitherT
         .cond[FutureUnlessShutdown](
@@ -365,7 +371,7 @@ private[mediator] class Mediator(
       }
 
       override def apply(
-          tracedEvents: Traced[Seq[BoxedEnvelope[OrdinarySequencedEvent, ClosedEnvelope]]]
+          tracedEvents: Traced[Seq[OrdinarySequencedEvent[Batch[ClosedEnvelope]]]]
       ): HandlerResult =
         tracedEvents.withTraceContext { implicit traceContext => events =>
           // update the delay logger using the latest event we've been handed
@@ -377,6 +383,7 @@ private[mediator] class Mediator(
             val (openEvent, openingErrors) = SequencedEvent.openEnvelopes(closedEvent)(
               protocolVersion,
               syncCrypto.crypto.pureCrypto,
+              topologyClient.getSynchronizerLimits,
             )
 
             val rejectionsF =
@@ -388,7 +395,12 @@ private[mediator] class Mediator(
                 val alarm = MediatorError.MalformedMessage.Reject(cause)
                 alarm.report()
 
-                val rootHashMessages = openEvent.envelopes.mapFilter(
+                val openEnvelopes = openEvent match {
+                  case d: Deliver[Batch[OpenEnvelope[ProtocolMessage]] @unchecked] =>
+                    d.batch.envelopes
+                  case _: DeliverError => Seq.empty
+                }
+                val rootHashMessages = openEnvelopes.mapFilter(
                   ProtocolMessage.select[RootHashMessage[SerializedRootHashMessagePayload]]
                 )
 

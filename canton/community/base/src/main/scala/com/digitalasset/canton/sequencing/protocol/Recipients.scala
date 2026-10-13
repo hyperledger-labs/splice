@@ -4,14 +4,14 @@
 package com.digitalasset.canton.sequencing.protocol
 
 import cats.syntax.reducible.*
-import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.v30
+import com.digitalasset.canton.protocol.{SynchronizerLimits, v30}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.Member
+import com.digitalasset.canton.validation.ProtoValidation
+import com.digitalasset.canton.version.ProtocolVersionValidation
+import com.digitalasset.nonempty.NonEmpty
 
 /** Recipients of a batch. Uses a list of
   * [[com.digitalasset.canton.sequencing.protocol.RecipientsTree]]s that define the members
@@ -59,10 +59,20 @@ final case class Recipients(trees: NonEmpty[Seq[RecipientsTree]]) extends Pretty
 object Recipients {
 
   def fromProtoV30(
-      proto: v30.Recipients
-  ): ParsingResult[Recipients] =
+      pvv: ProtocolVersionValidation,
+      synchronizerLimits: SynchronizerLimits,
+      proto: v30.Recipients,
+  ): ParsingResult[Recipients] = {
+    val maxRecipientsTrees = synchronizerLimits.transactionProtocolLimits.maxRecipientsTrees
+
     for {
-      trees <- proto.recipientsTree.traverse(RecipientsTree.fromProtoV30)
+      trees <- ProtoValidation
+        .validateLengthThen(
+          proto.recipientsTree,
+          "recipients_tree",
+          pvv,
+          maxRecipientsTrees.value,
+        )((element, _) => RecipientsTree.fromProtoV30(pvv, synchronizerLimits, element))
       recipients <- NonEmpty
         .from(trees)
         .toRight(
@@ -72,6 +82,7 @@ object Recipients {
           )
         )
     } yield Recipients(recipients)
+  }
 
   /** Create a [[com.digitalasset.canton.sequencing.protocol.Recipients]] representing a group of
     * members that "see" each other.

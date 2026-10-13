@@ -36,6 +36,15 @@ final case class MediatorVerdictIngestionConfig(
     batchSize: Int = 50
 )
 
+final case class BulkStorageBackfillingConfig(
+    enabled: Boolean = false,
+    pollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
+    noPeerWillHoldRetryInterval: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofMinutes(10),
+    downloadParallelism: Int = 1,
+    pageSize: Int = Limit.DefaultMaxPageSize,
+)
+
 final case class BulkStorageConfig(
     /** When new snapshot is not yet available, how long to wait for a new one. */
     snapshotPollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
@@ -48,6 +57,10 @@ final case class BulkStorageConfig(
     staging: Option[S3Config] = None,
     committed: Option[S3Config] = None,
     bftCheckEnabled: Boolean = true,
+    // temporary buffer size for zstd compression, safe to modify locally
+    tmpBufferSize: Int = 1024 * 1024 * 10,
+    // Number of elements to read from the DB at once when reading updates or snapshots for bulk storage. Safe to modify locally.
+    dbReadChunkSize: Int = 100,
     /** When enabled, the app will reset all progress markers thus force recomputing data from genesis.
       * Note that this does not delete any existing data, you usually would want to do that before setting
       * this flag. Also, after restarting the app once with this flag enabled, you'd want to disable it back
@@ -57,12 +70,20 @@ final case class BulkStorageConfig(
       *   this before starting to prune data.
       */
     debugForceStartFromGenesis: Boolean = false,
+    /** When enabled, the app forgets its recorded history start on startup, so it is determined again from the
+      * current data (founding SV, history backfilled from genesis, or the DSO party hosting time). The history start
+      * decides where bulk storage backfilling stops and which times this Scan answers as backfilling. If bulk
+      * storage progress was already built on a wrong history start, also set debugForceStartFromGenesis.
+      * As with that flag, restart once with it enabled and then disable it again.
+      */
+    debugReresolveHistoryStart: Boolean = false,
     /** A list of S3 object keys that this instance should not save to the committed bucket, and instead only
       * delete from staging. To be used only in extreme cases where we decide to accept a BFT disagreement,
       * and have the (minority of) disagreeing instances simply skip the broken objects.
       * Should typically be used in test environments only.
       */
     debugObjectsToNotCommit: Seq[String] = Seq.empty,
+    backfilling: BulkStorageBackfillingConfig = BulkStorageBackfillingConfig(),
 )
 
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
@@ -86,6 +107,9 @@ case class ScanAppBackendConfig(
       NonNegativeFiniteDuration.ofDays(7),
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
     enableForcedAcsSnapshots: Boolean = false,
+    // Whether each ACS snapshot should be stored in its own table
+    perAcsSnapshotTablesEnabled: Boolean = false,
+    analyzableTimeWindow: AnalyzableTimeWindowConfig = AnalyzableTimeWindowConfig(),
     // The migration id is normally read from the DB (the highest known migration id in the
     // update history). It only needs to be resolved from a sponsor to bootstrap a node that does
     // not yet have any migration id in its DB (e.g. a freshly joining scan). In that case, the
@@ -124,6 +148,21 @@ case class ScanAppBackendConfig(
   override val nodeTypeName: String = "scan"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
+}
+
+case class AnalyzableTimeWindowConfig(
+    duration: NonNegativeDuration = AnalyzableTimeWindowConfig.UnlimitedAtw
+) {
+  require(
+    duration.duration > AnalyzableTimeWindowConfig.MinimumAtw.duration,
+    s"The analyzable time window must be at least ${AnalyzableTimeWindowConfig.MinimumAtw}",
+  )
+}
+object AnalyzableTimeWindowConfig {
+  private val MinimumAtw = NonNegativeDuration.tryFromJavaDuration(java.time.Duration.ofDays(7L))
+  val UnlimitedAtw: NonNegativeDuration =
+    NonNegativeDuration.tryFromDuration(scala.concurrent.duration.Duration.Inf)
+
 }
 
 final case class ScanRollForwardLsuConfig(

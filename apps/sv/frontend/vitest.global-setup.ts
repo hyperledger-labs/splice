@@ -2,5 +2,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export const setup = () => {
-  process.env.TZ = 'ETC/GMT-2'; // setting the timezone to UTC+2
+  process.env.TZ = 'Etc/GMT-2'; // setting the timezone to UTC+2 (Etc/GMT-2 uses inverted signs)
 };

@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "name": "cantonnet"
+  },
+  "name": "sv-da-1-db-sequencer-6-pg-cantonnet",
+  "provider": "",
+  "type": "gcp:sql/database:Database"
+}

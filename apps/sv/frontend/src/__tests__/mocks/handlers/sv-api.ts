@@ -19,6 +19,7 @@ import {
   LookupFeaturedAppRightByContractIdResponse,
   ListVoteRequestByTrackingCidResponse,
   LookupDsoRulesVoteRequestResponse,
+  PrepareValidatorOnboardingResponse,
 } from '@canton-network/sv-openapi';
 
 import {
@@ -239,6 +240,9 @@ export const buildSvMock = (svUrl: string): HttpHandler[] => [
   }),
 
   validatorLicensesHandler(svUrl),
+  http.post(`${svUrl}/v0/admin/validator/onboarding/prepare`, () => {
+    return HttpResponse.json<PrepareValidatorOnboardingResponse>({ secret: 'new_encoded_secret' });
+  }),
   http.get(`${svUrl}/v0/admin/validator/onboarding/ongoing`, () => {
     return HttpResponse.json<ListOngoingValidatorOnboardingsResponse>({
       ongoing_validator_onboardings: [

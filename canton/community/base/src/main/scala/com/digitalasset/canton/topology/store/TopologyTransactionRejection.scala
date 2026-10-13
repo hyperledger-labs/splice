@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.topology.store
 
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{Fingerprint, PublicKey, SignatureCheckError}
@@ -19,6 +18,7 @@ import com.digitalasset.canton.topology.transaction.TopologyTransaction.{
   PositiveTopologyTransaction,
   TxHash,
 }
+import com.digitalasset.nonempty.NonEmpty
 
 sealed trait TopologyTransactionRejection extends PrettyPrinting with Product with Serializable {
   def asString: String
@@ -44,6 +44,14 @@ object TopologyTransactionRejection {
           actual = Some(actual),
           expected = Some(expected),
         )
+    }
+    case object MaxSerialReached extends TopologyTransactionRejection {
+      val message = "Max serial has been reached for the transaction."
+      override def asString: String = message
+      override protected def pretty: Pretty[MaxSerialReached.type] =
+        prettyOfClass(param("message", _.message.singleQuoted))
+      override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+        TopologyManagerError.TopologyManagerAlarm.Warn(message)
     }
     final case class InternalError(message: String) extends TopologyTransactionRejection {
       override def asString: String = message
@@ -302,8 +310,8 @@ object TopologyTransactionRejection {
     }
 
     final case class InvalidSynchronizerSuccessor(
-        successorSynchronizerId: PhysicalSynchronizerId,
-        inStoreSuccessorSynchronizerId: PhysicalSynchronizerId,
+        successorSynchronizerId: OpaquePhysicalSynchronizerId,
+        inStoreSuccessorSynchronizerId: OpaquePhysicalSynchronizerId,
     ) extends TopologyTransactionRejection {
       override def asString: String =
         s"The declared successor $successorSynchronizerId is not greater than prior synchronizer $inStoreSuccessorSynchronizerId."
@@ -338,8 +346,8 @@ object TopologyTransactionRejection {
 
     final case class LsuSequencerSuccessorInvalidSuccessorPsid(
         sequencerId: SequencerId,
-        successorPsid: PhysicalSynchronizerId,
-        expectedSuccessorPsid: PhysicalSynchronizerId,
+        successorPsid: OpaquePhysicalSynchronizerId,
+        expectedSuccessorPsid: OpaquePhysicalSynchronizerId,
     ) extends TopologyTransactionRejection {
       override def asString: String =
         s"Lsu sequencer successor for sequencer $sequencerId is invalid because it mentions successor $successorPsid but the current LSU announcement mentions $expectedSuccessorPsid"

@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.crypto.admin.grpc
 
-import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.crypto.admin.v30
@@ -16,6 +15,8 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.validation.ProtoValidation
+import com.digitalasset.canton.version.ProtocolVersionValidation
 
 final case class PrivateKeyMetadata(
     publicKeyWithName: PublicKeyWithName,
@@ -38,41 +39,41 @@ final case class PrivateKeyMetadata(
 
   def encrypted: Boolean = wrapperKeyId.isDefined
 
-  def toProtoV30: v30.PrivateKeyMetadata =
-    v30.PrivateKeyMetadata(
-      publicKeyWithName = Some(publicKeyWithName.toProtoV30),
-      wrapperKeyId = wrapperKeyId.map(_.toProtoPrimitive),
-      kmsKeyId = kmsKeyId.map(_.toProtoPrimitive),
+  def toProtoV30: Either[String, v30.PrivateKeyMetadata] =
+    publicKeyWithName.toProtoV30.map(serializedPubKey =>
+      v30.PrivateKeyMetadata(
+        publicKeyWithName = v30.PrivateKeyMetadata.PublicKeyWithName.V30(serializedPubKey),
+        wrapperKeyId = wrapperKeyId.map(_.toProtoPrimitive),
+        kmsKeyId = kmsKeyId.map(_.toProtoPrimitive),
+      )
     )
 }
 
 object PrivateKeyMetadata {
 
+  private def parseKeyId(keyId: String, field: String): ParsingResult[String300] =
+    if (keyId.isBlank)
+      Left(ProtoDeserializationError.InvariantViolation(field, s"empty or blank $field"))
+    else String300.fromProtoPrimitive(keyId, field)
+
   def fromProtoV30(key: v30.PrivateKeyMetadata): ParsingResult[PrivateKeyMetadata] =
     for {
-      publicKeyWithName <- ProtoConverter.parseRequired(
-        PublicKeyWithName.fromProto30,
-        "public_key_with_name",
-        key.publicKeyWithName,
-      )
-      wrapperKeyId <- key.wrapperKeyId
-        .traverse { keyId =>
-          if (keyId.isBlank)
-            Left(
-              ProtoDeserializationError
-                .InvariantViolation("wrapper_key_id", "empty or blank wrapper key ID")
-            )
-          else String300.fromProtoPrimitive(keyId, "wrapper_key_id")
-        }
-      kmsKeyId <- key.kmsKeyId
-        .traverse { keyId =>
-          if (keyId.isBlank)
-            Left(
-              ProtoDeserializationError
-                .InvariantViolation("kms_key_id", "empty or blank KMS key ID")
-            )
-          else String300.fromProtoPrimitive(keyId, "kms_key_id")
-        }
+      publicKeyWithName <- key.publicKeyWithName match {
+        case v30.PrivateKeyMetadata.PublicKeyWithName.V30(pk) =>
+          PublicKeyWithName.fromProto30(pk)
+        case v30.PrivateKeyMetadata.PublicKeyWithName.Empty =>
+          ProtoConverter.required("public_key_with_name", None)
+      }
+      wrapperKeyId <- ProtoValidation.validateThen(
+        key.wrapperKeyId,
+        "wrapper_key_id",
+        ProtocolVersionValidation.AlwaysValidation,
+      )(parseKeyId)
+      kmsKeyId <- ProtoValidation.validateThen(
+        key.kmsKeyId,
+        "kms_key_id",
+        ProtocolVersionValidation.AlwaysValidation,
+      )(parseKeyId)
     } yield PrivateKeyMetadata(
       publicKeyWithName,
       wrapperKeyId,

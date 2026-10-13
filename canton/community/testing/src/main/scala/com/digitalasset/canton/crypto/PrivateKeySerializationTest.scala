@@ -4,6 +4,7 @@
 package com.digitalasset.canton.crypto
 
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -50,7 +51,9 @@ trait PrivateKeySerializationTest extends AsyncWordSpec with BaseTest with HasEx
               .leftMap(_.toString)
               .subflatMap(_.toRight("Private key not found"))
               .valueOrFail("get key")
-            privateKeyP = privateKey.toProtoVersioned(testedProtocolVersion)
+            privateKeyP = privateKey
+              .toProtoVersioned(testedProtocolVersion)
+              .valueOrFail("serialization of private key")
             privateKey2 = SigningPrivateKey
               .fromProtoVersioned(privateKeyP)
               .valueOrFail("serialize key")

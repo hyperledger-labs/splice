@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.protocol.submission
 import cats.syntax.option.*
 import com.digitalasset.canton.ProtoDeserializationError.FieldNotSet
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.TransactionError
 import com.digitalasset.canton.ledger.participant.state.Update.UnSequencedCommandRejected
@@ -111,6 +112,7 @@ final case class TransactionSubmissionTrackingData(
     completionInfo: CompletionInfo,
     rejectionCause: TransactionSubmissionTrackingData.RejectionCause,
     synchronizerId: PhysicalSynchronizerId,
+    transactionHash: Option[Hash],
 ) extends SubmissionTrackingData
     with HasLoggerName {
 
@@ -128,13 +130,15 @@ final case class TransactionSubmissionTrackingData(
     val reasonTemplate = rejectionCause.asFinalReason
     Update.UnSequencedCommandRejected(
       // notification will be tracked based on this as a non-sequenced in-flight reference
-      completionInfo,
-      reasonTemplate,
-      synchronizerId.logical,
-      recordTime,
-      messageUuid,
+      completionInfo = completionInfo,
+      reasonTemplate = reasonTemplate,
+      synchronizerId = synchronizerId.logical,
+      recordTime = recordTime,
+      messageUuid = messageUuid,
       // TODO(i15875): Submission tracking is only enabled for transactions
       isTransaction = true,
+      transactionHash = transactionHash,
+      traceContext = traceContext,
     )
   }
 
@@ -159,6 +163,8 @@ final case class TransactionSubmissionTrackingData(
       completionInfo = completionInfoP.some,
       rejectionCause = rejectionCause.toProtoV30.some,
       physicalSynchronizerId = synchronizerId.toProtoPrimitive,
+      transactionHash =
+        transactionHash.fold(com.google.protobuf.ByteString.EMPTY)(_.getCryptographicEvidence),
     )
     v30.SubmissionTrackingData(v30.SubmissionTrackingData.Tracking.Transaction(transactionTracking))
   }
@@ -177,6 +183,7 @@ object TransactionSubmissionTrackingData {
       completionInfoP,
       causeP,
       synchronizerIdP,
+      transactionHashP,
     ) = tracking
     for {
       completionInfo <- ProtoConverter.parseRequired(
@@ -189,10 +196,12 @@ object TransactionSubmissionTrackingData {
         synchronizerIdP,
         "physical_synchronizer_id",
       )
+      txHash <- Hash.fromProtoPrimitiveOption(transactionHashP)
     } yield TransactionSubmissionTrackingData(
       completionInfo,
       cause,
       synchronizerId,
+      txHash,
     )
   }
 

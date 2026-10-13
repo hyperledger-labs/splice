@@ -34,7 +34,7 @@ import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService.AmuletOperationDedupConfig
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.SignatureFormat.Raw
@@ -250,7 +250,13 @@ class HttpValidatorAdminHandler(
                 topologyTxs
                   .map(tx =>
                     definitions.TopologyTx(
-                      topologyTx = Base64.getEncoder.encodeToString(tx.toByteArray),
+                      topologyTx = Base64.getEncoder.encodeToString(
+                        tx.toByteArray.valueOr(err =>
+                          throw new IllegalStateException(
+                            s"Failed to convert tx to byte array: $err"
+                          )
+                        )
+                      ),
                       hash = tx.hash.hash.toHexString,
                     )
                   )

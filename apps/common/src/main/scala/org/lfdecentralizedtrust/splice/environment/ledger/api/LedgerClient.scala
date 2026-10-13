@@ -180,11 +180,33 @@ private[environment] class LedgerClient(
   def ledgerEnd()(implicit
       traceContext: TraceContext
   ): Future[Long] = {
-    val req = lapi.state_service.GetLedgerEndRequest()
+    val req = lapi.state_service.GetLedgerEndRequest(Seq.empty)
     for {
       stub <- withGrpcContext(stateServiceStub)
       resp <- stub.getLedgerEnd(req)
     } yield resp.offset
+  }
+
+  def ledgerEndWithSynchronizerTimes(synchronizerIds: Seq[SynchronizerId])(implicit
+      traceContext: TraceContext
+  ): Future[(Long, Map[SynchronizerId, CantonTimestamp])] = {
+    val req = lapi.state_service.GetLedgerEndRequest(synchronizerIds.map(_.toProtoPrimitive))
+    for {
+      stub <- withGrpcContext(stateServiceStub)
+      resp <- stub.getLedgerEnd(req)
+    } yield (
+      resp.offset,
+      resp.synchronizerTimes.map { syncTime =>
+        SynchronizerId.tryFromString(syncTime.synchronizerId) -> CantonTimestamp
+          .tryFromProtoTimestamp(
+            syncTime.recordTime.getOrElse(
+              throw new IllegalArgumentException(
+                s"Synchronizer time for ${syncTime.synchronizerId} has no record time"
+              )
+            )
+          )
+      }.toMap,
+    )
   }
 
   def latestPrunedOffset()(implicit
@@ -236,6 +258,41 @@ private[environment] class LedgerClient(
       } yield ClientAdapter
         .serverStreaming(request.toProto, stub.getUpdates)
         .mapConcat(GetTreeUpdatesResponse.fromProto)
+    )
+  }
+
+  def topologyTransactions(
+      beginExclusive: Long
+  )(implicit tc: TraceContext): Source[TopologyTransactionUpdate, NotUsed] = {
+    import lapi.update_service.GetUpdatesResponse.Update as TU
+    val request = lapi.update_service.GetUpdatesRequest(
+      beginExclusive = beginExclusive,
+      endInclusive = None,
+      updateFormat = Some(
+        transaction_filter.UpdateFormat(
+          includeTransactions = None,
+          includeReassignments = None,
+          includeTopologyEvents = Some(
+            transaction_filter.TopologyFormat(
+              Some(transaction_filter.ParticipantAuthorizationTopologyFormat(parties = Seq.empty))
+            )
+          ),
+        )
+      ),
+      descendingOrder = false,
+    )
+    toSource(
+      for {
+        stub <- withGrpcContext(
+          updateServiceStub,
+          timeout = Some(timeouts.unbounded),
+        )
+      } yield ClientAdapter
+        .serverStreaming(request, stub.getUpdates)
+        .mapConcat(_.update match {
+          case TU.TopologyTransaction(tx) => Some(TopologyTransactionUpdate.fromProto(tx))
+          case _ => None
+        })
     )
   }
 

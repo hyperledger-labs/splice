@@ -111,6 +111,7 @@ class AuthTokenManager(
       clock
         .scheduleAt(
           backgroundRefreshToken,
+          "auth_token_refresh",
           expiresAt.minus(refreshAuthTokenBeforeExpiry.asJava),
         )
         .discard

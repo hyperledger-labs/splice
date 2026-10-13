@@ -12,7 +12,7 @@ import {
   CREATE_PROPOSAL_FIELD_LABEL_SX,
 } from '../../constants/createProposalLayout';
 import { useFieldContext } from '../../hooks/formContext';
-import { scrollableTextFieldSx } from '../beta/identifierStyles';
+import { scrollableTextFieldSx } from '../ui/identifierStyles';
 import { singleLineFieldSx } from '../../themes/fieldStyles';
 
 export interface TextFieldProps {

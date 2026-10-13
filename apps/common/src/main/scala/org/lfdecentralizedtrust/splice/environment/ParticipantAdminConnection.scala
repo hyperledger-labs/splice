@@ -66,6 +66,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologySnapshot,
 }
 
+import java.io.{InputStream, SequenceInputStream}
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -176,7 +177,7 @@ class ParticipantAdminConnection(
       activationTime: Instant,
   )(implicit
       traceContext: TraceContext
-  ): Future[ByteString] = {
+  ): Future[Seq[ByteString]] = {
     val observer = new SeqAccumulatingObserver[ExportPartyAcsResponse]
 
     for {
@@ -201,7 +202,7 @@ class ParticipantAdminConnection(
         )
       )
       chunks <- observer.resultFuture
-    } yield ByteString.copyFrom(chunks.map(_.chunk).asJava)
+    } yield chunks.map(_.chunk)
   }
 
   def downloadAcsSnapshotNonChunked(
@@ -243,7 +244,7 @@ class ParticipantAdminConnection(
     )
   }
 
-  def importPartyAcs(acsBytes: ByteString, synchronizerId: SynchronizerId, partyId: PartyId)(
+  def importPartyAcs(acsChunks: Seq[ByteString], synchronizerId: SynchronizerId, partyId: PartyId)(
       implicit tc: TraceContext
   ): Future[Unit] = {
     retryProvider.retryForClientCalls(
@@ -252,7 +253,9 @@ class ParticipantAdminConnection(
       runCmd(
         ParticipantAdminCommands.PartyManagement
           .ImportPartyAcs(
-            acsBytes.newInput(),
+            new SequenceInputStream(
+              acsChunks.iterator.map(chunk => chunk.newInput(): InputStream).asJavaEnumeration
+            ),
             synchronizerId,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
             contractImportMode = ContractImportMode.Validation,

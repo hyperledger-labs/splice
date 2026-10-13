@@ -6,10 +6,11 @@ package com.digitalasset.canton.protocol
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.SynchronizerParameters.MaxRequestSize
 import com.digitalasset.canton.time.PositiveSeconds
-import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
+import com.digitalasset.canton.topology.client.{SynchronizerTopologyClient, TopologySnapshot}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 
@@ -27,6 +28,18 @@ class DynamicSynchronizerParametersLookup[P](
 
   val protocolVersion: ProtocolVersion = topologyClient.protocolVersion
 
+  /** Return one value, valid at the specified snapshot
+    *
+    * @param warnOnUsingDefaults
+    *   Log a warning if dynamic synchronizer parameters are not set and default value is used.
+    */
+  def get(snapshot: TopologySnapshot, warnOnUsingDefaults: Boolean)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[P] =
+    snapshot
+      .findDynamicSynchronizerParametersOrDefault(protocolVersion, warnOnUsingDefaults)
+      .map(projector)
+
   /** Return one value, valid at the specified timestamp
     *
     * @param warnOnUsingDefaults
@@ -36,10 +49,7 @@ class DynamicSynchronizerParametersLookup[P](
       traceContext: TraceContext
   ): FutureUnlessShutdown[P] = topologyClient
     .awaitSnapshotUSSupervised(s"Querying for synchronizer parameters valid at $validAt")(validAt)
-    .flatMap(snapshot =>
-      snapshot.findDynamicSynchronizerParametersOrDefault(protocolVersion, warnOnUsingDefaults)
-    )
-    .map(projector)
+    .flatMap(snapshot => get(snapshot, warnOnUsingDefaults))
 
   /** Return the value of the topology snapshot approximation or the default value.
     */
@@ -50,15 +60,6 @@ class DynamicSynchronizerParametersLookup[P](
       .flatMap(
         _.findDynamicSynchronizerParametersOrDefault(protocolVersion, warnOnUsingDefaults)
           .map(projector)
-      )
-
-  /** Return the value of the topology snapshot approximation.
-    */
-  def getApproximate()(implicit traceContext: TraceContext): FutureUnlessShutdown[Option[P]] =
-    topologyClient.currentSnapshotApproximation
-      .flatMap(
-        _.findDynamicSynchronizerParameters()
-          .map(_.map(p => projector(p.parameters)).toOption)
       )
 
   /** Return the approximate latest validity/freshness. Returned value is the approximate timestamp

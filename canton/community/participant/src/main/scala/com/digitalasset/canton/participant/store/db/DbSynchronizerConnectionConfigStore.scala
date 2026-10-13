@@ -10,11 +10,11 @@ import cats.syntax.foldable.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.SynchronizerPredecessor
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore.{
   Active,
@@ -54,6 +54,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.version.ReleaseProtocolVersion
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
+import com.digitalasset.nonempty.NonEmpty
 import monocle.macros.syntax.lens.*
 import slick.dbio
 import slick.dbio.DBIOAction
@@ -92,7 +93,7 @@ class DbSynchronizerConnectionConfigStore private[store] (
 
   private implicit val setParameterSynchronizerPredecessor
       : SetParameter[Option[SynchronizerPredecessor]] =
-    SynchronizerPredecessor.getVersionedSetParameterO(releaseProtocolVersion.v)
+    SynchronizerPredecessor.getVersionedSetParameterO
 
   private def filter(id: ConfigIdentifier): SQLActionBuilder = id match {
     case ConfigIdentifier.WithPsid(psid) =>
@@ -241,6 +242,40 @@ class DbSynchronizerConnectionConfigStore private[store] (
     }
   }
 
+  override def delete(
+      psid: PhysicalSynchronizerId
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, UnknownPsid, Unit] = {
+    // return the deleted rows so that we can log exactly what was deleted,
+    // in case users want to reconstruct the config again.
+    val queryAndDelete = for {
+      existingConfig <- getInternalQuery(ConfigIdentifier.WithPsid(psid))
+      numRowsDeleted <-
+        sqlu"delete from par_synchronizer_connection_configs where physical_synchronizer_id=$psid"
+    } yield (numRowsDeleted, existingConfig)
+
+    EitherT
+      .right[UnknownPsid](
+        storage
+          .queryAndUpdate(
+            queryAndDelete.transactionally,
+            functionFullName,
+          )(traceContext, closeContext)
+          .map { case (_, existingConfigO) => existingConfigO }
+      )
+      .flatMap {
+        case None =>
+          EitherT.leftT(UnknownPsid(psid))
+        case Some(storedConfig) =>
+          logger.info(s"Deleted the following synchronizer configuration: $storedConfig")
+          synchronizerConfigCache
+            .updateWith(storedConfig.config.synchronizerAlias)(
+              _.map(_.removed(KnownPhysicalSynchronizerId((psid))))
+            )
+            .discard
+          EitherTUtil.unitUS[UnknownPsid]
+      }
+  }
+
   // Check that a new psid is consistent with stored IDs for that alias
   private def checkLogicalIdConsistent(
       psid: PhysicalSynchronizerId,
@@ -314,7 +349,7 @@ class DbSynchronizerConnectionConfigStore private[store] (
             .collect { case (_, LsuSource) => () }
             .fold(().asRight[LsuOngoing])(_ => LsuOngoing(predecessor.psid, psid).asLeft)
 
-        case _ => Right(())
+        case _ => Either.unit
       }
 
       _ <- EitherT.fromEither[DBIO](lsuOngoingCheckResult)
@@ -576,7 +611,7 @@ class DbSynchronizerConnectionConfigStore private[store] (
         .queryAndUpdate(
           queries.value.transactionally.withTransactionIsolation(TransactionIsolation.Serializable),
           functionFullName,
-        )(traceContext, closeContext, _.exists { case (altered, _) => altered > 0 })
+        )(traceContext, closeContext)
         .map(_.map { case (_, config) => config })
 
     EitherT(result).map { newStoredConfig =>
@@ -640,7 +675,7 @@ class DbSynchronizerConnectionConfigStore private[store] (
         .queryAndUpdate(
           queries.value.transactionally.withTransactionIsolation(TransactionIsolation.Serializable),
           functionFullName,
-        )(traceContext, closeContext, _.exists { case (updated, _) => updated > 0 })
+        )(traceContext, closeContext)
         .map(_.map { case (_, config) => config })
 
     EitherT(result).map { newConfig =>
@@ -675,14 +710,19 @@ class DbSynchronizerConnectionConfigStore private[store] (
   override def getAll(): Seq[StoredSynchronizerConnectionConfig] =
     synchronizerConfigCache.values.flatMap(_.values).toSeq
 
+  override def getByAlias(
+      alias: SynchronizerAlias
+  ): Map[ConfiguredPhysicalSynchronizerId, StoredSynchronizerConnectionConfig] =
+    synchronizerConfigCache.getOrElse(alias, Map.empty)
+
   override def getAllFor(
       alias: SynchronizerAlias
   ): Either[UnknownAlias, NonEmpty[Seq[StoredSynchronizerConnectionConfig]]] =
     synchronizerConfigCache
       .get(alias)
       .map(_.values.toSeq)
+      .flatMap(NonEmpty.from)
       .toRight(UnknownAlias(alias))
-      .flatMap(NonEmpty.from(_).toRight(UnknownAlias(alias)))
 
   override def setStatus(
       alias: SynchronizerAlias,

@@ -19,7 +19,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.cometbft.{
   CometBftNodeConfig,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
-  SequencerConfig,
+  SequencerIdentityConfig,
   SynchronizerNodeConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
@@ -428,18 +428,16 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest with HasR
         List.empty.asJava,
         List.empty.asJava,
       ),
+      None.asJava,
+      None.asJava,
+      None.asJava,
+      None.asJava,
       Some(
-        new SequencerConfig(
-          0,
+        new SequencerIdentityConfig(
           id.toProtoPrimitive,
-          "",
           None.asJava,
         )
       ).asJava,
-      None.asJava,
-      None.asJava,
-      None.asJava,
-      None.asJava,
       java.util.Optional.empty(),
     )
   }

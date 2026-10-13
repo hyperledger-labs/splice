@@ -6,15 +6,14 @@ package com.digitalasset.canton.sequencing.authentication
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.option.*
-import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{Fingerprint, Nonce, SynchronizerCrypto}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.metrics.SequencerConnectionPoolMetrics
@@ -43,7 +42,13 @@ import com.digitalasset.canton.util.retry.{
   Pause,
   RetryWithDelay,
 }
-import com.digitalasset.canton.version.{ProtocolVersion, ReleaseVersion}
+import com.digitalasset.canton.validation.{
+  ProtoUnvalidatedSeq,
+  ProtoUnvalidatedString,
+  ProtoValidation,
+}
+import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation, ReleaseVersion}
+import com.digitalasset.nonempty.NonEmpty
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.ExecutionContext
@@ -122,7 +127,13 @@ class AuthenticationTokenProvider(
             .fromProtoPrimitive(challenge.nonce)
             .leftMap(err => Status.INVALID_ARGUMENT.withDescription(s"Invalid nonce: $err"))
             .toEitherT[FutureUnlessShutdown]
-          token <- authenticate(endpoint, authenticationClient, nonce, challenge.fingerprints)
+          token <- authenticate(
+            endpoint,
+            authenticationClient,
+            nonce,
+            challenge.fingerprints,
+            synchronizerId.protocolVersion,
+          )
         } yield token).value
       }.map {
         case Left(status) if unavailableDueToChannelShutdown(status) =>
@@ -204,13 +215,19 @@ class AuthenticationTokenProvider(
       endpoint: Endpoint,
       authenticationClient: GrpcClient[SequencerAuthenticationServiceStub],
       nonce: Nonce,
-      fingerprintsP: Seq[String],
+      fingerprintsP: ProtoUnvalidatedSeq[ProtoUnvalidatedString],
+      protocolVersion: ProtocolVersion,
   )(implicit
       tc: TraceContext
   ): EitherT[FutureUnlessShutdown, Status, AuthenticationTokenWithExpiry] =
     for {
-      fingerprintsValid <- fingerprintsP
-        .traverse(Fingerprint.fromProtoPrimitive)
+      fingerprintsValid <- ProtoValidation
+        .validateThen(
+          fingerprintsP,
+          "fingerprints",
+          ProtocolVersionValidation.PV(protocolVersion),
+          ProtoValidation.MaxCollectionSize,
+        )(Fingerprint.fromProtoPrimitive)
         .leftMap(err => Status.INVALID_ARGUMENT.withDescription(err.toString))
         .toEitherT[FutureUnlessShutdown]
       fingerprintsNel <- NonEmpty

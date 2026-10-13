@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import { config } from '@canton-network/splice-pulumi-common';
 import {
   allValidatorsConfig,
@@ -18,10 +19,9 @@ function getValidatorConfig(validatorName: string) {
 export const validatorName = config.requireEnv('SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME');
 export const validatorConfig = getValidatorConfig(validatorName);
 
-console.error(
-  `Loaded validator ${validatorConfig} configuration`,
-  util.inspect(validatorConfig, {
+void pulumi.log.debug(
+  `Loaded validator ${validatorName} configuration ${util.inspect(validatorConfig, {
     depth: null,
     maxStringLength: null,
-  })
+  })}`
 );

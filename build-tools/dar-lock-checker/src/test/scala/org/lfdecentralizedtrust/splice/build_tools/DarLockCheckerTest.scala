@@ -109,6 +109,24 @@ class DarLockCheckerTest extends AnyWordSpec with Matchers {
     }
   }
 
+  "resolveRemoteRef" should {
+    "prefer a remote that already has the release ref" in {
+      DarLockChecker.resolveRemoteRef(
+        "release-line-0.8.3",
+        Seq("origin", "upstream"),
+        Some(Set("refs/remotes/upstream/release-line-0.8.3")),
+      ) shouldBe "upstream"
+    }
+
+    "fall back to origin when it is the active remote" in {
+      DarLockChecker.resolveRemoteRef(
+        "release-line-0.8.3",
+        Seq("origin", "upstream"),
+        Some(Set("refs/remotes/origin/release-line-0.8.3")),
+      ) shouldBe "origin"
+    }
+  }
+
   "rewriteDamlYamlVersion" should {
     "replace the top-level version line" in {
       val yaml =

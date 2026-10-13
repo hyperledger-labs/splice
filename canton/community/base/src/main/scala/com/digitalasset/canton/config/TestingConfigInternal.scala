@@ -62,6 +62,10 @@ import com.digitalasset.canton.metrics.MetricsFactoryType.External
   *   the Ledger API, provided that no explicit targetAudience or targetScope is configured. (In
   *   other cases, other appropriate warnings are raised on startup if needed). Such tokens are
   *   currently discouraged for security reasons and will be removed from use in future versions.
+  * @param trafficEnforcementProjectionEventCommitted
+  *   Hook invoked on every debit event that the traffic enforcement app has just committed. Used to
+  *   react exactly after a known number of events have been committed, for example to interrupt a
+  *   database connection. Does nothing by default.
   */
 final case class TestingConfigInternal(
     testSequencerClientFor: Set[TestSequencerClientFor] = Set.empty,
@@ -75,9 +79,10 @@ final case class TestingConfigInternal(
     participantsWithoutLapiVerification: Set[String] = Set.empty,
     enableInMemoryTransactionStoreForParticipants: Boolean = false,
     warnOnAcsCommitmentDegradation: Boolean = true,
-    // TODO (i#32650): remove this when we clean up scope based token
+    // TODO (i#33090): remove this when we clean up scope based token
     warnOnJwtScopeUsage: Boolean = true,
     useLegacyContractIdVersionV11: Boolean = false,
+    trafficEnforcementProjectionEventCommitted: () => Unit = () => (),
 )
 
 /** @param environmentId

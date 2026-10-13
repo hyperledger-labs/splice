@@ -329,4 +329,39 @@ describe('Offboard SV Form', () => {
 
     await screen.findByText('Successfully submitted the proposal');
   });
+
+  // REPRO (currently FAILING): the stuck-disabled submit button is form-wide, NOT caused
+  // by the switch-over feature. OffboardSvForm has no switch-over field, yet the same
+  // onBlur-slot staleness applies: a blur writes the error into the `onBlur` slot, and
+  // fixing by typing only re-runs the `onChange` validator (clearing the `onChange`
+  // slot), leaving the stale `onBlur` error -> the field stays invalid -> `canSubmit`
+  // stays false -> the submit button never re-enables until the field is blurred again.
+  // test.fails: locks a known bug (currently failing on purpose). Remove `.fails` once fixed.
+  test.fails(
+    're-enables submit after fixing an invalid url without re-blurring (onBlur-slot staleness)',
+    async () => {
+      const user = userEvent.setup();
+
+      render(
+        <Wrapper>
+          <OffboardSvForm />
+        </Wrapper>
+      );
+
+      const urlInput = screen.getByTestId('offboard-sv-url');
+      await user.type(urlInput, 'not-a-url'); // invalid -> onChange slot error
+      await user.click(screen.getByTestId('offboard-sv-summary')); // blur url -> onBlur slot error
+
+      const submitButton = screen.getByTestId('submit-button');
+      await waitFor(() => expect(submitButton).toBeDisabled());
+
+      // Fix by typing a valid URL, without re-blurring the field.
+      await user.clear(urlInput);
+      await user.type(urlInput, 'https://valid.com');
+
+      // Desired: the url is valid now, so submit re-enables. Currently the stale onBlur
+      // slot keeps it disabled, so this fails.
+      await waitFor(() => expect(submitButton).not.toBeDisabled());
+    }
+  );
 });

@@ -61,7 +61,7 @@ trait TestEnvironment[+C]
 
   private lazy val cryptoET: EitherT[FutureUnlessShutdown, String, Crypto] = Crypto
     .create(
-      CryptoConfig(),
+      CryptoConfig(enableExperimental = true), // Enable PQC for tests
       CachingConfigs.defaultKmsMetadataCache,
       SessionEncryptionKeyCacheConfig(),
       CachingConfigs.defaultPublicKeyConversionCache,

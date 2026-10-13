@@ -1,0 +1,52 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "allowedLogoutUrls": [
+      "https://cns.validator.mock.network.canton.global",
+      "https://cns.validator.mock.global.canton.network.digitalasset.com",
+      "http://localhost:3001",
+      "http://ans.localhost"
+    ],
+    "allowedOrigins": [
+      "https://cns.validator.mock.network.canton.global",
+      "https://cns.validator.mock.global.canton.network.digitalasset.com",
+      "http://localhost:3001",
+      "http://ans.localhost"
+    ],
+    "appType": "spa",
+    "callbacks": [
+      "https://cns.validator.mock.network.canton.global",
+      "https://cns.validator.mock.global.canton.network.digitalasset.com",
+      "http://localhost:3001",
+      "http://ans.localhost"
+    ],
+    "crossOriginAuth": false,
+    "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the ANS UI for the validator runbook",
+    "grantTypes": [
+      "authorization_code",
+      "implicit",
+      "refresh_token"
+    ],
+    "name": "ANS UI (Pulumi managed, test-stack)",
+    "oidcConformant": true,
+    "refreshToken": {
+      "expirationType": "expiring",
+      "idleTokenLifetime": 259200,
+      "infiniteIdleTokenLifetime": false,
+      "infiniteTokenLifetime": false,
+      "leeway": 5,
+      "rotationType": "rotating",
+      "tokenLifetime": 604800
+    },
+    "webOrigins": [
+      "https://cns.validator.mock.network.canton.global",
+      "https://cns.validator.mock.global.canton.network.digitalasset.com",
+      "http://localhost:3001",
+      "http://ans.localhost"
+    ]
+  },
+  "name": "validatorCnsUi",
+  "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::validator::04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+  "type": "auth0:index/client:Client"
+}

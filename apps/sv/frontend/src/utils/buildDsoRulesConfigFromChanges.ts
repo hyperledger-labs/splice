@@ -8,6 +8,7 @@ import type {
 } from '@daml.js/splice-dso-governance/lib/Splice/DSO/DecentralizedSynchronizer/module';
 import type { DsoRulesConfig } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import type { ConfigChange } from './types';
+import { configValueToSwitchOverMap } from '../components/forms/formValidators';
 
 /**
  * Given a list of config changes, build and return a DsoRulesConfig.
@@ -53,6 +54,10 @@ export function buildDsoRulesConfigFromChanges(dsoConfigChanges: ConfigChange[])
     true
   );
   const voteCooldownTime = getValue('voteCooldownTime', true);
+
+  const svOperationsSwitchOverTimes = configValueToSwitchOverMap(
+    getValue('svOperationsSwitchOverTimes', true)
+  );
 
   const dsoConfig: DsoRulesConfig = {
     numUnclaimedRewardsThreshold: getValue('numUnclaimedRewardsThreshold', false),
@@ -120,7 +125,7 @@ export function buildDsoRulesConfigFromChanges(dsoConfigChanges: ConfigChange[])
             ),
           },
     voteCooldownTime: voteCooldownTime === null ? null : { microseconds: voteCooldownTime },
-    svOperationsSwitchOverTimes: null,
+    svOperationsSwitchOverTimes: svOperationsSwitchOverTimes,
   };
 
   return dsoConfig;

@@ -1,0 +1,8 @@
+{
+  "custom": true,
+  "id": "sv-1-cn-apps-pg-7ca4614",
+  "inputs": {},
+  "name": "sv-1-cn-apps-pg",
+  "provider": "",
+  "type": "gcp:sql/databaseInstance:DatabaseInstance"
+}

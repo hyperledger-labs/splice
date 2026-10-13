@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.admin.api.client.data.SequencerAdminStatus.implicitPrettyString
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -217,10 +216,8 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
             key = Map("svParty" -> dsoStore.key.svParty.toProtoPrimitive),
           ),
           storage,
-          // TODO(#5019): implement the exponential backoff auto-ignore mechanism
-          // for now ignore forever
-          NonNegativeFiniteDuration.ofDays(365 * 100),
-          NonNegativeFiniteDuration.ofDays(365 * 100),
+          config.unavailablePartiesBackoffParameters.baseIgnoreDuration,
+          config.unavailablePartiesBackoffParameters.maxIgnoreDuration,
           clock,
           loggerFactory,
         )

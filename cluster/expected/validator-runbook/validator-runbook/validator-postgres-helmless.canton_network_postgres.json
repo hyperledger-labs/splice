@@ -1,0 +1,8 @@
+{
+  "custom": false,
+  "id": "",
+  "inputs": {},
+  "name": "validator-postgres-helmless",
+  "provider": "",
+  "type": "canton:network:postgres"
+}

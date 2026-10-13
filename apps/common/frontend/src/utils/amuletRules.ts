@@ -11,7 +11,7 @@ dayjs.extend(utc);
 export function getAmuletConfigurationAsOfNow(
   config: Schedule<string, AmuletConfig<'USD'>>
 ): Schedule<string, AmuletConfig<'USD'>> {
-  const orderedScheduleList = config.futureValues.sort((a, b) => {
+  const orderedScheduleList = config.futureValues.toSorted((a, b) => {
     return new Date(a._1).valueOf() - new Date(b._1).valueOf();
   });
 

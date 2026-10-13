@@ -72,7 +72,7 @@ const validatorVersion: CnChartVersion = validatorConfig.version
   : activeVersion;
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
-  console.error(
+  await pulumi.log.info(
     validatorVersion.type === 'local'
       ? 'Using locally built charts by default'
       : `Using charts from the ghcr by default, version ${validatorVersion.version}`

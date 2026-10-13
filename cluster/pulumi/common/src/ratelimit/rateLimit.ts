@@ -1,9 +1,32 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
+import { z } from 'zod';
 
-import { RateLimitProtocol, RateLimitEnvoyFilter, rateLimitedGrpcStatus } from './envoyRateLimiter';
+import { clusterSubConfig } from '../config/config';
+import {
+  directIngressXffNumTrustedHops,
+  gkeL7GatewayNumTrustedProxies,
+  rateLimitedGrpcStatus,
+  RateLimitEnvoyFilter,
+  RateLimitProtocol,
+} from './envoyRateLimiter';
 import { ExternalRateLimit } from './rateLimitSchema';
+
+const IngressTopologyConfigSchema = z.object({
+  gkeGateway: z.object({ proxyForIstioHttp: z.boolean().default(false) }).prefault({}),
+});
+
+/**
+ * The number of x-forwarded-for hops the sidecars must trust, which depends on whether the istio
+ * ingress gateway is exposed directly by the NLB or fronted by the GKE L7 gateway (the Cloud Armor
+ * prerequisite), as the latter adds proxies that each append an entry.
+ */
+export function sidecarXffNumTrustedHops(): number {
+  return IngressTopologyConfigSchema.parse(clusterSubConfig('infra')).gkeGateway.proxyForIstioHttp
+    ? gkeL7GatewayNumTrustedProxies
+    : directIngressXffNumTrustedHops;
+}
 
 /**
  * Envoy answers a rate limited HTTP request with `429`, but a rate limited gRPC call with HTTP
@@ -71,6 +94,7 @@ export function installRateLimits(
     globalPerIpLimits: rateLimit.globalPerIpLimits,
     rateLimits: rateLimit.rateLimits,
     protocol,
+    xffNumTrustedHops: sidecarXffNumTrustedHops(),
   });
   logRateLimitedRequests(namespace, app, protocol);
 }

@@ -88,15 +88,7 @@ ForkJoinIdlenessExecutorService.*shutdown did not complete gracefully in allotte
 
 Consensus not reached.*BftScanConnection:BftScanConnectionTest.*
 Consensus not reached.*BftScanConnection:ConfigurationProvidedBftScanConnectionIntegrationTest.*
-# TODO (#6502): under TBAR the reward-accounting BFT reads emit two related
-# WARNs during bootstrap — "Consensus not reached." when the retry loop
-# gives up (no peer can converge to Ok) and "The following Scan URLs
-# disagreed with consensus" when a minority disagrees with the reached
-# consensus. Both are scoped to the two triggers that call these reads so
-# real BFT problems elsewhere still surface. Removed once #6392's two-phase
-# probe lands.
-Consensus not reached.*BftScanConnection:.*"span-name":"(SummarizingMiningRoundTrigger|CalculateRewardsTrigger)"
-The following Scan URLs disagreed with consensus.*BftScanConnection:.*"span-name":"(SummarizingMiningRoundTrigger|CalculateRewardsTrigger)"
+All scans have responded with 'never'.*BftCallExecutorTest:BftCallExecutorTest.*
 
 # internal selenium error. Potentially intermittent
 Exception managing firefox: error sending request for url .* http2 error: stream error received: refused stream before processing any application
@@ -148,7 +140,7 @@ Previous channel ManagedChannelImpl.* was garbage collected without being shut d
 # as we don't want to miss non-shutdown warnings in production.
 Restarting stream due to failure.*Channel shutdown(Now)? invoked
 # TODO(#564) - check what's happening here during shutdown
-Timeout 10 seconds expired, but readers are still active. Shutting down forcibly.*LsuIntegrationTest
+Timeout 10 seconds expired, but readers are still active. Shutting down forcibly
 
 # Warnings in s3Mock log (which we redirect to our logs), that we don't care about
 \[s3Mock\].*Ignoring option --illegal-access=warn
@@ -181,3 +173,14 @@ api/sv/v0/onboard/validator \(POST\) resulted in a timeout
 # The same warning is emitted by both the FlywayExecutor and the ClassPathScanner loggers.
 # a single pattern matching the message (the unloadable sbt tests jar) covers both.
 Skipping unloadable jar file: file:.*-tests\.jar
+
+Connection for .* with psid .* is no longer active \(status: .*\), skipping update of the connection config
+
+# Onboarding multiple users in tests may lead to repeated STALE_STREAM_AUTHORIZATION and
+# ingestion restarts. This can result in long delays in signalWhenIngested.
+# See https://github.com/DACH-NY/cn-test-failures/issues/10095.
+signalWhenIngested.* has not completed after .* milliseconds
+
+# The BFT bootstrap test adds a dummy 5th SV with an unreachable scan URL (http://localhost:1)
+# to raise f from 0 to 1. All BFT peers attempt to connect to this URL and log warnings.
+Failed to connect to scan of.*NonZeroRoundBootstrapBftTimeBasedIntegrationTest

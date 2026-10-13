@@ -31,7 +31,7 @@ const AllocationSpecificationDisplay: React.FC<{
     settlementDeadline,
     transferLegSides,
   } = spec;
-  const sortedLegs = [...transferLegSides].sort((a, b) =>
+  const sortedLegs = transferLegSides.toSorted((a, b) =>
     a.transferLegId.localeCompare(b.transferLegId)
   );
   const hasAllocationMeta = Object.keys(meta.values).length > 0;

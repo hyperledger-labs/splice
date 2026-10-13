@@ -4,6 +4,7 @@ import { DsoRulesConfig } from '@daml.js/splice-dso-governance/lib/Splice/DsoRul
 import { DsoDecentralizedSynchronizerConfig } from '@daml.js/splice-dso-governance/lib/Splice/DSO/DecentralizedSynchronizer/module';
 import { Optional } from '@daml/types';
 import { ConfigChange } from './types';
+import { switchOverMapToConfigValue } from '../components/forms/formValidators';
 
 function buildSynchronizerMap(
   baseConfig: DsoDecentralizedSynchronizerConfig | undefined,
@@ -212,6 +213,12 @@ export function buildDsoConfigChanges(
       label: 'The minimum time between two votes (or vote changes) by the same Super Validator',
       currentValue: before?.voteCooldownTime?.microseconds || '',
       newValue: after?.voteCooldownTime?.microseconds || '',
+    },
+    {
+      fieldName: 'svOperationsSwitchOverTimes',
+      label: 'SV operations switch-over times',
+      currentValue: switchOverMapToConfigValue(before?.svOperationsSwitchOverTimes),
+      newValue: switchOverMapToConfigValue(after?.svOperationsSwitchOverTimes),
     },
   ] as ConfigChange[];
 

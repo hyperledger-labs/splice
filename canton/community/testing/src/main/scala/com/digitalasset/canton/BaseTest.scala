@@ -16,18 +16,24 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger, SuppressionRule}
 import com.digitalasset.canton.protocol.{
   DynamicSynchronizerParameters,
   StaticSynchronizerParameters,
   SynchronizerLimits,
+  TransactionProtocolLimits,
 }
+import com.digitalasset.canton.scalatest.{ScalaFuturesWithPatience, ScalatestEssentials}
+import com.digitalasset.canton.sequencing.HandlerResult
+import com.digitalasset.canton.sequencing.protocol.DecompressionPolicy
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, WallClock}
 import com.digitalasset.canton.topology.{PartyKind, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.util.LoggerUtil.roundDurationForHumans
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{CheckedT, MaxBytesToDecompress}
 import com.digitalasset.canton.version.{
@@ -36,27 +42,29 @@ import com.digitalasset.canton.version.{
   ProtocolVersionValidation,
   ReleaseProtocolVersion,
 }
+import com.typesafe.scalalogging.Logger
 import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.metrics.SdkMeterProvider
 import io.opentelemetry.sdk.trace.SdkTracerProvider
-import org.mockito.{ArgumentMatchers, ArgumentMatchersSugar}
+import org.mockito.ArgumentMatchers
 import org.scalacheck.Test
 import org.scalactic.source.Position
 import org.scalactic.{Prettifier, source}
-import org.scalatest.concurrent.{Eventually, PatienceConfiguration, ScalaFutures}
+import org.scalatest.*
+import org.scalatest.concurrent.{Eventually, PatienceConfiguration}
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.matchers.should.Matchers.*
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpecLike
-import org.scalatest.{Assertion, *}
 import org.scalatestplus.scalacheck.CheckerAsserting
 import org.slf4j.bridge.SLF4JBridgeHandler
 import org.slf4j.event.Level
 import org.typelevel.discipline.Laws
 
+import scala.annotation.{nowarn, tailrec}
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
@@ -64,26 +72,15 @@ import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
-trait ScalaFuturesWithPatience extends ScalaFutures {
-
-  /** Increase default timeout when evaluating futures.
-    */
-  implicit val defaultPatience: PatienceConfig =
-    PatienceConfig(timeout = Span(5, Seconds), interval = Span(20, Millis))
-}
-
 /** Tests' essentials disaggregated from scalatest's traits.
   */
-trait TestEssentials
-    extends ScalaFuturesWithPatience
-    // There are many MockitoSugar implementations, but only this one is not deprecated and
-    // supports when, verify, ...
-    with org.mockito.MockitoSugar
-    with ArgumentMatchersSugar
-    with NamedLogging {
+trait TestEssentials extends ScalatestEssentials with NamedLogging {
 
   protected def defaultMaxBytesToDecompress: MaxBytesToDecompress =
     BaseTest.defaultMaxBytesToDecompress
+
+  protected def defaultDecompressionPolicy: DecompressionPolicy =
+    BaseTest.defaultDecompressionPolicy
 
   protected def timeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing
 
@@ -94,6 +91,8 @@ trait TestEssentials
     BaseTest.testedReleaseProtocolVersion
   protected lazy val defaultStaticSynchronizerParameters: StaticSynchronizerParameters =
     BaseTest.defaultStaticSynchronizerParameters
+  protected lazy val defaultProtocolLimits: TransactionProtocolLimits =
+    BaseTest.defaultProtocolLimits
 
   protected implicit lazy val testedHashingSchemeVersion: HashingSchemeVersion =
     HashingSchemeVersion.getHashingSchemeVersionsForProtocolVersion(testedProtocolVersion).last1
@@ -114,9 +113,9 @@ trait TestEssentials
   protected lazy val nonEmptyTraceContext2: TraceContext =
     W3CTraceContext("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01").toTraceContext
 
-  // increase default patience from 5s to 20s to account for noisy CI neighbours
+  // increase default patience from 5s to 60s to account for noisy CI neighbours
   implicit override val defaultPatience: PatienceConfig =
-    PatienceConfig(timeout = Span(20, Seconds), interval = Span(25, Millis))
+    PatienceConfig(timeout = Span(60, Seconds), interval = Span(25, Millis))
 
   // when mocking methods touching transactions it's very common to need to mock the traceContext as a an additional argument list
   def anyTraceContext: TraceContext = ArgumentMatchers.any[TraceContext]()
@@ -323,7 +322,7 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
     def futureValueUS(timeout: PatienceConfiguration.Timeout)(implicit pos: Position): A =
       fut.unwrap.futureValue(timeout).onShutdown(fail("Unexpected shutdown"))
     def succeedOnFutureCompleteOrShutdown(implicit pos: Position): Unit =
-      fut.succeedOnFutureCompleteOrShutdown(PatienceConfiguration.Timeout(defaultPatience.timeout))(
+      succeedOnFutureCompleteOrShutdown(PatienceConfiguration.Timeout(defaultPatience.timeout))(
         pos
       )
     def succeedOnFutureCompleteOrShutdown(timeout: PatienceConfiguration.Timeout)(implicit
@@ -339,6 +338,11 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
       us.onShutdown(fail(s"Unexpected shutdown"))
   }
 
+  implicit class UnthrottledHandlerResultSyntax(handlerResult: HandlerResult) {
+    @nowarn("msg=side-effecting nullary methods are discouraged")
+    def handlerResultValue: Unit =
+      handlerResult.futureValueUS.unwrap.futureValueUS.future.futureValueUS
+  }
 }
 
 /** Base traits for tests. Makes syntactic sugar and logging available.
@@ -356,6 +360,8 @@ trait BaseTest
     with AppendedClues
     with TimestampHelpers
     with FutureHelpers { self =>
+
+  implicit val prettifier: Prettifier = org.scalactic.PrettyPrettifier.prettifier
 
   /** A metrics factory constructed from an OpenTelemetryOnDemandMetricsReader which allows to make
     * assertion on the content of the metrics registry.
@@ -463,11 +469,13 @@ trait BaseTest
       timeUntilSuccess: FiniteDuration = 20.seconds,
       maxPollInterval: FiniteDuration = 5.seconds,
       retryOnTestFailuresOnly: Boolean = true,
+      logElapsed: Option[String] = None,
   )(testCode: => T): T =
     BaseTest.eventually(
       timeUntilSuccess,
       maxPollInterval,
-      retryOnTestFailuresOnly = retryOnTestFailuresOnly,
+      retryOnTestFailuresOnly,
+      logElapsed.map(noTracingLogger -> _),
     )(testCode)
 
   /** Keeps evaluating `testCode` until it succeeds or a timeout occurs.
@@ -501,7 +509,7 @@ trait BaseTest
   ): T = BaseTest.always(durationOfSuccess, pollIntervalMs)(testCode)
 
   def eventuallyForever[T](
-      timeUntilSuccess: FiniteDuration = 2.seconds,
+      timeUntilSuccess: FiniteDuration = 20.seconds,
       durationOfSuccess: FiniteDuration = 2.seconds,
       pollIntervalMs: Long = 10,
   )(testCode: => T): T =
@@ -551,7 +559,7 @@ trait BaseTest
     id.map(_.logical)
 }
 
-object BaseTest {
+object BaseTest extends EitherValues {
   val DefaultEventuallyTimeUntilSuccess: FiniteDuration = 20.seconds
 
   implicit class RichSynchronizerIdO(val id: SynchronizerId) {
@@ -601,69 +609,94 @@ object BaseTest {
     * @throws java.lang.IllegalArgumentException
     *   if `timeUntilSuccess` is negative
     */
-  @SuppressWarnings(
-    Array(
-      "org.wartremover.warts.Var",
-      "org.wartremover.warts.While",
-      "org.wartremover.warts.Return",
-    )
-  )
+  @SuppressWarnings(Array("org.wartremover.warts.TryPartial"))
   def eventually[T](
       timeUntilSuccess: FiniteDuration = DefaultEventuallyTimeUntilSuccess,
       maxPollInterval: FiniteDuration = 100.millis,
       retryOnTestFailuresOnly: Boolean = true,
+      logElapsed: Option[(Logger, String)] = None,
   )(testCode: => T): T = {
     require(
       timeUntilSuccess >= Duration.Zero,
       s"The timeout must not be negative, but is $timeUntilSuccess",
     )
-    val deadline = timeUntilSuccess.fromNow
-    var sleepMs = 10L min (maxPollInterval.toMillis / 10L)
-    def sleep(): Unit = {
-      val timeLeft = deadline.timeLeft.toMillis max 0
+
+    val start = System.nanoTime()
+    val deadline = start + timeUntilSuccess.toNanos
+    def deadlineTimeLeft: FiniteDuration =
+      Duration.fromNanos(deadline - System.nanoTime())
+    def hasTimeLeft: Boolean =
+      deadline - System.nanoTime() >= 0
+    def timeElapsed: String =
+      roundDurationForHumans(Duration.fromNanos(System.nanoTime() - start))
+
+    def sleep(sleepMs: Long): Long = {
+      val timeLeft = deadlineTimeLeft.toMillis max 0
       Threading.sleep(sleepMs min timeLeft)
-      sleepMs = (sleepMs * 2) min maxPollInterval.toMillis
+      (sleepMs * 2) min maxPollInterval.toMillis
     }
-    while (deadline.hasTimeLeft()) {
-      try {
-        return testCode
-      } catch {
-        case _: TestFailedException =>
-          sleep()
-        case _: Throwable if !retryOnTestFailuresOnly =>
-          sleep()
+
+    @tailrec def go(sleepMs: Long): T = {
+      val result = Try(testCode)
+      result match {
+        case Success(value) =>
+          logElapsed.foreach { case (theLogger, msg) =>
+            theLogger.debug(s"$msg succeeded after $timeElapsed")
+          }
+          value
+        case Failure(ex) =>
+          val retry = !retryOnTestFailuresOnly || ex.isInstanceOf[TestFailedException]
+          if (retry && hasTimeLeft) {
+            val nextSleepMs = sleep(sleepMs)
+            go(nextSleepMs)
+          } else {
+            logElapsed.foreach { case (theLogger, msg) =>
+              theLogger.debug(s"$msg failed after $timeElapsed")
+            }
+            throw ex
+          }
       }
     }
-    testCode // try one last time and throw exception, if assertion keeps failing
+
+    go(sleepMs = 1L)
   }
 
   // Uses SymbolicCrypto for the configured crypto schemes
   lazy val defaultStaticSynchronizerParameters: StaticSynchronizerParameters =
     defaultStaticSynchronizerParametersWith()
 
+  lazy val defaultProtocolLimits: TransactionProtocolLimits =
+    defaultStaticSynchronizerParameters.synchronizerLimits.transactionProtocolLimits
+
   def defaultStaticSynchronizerParametersWith(
       topologyChangeDelay: NonNegativeFiniteDuration =
         StaticSynchronizerParameters.defaultTopologyChangeDelay,
       protocolVersion: ProtocolVersion = testedProtocolVersion,
   ): StaticSynchronizerParameters =
-    StaticSynchronizerParameters(
-      requiredSigningSpecs = SymbolicCryptoProvider.supportedSigningSpecs,
-      requiredEncryptionSpecs = SymbolicCryptoProvider.supportedEncryptionSpecs,
-      requiredSymmetricKeySchemes = SymbolicCryptoProvider.supportedSymmetricKeySchemes,
-      requiredHashAlgorithms = SymbolicCryptoProvider.supportedHashAlgorithms,
-      requiredCryptoKeyFormats = SymbolicCryptoProvider.supportedCryptoKeyFormats,
-      requiredSignatureFormats = SymbolicCryptoProvider.supportedSignatureFormats,
-      topologyChangeDelay = topologyChangeDelay,
-      enableTransparencyChecks = false,
-      protocolVersion = protocolVersion,
-      serial = NonNegativeInt.zero,
-      synchronizerLimits = SynchronizerLimits.defaultFor(protocolVersion),
-    )
+    StaticSynchronizerParameters
+      .create(
+        requiredSigningSpecs = SymbolicCryptoProvider.supportedSigningSpecs,
+        requiredEncryptionSpecs = SymbolicCryptoProvider.supportedEncryptionSpecs,
+        requiredSymmetricKeySchemes = SymbolicCryptoProvider.supportedSymmetricKeySchemes,
+        requiredHashAlgorithms = SymbolicCryptoProvider.supportedHashAlgorithms,
+        requiredCryptoKeyFormats = SymbolicCryptoProvider.supportedCryptoKeyFormats,
+        requiredSignatureFormats = SymbolicCryptoProvider.supportedSignatureFormats,
+        topologyChangeDelay = topologyChangeDelay,
+        enableTransparencyChecks = false,
+        protocolVersion = protocolVersion,
+        serial = NonNegativeInt.zero,
+        // Used to set protocol limits during testing
+        // - limit checking can be disabled by using SynchronizerLimits.max
+        synchronizerLimits = SynchronizerLimits.defaultFor(protocolVersion),
+      )
+      .value
 
   lazy val defaultMaxBytesToDecompress: MaxBytesToDecompress = MaxBytesToDecompress(
-    // TODO(i29003): Define our own param for this.
     DynamicSynchronizerParameters.defaultMaxRequestSize.value
   )
+
+  lazy val defaultDecompressionPolicy: DecompressionPolicy =
+    DecompressionPolicy.PerEnvelope(defaultMaxBytesToDecompress)
 
   sealed trait UnsupportedExternalPartyTest
   object UnsupportedExternalPartyTest {
@@ -675,17 +708,20 @@ object BaseTest {
     case object CommandTracking extends UnsupportedExternalPartyTest
     // TODO(i30256): Synchronizer routing for external parties
     case object MultiSynchronizerParties extends UnsupportedExternalPartyTest
-    // TODO(i32169): NUCK Support for external parties
-    case object NuckSupport extends UnsupportedExternalPartyTest
+    // TODO(i32963): Support malicious nodes for external parties
+    case object UsesMaliciousNode extends UnsupportedExternalPartyTest
+
   }
 
   lazy val testedProtocolVersion: ProtocolVersion = ProtocolVersion.forSynchronizer
 
-  def testedPartiesKind(hashingSchemeVersion: HashingSchemeVersion): PartyKind = sys.env
-    .get("CANTON_TEST_EXTERNAL_PARTIES")
-    .filter(_ == "true")
-    .map[PartyKind](_ => PartyKind.External(hashingSchemeVersion))
-    .getOrElse[PartyKind](PartyKind.Local)
+  /** True when the test run is configured for external parties. */
+  val cantonTestExternalParties: Boolean =
+    sys.env.get("CANTON_TEST_EXTERNAL_PARTIES").contains("true")
+
+  def testedPartiesKind(hashingSchemeVersion: HashingSchemeVersion): PartyKind =
+    if (cantonTestExternalParties) PartyKind.External(hashingSchemeVersion)
+    else PartyKind.Local
 
   lazy val testedProtocolVersionValidation: ProtocolVersionValidation =
     ProtocolVersionValidation(testedProtocolVersion)
@@ -699,6 +735,7 @@ object BaseTest {
   lazy val CantonTestsLF23Path: String = getResourcePath("CantonTestsLF23-1.0.0.dar")
   lazy val CantonLfDev: String = getResourcePath("CantonLfDev-1.0.0.dar")
   lazy val CantonLfV21: String = getResourcePath("CantonLfV21-1.0.0.dar")
+  lazy val ExternalCallTestPath: String = getResourcePath("ExternalCallTest-1.0.0.dar")
   lazy val PerformanceTestPath: String = getResourcePath("PerformanceTest.dar")
   // TODO(#25385): Deduplicate these upgrading test DARs
   lazy val FooV1Path: String = getResourcePath("foo-0.0.1.dar")
@@ -821,7 +858,7 @@ object BaseTest {
 
 }
 
-trait BaseTestWordSpec extends BaseTest with AnyWordSpecLike {
+trait BaseTestWordSpec extends BaseTest with AnyWordSpecLike with ProtocolVersionSuiteChecks {
   def checkAllLaws(name: String, ruleSet: Laws#RuleSet)(implicit position: Position): Unit =
     for ((id, prop) <- ruleSet.all.properties) {
       (name + "." + id) in {

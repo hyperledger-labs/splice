@@ -190,7 +190,7 @@ object SequencerErrors extends SequencerErrorGroup {
         id = "SEQUENCER_AGGREGATE_INVALID_RULE",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
-    def invalidMediatorGroup(desc: String): SequencerDeliverError = apply(desc)
+    def invalid(desc: String): SequencerDeliverError = apply(desc)
   }
 
   @Explanation(

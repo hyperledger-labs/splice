@@ -139,7 +139,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (test_suite) (\n  max_over_time(\n    (sum(container_memory_working_set_bytes{container!=\"\", image!=\"\"}) by(pod) \n    * on(pod) group_left(test_suite) \n    gha_runner_info) [24h:5m]\n  )\n)",
+          "expr": "max by (test_suite) (\n  max_over_time(\n    (sum(container_memory_rss{container!=\"\", image!=\"\"}) by(pod) \n    * on(pod) group_left(test_suite) \n    gha_runner_info) [24h:5m]\n  )\n)",
           "format": "table",
           "hide": false,
           "instant": true,

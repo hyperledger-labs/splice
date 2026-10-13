@@ -12,7 +12,13 @@ import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommand
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Pruning.*
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.ReinitCommitments.{
   CommitmentReinitializationInfo,
+  DigestCommitmentReinitializationInfo,
+  DigestCommitmentReinitializationStatusInfo,
+  DigestConsistencyCheckStatus,
   ReinitializeCommitments,
+  ReinitializeDigestCommitments,
+  ReinitializeDigestCommitmentsStatus,
+  RunDigestConsistencyCheck,
 }
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Resources.{
   GetResourceLimits,
@@ -53,6 +59,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.participant.admin.ResourceLimits
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
+import com.digitalasset.canton.participant.commitment.DigestConsistencyCheckProcessor
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.{
   ReceivedCmtState,
   SentCmtState,
@@ -63,9 +70,10 @@ import com.digitalasset.canton.participant.pruning.{
   OpenCommitmentHelper,
 }
 import com.digitalasset.canton.protocol.messages.{
-  AcsCommitment,
-  CommitmentPeriod,
   CommitmentPeriodState,
+  Digest,
+  LegacyAcsCommitment,
+  LegacyCommitmentPeriod,
   SignedProtocolMessage,
 }
 import com.digitalasset.canton.protocol.{ContractInstance, LfContractId, LfVersionedTransaction}
@@ -73,7 +81,12 @@ import com.digitalasset.canton.scheduler.SafeToPruneCommitmentState
 import com.digitalasset.canton.sequencing.PossiblyIgnoredProtocolEvent
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.transaction.GrpcConnection
+import com.digitalasset.canton.topology.transaction.{
+  GrpcConnection,
+  SignedTopologyTransaction,
+  TopologyChangeOp,
+  TopologyMapping,
+}
 import com.digitalasset.canton.topology.{
   ParticipantId,
   PartyId,
@@ -82,7 +95,7 @@ import com.digitalasset.canton.topology.{
   Synchronizer,
   SynchronizerId,
 }
-import com.digitalasset.canton.tracing.NoTracing
+import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias, config}
 import com.google.protobuf.ByteString
@@ -191,6 +204,7 @@ private[console] object ParticipantCommands {
           SubmissionRequestAmplification.NoAmplification,
         sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
           SequencerConnectionPoolDelays.default,
+        subscriptionLivenessLimits: SubscriptionLivenessLimits = SubscriptionLivenessLimits.default,
     )(implicit consoleEnvironment: ConsoleEnvironment): SynchronizerConnectionConfig =
       SynchronizerConnectionConfig(
         synchronizerAlias,
@@ -202,6 +216,7 @@ private[console] object ParticipantCommands {
           sequencerLivenessMargin,
           submissionRequestAmplification,
           sequencerConnectionPoolDelays,
+          subscriptionLivenessLimits,
         ),
         manualConnect = manualConnect,
         psid,
@@ -245,11 +260,29 @@ private[console] object ParticipantCommands {
       // architecture-handbook-entry-end: OnboardParticipantToConfig
     }
 
+    /** Registers a synchronizer without necessarily connecting to it.
+      *
+      * @param config
+      *   The synchronizer connection configuration.
+      * @param performHandshake
+      *   Whether to perform a handshake with the synchronizer as part of the registration.
+      * @param validation
+      *   Whether to validate the connectivity and ids of the given sequencers.
+      * @param onboardingTransactions
+      *   Optional onboarding topology transactions used for onboarding. They must contain exactly
+      *   one SynchronizerTrustCertificate, exactly one OwnerToKeyMapping and at least one
+      *   NamespaceDelegation, each serialized with the synchronizer's protocol version and signed.
+      *   If empty, the participant uses the ones it automatically generates and persists. When
+      *   provided, they are persisted at registration and used when the participant
+      *   connects/reconnects.
+      */
     def register(
         runner: AdminCommandRunner,
         config: SynchronizerConnectionConfig,
         performHandshake: Boolean,
         validation: SequencerConnectionValidation,
+        onboardingTransactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] =
+          Seq.empty,
     ): ConsoleCommandResult[Unit] =
       runner.adminCommand(
         ParticipantAdminCommands.SynchronizerConnectivity
@@ -257,6 +290,7 @@ private[console] object ParticipantCommands {
             config.toInternal,
             performHandshake = performHandshake,
             validation.toInternal,
+            onboardingTransactions,
           )
       )
 
@@ -264,10 +298,12 @@ private[console] object ParticipantCommands {
         runner: AdminCommandRunner,
         config: SynchronizerConnectionConfig,
         validation: SequencerConnectionValidation,
+        onboardingTransactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] =
+          Seq.empty,
     ): ConsoleCommandResult[Unit] =
       runner.adminCommand(
         ParticipantAdminCommands.SynchronizerConnectivity
-          .ConnectSynchronizer(config.toInternal, validation.toInternal)
+          .ConnectSynchronizer(config.toInternal, validation.toInternal, onboardingTransactions)
       )
 
     def reconnect(
@@ -676,7 +712,7 @@ class ParticipantPruningAdministrationGroup(
   )
   def find_safe_offset(beforeOrAt: Instant = Instant.now()): Option[Long] = {
     val ledgerEnd = consoleEnvironment.run(
-      ledgerApiCommand(LedgerApiCommands.StateService.LedgerEnd())
+      ledgerApiCommand(LedgerApiCommands.StateService.LedgerEnd(Seq()))
     )
 
     consoleEnvironment
@@ -804,7 +840,7 @@ class LocalCommitmentsAdministrationGroup(
       start: Instant,
       end: Instant,
       counterParticipant: Option[ParticipantId] = None,
-  ): Iterable[SignedProtocolMessage[AcsCommitment]] =
+  ): Iterable[SignedProtocolMessage[LegacyAcsCommitment]] =
     access(node =>
       node.sync.stateInspection
         .findReceivedCommitments(
@@ -821,7 +857,7 @@ class LocalCommitmentsAdministrationGroup(
       start: Instant,
       end: Instant,
       counterParticipant: Option[ParticipantId] = None,
-  ): Iterable[(CommitmentPeriod, ParticipantId, AcsCommitment.HashedCommitmentType)] =
+  ): Iterable[(LegacyCommitmentPeriod, ParticipantId, Digest.HashedDigestType)] =
     access { node =>
       node.sync.stateInspection.findComputedCommitments(
         synchronizerAlias,
@@ -836,7 +872,7 @@ class LocalCommitmentsAdministrationGroup(
       start: Instant,
       end: Instant,
       counterParticipant: Option[ParticipantId] = None,
-  ): Iterable[(CommitmentPeriod, ParticipantId, CommitmentPeriodState)] =
+  ): Iterable[(LegacyCommitmentPeriod, ParticipantId, CommitmentPeriodState)] =
     access { node =>
       node.sync.stateInspection.outstandingCommitments(
         synchronizerAlias,
@@ -894,7 +930,7 @@ class CommitmentsAdministrationGroup(
       """
   )
   def open_commitment(
-      commitment: AcsCommitment.HashedCommitmentType,
+      commitment: Digest.HashedDigestType,
       physicalSynchronizerId: PhysicalSynchronizerId,
       timestamp: CantonTimestamp,
       counterParticipant: ParticipantId,
@@ -1571,6 +1607,108 @@ class CommitmentsAdministrationGroup(
     )
   )
 
+  @Help.Summary(
+    "Kicks off a reinitialization of ACS digests for the given synchronizer"
+  )
+  @Help.Description(
+    """Starts a reinitialization of the ACS digest for the given synchronizer
+      |on this participant and then starts a running digest processor.
+      |Useful for recovering when participant commitments have become corrupted.
+      |
+      |The target reinitialization timestamp is derived from the current ledger end.
+      |
+      |Since this command doesn't wait until the reinitialization completes,
+      |the operator should query the status of the reinitialization using
+      |`digest_commitments_reinitialization_status`.
+      |
+      |If reinitialization is already in progress for the synchronizer, resubmitting
+      |this command joins the ongoing run.
+      |
+      |Returns the target reinitialization timestamp or an error."""
+  )
+  def reinitialize_digest_commitments(
+      synchronizerId: SynchronizerId
+  ): DigestCommitmentReinitializationInfo =
+    consoleEnvironment.run(
+      runner.adminCommand(
+        ReinitializeDigestCommitments(
+          synchronizerId
+        )
+      )
+    )
+
+  @Help.Summary(
+    "Gets the latest completed ACS digest reinitialization timestamp"
+  )
+  @Help.Description(
+    """Retrieves the record timestamp of the most recent finished ACS digest
+      |reinitialization for the specified synchronizer.
+      |
+      |Useful for verifying the completion of the latest run
+      |started by `reinitialize_digest_commitments`.
+      |
+      |Returns either the last completed timestamp or `None` if no
+      |reinitialization has finished yet or an error."""
+  )
+  def digest_commitments_reinitialization_status(
+      synchronizerId: SynchronizerId
+  ): DigestCommitmentReinitializationStatusInfo =
+    consoleEnvironment.run(
+      runner.adminCommand(
+        ReinitializeDigestCommitmentsStatus(
+          synchronizerId
+        )
+      )
+    )
+
+  @Help.Summary(
+    "Kicks off a consistency check of ACS digests for the given synchronizer"
+  )
+  @Help.Description(
+    """Starts a consistency check of ACS digests for the given synchronizer
+      |on this participant.
+      |
+      |Useful as a safety check before performing a LSU.
+      |
+      |Since this command doesn't wait until the check completes, the operator
+      |should query the status of the check using `digest_consistency_check_status`.
+      |
+      |If the check is already in progress for the synchronizer,
+      |resubmitting this command will be ignored."""
+  )
+  def run_digest_consistency_check(
+      synchronizerId: SynchronizerId
+  ): Unit =
+    consoleEnvironment.run(
+      runner.adminCommand(
+        RunDigestConsistencyCheck(
+          synchronizerId
+        )
+      )
+    )
+
+  @Help.Summary(
+    "Gets the status of the digest consistency check processor"
+  )
+  @Help.Description(
+    """Retrieves:
+      | - a boolean indicating whether there is a consistency check processor running
+      | - a timestamp of the checkpoint of the latest run
+      |
+      |Useful for checking if the processor started by `run_digest_consistency_check`
+      |finished its job."""
+  )
+  def digest_consistency_check_status(
+      synchronizerId: SynchronizerId
+  ): DigestConsistencyCheckProcessor.Status =
+    consoleEnvironment.run(
+      runner.adminCommand(
+        DigestConsistencyCheckStatus(
+          synchronizerId
+        )
+      )
+    )
+
   private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
   private implicit val ec: ExecutionContext = consoleEnvironment.environment.executionContext
 }
@@ -2069,6 +2207,11 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         |  to have been effected on all local nodes.
         |- validation: Whether to validate the connectivity and ids of the given sequencers
         |  (default All)
+        |- onboardingTransactions: Optional onboarding topology transactions used for
+        |  onboarding. They must contain exactly one SynchronizerTrustCertificate, exactly
+        |  one OwnerToKeyMapping and at least one NamespaceDelegation, each serialized
+        |  with the synchronizer's protocol version and signed. If empty, the participant
+        |  uses the ones it automatically generates and persists.
         """
     )
     def register(
@@ -2083,6 +2226,8 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           consoleEnvironment.commandTimeouts.bounded
         ),
         validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
+        onboardingTransactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] =
+          Seq.empty,
     ): Unit = {
       val config = ParticipantCommands.synchronizers.reference_to_config(
         sequencers = Seq(sequencer),
@@ -2092,7 +2237,13 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         maxRetryDelay = maxRetryDelayMillis.map(NonNegativeFiniteDuration.tryOfMillis),
         priority = priority,
       )
-      register_by_config(config, performHandshake = performHandshake, validation, synchronize)
+      register_by_config(
+        config,
+        performHandshake = performHandshake,
+        validation,
+        synchronize,
+        onboardingTransactions,
+      )
     }
 
     @Help.Summary(
@@ -2107,6 +2258,11 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         |  (default All)
         |- synchronize: A timeout duration indicating how long to wait for all topology changes
         |  to have been effected on all local nodes.
+        |- onboardingTransactions: Optional onboarding topology transactions used for
+        |  onboarding. They must contain exactly one SynchronizerTrustCertificate, exactly
+        |  one OwnerToKeyMapping and at least one NamespaceDelegation, each serialized
+        |  with the synchronizer's protocol version and signed. If empty, the participant
+        |  uses the ones it automatically generates and persists.
         """
     )
     def register_by_config(
@@ -2116,17 +2272,20 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
+        onboardingTransactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] =
+          Seq.empty,
     ): Unit = {
       val current = this.config(config.synchronizerAlias)
-      // if the config is not found, then we register the synchronizer
-      if (current.isEmpty) {
-        // register the synchronizer configuration
+      // Register the synchronizer if it is not yet registered. If it is already registered but
+      // onboarding transactions are provided, re-register to overwrite the previously provided ones.
+      if (current.isEmpty || onboardingTransactions.nonEmpty) {
         consoleEnvironment.run {
           ParticipantCommands.synchronizers.register(
             runner,
             config,
             performHandshake = performHandshake,
             validation,
+            onboardingTransactions,
           )
         }
       }
@@ -2239,6 +2398,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           SubmissionRequestAmplification.NoAmplification,
         sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
           SequencerConnectionPoolDelays.default,
+        subscriptionLivenessLimits: SubscriptionLivenessLimits = SubscriptionLivenessLimits.default,
         validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
     ): Unit = {
       val config = SynchronizerConnectionConfig.tryGrpc(
@@ -2251,6 +2411,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         sequencerLivenessMargin = sequencerLivenessMargin,
         submissionRequestAmplification = submissionRequestAmplification,
         sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
+        subscriptionLivenessLimits = subscriptionLivenessLimits,
       )
       connect_by_config(config, validation, synchronize)
     }
@@ -2270,6 +2431,11 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         |Parameters:
         |- validation: Whether to validate the connectivity and ids of the given sequencers
         |  (default all)
+        |- onboardingTransactions: Optional onboarding topology transactions used for
+        |  onboarding. They must contain exactly one SynchronizerTrustCertificate, exactly
+        |  one OwnerToKeyMapping and at least one NamespaceDelegation, each serialized
+        |  with the synchronizer's protocol version and signed. If empty, the participant
+        |  uses the ones it automatically generates and persists.
         """
     )
     def connect_by_config(
@@ -2278,6 +2444,8 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.unbounded
         ),
+        onboardingTransactions: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] =
+          Seq.empty,
     ): Unit = {
       val current = this.config(config.synchronizerAlias)
 
@@ -2285,10 +2453,19 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         // architecture-handbook-entry-begin: OnboardParticipantConnect
         // connect to the new synchronizer
         consoleEnvironment.run {
-          ParticipantCommands.synchronizers.connect(runner, config, validation)
+          ParticipantCommands.synchronizers.connect(
+            runner,
+            config,
+            validation,
+            onboardingTransactions,
+          )
         }
         // architecture-handbook-entry-end: OnboardParticipantConnect
       } else {
+        if (onboardingTransactions.nonEmpty)
+          logger.warn(
+            s"Synchronizer ${config.synchronizerAlias} is already registered: the provided onboarding transactions are ignored"
+          )(TraceContext.empty)
         reconnect(config.synchronizerAlias, retry = false).discard
       }
 

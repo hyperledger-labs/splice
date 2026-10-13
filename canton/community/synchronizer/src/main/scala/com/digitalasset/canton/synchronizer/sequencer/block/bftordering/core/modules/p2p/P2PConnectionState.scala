@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p
 
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
@@ -21,7 +20,7 @@ trait P2PConnectionState {
 
   def isOutgoing(p2pEndpointId: P2PEndpoint.Id): Boolean
 
-  def authenticatedCount: NonNegativeInt
+  def isConnected(p2pAddressId: P2PAddress.Id)(implicit traceContext: TraceContext): Boolean
 
   def associateP2PEndpointIdToBftNodeId(
       p2pAddress: P2PAddress

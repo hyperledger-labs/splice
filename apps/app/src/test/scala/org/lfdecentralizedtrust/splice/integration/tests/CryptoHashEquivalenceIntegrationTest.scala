@@ -28,6 +28,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.rewardaccounti
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbAppActivityRecordStore,
   DbScanAppRewardsStore,
@@ -146,6 +147,7 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
           loggerFactory,
           NoOpMetricsFactory,
         ),
+        AnalyzableTimeWindowConfig.UnlimitedAtw,
         loggerFactory,
         enableissue12777Workaround = true,
         enableImportUpdateBackfill = false,

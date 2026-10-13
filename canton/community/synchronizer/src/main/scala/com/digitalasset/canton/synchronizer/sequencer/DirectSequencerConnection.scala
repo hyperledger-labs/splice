@@ -10,6 +10,7 @@ import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.health.HealthComponent.AlwaysHealthyComponent
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   HasRunOnClosing,
@@ -20,7 +21,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
-import com.digitalasset.canton.sequencing.SequencedEventHandler
+import com.digitalasset.canton.sequencing.MaybeCompressedSequencedEventHandler
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
 import com.digitalasset.canton.sequencing.client.pool.Connection.ConnectionConfig
 import com.digitalasset.canton.sequencing.client.pool.InternalSequencerConnection.{
@@ -147,7 +148,7 @@ class DirectSequencerConnection(
 
   override def subscribe[E](
       request: SubscriptionRequest,
-      handler: SequencedEventHandler[E],
+      handler: MaybeCompressedSequencedEventHandler[E],
       timeout: Duration,
   )(implicit
       traceContext: TraceContext

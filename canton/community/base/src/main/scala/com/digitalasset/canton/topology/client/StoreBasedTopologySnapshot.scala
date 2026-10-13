@@ -3,9 +3,9 @@
 
 package com.digitalasset.canton.topology.client
 
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.DynamicSynchronizerParametersWithValidity
 import com.digitalasset.canton.topology.*
@@ -14,6 +14,7 @@ import com.digitalasset.canton.topology.store.*
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Replace
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.concurrent.ExecutionContext
 
@@ -209,7 +210,7 @@ class StoreBasedTopologySnapshot(
         )
     }
 
-  override def sequencerConnectionSuccessors(successorPsid: PhysicalSynchronizerId)(implicit
+  override def sequencerConnectionSuccessors(successorPsid: OpaquePhysicalSynchronizerId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[
     Map[SequencerId, TopologyTransaction[Replace, LsuSequencerConnectionSuccessor]]

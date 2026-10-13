@@ -5,10 +5,10 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 
 import cats.syntax.parallel.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.caching.{CaffeineCache, ConcurrentCache}
 import com.digitalasset.canton.config.CantonRequireTypes.String68
 import com.digitalasset.canton.config.{BatchAggregatorConfig, CachingConfigs, ProcessingTimeout}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
@@ -30,6 +30,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Mi
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.BatchAggregator
+import com.digitalasset.nonempty.NonEmpty
 import slick.jdbc.{GetResult, SetParameter}
 
 import scala.collection.immutable
@@ -91,7 +92,7 @@ class DbAvailabilityStore(
         ): FutureUnlessShutdown[immutable.Iterable[Option[OrderingRequestBatch]]] =
           lookupBatches(items.map(_.value))
 
-        override def prettyItem: Pretty[BatchIdAndEpochNumber] = {
+        override val prettyItem: Pretty[BatchIdAndEpochNumber] = {
           import com.digitalasset.canton.logging.pretty.PrettyUtil.*
           prettyOfClass[BatchIdAndEpochNumber](
             param("batchId", _.batchId.hash),

@@ -9,6 +9,7 @@ import com.digitalasset.canton.config.{BatchAggregatorConfig, ProcessingTimeout,
 import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.topology.processing.InitialTopologySnapshotValidator.MergeTx
@@ -77,6 +78,7 @@ class InitialTopologySnapshotValidator(
       lookup =>
         new RequiredTopologyMappingChecks(
           staticSynchronizerParameters,
+          store.protocolVersion,
           lookup,
           loggerFactory,
         ),

@@ -101,7 +101,7 @@ describe('Action Required', () => {
 
     const createdAt = screen.getByTestId('action-required-created-at-content');
     expect(createdAt).toBeInTheDocument();
-    expect(createdAt.textContent).toBe(actionRequired.createdAt);
+    expect(createdAt.textContent).toBe(`${actionRequired.createdAt} (UTC+02:00)`);
 
     const votingCloses = screen.getByTestId('action-required-voting-closes-content');
     expect(votingCloses).toBeInTheDocument();

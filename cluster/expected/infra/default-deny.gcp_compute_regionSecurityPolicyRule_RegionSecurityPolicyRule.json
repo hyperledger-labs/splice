@@ -1,0 +1,22 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "action": "allow",
+    "description": "Default rule allowing all other traffic, as all rules are in preview mode",
+    "match": {
+      "config": {
+        "srcIpRanges": [
+          "*"
+        ]
+      },
+      "versionedExpr": "SRC_IPS_V1"
+    },
+    "preview": false,
+    "priority": 2147483647,
+    "securityPolicy": "waf-whitelist-throttle-ban-mock"
+  },
+  "name": "default-deny",
+  "provider": "",
+  "type": "gcp:compute/regionSecurityPolicyRule:RegionSecurityPolicyRule"
+}

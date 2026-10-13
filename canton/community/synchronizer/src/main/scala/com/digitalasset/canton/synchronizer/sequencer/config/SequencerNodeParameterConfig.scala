@@ -29,9 +29,12 @@ final case class AsyncWriterConfig(
 
 /** Various parameters for non-standard sequencer settings
   *
-  * @param alphaVersionSupport
-  *   if true, then dev version will be turned on, but we will brick this sequencer node if it is
+  * @param devVersionSupport
+  *   if true, then support for the dev protocol version is enabled and the dev database schemas are
+  *   applied, which does not provide data continuity guarantees and must not be used in production
   *   used for production.
+  * @param alphaVersionSupport
+  *   if true, then support for alpha protocol versions will be turned on.
   * @param dontWarnOnDeprecatedPV
   *   if true, then this sequencer will not emit a warning when configured to use protocol version
   *   2.0.0.
@@ -58,6 +61,10 @@ final case class AsyncWriterConfig(
   *   If true, disable checks on the write path of the sequencer in order to allow testing the same
   *   checks on the post-processing path (malicious sequencer node tests). Only to be used for
   *   testing purposes.
+  * @param disableAggregationRuleSizeCheckForTesting
+  *   Whether to disable the aggregation rule size check for testing purposes. This should only be
+  *   used in tests and should eventually be removed as the tests are based on a feature that is not
+  *   intended to be used in production.
   * @param disableReleaseVersionHandshakeCheck
   *   If true, then we won't check whether the client binaries are really supported during
   *   handshake. This is normally only useful for unstable protocol versions to avoid accidental
@@ -65,8 +72,12 @@ final case class AsyncWriterConfig(
   * @param enablePrevalidation
   *   If true (as of 3.6), we will use pre-validation to move the signature validation into a
   *   separate parallel stage instead of the sequential step.
+  * @param enableAsyncSequencerLogging
+  *   If true, then we will use the async logging with outcomes (but potentially out of order log
+  *   messages)
   */
 final case class SequencerNodeParameterConfig(
+    override val devVersionSupport: Boolean = false,
     override val alphaVersionSupport: Boolean = false,
     override val betaVersionSupport: Boolean = false,
     override val dontWarnOnDeprecatedPV: Boolean = false,
@@ -84,8 +95,10 @@ final case class SequencerNodeParameterConfig(
     delayRequestsBeforeLsuTrafficInit: Boolean = false,
     enableRejectDeliveredAggregationsOnPv35: Seq[String] = Seq("MED"),
     disableSubmissionChecksForTesting: Boolean = false,
+    disableAggregationRuleSizeCheckForTesting: Boolean = false,
     disableReleaseVersionHandshakeCheck: Boolean = false,
     enablePrevalidation: Boolean = true,
+    enableAsyncSequencerLogging: Boolean = false,
 ) extends ProtocolConfig
     with LocalNodeParametersConfig
 

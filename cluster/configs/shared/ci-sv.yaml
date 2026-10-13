@@ -1,0 +1,11 @@
+svApp:
+  additionalEnvVars:
+    - name: ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING
+      value: |
+        canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{
+          how-long-to-blacklist {
+            type=linear
+            maximum-epoch-blacklisted=62
+          }
+          how-many-can-we-blacklist=num-faults-tolerated
+        }

@@ -1,8 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
+import * as fs from 'fs';
 import * as path from 'path';
 import { setMocks } from '@pulumi/pulumi/runtime/mocks';
+import { AsyncLocalStorage } from 'async_hooks';
 
 import {
   Auth0ClientSecret,
@@ -198,6 +200,85 @@ export const svRunbookAuth0Config = {
   fixedTokenCacheName: 'fixedTokenCacheName',
 };
 
+// Name of the stack (e.g. sv or validator) whose resources are currently being created.
+// Projects that deploy one stack per sv/validator use it to write each stack's resources to its own folder.
+const dumpConfigStack = new AsyncLocalStorage<string>();
+
+export function withDumpConfigStack<T>(stack: string, f: () => T): T {
+  return dumpConfigStack.run(stack, f);
+}
+
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortKeys);
+  } else if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map(key => [key, sortKeys((value as Record<string, unknown>)[key])])
+    );
+  } else {
+    return value;
+  }
+}
+
+// Replace absolute paths to helm charts with relative paths so the output does not depend on the checkout location
+function relativizeChartPaths(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(relativizeChartPaths);
+  } else if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, v]) => [
+        key,
+        key === 'chart' && typeof v === 'string'
+          ? v.replace(/^\/.*?(?=\/cluster\/helm\/)/, '')
+          : relativizeChartPaths(v),
+      ])
+    );
+  } else {
+    return value;
+  }
+}
+
+function sanitizeFileName(name: string): string {
+  return name.replace(/[^A-Za-z0-9._-]+/g, '_');
+}
+
+// Every resource is written to its own file under DUMP_CONFIG_OUTPUT_DIR (in a subfolder per stack if set via withDumpConfigStack).
+// Files are only written once the process exits successfully, so that resources sharing a file path can be given deterministic names.
+function registerResourceFileWriter(): (args: pulumi.runtime.MockResourceArgs) => void {
+  const outputDir = process.env.DUMP_CONFIG_OUTPUT_DIR;
+  if (!outputDir) {
+    throw new Error(
+      'DUMP_CONFIG_OUTPUT_DIR must be set to the directory the resources are written to'
+    );
+  }
+  const resources = new Map<string, Set<string>>();
+  process.on('exit', code => {
+    if (code !== 0) {
+      return;
+    }
+    fs.rmSync(outputDir, { recursive: true, force: true });
+    for (const [filePath, contents] of resources) {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      const sorted = [...contents].sort();
+      sorted.forEach((content, index) => {
+        const target = index === 0 ? filePath : filePath.replace(/\.json$/, `.${index}.json`);
+        fs.writeFileSync(target, content);
+      });
+    }
+  });
+  return args => {
+    const stack = dumpConfigStack.getStore();
+    const fileName = `${sanitizeFileName(args.name)}.${sanitizeFileName(args.type)}.json`;
+    const filePath = path.resolve(outputDir, ...(stack ? [sanitizeFileName(stack)] : []), fileName);
+    const content = JSON.stringify(sortKeys(relativizeChartPaths(args)), undefined, 2) + '\n';
+    const contents = resources.get(filePath) ?? new Set<string>();
+    contents.add(content);
+    resources.set(filePath, contents);
+  };
+}
+
 /*eslint no-process-env: "off"*/
 export async function initDumpConfig({
   stackOutputsProvider = infraStackOutputsProvider,
@@ -219,6 +300,7 @@ export async function initDumpConfig({
 
   const projectName = 'test-project';
   const stackName = 'test-stack';
+  const writeResource = registerResourceFileWriter();
 
   await setMocks(
     {
@@ -226,9 +308,7 @@ export async function initDumpConfig({
         id: string;
         state: any;
       } {
-        const buffer = Buffer.from(JSON.stringify(args, undefined, 4), 'utf8');
-        process.stdout.write(buffer);
-        process.stdout.write('\n');
+        writeResource(args);
 
         switch (args.type) {
           case 'pulumi:pulumi:StackReference': {

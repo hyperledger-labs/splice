@@ -6,15 +6,14 @@
 
 
 .. NOTE:
-   We keep notes for upcoming releases in `release_notes_upcoming.rst`
+   New release notes are no longer added to this file; the notes for upcoming releases
+   are kept in ``release-notes/release_notes_upcoming.mdx``
    to avoid merges accidentally merging new changes into an existing release.
 
-    - add your upcoming release notes into `release_notes_upcoming.rst`
-    - upon release add the content of `release_notes_upcoming.rst` into a
-      new `..  release-notes:: x.y.z` section with the actual version number;
-      and comment out the `Upcoming` section in `release_notes_upcoming.rst`.
-
-.. include:: release_notes_upcoming.rst
+    - add your upcoming release notes into ``release-notes/release_notes_upcoming.mdx``
+    - upon release, ``build-tools/prep-release-notes.py --cf-docs <path to cf-docs clone>``
+      moves the patch release section of ``release_notes_upcoming.mdx`` into
+      ``docs-main/global-synchronizer/release-notes/splice.mdx`` in the cf-docs repo.
 
 .. _release_notes:
 

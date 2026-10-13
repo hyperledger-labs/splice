@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { WafRuleGroupsSchema } from '@canton-network/splice-pulumi-common/src/config/cloudArmorConfig';
 import { expect, test, describe } from '@jest/globals';
 import fs from 'fs';
 import yaml from 'js-yaml';
@@ -14,14 +15,12 @@ import {
   MAX_IPS_PER_RULE,
   MAX_IP_WHITELIST_RULES,
   MAX_SUBEXPRESSION_LENGTH,
+  seededPriorityOffset,
   wafRuleExpression,
-  WafRuleGroupsSchema,
 } from './cloudArmorRules';
 
-const dnsNames = [
-  'scratchd.network.canton.global',
-  'scratchd.global.canton.network.digitalasset.com',
-];
+const clusterHostname = 'scratchd.network.canton.global';
+const otherDnsName = 'scratchd.global.canton.network.digitalasset.com';
 
 const scanRateLimits = {
   rateLimits: {
@@ -54,13 +53,16 @@ function matchesFromExpr(expr: string): (value: string) => boolean {
 }
 
 describe('hostCondition', () => {
-  test('matches per-node hosts on every cluster DNS name, with and without a port', () => {
-    const expr = hostCondition('publicScan', dnsNames, undefined, 'scan')!;
+  test('matches per-node hosts on the cluster DNS name, with and without a port', () => {
+    const expr = hostCondition('publicScan', clusterHostname, {
+      hostPrefixRegex: 'scan',
+      perNodeHost: true,
+    })!;
     const matches = matchesFromExpr(expr);
 
     expect(matches('scan.sv-2.scratchd.network.canton.global')).toBe(true);
-    expect(matches('scan.sv-2.scratchd.global.canton.network.digitalasset.com')).toBe(true);
     expect(matches('scan.sv-2.scratchd.network.canton.global:443')).toBe(true);
+    expect(matches(`scan.sv-2.${otherDnsName}`)).toBe(false);
     expect(matches('SCAN.sv-2.scratchd.network.canton.global')).toBe(true);
 
     expect(matches('sv.sv-2.scratchd.network.canton.global')).toBe(false);
@@ -74,14 +76,15 @@ describe('hostCondition', () => {
 
   test('sequencer prefix regex matches all migration ids, but not the P2P API', () => {
     const matches = matchesFromExpr(
-      hostCondition('sequencer', dnsNames, undefined, 'sequencer-[0-9]+')!
+      hostCondition('sequencer', clusterHostname, {
+        hostPrefixRegex: 'sequencer-[0-9]+',
+        perNodeHost: true,
+      })!
     );
 
     expect(matches('sequencer-0.sv-1.scratchd.network.canton.global')).toBe(true);
     expect(matches('sequencer-12.sv-1.scratchd.network.canton.global')).toBe(true);
-    expect(matches('sequencer-0.sv-1.scratchd.global.canton.network.digitalasset.com:443')).toBe(
-      true
-    );
+    expect(matches('sequencer-12.sv-1.scratchd.network.canton.global:443')).toBe(true);
 
     // the P2P API has no rule of its own: peer SVs are covered by the IP whitelist
     expect(matches('sequencer-p2p-3.sv-1.scratchd.network.canton.global')).toBe(false);
@@ -91,7 +94,9 @@ describe('hostCondition', () => {
 
   test('exact hostname is anchored and regex-escaped', () => {
     const matches = matchesFromExpr(
-      hostCondition('publicScan', dnsNames, 'scan.sv-2.scratchd.network.canton.global')!
+      hostCondition('publicScan', clusterHostname, {
+        hostname: 'scan.sv-2.scratchd.network.canton.global',
+      })!
     );
     expect(matches('scan.sv-2.scratchd.network.canton.global')).toBe(true);
     expect(matches('scan.sv-2.scratchdXnetwork.canton.global')).toBe(false);
@@ -99,7 +104,7 @@ describe('hostCondition', () => {
   });
 
   test('is undefined when neither hostname nor prefix is given', () => {
-    expect(hostCondition('anything', dnsNames)).toBeUndefined();
+    expect(hostCondition('anything', clusterHostname)).toBeUndefined();
   });
 });
 
@@ -205,7 +210,7 @@ describe('wafRuleExpression', () => {
   const wafRuleGroups = WafRuleGroupsSchema.parse(
     yaml.load(fs.readFileSync(path.resolve(__dirname, 'cloudArmorRules.test.yaml'), 'utf8'))
   );
-  const expressions = wafRuleGroups.map(wafRuleExpression);
+  const expressions = wafRuleGroups.map(g => wafRuleExpression(g));
 
   test('matches the tuning validated on the DA-1 SV and DA-Wallet validator', () => {
     expect(expressions).toEqual([
@@ -231,6 +236,29 @@ describe('wafRuleExpression', () => {
     });
   });
 
+  test('excludes the grafana host from every WAF rule', () => {
+    const excluded = hostCondition('waf-excluded-hosts', clusterHostname, {
+      hostPrefixRegex: 'grafana',
+      perNodeHost: false,
+    })!;
+    const matches = matchesFromExpr(excluded);
+    expect(matches('grafana.scratchd.network.canton.global')).toBe(true);
+    expect(matches('grafana.scratchd.network.canton.global:443')).toBe(true);
+    expect(matches('grafanax.scratchd.network.canton.global')).toBe(false);
+    expect(matches('sv.scratchd.network.canton.global')).toBe(false);
+    expect(matches('grafana.sv.scratchd.network.canton.global')).toBe(false);
+
+    wafRuleGroups.forEach((group, i) => {
+      const expr = wafRuleExpression(group, excluded);
+      expect(expr).toBe(`!(${excluded}) && (${expressions[i]})`);
+      expect(expr.length).toBeLessThanOrEqual(MAX_EXPRESSION_LENGTH);
+    });
+  });
+
+  test('applies no host exclusion when none is configured', () => {
+    expect(wafRuleExpression(wafRuleGroups[0], undefined)).toBe(expressions[0]);
+  });
+
   test('has unique rule names', () => {
     const names = wafRuleGroups.map(g => g.name);
     expect(new Set(names).size).toBe(names.length);
@@ -248,5 +276,41 @@ describe('wafRuleExpression', () => {
         })),
       })
     ).toThrow(new RegExp(`exceeds the ${MAX_EXPRESSION_LENGTH} character limit`));
+  });
+});
+
+describe('seededPriorityOffset', () => {
+  const available = 100_000_000;
+  const priorities = (names: string[]) => {
+    const first = seededPriorityOffset(names, available);
+    return new Map(names.map((n, i) => [n, first + i]));
+  };
+
+  test('is deterministic and keeps all rules within the available priorities', () => {
+    const names = ['a', 'b', 'c'];
+    const first = seededPriorityOffset(names, available);
+    expect(seededPriorityOffset([...names], available)).toBe(first);
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(first + names.length - 1).toBeLessThan(available);
+    expect(seededPriorityOffset(names, names.length)).toBe(0);
+  });
+
+  test('gives every rule a fresh priority when rules are reordered, added or renamed', () => {
+    const before = priorities(['a', 'b', 'c']);
+    for (const after of [
+      ['b', 'a', 'c'],
+      ['a', 'x', 'b', 'c'],
+      ['a', 'b'],
+      ['a', 'b', 'd'],
+    ]) {
+      const old = new Set(before.values());
+      for (const p of priorities(after).values()) {
+        expect(old.has(p)).toBe(false);
+      }
+    }
+  });
+
+  test('rejects more rules than available priorities', () => {
+    expect(() => seededPriorityOffset(['a', 'b', 'c'], 2)).toThrow();
   });
 });

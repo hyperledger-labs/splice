@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration
@@ -12,8 +12,8 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.{
   CommandService,
   CommandSubmissionService,
 }
-import com.digitalasset.canton.config.{DefaultPorts, SharedCantonConfig, TestingConfigInternal}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{DefaultPorts, SharedCantonConfig, TestingConfigInternal}
 import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
 import com.digitalasset.canton.error.TransactionRoutingError
 import com.digitalasset.canton.integration.EnvironmentSetup.EnvironmentSetupException
@@ -23,6 +23,8 @@ import com.digitalasset.canton.metrics.{MetricsFactoryType, ScopedInMemoryMetric
 import com.digitalasset.canton.networking.grpc.GrpcError
 import com.digitalasset.canton.participant.sync.SyncServiceInjectionError
 import com.digitalasset.canton.tracing.TraceContext
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
+import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{Assertion, BeforeAndAfterAll, Suite}
 
 import scala.util.Try
@@ -49,6 +51,10 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
 
   protected[integration] def registerPlugin(plugin: BaseEnvironmentSetupPlugin[C, E]): Unit =
     plugins = plugins :+ plugin
+
+  // TODO(#35929) Remove the feature flag after fixing the failures
+  protected val enableAcsDigestConsistencyCheck: Boolean = false
+  protected val acsDigestConsistencyCheckTimeout: Timeout = Timeout(Span(60, Seconds))
 
   /** Provide an environment for an individual test either by reusing an existing one or creating a
     * new one depending on the approach being used.
@@ -292,9 +298,16 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
       testName: Option[String],
       environment: BaseTestConsoleEnvironment[C, E],
   ): Unit = {
+
     // Run the Ledger API integrity check before destroying the environment
-    val checker = new LedgerApiStoreIntegrityChecker(loggerFactory)
-    checker.verifyParticipantLapiIntegrity(environment, plugins)
+    val ledgerApiChecker = new LedgerApiStoreIntegrityChecker(loggerFactory)
+    ledgerApiChecker.verifyParticipantLapiIntegrity(environment, plugins)
+
+    if (enableAcsDigestConsistencyCheck) {
+      val acsDigestConsistencyChecker =
+        new AcsDigestConsistencyChecker(loggerFactory, acsDigestConsistencyCheckTimeout)
+      acsDigestConsistencyChecker.verifyParticipantsAcsDigestConsistency(environment, plugins)
+    }
 
     ConcurrentEnvironmentLimiter.destroy(getClass.getName, numPermits) {
       manualDestroyEnvironment(environment)

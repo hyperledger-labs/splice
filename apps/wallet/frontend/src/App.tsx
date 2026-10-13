@@ -4,6 +4,7 @@ import * as React from 'react';
 import {
   AuthProvider,
   ErrorRouterPage,
+  QueryDevtools,
   retryQuery,
   retrySynchronizerError,
   theme,
@@ -11,7 +12,6 @@ import {
 } from '@canton-network/splice-common-frontend';
 import { replaceEqualDeep } from '@canton-network/splice-common-frontend-utils';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
@@ -69,7 +69,7 @@ const App: React.FC = () => {
       <LocalizationProvider dateAdapter={AdapterDayjs}>
         <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
           <QueryClientProvider client={queryClient}>
-            <ReactQueryDevtools initialIsOpen={false} />
+            <QueryDevtools />
             <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
               <ValidatorClientProvider url={config.services.validator.url}>
                 <WalletClientProvider url={config.services.validator.url}>

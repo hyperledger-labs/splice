@@ -4,7 +4,6 @@
 package com.digitalasset.canton.crypto.provider.symbolic
 
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CryptoParallelismConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.*
@@ -18,6 +17,7 @@ import com.digitalasset.canton.serialization.{DeserializationError, Deterministi
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ByteStringUtil, EitherUtil}
 import com.digitalasset.canton.version.HasToByteString
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 
@@ -59,7 +59,7 @@ class SymbolicPureCrypto extends CryptoPureApi {
   override def signatureVerificationParallelism: PositiveInt =
     CryptoParallelismConfig.defaultSignatureVerificationParallelism
 
-  override private[crypto] def signBytesInternal(
+  override private[crypto] def signBytes(
       bytes: ByteString,
       signingKey: SigningPrivateKey,
       usage: NonEmpty[Set[SigningKeyUsage]],
@@ -142,6 +142,9 @@ class SymbolicPureCrypto extends CryptoPureApi {
   ): Either[EncryptionKeyCreationError, SymmetricKey] =
     SymmetricKey.create(CryptoKeyFormat.Symbolic, bytes.unwrap, scheme)
 
+  override def encryptionParallelism: PositiveInt =
+    CryptoParallelismConfig.defaultEncryptionParallelism
+
   private def encryptWithInternal[M](
       bytes: ByteString,
       publicKey: EncryptionPublicKey,
@@ -188,7 +191,7 @@ class SymbolicPureCrypto extends CryptoPureApi {
       randomized = false,
     )
 
-  override private[crypto] def decryptWithInternal[M](
+  override def decryptWith[M](
       encrypted: AsymmetricEncrypted[M],
       privateKey: EncryptionPrivateKey,
   )(
@@ -349,6 +352,9 @@ class SymbolicPureCrypto extends CryptoPureApi {
       .leftMap(PasswordBasedEncryptionError.KeyCreationError.apply)
       .map(key => PasswordBasedEncryptionKey(key, salt))
   }
+
+  override def toJwk(publicKey: SigningPublicKey): Either[JwksError, Jwk] =
+    ???
 
   val cryptoMetrics: CryptoMetrics = CommonMockMetrics.cryptoMetrics
 

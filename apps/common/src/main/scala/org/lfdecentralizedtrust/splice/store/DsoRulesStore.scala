@@ -257,18 +257,12 @@ object DsoRulesStore {
     def lookupActiveSequencerIdConfigFor(
         decentralizedSynchronizerId: SynchronizerId,
         domainTimeLowerBound: Instant,
-        migrationId: Long,
     ): Option[String] = {
       for {
         synchronizerNodeConfig <- svNodeState.payload.state.synchronizerNodes.asScala
           .get(decentralizedSynchronizerId.toProtoPrimitive)
         (identity, availableAfter) <- synchronizerNodeConfig.sequencerIdentity.toScala
           .map(identity => identity.sequencerId -> identity.availableAfter.toScala)
-          .orElse(
-            synchronizerNodeConfig.sequencer.toScala
-              .filter(config => config.migrationId == migrationId && config.url.nonEmpty)
-              .map(config => config.sequencerId -> config.availableAfter.toScala)
-          )
         if availableAfter.exists(availableAfter => domainTimeLowerBound.isAfter(availableAfter))
       } yield identity
     }

@@ -3,19 +3,17 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_DsoRules,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_OffboardSv,
   SRARC_SetConfig,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_OffboardSv
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
+  DsoRules_OffboardSv,
   DsoRules_SetConfig,
   VoteRequest,
 }
@@ -27,7 +25,6 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequ
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultDsoRulesConfig
 import org.lfdecentralizedtrust.splice.util.*
 import org.openqa.selenium.By
-import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
 
 import scala.jdk.CollectionConverters.*
@@ -337,16 +334,6 @@ class SvFrontendIntegrationTest
           ) should not be empty withClue "'Initiate Proposal' button",
       )
 
-    def navigateToLegacyGovernancePage(uiPort: Int)(implicit webDriver: WebDriverType): Unit =
-      go to s"http://localhost:$uiPort/governance-old"
-
-    def loginToLegacyGovernance(uiPort: Int, ledgerApiUser: String)(implicit
-        webDriver: WebDriverType
-    ): Unit = {
-      navigateToLegacyGovernancePage(uiPort)
-      loginOnCurrentPage(uiPort, ledgerApiUser)
-    }
-
     def selectActionAndNavigateToForm(action: String, formPrefix: String)(implicit
         webDriver: WebDriverType
     ): Unit =
@@ -437,7 +424,7 @@ class SvFrontendIntegrationTest
       )
     }
 
-    def sv2CastVoteOnActionRequired(proposalContractId: String)(implicit
+    def sv2CastVoteOnActionRequired(proposalContractId: String, accept: Boolean = true)(implicit
         webDriver: WebDriverType,
         env: SpliceTestConsoleEnvironment,
     ): Unit = {
@@ -455,7 +442,7 @@ class SvFrontendIntegrationTest
       )
 
       actAndCheck(
-        "sv2 fills out and submits a vote", {
+        s"sv2 fills out and submits a vote to ${if (accept) "accept" else "reject"}", {
           inside(find(testId("your-vote-reason-input"))) { case Some(element) =>
             element.underlying.sendKeys("A sample reason")
           }
@@ -464,7 +451,7 @@ class SvFrontendIntegrationTest
             element.underlying.sendKeys("https://my-splice-vote-url.com")
           }
 
-          click on testId("your-vote-accept")
+          click on testId(if (accept) "your-vote-accept" else "your-vote-reject")
         },
       )(
         "the vote submission success message is shown",
@@ -567,833 +554,7 @@ class SvFrontendIntegrationTest
       proposalContractId
     }
 
-    def testCreateAndVoteDsoRulesAction(action: String, effectiveAtThreshold: Boolean = true)(
-        fillUpForm: WebDriverType => Unit
-    )(validateRequestedActionInModal: WebDriverType => Unit)(implicit
-        env: SpliceTestConsoleEnvironment
-    ) = {
-      val requestReasonUrl = "https://vote-request-url.com/"
-      val requestReasonBody = "This is a request reason."
-      val expirationDate = "2034-07-12 00:12"
-      val effectiveDate = "2034-07-13 00:12"
-
-      val (createdVoteRequestAction, createdVoteRequestRequester) = withFrontEnd("sv1") {
-        implicit webDriver =>
-          actAndCheck(
-            "sv1 operator can login and browse to the governance tab", {
-              loginToLegacyGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
-            },
-          )(
-            "sv1 can see the create vote request button",
-            _ => {
-              find(
-                id("create-voterequest-submit-button")
-              ) should not be empty withClue "'Send Request to Super Validators' button"
-              find(
-                id("display-actions")
-              ) should not be empty withClue "Create Vote Request 'Action' dropdown"
-            },
-          )
-
-          eventuallyClickOn(id("tab-panel-in-progress"))
-          val previousVoteRequestsInProgress = getLegacyVoteRequestsInProgressSize()
-
-          val (_, (createdVoteRequestAction, createdVoteRequestRequester)) = actAndCheck(
-            "sv1 operator can create a new vote request", {
-              changeAction(action)
-
-              fillUpForm(webDriver)
-
-              if (effectiveAtThreshold) {
-                inside(find(id("checkbox-set-effective-at-threshold"))) { case Some(element) =>
-                  element.underlying.click()
-                }
-              } else {
-                setLegacyEffectiveDate("sv1", effectiveDate)
-              }
-
-              inside(find(id("create-reason-url"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonUrl)
-              }
-
-              clue("sv1 operator can't click submit before adding a summary") {
-                find(id("create-voterequest-submit-button")).value.isEnabled shouldBe false
-              }
-
-              inside(find(id("create-reason-summary"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonBody)
-              }
-
-              setLegacyExpiryDate("sv1", expirationDate)
-
-              clickLegacyVoteRequestSubmitButtonOnceEnabled()
-            },
-          )(
-            "sv1 can see the new vote request",
-            _ => {
-              eventuallyClickOn(id("tab-panel-in-progress"))
-
-              val tbody = find(id("sv-voting-in-progress-table-body"))
-              inside(tbody) { case Some(tb) =>
-                val rows = getAllVoteRows("sv-voting-in-progress-table-body")
-                rows.size shouldBe previousVoteRequestsInProgress + 1
-                (
-                  rows.head.text,
-                  tb.findAllChildElements(className("vote-row-requester")).toSeq.head.text,
-                )
-              }
-            },
-          )
-          (createdVoteRequestAction, createdVoteRequestRequester)
-      }
-
-      withFrontEnd("sv2") { implicit webDriver =>
-        val (_, reviewButton) = actAndCheck(
-          "sv2 operator can login and browse to the governance tab", {
-            loginToLegacyGovernance(sv2UIPort, sv2Backend.config.ledgerApiUser)
-          },
-        )(
-          "sv2 can see the new vote request",
-          _ => {
-            eventuallyClickOn(id("tab-panel-action-needed"))
-
-            val tbody = find(id("sv-voting-action-needed-table-body"))
-            inside(tbody) { case Some(tb) =>
-              val rows = getAllVoteRows("sv-voting-action-needed-table-body")
-              rows should not be empty withClue "'Action Needed' vote request rows"
-
-              rows.head.text should matchText(
-                createdVoteRequestAction
-              )
-              tb.findAllChildElements(className("vote-row-requester"))
-                .toSeq
-                .head
-                .text should matchText(
-                createdVoteRequestRequester
-              )
-              rows.head.underlying
-            }
-          },
-        )
-
-        actAndCheck(
-          "sv2 operator can review the vote request", {
-            reviewButton.click()
-          },
-        )(
-          "sv2 can see the new vote request detail",
-          _ => {
-            inside(find(id("vote-request-modal-action-type"))) { case Some(element) =>
-              element.text should matchText("ARC_DsoRules")
-            }
-            inside(find(id("vote-request-modal-action-name"))) { case Some(element) =>
-              element.text should matchText(action)
-            }
-            validateRequestedActionInModal(webDriver)
-            inside(find(id("vote-request-modal-requested-by"))) { case Some(element) =>
-              seleniumText(element) should matchText(
-                getSvName(1)
-              )
-            }
-            inside(find(id("vote-request-modal-reason-body"))) { case Some(element) =>
-              element.text should matchText(requestReasonBody)
-            }
-            inside(find(id("vote-request-modal-reason-url"))) { case Some(element) =>
-              element.text should matchText(requestReasonUrl)
-            }
-            inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
-              element.text should matchText("0")
-            }
-            inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
-              element.text should matchText("1")
-            }
-            inside(find(id("vote-request-modal-expires-at"))) { case Some(element) =>
-              element.text should startWith(expirationDate)
-            }
-            inside(find(id("vote-request-modal-effective-at"))) { case Some(element) =>
-              if (effectiveAtThreshold) {
-                element.text should matchText("threshold")
-              } else {
-                element.text should startWith(effectiveDate)
-              }
-            }
-          },
-        )
-
-        val voteReasonBody = "vote reason body"
-        val voteReasonUrl = "vote reason url"
-        actAndCheck(
-          "sv2 operator can cast vote", {
-            eventuallyClickOn(id("cast-vote-button"))
-            eventuallyClickOn(id("reject-vote-button"))
-            inside(find(id("vote-reason-url"))) { case Some(element) =>
-              element.underlying.sendKeys(voteReasonUrl)
-            }
-            inside(find(id("vote-reason-body"))) { case Some(element) =>
-              element.underlying.sendKeys(voteReasonBody)
-            }
-            eventuallyClickOn(id("save-vote-button"))
-            eventuallyClickOn(id("vote-confirmation-dialog-accept-button"))
-          },
-        )(
-          "sv2 can see the new vote request detail",
-          _ => {
-            inside(find(id("vote-request-modal-vote-reason-body"))) { case Some(element) =>
-              element.text should matchText(voteReasonBody)
-            }
-            inside(find(id("vote-request-modal-vote-reason-url"))) { case Some(element) =>
-              element.text should matchText(voteReasonUrl)
-            }
-            inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
-              element.text should matchText("1")
-            }
-            inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
-              element.text should matchText("1")
-            }
-          },
-        )
-      }
-
-      withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck(
-          "sv1 operator can see the vote request detail by clicking review button", {
-            val rows = getAllVoteRows("sv-voting-in-progress-table-body")
-            val reviewButton = rows.head
-            reviewButton.underlying.click()
-          },
-        )(
-          "sv1 can see the new vote request detail",
-          _ => {
-            inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
-              element.text should matchText("1")
-            }
-            inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
-              element.text should matchText("1")
-            }
-          },
-        )
-      }
-
-      val updatedVoteReasonBody = "new vote reason body"
-      val updatedVoteReasonUrl = "new vote reason url"
-      withFrontEnd("sv2") { implicit webDriver =>
-        actAndCheck(
-          "sv2 operator can update its vote", {
-            eventuallyClickOn(id("edit-vote-button"))
-            eventuallyClickOn(id("accept-vote-button"))
-            inside(find(id("vote-reason-url"))) { case Some(element) =>
-              element.underlying.clear()
-              element.underlying.sendKeys(updatedVoteReasonUrl)
-            }
-            inside(find(id("vote-reason-body"))) { case Some(element) =>
-              element.underlying.clear()
-              element.underlying.sendKeys(updatedVoteReasonBody)
-            }
-            eventuallyClickOn(id("save-vote-button"))
-            eventuallyClickOn(id("vote-confirmation-dialog-accept-button"))
-          },
-        )(
-          "sv2 can see the new updated vote",
-          _ => {
-            inside(find(id("vote-request-modal-vote-reason-body"))) { case Some(element) =>
-              element.text should matchText(updatedVoteReasonBody)
-            }
-            inside(find(id("vote-request-modal-vote-reason-url"))) { case Some(element) =>
-              element.text should matchText(updatedVoteReasonUrl)
-            }
-            inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
-              element.text should matchText("0")
-            }
-            inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
-              element.text should matchText("2")
-            }
-          },
-        )
-      }
-
-      withFrontEnd("sv1") { implicit webDriver =>
-        clue("sv1 can see the updated vote by sv2") {
-          eventually() {
-            inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
-              element.text should matchText("0")
-            }
-            inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
-              element.text should matchText("2")
-            }
-          }
-        }
-      }
-    }
-
-    "can create a valid SRARC_OffboardSv vote request and cast vote on it" in { implicit env =>
-      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-      testCreateAndVoteDsoRulesAction("SRARC_OffboardSv") { webDriver =>
-        val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
-        dropDownMember.selectByValue(sv3PartyId)
-      } { implicit webDriver =>
-        find(id("srarc_offboardsv-member"))
-          .flatMap(_.findChildElement(tagName("input")))
-          .flatMap(_.attribute("value")) should be(Some(sv3PartyId))
-      }
-    }
-
-    "can create a valid SRARC_OffboardSv vote request not effective at threshold and cast vote on it" in {
-      implicit env =>
-        val sv4PartyId = sv4Backend.getDsoInfo().svParty.toProtoPrimitive
-        testCreateAndVoteDsoRulesAction("SRARC_OffboardSv", effectiveAtThreshold = false) {
-          webDriver =>
-            val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
-            dropDownMember.selectByValue(sv4PartyId)
-        } { implicit webDriver =>
-          find(id("srarc_offboardsv-member"))
-            .flatMap(_.findChildElement(tagName("input")))
-            .flatMap(_.attribute("value")) should be(Some(sv4PartyId))
-        }
-    }
-
-    "can create a valid SRARC_UpdateSvRewardWeight vote request and cast vote on it" in {
-      implicit env =>
-        val newWeight = "1234"
-        val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-        testCreateAndVoteDsoRulesAction("SRARC_UpdateSvRewardWeight") { webDriver =>
-          eventuallySucceeds() {
-            val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
-            dropDownMember.selectByValue(sv3PartyId)
-          }
-
-          val weightInput = webDriver.findElement(By.id("reward-weight"))
-
-          weightInput.clear()
-          weightInput.sendKeys(newWeight)
-        } { implicit webDriver =>
-          find(id("srarc_updatesvrewardweight-member"))
-            .flatMap(_.findChildElement(tagName("input")))
-            .flatMap(_.attribute("value")) should be(Some(sv3PartyId))
-          find(id("srarc_updatesvrewardweight-weight")).map(_.text) should be(Some(newWeight))
-        }
-    }
-
-    "can create valid SRARC_GrantFeaturedAppRight and SRARC_RevokeFeaturedAppRight vote requests" in {
-      implicit env =>
-        val requestProviderParty = "TestProviderParty"
-        val requestReasonUrl = "https://vote-request-url.com"
-        val requestReasonBody = "This is a request reason."
-
-        withFrontEnd("sv1") { implicit webDriver =>
-          actAndCheck(
-            "sv1 operator can login and browse to the governance tab", {
-              loginToLegacyGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
-            },
-          )(
-            "sv1 can see the create vote request button",
-            _ => {
-              find(
-                id("create-voterequest-submit-button")
-              ) should not be empty withClue "'Send Request to Super Validators' button"
-              find(
-                id("display-actions")
-              ) should not be empty withClue "Create Vote Request 'Action' dropdown"
-            },
-          )
-
-          eventuallyClickOn(id("tab-panel-in-progress"))
-          val previousVoteRequestsInProgress = getLegacyVoteRequestsInProgressSize()
-
-          actAndCheck(
-            "sv1 operator can create a new vote request", {
-              changeAction("SRARC_GrantFeaturedAppRight")
-
-              inside(find(id("set-application-provider"))) { case Some(element) =>
-                element.underlying.sendKeys(requestProviderParty)
-              }
-              inside(find(id("create-reason-url"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonUrl)
-              }
-              clue("sv1 operator can't click submit before adding a summary") {
-                find(id("create-voterequest-submit-button")).value.isEnabled shouldBe false
-              }
-              inside(find(id("create-reason-summary"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonBody)
-              }
-
-              clickLegacyVoteRequestSubmitButtonOnceEnabled()
-            },
-          )(
-            "sv1 can see the new vote request",
-            _ => {
-              eventuallyClickOn(id("tab-panel-in-progress"))
-
-              val tbody = find(id("sv-voting-in-progress-table-body"))
-              inside(tbody) { case Some(tb) =>
-                val rows = getAllVoteRows("sv-voting-in-progress-table-body")
-                rows.size shouldBe previousVoteRequestsInProgress + 1
-                (
-                  rows.head.text,
-                  tb.findAllChildElements(className("vote-row-requester")).toSeq.head.text,
-                )
-              }
-            },
-          )
-
-          val (_, rightCid) = actAndCheck(
-            "sv1 operator can see the vote request detail by clicking review button", {
-              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
-              val reviewButton = rows.head
-              reviewButton.underlying.click()
-            },
-          )(
-            "sv1 can see the new vote request detail",
-            _ => {
-              val RightCid =
-                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
-                  tb.text
-                }
-              RightCid
-            },
-          )
-
-          actAndCheck(
-            "sv1 operator can create a new vote request to revoke the featured app right", {
-              navigateToLegacyGovernancePage(sv1UIPort)
-
-              changeAction("SRARC_RevokeFeaturedAppRight")
-
-              inside(find(id("set-application-rightcid"))) { case Some(element) =>
-                element.underlying.sendKeys(rightCid)
-              }
-
-              inside(find(id("create-reason-url"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonUrl)
-              }
-              clue("sv1 operator can't click submit before adding a summary") {
-                find(id("create-voterequest-submit-button")).value.isEnabled shouldBe false
-              }
-              inside(find(id("create-reason-summary"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonBody)
-              }
-
-              clickLegacyVoteRequestSubmitButtonOnceEnabled()
-            },
-          )(
-            "sv1 can see the new vote request",
-            _ => {
-              eventuallyClickOn(id("tab-panel-in-progress"))
-
-              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
-              rows.size shouldBe previousVoteRequestsInProgress + 2
-            },
-          )
-        }
-    }
-
-    "SV1 can create valid SRARC_SetConfig (new DsoRules Configuration) vote requests that can expire and get rejected by other SVs" in {
-      implicit env =>
-        val requestReasonUrl = "https://vote-request-url.com"
-        val requestReasonBody = "This is a request reason."
-
-        withFrontEnd("sv1") { implicit webDriver =>
-          // If we try to create two vote requests for identical configs,
-          // the second request will be rejected with "This vote request has already been created."
-          def submitSetDsoConfigRequestViaFrontend(
-              numUnclaimedRewardsThreshold: String = "",
-              numMemberTrafficContractsThreshold: String,
-              enabled: Boolean = true,
-          ): Unit = {
-            // The `eventually` guards against `StaleElementReferenceException`s
-            // eventually() must contain clickLegacyVoteRequestSubmitButtonOnceEnabled() to retry the whole process
-            eventually() {
-              changeAction("SRARC_SetConfig")
-
-              inside(find(id("checkbox-set-effective-at-threshold"))) { case Some(element) =>
-                element.underlying.click()
-              }
-              inside(find(id("numUnclaimedRewardsThreshold-value"))) { case Some(element) =>
-                if (numUnclaimedRewardsThreshold != "") element.underlying.clear()
-                element.underlying.sendKeys(numUnclaimedRewardsThreshold)
-              }
-              inside(find(id("numMemberTrafficContractsThreshold-value"))) { case Some(element) =>
-                if (numMemberTrafficContractsThreshold != "") element.underlying.clear()
-                element.underlying.sendKeys(numMemberTrafficContractsThreshold)
-              }
-              inside(find(id("create-reason-summary"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonBody)
-              }
-              inside(find(id("create-reason-url"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonUrl)
-              }
-              clickLegacyVoteRequestSubmitButtonOnceEnabled(enabled)
-            }
-          }
-
-          def submitSetDsoConfigRequestViaBackend(
-              numUnclaimedRewardsThreshold: String,
-              numMemberTrafficContractsThreshold: String = "",
-              expiresSoon: Boolean = true,
-          ): Unit = {
-            val activeSynchronizerId =
-              AmuletConfigSchedule(sv1Backend.getDsoInfo().amuletRules)
-                .getConfigAsOf(env.environment.clock.now)
-                .decentralizedSynchronizer
-                .activeSynchronizer
-            val baseConfig = defaultDsoRulesConfig(
-              1,
-              2,
-              3,
-              SynchronizerId.tryFromString(activeSynchronizerId),
-            )
-            val newConfig = defaultDsoRulesConfig(
-              numUnclaimedRewardsThreshold.toIntOption.getOrElse(1),
-              numMemberTrafficContractsThreshold.toIntOption.getOrElse(2),
-              3,
-              SynchronizerId.tryFromString(activeSynchronizerId),
-            )
-            val setDsoConfigAction: ActionRequiringConfirmation = new ARC_DsoRules(
-              new SRARC_SetConfig(
-                new DsoRules_SetConfig(
-                  newConfig,
-                  Optional.of(baseConfig),
-                )
-              )
-            )
-            sv1Backend.createVoteRequest(
-              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
-              setDsoConfigAction,
-              requestReasonUrl,
-              requestReasonBody,
-              if (expiresSoon) {
-                new RelTime(java.time.Duration.ofSeconds(10).toMillis * 1000L)
-              } else {
-                sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout
-              },
-              None,
-            )
-          }
-
-          def checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress: Int) = {
-            eventually() {
-              closeVoteModalsIfOpen
-              eventuallyClickOn(id("tab-panel-in-progress"))
-              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
-              rows.size shouldBe previousVoteRequestsInProgress + 1
-              rows.head
-            }
-          }
-
-          actAndCheck(
-            "sv1 operator can login and browse to the governance tab", {
-              loginToLegacyGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
-            },
-          )(
-            "sv1 can see the create vote request button",
-            _ => {
-              find(
-                id("create-voterequest-submit-button")
-              ) should not be empty withClue "'Send Request to Super Validators' button"
-              find(
-                id("display-actions")
-              ) should not be empty withClue "Create Vote Request 'Action' dropdown"
-            },
-          )
-
-          eventuallyClickOn(id("tab-panel-in-progress"))
-          val previousVoteRequestsInProgress = getLegacyVoteRequestsInProgressSize()
-
-          clue("Pausing vote request expiration automation") {
-            sv1Backend.dsoDelegateBasedAutomation
-              .trigger[CloseVoteRequestTrigger]
-              .pause()
-              .futureValue
-          }
-
-          actAndCheck(
-            "sv1 operator creates a new vote request with a short expiration time", {
-              submitSetDsoConfigRequestViaBackend(
-                numUnclaimedRewardsThreshold = "41"
-              )
-            },
-          )(
-            "sv1 can see the new vote request in the progress tab",
-            _ => checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress),
-          )
-
-          actAndCheck(
-            "sv1 operator creates a new vote request with a long expiration time", {
-              submitSetDsoConfigRequestViaFrontend(
-                numMemberTrafficContractsThreshold = "42"
-              )
-            },
-          )(
-            "sv1 can see the new vote request in the progress tab",
-            _ => {
-              checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress + 1)
-            },
-          )
-          val requestId = eventually() {
-            // find the review button again because the DOM may have been updated
-            val reviewButton = checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress + 1)
-            reviewButton.underlying.click()
-            val requestId =
-              inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
-                tb.text
-              }
-            requestId
-          }
-
-          clue("Resuming vote request expiration automation") {
-            sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
-          }
-
-          clue("Voting to reject the other vote request") {
-            vote(sv2Backend, requestId, false, "1", false)
-            vote(sv3Backend, requestId, false, "1", false)
-            vote(sv4Backend, requestId, false, "1", true)
-          }
-
-          clue("the vote requests get rejected (one by vote, one by expiry)") {
-            // Generous buffer for expiry
-            eventually() {
-              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
-              rows.size shouldBe previousVoteRequestsInProgress
-            }
-            eventually() {
-              find(id("vote-request-modal-root")) shouldBe empty withClue "'Vote Request' modal"
-            }
-            eventuallyClickOn(id("tab-panel-rejected"))
-            eventually() {
-              val rows = getAllVoteRows("sv-vote-results-rejected-table-body")
-              rows.size shouldBe 2 withClue "'Rejected' votes tab table rows"
-            }
-          }
-        }
-    }
-
-    "SV1 can create valid CRARC_SetConfig (new AmuletRules Configuration) vote requests that can expire and get rejected by other SVs" in {
-      implicit env =>
-        val requestReasonUrl = "https://vote-request-url.com"
-        val requestReasonBody = "This is a request reason."
-
-        withFrontEnd("sv1") { implicit webDriver =>
-          // If we try to create two vote requests for identical configs,
-          // the second request will be rejected with "This vote request has already been created."
-          def submitSetAmuletConfigRequestViaBackend(
-              holdingFee: String = "0.001",
-              expiresSoon: Boolean,
-          ): Unit = {
-            val baseConfig = mkUpdatedAmuletConfig(
-              sv1Backend.getDsoInfo().amuletRules.contract,
-              defaultTickDuration,
-              1000,
-            )
-            val newConfig = mkUpdatedAmuletConfig(
-              sv1Backend.getDsoInfo().amuletRules.contract,
-              defaultTickDuration,
-              1000,
-              holdingFee = BigDecimal(holdingFee),
-            )
-            val setAmuletConfigAction: ActionRequiringConfirmation = new ARC_AmuletRules(
-              new CRARC_SetConfig(
-                new AmuletRules_SetConfig(
-                  newConfig,
-                  baseConfig,
-                )
-              )
-            )
-            sv1Backend.createVoteRequest(
-              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
-              setAmuletConfigAction,
-              requestReasonUrl,
-              requestReasonBody,
-              if (expiresSoon) {
-                new RelTime(java.time.Duration.ofSeconds(10).toMillis * 1000L)
-              } else {
-                sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout
-              },
-              None,
-            )
-          }
-
-          def checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress: Int) = {
-            eventually() {
-              closeVoteModalsIfOpen
-              eventuallyClickOn(id("tab-panel-in-progress"))
-              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
-              rows.size shouldBe previousVoteRequestsInProgress + 1
-              rows.head
-            }
-          }
-
-          actAndCheck(
-            "sv1 operator can login and browse to the governance tab", {
-              loginToLegacyGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
-            },
-          )(
-            "sv1 can see the create vote request button",
-            _ => {
-              find(
-                id("create-voterequest-submit-button")
-              ) should not be empty withClue "'Send Request to Super Validators' button"
-              find(
-                id("display-actions")
-              ) should not be empty withClue "Create Vote Request 'Action' dropdown"
-            },
-          )
-
-          eventuallyClickOn(id("tab-panel-in-progress"))
-          val previousVoteRequestsInProgress = getLegacyVoteRequestsInProgressSize()
-          eventuallyClickOn(id("tab-panel-rejected"))
-          val previousVoteRequestsRejected = getLegacyVoteRequestsRejectedSize()
-
-          clue("Pausing vote request expiration automation") {
-            sv1Backend.dsoDelegateBasedAutomation
-              .trigger[CloseVoteRequestTrigger]
-              .pause()
-              .futureValue
-          }
-
-          actAndCheck(
-            "sv1 operator creates a new vote request with a short expiration time", {
-              submitSetAmuletConfigRequestViaBackend(expiresSoon = true)
-            },
-          )(
-            "sv1 can see the new vote request in the progress tab",
-            _ => checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress),
-          )
-
-          val (_, requestId) = actAndCheck(
-            "sv1 operator creates a new vote request with a long expiration time", {
-              submitSetAmuletConfigRequestViaBackend(
-                holdingFee = "42",
-                expiresSoon = false,
-              )
-            },
-          )(
-            "sv1 can see the new vote request in the progress tab",
-            _ => {
-              val reviewButton =
-                checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress + 1)
-              reviewButton.underlying.click()
-              val requestId =
-                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
-                  tb.text
-                }
-              requestId
-            },
-          )
-
-          clue("Resuming vote request expiration automation") {
-            sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
-          }
-
-          clue("Voting to reject the other vote request") {
-            vote(sv2Backend, requestId, false, "1", false)
-            vote(sv3Backend, requestId, false, "1", false)
-            vote(sv4Backend, requestId, false, "1", true)
-          }
-
-          clue("the vote requests get rejected (one by vote, one by expiry)") {
-            // Generous buffer for expiry
-            eventually() {
-              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
-              rows.size shouldBe previousVoteRequestsInProgress
-            }
-            eventually() {
-              find(id("vote-request-modal-root")) shouldBe empty withClue "'Vote Request' modal"
-            }
-            eventuallyClickOn(id("tab-panel-rejected"))
-            eventually() {
-              val rows = getAllVoteRows("sv-vote-results-rejected-table-body")
-              rows.size shouldBe previousVoteRequestsRejected + 2
-            }
-          }
-        }
-    }
-
-    "can create valid SRARC_CreateUnallocatedUnclaimedActivityRecord vote requests" in {
-      implicit env =>
-        val requestReasonUrl = "https://vote-request-url.com"
-        val requestReasonBody = "This is a request reason."
-
-        val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-        val amount = "1000"
-
-        withFrontEnd("sv1") { implicit webDriver =>
-          actAndCheck(
-            "sv1 operator can login and browse to the governance tab", {
-              loginToLegacyGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
-            },
-          )(
-            "sv1 can see the create vote request button",
-            _ => {
-              find(
-                id("create-voterequest-submit-button")
-              ) should not be empty withClue "'Send Request to Super Validators' button"
-              find(
-                id("display-actions")
-              ) should not be empty withClue "Create Vote Request 'Action' dropdown"
-            },
-          )
-
-          eventuallyClickOn(id("tab-panel-in-progress"))
-          val previousVoteRequestsInProgress = getLegacyVoteRequestsInProgressSize()
-
-          actAndCheck(
-            "sv1 operator can create a new vote request", {
-              changeAction("SRARC_CreateUnallocatedUnclaimedActivityRecord")
-
-              inside(find(id("create-beneficiary"))) { case Some(element) =>
-                element.underlying.sendKeys(beneficiary)
-              }
-              inside(find(id("create-amount"))) { case Some(element) =>
-                element.underlying.sendKeys(amount)
-              }
-
-              inside(find(id("create-reason-url"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonUrl)
-              }
-              clue("sv1 operator can't click submit before adding a summary") {
-                find(id("create-voterequest-submit-button")).value.isEnabled shouldBe false
-              }
-              inside(find(id("create-reason-summary"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonBody)
-              }
-
-              clickLegacyVoteRequestSubmitButtonOnceEnabled()
-            },
-          )(
-            "sv1 can see the new vote request",
-            _ => {
-              eventuallyClickOn(id("tab-panel-in-progress"))
-
-              val tbody = find(id("sv-voting-in-progress-table-body"))
-              inside(tbody) { case Some(tb) =>
-                val rows = getAllVoteRows("sv-voting-in-progress-table-body")
-                rows.size shouldBe previousVoteRequestsInProgress + 1
-                (
-                  rows.head.text,
-                  tb.findAllChildElements(className("vote-row-requester")).toSeq.head.text,
-                )
-              }
-            },
-          )
-
-          actAndCheck(
-            "sv1 operator can see the vote request detail by clicking review button", {
-              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
-              val reviewButton = rows.head
-              reviewButton.underlying.click()
-            },
-          )(
-            "sv1 can see the new vote request detail",
-            _ => {
-              inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
-                tb.text
-              }
-            },
-          )
-        }
-    }
-
-    "NEW UI: Offboard SV" in { implicit env =>
+    "Offboard SV" in { implicit env =>
       val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
 
       assertCreateProposal("SRARC_OffboardSv", "offboard-sv") { implicit webDriver =>
@@ -1401,7 +562,7 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "NEW UI: Offboard SV with custom effective date" in { implicit env =>
+    "Offboard SV with custom effective date" in { implicit env =>
       val sv4PartyId = sv4Backend.getDsoInfo().svParty.toProtoPrimitive
       val effectiveDate = "2099-01-31 00:12"
 
@@ -1419,7 +580,7 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "NEW UI: Grant, Update and Revoke Featured App Right" in { implicit env =>
+    "Grant, Update and Revoke Featured App Right" in { implicit env =>
       val providerParty = sv3Backend.getDsoInfo().svParty
       val providerPartyId = providerParty.toProtoPrimitive
       val activityWeight = BigDecimal("2.5")
@@ -1498,7 +659,7 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "NEW UI: Set Dso Rules Configuration" in { implicit env =>
+    "Set Dso Rules Configuration" in { implicit env =>
       assertCreateProposal("SRARC_SetConfig", "set-dso-config-rules") { implicit webDriver =>
         eventually() {
           inside(find(testId("config-field-numUnclaimedRewardsThreshold"))) { case Some(element) =>
@@ -1508,7 +669,7 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "NEW UI: Create Unclaimed Activity Record" in { implicit env =>
+    "Create Unclaimed Activity Record" in { implicit env =>
       val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
       val amount = "100.5"
 
@@ -1521,7 +682,7 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
+    "Set Amulet Rules Configuration" in { implicit env =>
       assertCreateProposal("CRARC_SetConfig", "set-amulet-config-rules") { implicit webDriver =>
         eventually() {
           inside(find(testId("config-field-transferPreapprovalFee"))) { case Some(element) =>
@@ -1531,7 +692,7 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "NEW UI: Update SV Reward Weight" in { implicit env =>
+    "Update SV Reward Weight" in { implicit env =>
       val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
       val newWeight = "0_5000"
 
@@ -1540,6 +701,157 @@ class SvFrontendIntegrationTest
           selectMuiOptionByValue("update-sv-reward-weight-member-dropdown", sv3PartyId)
           fillOutTextField("update-sv-reward-weight-weight", newWeight)
       }
+    }
+
+    "Set Dso Rules Configuration proposals can be rejected by other SVs and can expire" in {
+      implicit env =>
+        val requestReasonUrl = "https://new-proposal-url.com/"
+        // A VoteRequest only gets a trackingCid once somebody votes on it, so the UI cannot show a
+        // stable contract id for a request that expires untouched. Match rows by description instead.
+        val expiringProposalReason = "This proposal expires before anybody votes on it"
+        val rejectedProposalReason = "This proposal gets rejected by the other SVs"
+
+        def rowDescriptions(section: String)(implicit webDriver: WebDriverType): Seq[String] =
+          webDriver
+            .findElements(By.cssSelector(s"[data-testid='$section-row-description']"))
+            .asScala
+            .map(_.getText)
+            .toSeq
+
+        def voteHistoryStatus(reason: String)(implicit webDriver: WebDriverType): Option[String] =
+          webDriver
+            .findElements(By.cssSelector("[data-testid='vote-history-row']"))
+            .asScala
+            .find(
+              _.findElement(
+                By.cssSelector("[data-testid='vote-history-row-description']")
+              ).getText == reason
+            )
+            .map(_.findElement(By.cssSelector("[data-testid='vote-history-row-status']")).getText)
+
+        def newVoteRequestWithReason(reason: String): VoteRequest.ContractId =
+          eventually() {
+            getTrackingId(
+              sv1Backend.listVoteRequests().filter(_.payload.reason.body == reason).loneElement
+            )
+          }
+
+        // Creates a SetConfig proposal via the backend with a short expiry so it expires on its own
+        def createShortLivedSetConfigProposal(): Unit = {
+          val activeSynchronizerId =
+            AmuletConfigSchedule(sv1Backend.getDsoInfo().amuletRules)
+              .getConfigAsOf(env.environment.clock.now)
+              .decentralizedSynchronizer
+              .activeSynchronizer
+          val baseConfig =
+            defaultDsoRulesConfig(1, 2, 3, SynchronizerId.tryFromString(activeSynchronizerId))
+          val newConfig =
+            defaultDsoRulesConfig(41, 2, 3, SynchronizerId.tryFromString(activeSynchronizerId))
+          val setDsoConfigAction: ActionRequiringConfirmation = new ARC_DsoRules(
+            new SRARC_SetConfig(new DsoRules_SetConfig(newConfig, Optional.of(baseConfig)))
+          )
+          sv1Backend.createVoteRequest(
+            sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+            setDsoConfigAction,
+            requestReasonUrl,
+            expiringProposalReason,
+            new RelTime(java.time.Duration.ofSeconds(10).toMillis * 1000L),
+            None,
+          )
+        }
+
+        clue("Pausing vote request expiration automation") {
+          sv1Backend.dsoDelegateBasedAutomation
+            .trigger[CloseVoteRequestTrigger]
+            .pause()
+            .futureValue
+        }
+
+        actAndCheck(
+          "sv1 creates a proposal with a short expiration time",
+          createShortLivedSetConfigProposal(),
+        )(
+          "the short-lived proposal exists",
+          _ => newVoteRequestWithReason(expiringProposalReason),
+        )
+
+        val rejectedProposalCid = clue("sv1 creates a proposal via the UI") {
+          withFrontEnd("sv1") { implicit webDriver =>
+            loginToGovernance(sv1UIPort, sv1Backend.config.ledgerApiUser)
+            selectActionAndNavigateToForm("SRARC_SetConfig", "set-dso-config-rules")
+            fillAndSubmitProposalForm(
+              "set-dso-config-rules",
+              rejectedProposalReason,
+              requestReasonUrl,
+              effectiveAtThreshold = true,
+              { implicit webDriver =>
+                eventually() {
+                  inside(find(testId("config-field-numMemberTrafficContractsThreshold"))) {
+                    case Some(element) => element.underlying.sendKeys("42")
+                  }
+                }
+              },
+            )
+          }
+          newVoteRequestWithReason(rejectedProposalReason)
+        }
+
+        withFrontEnd("sv1") { implicit webDriver =>
+          clue("sv1 sees both proposals in flight and neither in the vote history") {
+            go to s"http://localhost:$sv1UIPort/governance"
+            eventually() {
+              val inflight = rowDescriptions("inflight-proposals")
+              inflight should contain(expiringProposalReason)
+              inflight should contain(rejectedProposalReason)
+              val history = rowDescriptions("vote-history")
+              history should not contain expiringProposalReason
+              history should not contain rejectedProposalReason
+            }
+          }
+        }
+
+        clue("Resuming vote request expiration automation") {
+          sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
+        }
+
+        withFrontEnd("sv2") { implicit webDriver =>
+          sv2CastVoteOnActionRequired(rejectedProposalCid.contractId, accept = false)
+        }
+
+        actAndCheck(
+          "sv3 and sv4 also reject the proposal",
+          Seq(sv3Backend, sv4Backend).foreach(
+            _.castVote(rejectedProposalCid, false, requestReasonUrl, "rejecting")
+          ),
+        )(
+          "both proposals are closed, one by vote and one by expiry",
+          _ => {
+            val closedReasons = sv1Backend
+              .listVoteRequestResults(VoteResultsFilters(accepted = Some(false)), 10)
+              ._1
+              .map(_.request.reason.body)
+            closedReasons should contain(rejectedProposalReason)
+            closedReasons should contain(expiringProposalReason)
+            sv1Backend
+              .listVoteRequests()
+              .map(_.payload.reason.body)
+              .toSet
+              .intersect(Set(rejectedProposalReason, expiringProposalReason)) shouldBe empty
+          },
+        )
+
+        withFrontEnd("sv1") { implicit webDriver =>
+          clue("sv1 sees both proposals in the vote history with the right status") {
+            go to s"http://localhost:$sv1UIPort/governance"
+            eventually() {
+              val inflight = rowDescriptions("inflight-proposals")
+              inflight should not contain expiringProposalReason
+              inflight should not contain rejectedProposalReason
+              voteHistoryStatus(rejectedProposalReason) shouldBe Some("Rejected")
+              voteHistoryStatus(expiringProposalReason) shouldBe Some("Expired")
+            }
+          }
+        }
     }
 
     "Vote history is ordered by completion time and supports pagination" in { implicit env =>
@@ -1694,26 +1006,6 @@ class SvFrontendIntegrationTest
     voteRequest
   }
 
-  def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
-    eventually() {
-      find(
-        id("display-actions")
-      ) should not be empty withClue "Create Vote Request 'Action' dropdown"
-    }
-    val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-    val existingAction: String = dropDownAction.getFirstSelectedOption().getAttribute("value")
-    dropDownAction.selectByValue(actionName)
-
-    if (actionName != "SRARC_OffboardSv" && existingAction != actionName) {
-      logger.debug(
-        s"Changed action from $existingAction to $actionName, waiting for confirmation dialog"
-      )
-      waitForQuery(id("action-change-dialog-proceed"))
-      val proceedButton = webDriver.findElement(By.id("action-change-dialog-proceed"))
-      proceedButton.click()
-    }
-  }
-
   def selectMuiOptionByValue(dropdownId: String, optionValue: String)(implicit
       webDriver: WebDriverType
   ): Unit = {
@@ -1759,23 +1051,12 @@ class SvFrontendIntegrationTest
     }
   }
 
-  def getLegacyVoteRequestsInProgressSize()(implicit webDriver: WebDriverType) = {
-    val tbodyInProgress = find(id("sv-voting-in-progress-table-body"))
-    tbodyInProgress
-      .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
-      .getOrElse(0)
-  }
-
   def getInflightProposals()(implicit webDriver: WebDriverType) = {
     webDriver.findElements(By.cssSelector("[data-testid='inflight-proposals-row']"))
   }
 
   def getActionRequiredElems()(implicit webDriver: WebDriverType) = {
     webDriver.findElements(By.cssSelector("[data-testid='action-required-view-details']"))
-  }
-
-  def getLegacyVoteRequestsRejectedSize()(implicit webDriver: WebDriverType) = {
-    eventuallyFindAll(className("vote-row-action")).toSeq.size
   }
 
   private def svAmuletPriceShouldMatch(

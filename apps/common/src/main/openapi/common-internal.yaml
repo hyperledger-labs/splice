@@ -275,6 +275,7 @@ components:
         vote_request_contract_ids:
           description: Contract IDs of Daml template `Splice.DsoRules:VoteRequest`.
           type: array
+          maxItems: 1000
           items:
             type: string
 

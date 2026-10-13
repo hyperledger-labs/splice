@@ -1,0 +1,43 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "alertStrategy": {
+      "autoClose": "3600s",
+      "notificationChannelStrategies": [
+        {
+          "notificationChannelNames": [
+            null
+          ],
+          "renotifyInterval": "14400s"
+        }
+      ]
+    },
+    "combiner": "OR",
+    "conditions": [
+      {
+        "conditionPrometheusQueryLanguage": {
+          "duration": "1200s",
+          "evaluationInterval": "30s",
+          "query": "sum by (gateway_name, reason) (router_googleapis_com:nat_dropped_sent_packets_count{monitored_resource=\"nat_gateway\", gateway_name=~\"nat-mock-gw.*\"}) > 30"
+        },
+        "displayName": "NAT dropped sent packets in mock"
+      }
+    ],
+    "displayName": "NAT dropped sent packets in mock",
+    "documentation": {
+      "content": "Cloud NAT is dropping outbound packets in cluster mock. This can be caused by NAT IP/port exhaustion (OUT_OF_RESOURCES) or endpoint independence conflicts (ENDPOINT_INDEPENDENCE_CONFLICT).",
+      "mimeType": "text/markdown",
+      "subject": "NAT dropped sent packets in mock"
+    },
+    "notificationChannels": [
+      null
+    ],
+    "userLabels": {
+      "cluster": "mock"
+    }
+  },
+  "name": "natDroppedSentPacketsAlert",
+  "provider": "",
+  "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+}

@@ -8,17 +8,22 @@ import cats.implicits.toFunctorFilterOps
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import com.daml.metrics.api.MetricsContext
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{SyncCryptoError, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.RequestId
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError.RequestRefused
 import com.digitalasset.canton.sequencing.client.SequencerClientSend.SendRequestTimestamps
-import com.digitalasset.canton.sequencing.client.{SendCallback, SendResult, SequencerClientSend}
+import com.digitalasset.canton.sequencing.client.{
+  SendAsyncClientError,
+  SendCallback,
+  SendResult,
+  SequencerClientSend,
+}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{MediatorId, ParticipantId}
@@ -26,6 +31,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, FutureUnlessShutdownUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPartyId, config}
+import com.digitalasset.nonempty.NonEmpty
 
 import java.time.Duration
 import scala.concurrent.ExecutionContext
@@ -162,7 +168,9 @@ private[mediator] class DefaultVerdictSender(
             )
         }
       case UnlessShutdown.Outcome(_: SendResult.Timeout) =>
-        logger.info("Sequencing result message timed out asynchronously.")
+        logger.info(
+          s"Sequencing result message timed out asynchronously for request ${requestId.unwrap}"
+        )
       case UnlessShutdown.AbortedDueToShutdown =>
         logger.debug("Sequencing result processing was aborted due to shutdown")
     }
@@ -193,7 +201,12 @@ private[mediator] class DefaultVerdictSender(
             )
         ) {
           case RequestRefused(refused) if refused.hasMaxSequencingTimeElapsed =>
-            logger.info("Sequencing result message timed out synchronously.")
+            logger.info(
+              s"Sequencing result message timed out synchronously for request ${requestId.unwrap}"
+            )
+            Right(())
+          case SendAsyncClientError.RequestAlreadyExists(err) =>
+            logger.info(s"Verdict aggregation for $requestId already completed $err.")
             Right(())
           case other =>
             Left(other)

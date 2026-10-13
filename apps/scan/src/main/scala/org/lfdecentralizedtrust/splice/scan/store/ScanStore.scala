@@ -170,7 +170,7 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
-  def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+  def listFeaturedAppRightsByProvider(providerPartyId: PartyId, limit: Limit)(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 

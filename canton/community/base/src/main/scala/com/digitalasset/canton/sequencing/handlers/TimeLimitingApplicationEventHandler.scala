@@ -3,11 +3,11 @@
 
 package com.digitalasset.canton.sequencing.handlers
 
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.error.FatalError
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{
@@ -21,6 +21,7 @@ import com.digitalasset.canton.sequencing.protocol.Envelope
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.nonempty.NonEmpty
 
 import java.time.temporal.ChronoUnit
 import scala.concurrent.ExecutionContext
@@ -62,7 +63,11 @@ class TimeLimitingApplicationEventHandler(
             )
             val trigger = ApplicationEventHandlerTimeoutTrigger(logger, exitOnTimeout, data)
             val (timeoutFuture, timeoutHandle) =
-              clock.scheduleAtCancellable(trigger.trigger, deadline)
+              clock.scheduleAtCancellable(
+                trigger.trigger,
+                s"${getClass.getName}: trigger application event timeout",
+                deadline,
+              )
             timeoutFuture.discard[FutureUnlessShutdown[Unit]]
             handler(boxedEnvelopes).transform {
               case Success(Outcome(async)) =>

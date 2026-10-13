@@ -349,6 +349,11 @@ describe('Wallet user can', () => {
       test('see allocation requests v2, and accept them', async () => {
         const allocationRequest = getAllocationRequestV2();
         const allocationRequests = [allocationRequest];
+        // Build the contracts once so the contract id is stable across polls; a fresh id on
+        // every poll remounts the row (keyed by contract id) and the Accept button we click.
+        const allocationRequestContracts = allocationRequests.map(payload => ({
+          contract: mkContract(AllocationRequestV2, payload),
+        }));
         let calledCreate: (body: AllocateAmuletV2Request) => void;
         const createPromise: Promise<AllocateAmuletV2Request> = new Promise(
           resolve => (calledCreate = resolve)
@@ -356,9 +361,7 @@ describe('Wallet user can', () => {
         server.use(
           http.get(`${walletUrl}/v0/wallet/token-standard/allocation-requests`, async () => {
             return HttpResponse.json<ListAllocationRequestsResponse>({
-              allocation_requests: allocationRequests.map(contract => {
-                return { contract: mkContract(AllocationRequestV2, contract) };
-              }),
+              allocation_requests: allocationRequestContracts,
             });
           }),
           http.get(`${walletUrl}/v0/allocations`, async () => {

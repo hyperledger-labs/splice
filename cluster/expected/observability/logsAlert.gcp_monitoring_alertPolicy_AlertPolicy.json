@@ -1,0 +1,48 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "alertStrategy": {
+      "autoClose": "3600s",
+      "notificationChannelStrategies": [
+        {
+          "notificationChannelNames": [
+            null
+          ],
+          "renotifyInterval": "14400s"
+        }
+      ]
+    },
+    "combiner": "OR",
+    "conditions": [
+      {
+        "conditionThreshold": {
+          "aggregations": [
+            {
+              "alignmentPeriod": "600s",
+              "crossSeriesReducer": "REDUCE_SUM",
+              "groupByFields": [
+                "metric.label.cluster"
+              ],
+              "perSeriesAligner": "ALIGN_SUM"
+            }
+          ],
+          "comparison": "COMPARISON_GT",
+          "duration": "300s",
+          "filter": "resource.type=\"k8s_container\"  AND metric.type = \"logging.googleapis.com/user/log_warnings_mock\"",
+          "trigger": {
+            "count": 1
+          }
+        },
+        "displayName": "Log warnings and errors > 1 mock"
+      }
+    ],
+    "displayName": "Log warnings and errors > 1 mock",
+    "notificationChannels": [
+      null
+    ]
+  },
+  "name": "logsAlert",
+  "provider": "",
+  "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+}

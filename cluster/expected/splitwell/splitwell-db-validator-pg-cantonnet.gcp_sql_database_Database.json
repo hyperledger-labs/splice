@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "name": "cantonnet"
+  },
+  "name": "splitwell-db-validator-pg-cantonnet",
+  "provider": "",
+  "type": "gcp:sql/database:Database"
+}

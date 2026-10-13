@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.sequencing.client
 
-import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
+import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution, RpcError}
 import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.error.CantonErrorGroups.SequencerErrorGroup
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -22,6 +22,7 @@ object SendAsyncClientError extends SequencerErrorGroup {
 
   def logLevel(err: SendAsyncClientError): Level = err match {
     case RequestRefused(x) if x.hasMaxSequencingTimeElapsed => Level.INFO
+    case _: TrafficEnforcementRejected => Level.INFO
     case _ => Level.WARN
   }
 
@@ -45,6 +46,16 @@ object SendAsyncClientError extends SequencerErrorGroup {
     )
   }
 
+  /** Why traffic enforcement refused the send, as an `RpcError` owned by it. This client only
+    * carries the value back to whoever asked for the send without interpreting it.
+    */
+  final case class TrafficEnforcementRejected(reason: RpcError) extends SendAsyncClientError {
+    override protected def pretty: Pretty[TrafficEnforcementRejected] = prettyOfClass(
+      param("code", _.reason.code.id.unquoted),
+      param("cause", _.reason.cause.unquoted),
+    )
+  }
+
   /** A send with the supplied message id is already being tracked */
   case object DuplicateMessageId extends SendAsyncClientError {
     override protected def pretty: Pretty[DuplicateMessageId.type] =
@@ -57,6 +68,13 @@ object SendAsyncClientError extends SequencerErrorGroup {
   /** We were unable to make the request for a technical reason */
   final case class RequestFailed(message: String) extends SendAsyncClientResponseError {
     override protected def pretty: Pretty[RequestFailed] = prettyOfClass(
+      unnamedParam(_.message.unquoted)
+    )
+  }
+
+  /** The request already exists and was therefore rejected */
+  final case class RequestAlreadyExists(message: String) extends SendAsyncClientResponseError {
+    override protected def pretty: Pretty[RequestAlreadyExists] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }

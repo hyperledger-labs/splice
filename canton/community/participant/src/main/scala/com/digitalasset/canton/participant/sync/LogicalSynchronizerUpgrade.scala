@@ -3,25 +3,28 @@
 
 package com.digitalasset.canton.participant.sync
 
-import cats.data.{EitherT, OptionT}
+import cats.data.EitherT
+import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.{
   CantonTimestamp,
   SynchronizerPredecessor,
   SynchronizerSuccessor,
 }
+import com.digitalasset.canton.error.LsuError
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.LifeCycleContainer
 import com.digitalasset.canton.participant.admin.data.ManualLsuRequest as AdminManualLsuRequest
-import com.digitalasset.canton.participant.config.LsuConfig
+import com.digitalasset.canton.participant.config.{AcsCommitmentConfig, LsuConfig}
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore.UnknownPsid
 import com.digitalasset.canton.participant.store.{
   StoredSynchronizerConnectionConfig,
+  SyncPersistentState,
   SynchronizerConnectionConfigStore,
 }
 import com.digitalasset.canton.participant.sync.CheckedLogicalSynchronizerUpgrade.UpgradabilityCheckResult
@@ -60,6 +63,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry.Backoff
 import com.digitalasset.canton.util.{EitherTUtil, SimpleExecutionQueue}
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.concurrent.ExecutionContext
 import scala.math.Ordered.orderingToOrdered
@@ -140,18 +144,18 @@ sealed trait LogicalSynchronizerUpgrade[Req <: LsuRequest] extends NamedLogging 
     */
   protected def runWithRetries[T](
       operation: => FutureUnlessShutdown[Either[NegativeResult, T]]
-  ): FutureUnlessShutdown[Either[String, T]] =
+  ): FutureUnlessShutdown[Either[LsuError, T]] =
     retryPolicy
       .unlessShutdown(
         operation.map {
-          case Left(NegativeResult(details, isRetryable)) =>
+          case Left(NegativeResult(lsuError, isRetryable)) =>
             if (isRetryable)
-              Left[String, Either[String, T]](details)
+              Left[LsuError, Either[LsuError, T]](lsuError)
             else
-              Right[String, Either[String, T]](Left(details))
+              Right[LsuError, Either[LsuError, T]](Left(lsuError))
 
           case Right(success) =>
-            Right[String, Either[String, T]](Right(success))
+            Right[LsuError, Either[LsuError, T]](Right(success))
         },
         DbExceptionRetryPolicy,
       )
@@ -163,7 +167,7 @@ sealed trait LogicalSynchronizerUpgrade[Req <: LsuRequest] extends NamedLogging 
     *   - Node is disconnected from the synchronizer
     *   - See prerequisites for each implementation
     */
-  protected def performUpgradeInternal(): EitherT[FutureUnlessShutdown, String, Unit]
+  protected def performUpgradeInternal(): EitherT[FutureUnlessShutdown, LsuError, Unit]
 
   /** Run `operation` only if connectivity to `lsid` matches `shouldBeConnected`.
     */
@@ -185,10 +189,7 @@ sealed trait LogicalSynchronizerUpgrade[Req <: LsuRequest] extends NamedLogging 
           logger.info(msg)
           FutureUnlessShutdown.pure(
             Left(
-              NegativeResult(
-                msg,
-                isRetryable = true,
-              )
+              NegativeResult.retryable(msg)
             )
           )
         }
@@ -220,7 +221,7 @@ sealed trait LogicalSynchronizerUpgrade[Req <: LsuRequest] extends NamedLogging 
     performIfNotUpgradedYet(
       for {
         _disconnect <- disconnectSynchronizer(traceContext).leftMap(err =>
-          NegativeResult(err.toString, isRetryable = true)
+          NegativeResult.retryable(err.toString)
         )
 
         _ <- EitherT(
@@ -230,9 +231,10 @@ sealed trait LogicalSynchronizerUpgrade[Req <: LsuRequest] extends NamedLogging 
                 Because preconditions are checked, a failure of the upgrade is not something that can be automatically
                 recovered from (except DB exceptions).
                */
-              NegativeResult(
-                s"Unable to upgrade $currentPsid to ${request.successorPsid}. Not retrying. Cause: $error",
-                isRetryable = false,
+              NegativeResult.nonRetryable(
+                LsuError.Internal.Error(
+                  s"Unable to upgrade $currentPsid to ${request.successorPsid}. Not retrying. Cause: $error"
+                )
               )
             }.value,
             description = s"$kind-lsu-upgrade",
@@ -256,41 +258,40 @@ sealed trait LogicalSynchronizerUpgrade[Req <: LsuRequest] extends NamedLogging 
       upgradeTime,
       isLateUpgrade = false,
     )
-
-    synchronizerConnectionConfigStore
-      .upsert(
-        psid = successorPsid,
-        insert = (
-          successorConfig,
-          SynchronizerConnectionConfigStore.LsuTarget,
-          Some(predecessor),
-        ),
-        overrideSequencerConnections = Some(successorConfig.sequencerConnections),
-        overridePredecessor = Some(predecessor),
-      )
-      .leftMap(err =>
-        NegativeResult(s"Unable to store new synchronizer connection: $err", isRetryable = false)
-      )
-      .map(_ => ())
+    val insert = (successorConfig, SynchronizerConnectionConfigStore.LsuTarget, Some(predecessor))
+    for {
+      _ <- synchronizerConnectionConfigStore
+        .deactivatePriorLsuTargets(successorPsid)
+        .leftMap(err =>
+          NegativeResult.nonRetryable(
+            LsuError.Internal.Error(s"Unable to deactivate prior LSU targets: $err")
+          )
+        )
+      _ <-
+        synchronizerConnectionConfigStore
+          .upsert(
+            psid = successorPsid,
+            insert = insert,
+            overrideSequencerConnections = Some(successorConfig.sequencerConnections),
+            overridePredecessor = Some(predecessor),
+          )
+          .leftMap(err =>
+            NegativeResult.nonRetryable(
+              LsuError.Internal.Error(s"Unable to store new synchronizer connection: $err")
+            )
+          )
+    } yield ()
   }
 
-  def isUpgradeDone(): Boolean =
-    synchronizerConnectionConfigStore
+  protected def ifAnythingToBeDone(
+      f: () => EitherT[FutureUnlessShutdown, NegativeResult, UpgradabilityCheckResult]
+  ): EitherT[FutureUnlessShutdown, NegativeResult, UpgradabilityCheckResult] = {
+    val nothingToBeDone = synchronizerConnectionConfigStore
       .get(successorPsid)
-      .fold(
-        _ => false, // successor is not registered yet
-        _.status match {
-          case SynchronizerConnectionConfigStore.Active |
-              SynchronizerConnectionConfigStore.Inactive |
-              SynchronizerConnectionConfigStore.HardMigratingSource |
-              SynchronizerConnectionConfigStore.LsuSource =>
-            true
-
-          case SynchronizerConnectionConfigStore.HardMigratingTarget |
-              SynchronizerConnectionConfigStore.LsuTarget =>
-            false
-        },
-      )
+      .exists(_.status != SynchronizerConnectionConfigStore.LsuTarget)
+    if (nothingToBeDone) EitherT.pure(UpgradabilityCheckResult.UpgradeDone)
+    else f()
+  }
 }
 
 /** Contains methods that are used for both the [[AutomaticLogicalSynchronizerUpgrade]] amd
@@ -312,7 +313,7 @@ trait CheckedLogicalSynchronizerUpgrade[Req <: LsuRequest] extends LogicalSynchr
 
   def metrics: ParticipantMetrics
 
-  protected def upgradeInternal(): EitherT[FutureUnlessShutdown, String, Unit] = {
+  protected def upgradeInternal(): EitherT[FutureUnlessShutdown, LsuError, Unit] = {
     logger.info(s"Upgrade from $currentPsid to $successorPsid")
 
     val upgradabilityCheck =
@@ -336,7 +337,9 @@ trait CheckedLogicalSynchronizerUpgrade[Req <: LsuRequest] extends LogicalSynchr
             EitherTUtil.unitUS
         }
 
-        _ <- connectSynchronizer(traceContext).leftMap(_.toString)
+        _ <- connectSynchronizer(traceContext)
+          .leftMap(err => LsuError.SynchronizerConnection.Error(err.toString))
+          .leftWiden[LsuError]
       } yield (),
       operation = s"$kind upgrade from $currentPsid to $successorPsid",
     )
@@ -362,18 +365,20 @@ trait CheckedLogicalSynchronizerUpgrade[Req <: LsuRequest] extends LogicalSynchr
       case Left(error) =>
         // Left will lead to a retry
         FutureUnlessShutdown.pure(
-          NegativeResult(
-            s"Failed to connect to $alias to perform upgradability check: $error",
-            isRetryable = true,
-          ).asLeft
+          NegativeResult
+            .retryable(
+              s"Failed to connect to $alias to perform upgradability check: $error"
+            )
+            .asLeft
         )
 
       case Right(None) =>
         FutureUnlessShutdown.pure(
-          NegativeResult(
-            s"Failed to connect to $alias to perform upgradability check.",
-            isRetryable = true,
-          ).asLeft
+          NegativeResult
+            .retryable(
+              s"Failed to connect to $alias to perform upgradability check."
+            )
+            .asLeft
         )
 
       case Right(Some(`successorPsid`)) =>
@@ -388,10 +393,13 @@ trait CheckedLogicalSynchronizerUpgrade[Req <: LsuRequest] extends LogicalSynchr
 
       case Right(Some(other)) =>
         FutureUnlessShutdown.pure(
-          NegativeResult(
-            s"Node is connected to $other which is incompatible with upgrade from $currentPsid to $successorPsid",
-            isRetryable = false,
-          ).asLeft
+          NegativeResult
+            .nonRetryable(
+              LsuError.WrongPsid.Error(
+                s"Node is connected to $other which is incompatible with upgrade from $currentPsid to $successorPsid"
+              )
+            )
+            .asLeft
         )
 
     }
@@ -416,10 +424,11 @@ trait CheckedLogicalSynchronizerUpgrade[Req <: LsuRequest] extends LogicalSynchr
       case Left(error) =>
         // Left will lead to a retry
         FutureUnlessShutdown.pure(
-          NegativeResult(
-            s"Failed to disconnect from $alias to perform upgradability check: $error",
-            isRetryable = true,
-          ).asLeft
+          NegativeResult
+            .retryable(
+              s"Failed to disconnect from $alias to perform upgradability check: $error"
+            )
+            .asLeft
         )
 
       case Right(_) =>
@@ -438,30 +447,28 @@ trait CheckedLogicalSynchronizerUpgrade[Req <: LsuRequest] extends LogicalSynchr
     */
   protected def checkCleanSynchronizerIndex(
       upgradeTime: CantonTimestamp
-  ): EitherT[FutureUnlessShutdown, NegativeResult, Unit] =
+  ): Either[NegativeResult, Unit] =
     for {
-      synchronizerIndex <- EitherT.fromOptionF(
-        ledgerApiIndexer.asEval.value.ledgerApiStore.value.cleanSynchronizerIndex(lsid),
-        NegativeResult(
-          s"Unable to get synchronizer index for $lsid",
-          isRetryable = true,
-        ),
+      synchronizerIndex <- Either.fromOption(
+        ledgerApiIndexer.asEval.value.ledgerApiStore.cleanSynchronizerIndex(lsid),
+        NegativeResult.retryable(s"Unable to get synchronizer index for $lsid"),
       )
-
-      checkResultE =
+      _ <-
         if (synchronizerIndex.recordTime < upgradeTime)
-          NegativeResult(
-            s"Synchronizer index is not yet at upgrade time: should be at $upgradeTime time but found ${synchronizerIndex.recordTime}",
-            isRetryable = true,
-          ).asLeft
+          NegativeResult
+            .retryable(
+              s"Synchronizer index is not yet at upgrade time: should be at $upgradeTime time but found ${synchronizerIndex.recordTime}"
+            )
+            .asLeft
         else if (synchronizerIndex.recordTime > upgradeTime)
-          NegativeResult(
-            s"Synchronizer index is past upgrade time: should not be higher than $upgradeTime time but found ${synchronizerIndex.recordTime}",
-            isRetryable = false,
-          ).asLeft
+          NegativeResult
+            .nonRetryable(
+              LsuError.Internal.Error(
+                s"Synchronizer index is past upgrade time: should not be higher than $upgradeTime time but found ${synchronizerIndex.recordTime}"
+              )
+            )
+            .asLeft
         else ().asRight
-
-      _ <- EitherT.fromEither[FutureUnlessShutdown](checkResultE)
     } yield ()
 
   /** Check whether the current psid and the successor psid are compatible.
@@ -469,17 +476,22 @@ trait CheckedLogicalSynchronizerUpgrade[Req <: LsuRequest] extends LogicalSynchr
   protected def checkPsids(): EitherT[FutureUnlessShutdown, NegativeResult, Unit] = for {
     _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
       currentPsid.logical == request.lsid,
-      NegativeResult(
-        s"Current psid ($currentPsid) and request lsid (${request.lsid}) are incompatible ",
-        isRetryable = false,
+      NegativeResult.nonRetryable(
+        LsuError.WrongPsid.Error(
+          s"Current psid ($currentPsid) and request lsid (${request.lsid}) are incompatible "
+        )
       ),
     )
 
     _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+      // we only require that the successor psid is larger, so that in a disaster recovery scenario
+      // users can roll forward to a synchronizer that is different from the synchronizer in the
+      // LsuAnnouncement topology mapping, if there even is one in the topology store.
       currentPsid < request.successorPsid,
-      NegativeResult(
-        s"Current psid ($currentPsid) is not smaller than successor psid (${request.successorPsid})",
-        isRetryable = false,
+      NegativeResult.nonRetryable(
+        LsuError.WrongPsid.Error(
+          s"Current psid ($currentPsid) is not smaller than successor psid (${request.successorPsid})"
+        )
       ),
     )
   } yield ()
@@ -491,7 +503,7 @@ trait CheckedLogicalSynchronizerUpgrade[Req <: LsuRequest] extends LogicalSynchr
     *   - `canBeUpgradedTo` returns Right(`ReadyToUpgrade`)
     *   - Node is disconnected from the synchronizer
     */
-  override protected def performUpgradeInternal(): EitherT[FutureUnlessShutdown, String, Unit] = {
+  override protected def performUpgradeInternal(): EitherT[FutureUnlessShutdown, LsuError, Unit] = {
 
     logger.info(s"Marking synchronizer connection $currentPsid as inactive")
 
@@ -503,14 +515,16 @@ trait CheckedLogicalSynchronizerUpgrade[Req <: LsuRequest] extends LogicalSynchr
           SynchronizerConnectionConfigStore.LsuSource,
         )
         .leftMap(err =>
-          s"Unable to mark current synchronizer $currentPsid as inactive (Status: LsuSource): $err"
+          LsuError.Internal.Error(
+            s"Unable to mark current synchronizer $currentPsid as inactive (Status: LsuSource): $err"
+          ): LsuError
         )
 
       /*
       Handshake and topology copy are useless now: the node is doing the LSU regardless of the outcome.
        Potential issues will be flagged upon connection attempt to the synchronizer.
        */
-      _ <- EitherT.rightT[FutureUnlessShutdown, String](
+      _ <- EitherT.rightT[FutureUnlessShutdown, LsuError](
         pendingLsuOperationsStore.delete(
           currentPsid,
           PendingLsuOperation.operationKey,
@@ -527,10 +541,15 @@ trait CheckedLogicalSynchronizerUpgrade[Req <: LsuRequest] extends LogicalSynchr
           SynchronizerConnectionConfigStore.Active,
         )
         .leftMap(err =>
-          s"Unable to mark successor synchronizer ${request.successorPsid} as active: $err"
+          LsuError.Internal.Error(
+            s"Unable to mark successor synchronizer ${request.successorPsid} as active: $err"
+          ): LsuError
         )
 
-      _ = metrics.setLsuStatus(ParticipantMetrics.LsuStatus.LsuDone, request.successorPsid)
+      _ = metrics.setLsuStatus(
+        ParticipantMetrics.LsuStatus.LsuDone,
+        request.successorPsid.opaque,
+      )
     } yield logger.info(s"${kind.capitalize} upgrade was successful")
   }
 }
@@ -570,6 +589,7 @@ class AutomaticLogicalSynchronizerUpgrade(
     override val pendingLsuOperationsStore: PendingLsuOperation.Store,
     override val lsuConfig: LsuConfig,
     override val loggerFactory: NamedLoggerFactory,
+    disableLegacyAcsCommitmentProcessor: AcsCommitmentConfig.DisableOldAcsCommitmentProcessor,
 )(override val request: FullAutomaticLsuRequest)(implicit
     override val executionContext: ExecutionContext,
     override val traceContext: TraceContext,
@@ -594,14 +614,14 @@ class AutomaticLogicalSynchronizerUpgrade(
     *   - The upgrade involves operations that are retried, so the method can take some time to
     *     complete.
     */
-  def upgrade(): EitherT[FutureUnlessShutdown, String, Unit] = {
+  def upgrade(): EitherT[FutureUnlessShutdown, LsuError, Unit] = {
     logger.info(s"Upgrade from $currentPsid to $successorPsid")
 
     // Ensure upgrade is not attempted if announcement was revoked
-    def ensureUpgradeOngoing(): EitherT[FutureUnlessShutdown, String, Unit] = for {
+    def ensureUpgradeOngoing(): EitherT[FutureUnlessShutdown, LsuError, Unit] = for {
       topologyStore <- EitherT.fromOption[FutureUnlessShutdown](
         syncPersistentStateManager.get(currentPsid).map(_.topologyStore),
-        "Unable to find topology store",
+        LsuError.Internal.Error("Unable to find topology store"),
       )
 
       announcements <- EitherT
@@ -619,15 +639,20 @@ class AutomaticLogicalSynchronizerUpgrade(
         .map(_.result.map(_.transaction.mapping))
 
       _ <- announcements match {
-        case Seq() => EitherT.leftT[FutureUnlessShutdown, Unit]("No synchronizer upgrade ongoing")
+        case Seq() =>
+          EitherT.leftT[FutureUnlessShutdown, Unit](
+            LsuError.Internal.Error("No synchronizer upgrade ongoing"): LsuError
+          )
         case Seq(head) =>
           EitherT.cond[FutureUnlessShutdown](
             head.successor == synchronizerSuccessor,
             (),
-            s"Expected synchronizer successor to be $synchronizerSuccessor but found ${head.successor} in topology state",
+            LsuError.Internal.Error(
+              s"Expected synchronizer successor to be $synchronizerSuccessor but found ${head.successor} in topology state"
+            ): LsuError,
           )
         case _more =>
-          EitherT.liftF[FutureUnlessShutdown, String, Unit](
+          EitherT.liftF[FutureUnlessShutdown, LsuError, Unit](
             FutureUnlessShutdown.failed(
               new IllegalStateException("Found several SynchronizerUpgradeAnnouncement")
             )
@@ -652,77 +677,81 @@ class AutomaticLogicalSynchronizerUpgrade(
     val upgradeTime = request.upgradeTime
 
     def runningCommitmentWatermarkCheck(
-        runningCommitmentWatermark: CantonTimestamp
+        currentSyncPersistentState: SyncPersistentState
     ): EitherT[FutureUnlessShutdown, NegativeResult, Unit] =
-      if (runningCommitmentWatermark == upgradeTime)
-        EitherTUtil.unitUS
-      else if (runningCommitmentWatermark < upgradeTime)
-        EitherT.leftT(
-          NegativeResult(
-            s"Running commitment watermark ($runningCommitmentWatermark) did not reach the upgrade time ($upgradeTime) yet",
-            isRetryable = true,
-          )
+      if (
+        !AcsCommitmentConfig.DisableOldAcsCommitmentProcessor.isOldProcessorEnabled(
+          disableLegacyAcsCommitmentProcessor,
+          currentPsid.protocolVersion,
         )
-      else
-        EitherT.leftT(
-          NegativeResult(
-            s"Running commitment watermark ($runningCommitmentWatermark) is already past the upgrade time ($upgradeTime). Upgrade is impossible.",
-            isRetryable = false,
-          )
-        )
-
-    def upgradeCheck(): EitherT[FutureUnlessShutdown, NegativeResult, Unit] = for {
-      _ <- checkPsids()
-
-      _ <- checkCleanSynchronizerIndex(upgradeTime)
-
-      currentSyncPersistentState <- EitherT.fromEither[FutureUnlessShutdown](
-        syncPersistentStateManager
-          .get(currentPsid)
-          .toRight(
-            NegativeResult(
-              s"Unable to find persistent state for $currentPsid",
-              isRetryable = false,
+      ) EitherTUtil.unitUS
+      else {
+        val fut = currentSyncPersistentState.acsCommitmentStore.runningCommitments.watermark.map {
+          watermark =>
+            val runningCommitmentWatermark = watermark.timestamp
+            Either.cond(
+              runningCommitmentWatermark == upgradeTime,
+              (),
+              if (runningCommitmentWatermark < upgradeTime)
+                NegativeResult.retryable(
+                  s"Running commitment watermark ($runningCommitmentWatermark) did not reach the upgrade time ($upgradeTime) yet"
+                )
+              else
+                NegativeResult.nonRetryable(
+                  LsuError.Internal.Error(
+                    s"Running commitment watermark ($runningCommitmentWatermark) is already past the upgrade time ($upgradeTime). Upgrade is impossible."
+                  )
+                ),
             )
-          )
-      )
+        }
+        EitherT(fut)
+      }
 
-      runningCommitmentWatermark <- EitherT.liftF(
-        currentSyncPersistentState.acsCommitmentStore.runningCommitments.watermark.map(_.timestamp)
-      )
+    ifAnythingToBeDone { () =>
+      for {
+        _ <- checkPsids()
 
-      _ <- runningCommitmentWatermarkCheck(runningCommitmentWatermark)
+        _ <- EitherT.fromEither[FutureUnlessShutdown](checkCleanSynchronizerIndex(upgradeTime))
 
-      topologySnapshot = new StoreBasedTopologySnapshot(
-        psid = currentSyncPersistentState.psid, // guaranteed to be same as currentPsid
-        timestamp = request.upgradeTime,
-        store = currentSyncPersistentState.topologyStore,
-        packageDependencyResolver = NoPackageDependencies,
-        loggerFactory = loggerFactory,
-      )
-
-      successors <- EitherT.liftF(
-        topologySnapshot.sequencerConnectionSuccessors(request.successorPsid)
-      )
-
-      successorSynchronizerConnectionConfig <- LogicalSynchronizerUpgrade
-        .prepareNewSynchronizerConnectionConfig(
-          psid = currentPsid,
-          successorPsid = successorPsid,
-          sequencerSuccessors = successors.fmap(_.mapping),
-          configStore = synchronizerConnectionConfigStore,
-          warnOnIncomplete = true,
+        currentSyncPersistentState <- EitherT.fromEither[FutureUnlessShutdown](
+          syncPersistentStateManager
+            .get(currentPsid)
+            .toRight(
+              NegativeResult.nonRetryable(
+                LsuError.Internal.Error(s"Unable to find persistent state for $currentPsid")
+              )
+            )
         )
 
-      _ <- storesSuccessorSynchronizerConnectionConfig(
-        upgradeTime,
-        successorSynchronizerConnectionConfig,
-      )
-    } yield ()
+        _ <- runningCommitmentWatermarkCheck(currentSyncPersistentState)
 
-    if (isUpgradeDone())
-      EitherT.pure[FutureUnlessShutdown, NegativeResult](UpgradabilityCheckResult.UpgradeDone)
-    else upgradeCheck().map(_ => UpgradabilityCheckResult.ReadyToUpgrade)
+        topologySnapshot = new StoreBasedTopologySnapshot(
+          psid = currentSyncPersistentState.psid, // guaranteed to be same as currentPsid
+          timestamp = request.upgradeTime,
+          store = currentSyncPersistentState.topologyStore,
+          packageDependencyResolver = NoPackageDependencies,
+          loggerFactory = loggerFactory,
+        )
+
+        successors <- EitherT.liftF(
+          topologySnapshot.sequencerConnectionSuccessors(request.successorPsid.opaque)
+        )
+
+        successorSynchronizerConnectionConfig <- LogicalSynchronizerUpgrade
+          .prepareNewSynchronizerConnectionConfig(
+            psid = currentPsid,
+            successorPsid = successorPsid,
+            sequencerSuccessors = successors.fmap(_.mapping),
+            configStore = synchronizerConnectionConfigStore,
+            warnOnIncomplete = true,
+          )
+
+        _ <- storesSuccessorSynchronizerConnectionConfig(
+          upgradeTime,
+          successorSynchronizerConnectionConfig,
+        )
+      } yield UpgradabilityCheckResult.ReadyToUpgrade
+    }
   }
 }
 
@@ -765,9 +794,13 @@ class FinishAutomaticLogicalSynchronizerUpgrade(
     */
   def finishUpgradeWithoutChecks(): EitherT[FutureUnlessShutdown, String, Unit] =
     for {
-      _disconnect <- disconnectSynchronizer(traceContext)
-        .leftMap(err => NegativeResult(err.toString, isRetryable = true))
-        .leftMap(_.details)
+      _disconnect <- EitherT(
+        runWithRetries(
+          disconnectSynchronizer(traceContext)
+            .leftMap(err => NegativeResult.retryable(err.toString))
+            .value
+        )
+      ).leftMap(_.cause)
 
       _ <- enqueueOperation(
         operation = performUpgradeInternal().leftMap { error =>
@@ -775,14 +808,15 @@ class FinishAutomaticLogicalSynchronizerUpgrade(
           Because preconditions are checked, a failure of the upgrade is not something that can be automatically
           recovered from (except DB exceptions).
            */
-          NegativeResult(
-            s"Unable to finish upgrade of $currentPsid to $successorPsid. Not retrying. Cause: $error",
-            isRetryable = false,
+          NegativeResult.nonRetryable(
+            LsuError.Internal.Error(
+              s"Unable to finish upgrade of $currentPsid to $successorPsid. Not retrying. Cause: $error"
+            )
           )
         }.value,
         description = s"finish-lsu-upgrade",
         shouldBeConnected = false,
-      ).pipe(EitherT(_)).leftMap(_.details)
+      ).pipe(EitherT(_)).leftMap(_.error.cause)
     } yield ()
 
   override protected def canBeUpgradedTo()
@@ -801,7 +835,7 @@ sealed trait ManualLogicalSynchronizerUpgrade[Req <: ManualLsuRequest]
           sequencerSuccessors.map { case (sequencerId, connection) =>
             sequencerId -> LsuSequencerConnectionSuccessor(
               sequencerId,
-              successorPsid = request.successorPsid,
+              successorPsid = request.successorPsid.opaque,
               connection,
             )
           }
@@ -841,7 +875,8 @@ object ManualLogicalSynchronizerUpgrade {
       executionContext: ExecutionContext,
       traceContext: TraceContext,
       closeContext: CloseContext,
-  ): EitherT[FutureUnlessShutdown, String, Unit] =
+      elc: ErrorLoggingContext,
+  ): EitherT[FutureUnlessShutdown, LsuError, Unit] =
     request.upgradeTime match {
       case Some(_) =>
         for {
@@ -920,7 +955,7 @@ class OnlineManualLogicalSynchronizerUpgrade(
 
   def upgrade()(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, Unit] = {
+  ): EitherT[FutureUnlessShutdown, LsuError, Unit] = {
     logger.info(
       s"Manual upgrade from $currentPsid to ${request.successorPsid} with upgrade time ${request.upgradeTime}"
     )
@@ -932,25 +967,23 @@ class OnlineManualLogicalSynchronizerUpgrade(
   }
 
   override protected def canBeUpgradedTo()
-      : EitherT[FutureUnlessShutdown, NegativeResult, UpgradabilityCheckResult] = {
+      : EitherT[FutureUnlessShutdown, NegativeResult, UpgradabilityCheckResult] =
+    ifAnythingToBeDone { () =>
+      for {
+        _ <- checkPsids()
 
-    def upgradeCheck(): EitherT[FutureUnlessShutdown, NegativeResult, Unit] = for {
-      _ <- checkPsids()
+        _ <- EitherT.fromEither[FutureUnlessShutdown](
+          checkCleanSynchronizerIndex(request.upgradeTime)
+        )
 
-      _ <- checkCleanSynchronizerIndex(request.upgradeTime)
+        successorSynchronizerConnectionConfig <- prepareNewSynchronizerConnectionConfig()
 
-      successorSynchronizerConnectionConfig <- prepareNewSynchronizerConnectionConfig()
-
-      _ <- storesSuccessorSynchronizerConnectionConfig(
-        request.upgradeTime,
-        successorSynchronizerConnectionConfig,
-      )
-    } yield ()
-
-    if (isUpgradeDone())
-      EitherT.pure[FutureUnlessShutdown, NegativeResult](UpgradabilityCheckResult.UpgradeDone)
-    else upgradeCheck().map(_ => UpgradabilityCheckResult.ReadyToUpgrade)
-  }
+        _ <- storesSuccessorSynchronizerConnectionConfig(
+          request.upgradeTime,
+          successorSynchronizerConnectionConfig,
+        )
+      } yield UpgradabilityCheckResult.ReadyToUpgrade
+    }
 }
 
 /** Perform a manual logical synchronizer upgrade. This endpoint should ONLY be used when the
@@ -989,7 +1022,7 @@ class OfflineManualLogicalSynchronizerUpgrade(
 ) extends ManualLogicalSynchronizerUpgrade[OfflineManualLsuRequest] {
   override def kind: String = "manual-offline"
 
-  def upgrade(): EitherT[FutureUnlessShutdown, String, Unit] = {
+  def upgrade(): EitherT[FutureUnlessShutdown, LsuError, Unit] = {
     logger.info(s"Manual upgrade from $currentPsid to $successorPsid")
 
     performIfNotUpgradedYet(
@@ -1000,49 +1033,43 @@ class OfflineManualLogicalSynchronizerUpgrade(
 
   // This method MUST be called when the node is disconnected from the synchronizer
   override protected def canBeUpgradedTo()
-      : EitherT[FutureUnlessShutdown, NegativeResult, UpgradabilityCheckResult] = {
+      : EitherT[FutureUnlessShutdown, NegativeResult, UpgradabilityCheckResult] =
+    ifAnythingToBeDone { () =>
+      for {
+        _ <- checkPsids()
 
-    def upgradeCheck(): EitherT[FutureUnlessShutdown, NegativeResult, Unit] = for {
-      _ <- checkPsids()
+        successorSynchronizerConnectionConfig <- prepareNewSynchronizerConnectionConfig()
 
-      successorSynchronizerConnectionConfig <- prepareNewSynchronizerConnectionConfig()
-
-      // Ensure the node will not connect to the current synchronizer...
-      _ <- synchronizerConnectionConfigStore
-        .setStatus(
-          request.alias,
-          KnownPhysicalSynchronizerId(currentPsid),
-          SynchronizerConnectionConfigStore.LsuSource,
-        )
-        .leftMap(err =>
-          NegativeResult(
-            s"Unable to mark current synchronizer $currentPsid as inactive: $err",
-            isRetryable = false,
+        // Ensure the node will not connect to the current synchronizer...
+        _ <- synchronizerConnectionConfigStore
+          .setStatus(
+            request.alias,
+            KnownPhysicalSynchronizerId(currentPsid),
+            SynchronizerConnectionConfigStore.LsuSource,
           )
-        )
-
-      // ... so that the clean synchronizer index will not progress anymore
-      upgradeTime <- OptionT(
-        ledgerApiIndexer.asEval.value.ledgerApiStore.value
-          .cleanSynchronizerIndex(request.lsid)
-      ).map(_.recordTime)
-        .toRight(
-          NegativeResult(
-            s"Unable to get synchronizer index for ${request.lsid}",
-            isRetryable = true,
+          .leftMap(err =>
+            NegativeResult.nonRetryable(
+              LsuError.MalformedRequest
+                .Error(s"Unable to mark current synchronizer $currentPsid as inactive: $err")
+            )
           )
+
+        // ... so that the clean synchronizer index will not progress anymore
+        upgradeTime <- EitherT.fromEither[FutureUnlessShutdown](
+          ledgerApiIndexer.asEval.value.ledgerApiStore
+            .cleanSynchronizerIndex(request.lsid)
+            .map(_.recordTime)
+            .toRight(
+              NegativeResult.retryable(s"Unable to get synchronizer index for ${request.lsid}")
+            )
         )
 
-      _ <- storesSuccessorSynchronizerConnectionConfig(
-        upgradeTime,
-        successorSynchronizerConnectionConfig,
-      )
-    } yield ()
-
-    if (isUpgradeDone())
-      EitherT.pure[FutureUnlessShutdown, NegativeResult](UpgradabilityCheckResult.UpgradeDone)
-    else upgradeCheck().map(_ => UpgradabilityCheckResult.ReadyToUpgrade)
-  }
+        _ <- storesSuccessorSynchronizerConnectionConfig(
+          upgradeTime,
+          successorSynchronizerConnectionConfig,
+        )
+      } yield UpgradabilityCheckResult.ReadyToUpgrade
+    }
 }
 
 /** This class implements late manual LSU. It should be called for participants that are upgrading
@@ -1075,10 +1102,10 @@ class UncheckedLateLogicalSynchronizerUpgrade(
 
   override def kind: String = "late"
 
-  def upgrade(): EitherT[FutureUnlessShutdown, String, Unit] =
+  def upgrade(): EitherT[FutureUnlessShutdown, LsuError, Unit] =
     EitherT(runWithRetries(performUpgrade().value))
 
-  override protected def performUpgradeInternal(): EitherT[FutureUnlessShutdown, String, Unit] = {
+  override protected def performUpgradeInternal(): EitherT[FutureUnlessShutdown, LsuError, Unit] = {
     logger.info(s"Marking synchronizer connection $currentPsid as inactive")
 
     for {
@@ -1088,12 +1115,12 @@ class UncheckedLateLogicalSynchronizerUpgrade(
           KnownPhysicalSynchronizerId(currentPsid),
           SynchronizerConnectionConfigStore.LsuSource,
         )
-        .leftMap(_.message)
+        .leftMap(err => LsuError.Internal.Error(err.message): LsuError)
 
       /* Handshake and topology copy are useless now: the node is doing the LSU regardless of the
        * outcome. Potential issues will be flagged upon connection attempt to the synchronizer.
        */
-      _ <- EitherT.rightT[FutureUnlessShutdown, String](
+      _ <- EitherT.rightT[FutureUnlessShutdown, LsuError](
         pendingLsuOperationsStore.delete(
           currentPsid,
           PendingLsuOperation.operationKey,
@@ -1117,7 +1144,10 @@ class UncheckedLateLogicalSynchronizerUpgrade(
                 )
               ),
             )
-            .leftMap(err => s"Unable to store connection config for $successorPsid: $err")
+            .leftMap(err =>
+              LsuError.Internal
+                .Error(s"Unable to store connection config for $successorPsid: $err"): LsuError
+            )
 
         case Right(foundConfig) =>
           logger.info(s"Marking synchronizer connection $successorPsid as active")
@@ -1127,10 +1157,17 @@ class UncheckedLateLogicalSynchronizerUpgrade(
               foundConfig.configuredPsid,
               SynchronizerConnectionConfigStore.Active,
             )
-            .leftMap(err => s"Unable to mark successor synchronizer $successorPsid as active: $err")
+            .leftMap(err =>
+              LsuError.Internal.Error(
+                s"Unable to mark successor synchronizer $successorPsid as active: $err"
+              ): LsuError
+            )
       }
 
-      _ = metrics.setLsuStatus(ParticipantMetrics.LsuStatus.LsuDone, request.successorPsid)
+      _ = metrics.setLsuStatus(
+        ParticipantMetrics.LsuStatus.LsuDone,
+        request.successorPsid.opaque,
+      )
     } yield logger.info("Late upgrade was successful")
   }
 }
@@ -1145,7 +1182,16 @@ object LogicalSynchronizerUpgrade {
     *   - True when the operation can be retried (e.g., if the upgrade is not ready *yet*)
     *   - False when the operation should not be retried (e.g., invariant of a store violated)
     */
-  final case class NegativeResult(details: String, isRetryable: Boolean)
+  final case class NegativeResult private (error: LsuError, isRetryable: Boolean)
+
+  object NegativeResult {
+
+    /** Indicates an error that will be retried */
+    def retryable(msg: String)(implicit elc: ErrorLoggingContext): NegativeResult =
+      NegativeResult(LsuError.Transient.Error(msg), isRetryable = true)
+
+    def nonRetryable(error: LsuError): NegativeResult = NegativeResult(error, isRetryable = false)
+  }
 
   sealed trait LsuRequest {
     def currentPsid: PhysicalSynchronizerId
@@ -1163,8 +1209,8 @@ object LogicalSynchronizerUpgrade {
       alias: SynchronizerAlias,
       currentPsid: PhysicalSynchronizerId,
       successor: SynchronizerSuccessor,
+      override val successorPsid: PhysicalSynchronizerId,
   ) extends AutomaticLsu {
-    override def successorPsid: PhysicalSynchronizerId = successor.psid
     def upgradeTime: CantonTimestamp = successor.upgradeTime
 
     override def isOnline: Boolean = true
@@ -1180,20 +1226,28 @@ object LogicalSynchronizerUpgrade {
   }
 
   sealed trait SuccessorConnectionConfiguration extends Product with Serializable {
-    def compatibilityCheck(alias: SynchronizerAlias): Either[String, Unit]
+    def compatibilityCheck(alias: SynchronizerAlias)(implicit
+        elc: ErrorLoggingContext
+    ): Either[LsuError, Unit]
   }
 
   final case class SequencerSuccessors(sequencerSuccessors: Map[SequencerId, GrpcConnection])
       extends SuccessorConnectionConfiguration {
-    override def compatibilityCheck(alias: SynchronizerAlias): Either[String, Unit] = Right(())
+    override def compatibilityCheck(alias: SynchronizerAlias)(implicit
+        elc: ErrorLoggingContext
+    ): Either[LsuError, Unit] = Right(())
   }
   final case class NewConfig(config: SynchronizerConnectionConfig)
       extends SuccessorConnectionConfiguration {
-    override def compatibilityCheck(alias: SynchronizerAlias): Either[String, Unit] =
+    override def compatibilityCheck(alias: SynchronizerAlias)(implicit
+        elc: ErrorLoggingContext
+    ): Either[LsuError, Unit] =
       Either.cond(
         config.synchronizerAlias == alias,
         (),
-        s"synchronizer alias $alias is not compatible with the alias in the configuration (${config.synchronizerAlias})",
+        LsuError.MalformedRequest.Error(
+          s"synchronizer alias $alias is not compatible with the alias in the configuration (${config.synchronizerAlias})"
+        ),
       )
   }
 
@@ -1215,9 +1269,11 @@ object LogicalSynchronizerUpgrade {
     def create(
         request: AdminManualLsuRequest,
         alias: SynchronizerAlias,
-    ): Either[String, OnlineManualLsuRequest] =
+    )(implicit elc: ErrorLoggingContext): Either[LsuError, OnlineManualLsuRequest] =
       for {
-        upgradeTime <- request.upgradeTime.toRight("Upgrade time should be defined for online LSU")
+        upgradeTime <- request.upgradeTime.toRight(
+          LsuError.MalformedRequest.Error("Upgrade time should be defined for online LSU")
+        )
         _ <- request.successorConnectionConfiguration.compatibilityCheck(alias)
       } yield OnlineManualLsuRequest(
         alias = alias,
@@ -1241,10 +1297,13 @@ object LogicalSynchronizerUpgrade {
     def create(
         request: AdminManualLsuRequest,
         alias: SynchronizerAlias,
-    ): Either[String, OfflineManualLsuRequest] =
+    )(implicit elc: ErrorLoggingContext): Either[LsuError, OfflineManualLsuRequest] =
       for {
         _ <- request.upgradeTime
-          .map(ts => s"Upgrade time should not be defined for offline LSU but found $ts")
+          .map(ts =>
+            LsuError.MalformedRequest
+              .Error(s"Upgrade time should not be defined for offline LSU but found $ts")
+          )
           .toLeft(())
         _ <- request.successorConnectionConfiguration.compatibilityCheck(alias)
       } yield OfflineManualLsuRequest(
@@ -1259,9 +1318,10 @@ object LogicalSynchronizerUpgrade {
       successorConfig: SynchronizerConnectionConfig,
       currentPsid: PhysicalSynchronizerId,
       successor: SynchronizerSuccessor,
+      override val successorPsid: PhysicalSynchronizerId,
   ) extends LsuRequest {
     def alias: SynchronizerAlias = successorConfig.synchronizerAlias
-    override def successorPsid: PhysicalSynchronizerId = successor.psid
+
     override def isOnline: Boolean = false
 
     def upgradeTime: CantonTimestamp = successor.upgradeTime
@@ -1287,7 +1347,12 @@ object LogicalSynchronizerUpgrade {
       currentConfig <- EitherT.fromEither[FutureUnlessShutdown](
         configStore
           .get(psid)
-          .leftMap(err => NegativeResult(err.message, isRetryable = false))
+          .leftMap(err =>
+            NegativeResult.nonRetryable(
+              LsuError.Internal
+                .Error(s"Synchronizer connection configuration store error: ${err.message}")
+            )
+          )
       )
       currentSequencerConnections = currentConfig.config.sequencerConnections
 
@@ -1333,7 +1398,9 @@ object LogicalSynchronizerUpgrade {
       newConnectionsNE <- EitherT.fromOption[FutureUnlessShutdown](
         NonEmpty.from(newConnections),
         // if there are no new connections with known successors, i.e. list newConnections is empty, return an error
-        NegativeResult("No sequencer successor was found", isRetryable = false),
+        NegativeResult.nonRetryable(
+          LsuError.MalformedRequest.Error("No sequencer successor was found")
+        ),
       )
 
       newSequencerConnections <-
@@ -1342,17 +1409,18 @@ object LogicalSynchronizerUpgrade {
             currentSequencerConnections
               .modifyConnections(newConnectionsNE)
               .leftMap(err =>
-                NegativeResult(
-                  s"Unable to build new sequencer connections: $err",
-                  isRetryable = false,
+                NegativeResult.nonRetryable(
+                  LsuError.MalformedRequest
+                    .Error(s"Unable to build new sequencer connections: $err")
                 )
               )
           )
         } else {
           EitherT.leftT[FutureUnlessShutdown, SequencerConnections](
-            NegativeResult(
-              s"Not enough successors sequencers (${newConnections.size}) to meet the sequencer threshold (${currentSequencerConnections.sequencerTrustThreshold})",
-              isRetryable = false,
+            NegativeResult.nonRetryable(
+              LsuError.MalformedRequest.Error(
+                s"Not enough successors sequencers (${newConnections.size}) to meet the sequencer threshold (${currentSequencerConnections.sequencerTrustThreshold})"
+              )
             )
           )
         }

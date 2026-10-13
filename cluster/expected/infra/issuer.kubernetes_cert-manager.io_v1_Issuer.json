@@ -1,0 +1,38 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "cert-manager.io/v1",
+    "kind": "Issuer",
+    "metadata": {
+      "name": "letsencrypt-production",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "acme": {
+        "email": "email-for-letsencrypt@test.com",
+        "preferredChain": "",
+        "privateKeySecretRef": {
+          "name": "letsencrypt-production-acme-account"
+        },
+        "server": "https://acme-v02.api.letsencrypt.org/directory",
+        "solvers": [
+          {
+            "dns01": {
+              "cloudDNS": {
+                "project": "da-gcp-canton-domain",
+                "serviceAccountSecretRef": {
+                  "key": "key.json",
+                  "name": "clouddns-dns01-solver-svc-acct"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "name": "issuer",
+  "provider": "",
+  "type": "kubernetes:cert-manager.io/v1:Issuer"
+}

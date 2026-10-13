@@ -65,7 +65,6 @@ class SvOnboardingMediatorProposalTrigger(
         .flatMap { domainConfigs =>
           val sequencerIdOpt = domainConfigs.sequencerIdentity.toScala
             .map(_.sequencerId)
-            .orElse(domainConfigs.sequencer.toScala.map(_.sequencerId))
           (domainConfigs.mediator.toScala -> sequencerIdOpt).tupled
         }
         .map { case (mediatorConfig, sequencerId) =>

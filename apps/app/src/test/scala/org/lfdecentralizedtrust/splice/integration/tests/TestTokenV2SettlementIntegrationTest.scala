@@ -816,8 +816,15 @@ class TestTokenV2SettlementIntegrationTest
             bobAllocateTx.getUpdateId -> ExpectedTrafficCost("Bob Allocations", 17333),
             settleTradeTx.getUpdateId -> ExpectedTrafficCost("Settle Trade", 22460),
           )
-        ).map { case (action, item) => action -> EventHistoryItem.encodeEventHistoryItem(item) }
-        val json = io.circe.JsonObject(events*)
+        )
+        events.foreach { case (action, item) =>
+          withClue(action)(item.appActivityRecords should be(defined))
+        }
+        val eventsJson =
+          events.map { case (action, item) =>
+            action -> EventHistoryItem.encodeEventHistoryItem(item)
+          }
+        val json = io.circe.JsonObject(eventsJson*)
         val savePath =
           java.io.File.createTempFile("test_token_v2_settlement_results", ".json").toPath
         Files.writeString(savePath, json.toJson.spaces2)

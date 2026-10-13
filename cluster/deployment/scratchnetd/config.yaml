@@ -1,13 +1,1 @@
-!include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml)
-infra:
-  gkeGateway:
-    # required for Cloud Armor to be attached to anything
-    proxyForIstioHttp: false
-cloudArmor:
-  enabled: false
-  allRulesPreviewOnly: false
-  wafRules:
-    enabled: true
-    previewOnly: false
-  logging:
-    enabled: true
+!include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml) {}

@@ -36,17 +36,21 @@ export async function setupBootstrapping(config: BootstrapParams): Promise<Boots
     config;
 
   if (participantIdentitiesFile && bootstrappingConfig) {
-    console.error(
+    await pulumi.log.error(
       `We can restore participant identities from *either* a file or from GCP,` +
         `but both PARTICIPANT_IDENTITIES_FILE and BOOTSTRAPPING_CONFIG have been set.`
     );
     exit(1);
   } else if (participantIdentitiesFile) {
-    console.error(`Bootstrapping participant identity from file ${participantIdentitiesFile}`);
+    await pulumi.log.info(
+      `Bootstrapping participant identity from file ${participantIdentitiesFile}`
+    );
   } else if (bootstrappingConfig) {
-    console.error(`Bootstrapping participant identity from cluster ${bootstrappingConfig.cluster}`);
+    await pulumi.log.info(
+      `Bootstrapping participant identity from cluster ${bootstrappingConfig.cluster}`
+    );
   } else {
-    console.error(`Bootstraping participant with fresh identity`);
+    await pulumi.log.info(`Bootstrapping participant with fresh identity`);
   }
 
   let participantBootstrapDumpSecret: pulumi.Resource | undefined;

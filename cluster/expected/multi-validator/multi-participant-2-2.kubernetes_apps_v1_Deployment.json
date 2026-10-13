@@ -1,0 +1,293 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+      "labels": {
+        "app": "multi-participant-2-2"
+      },
+      "namespace": "multi-validator"
+    },
+    "spec": {
+      "replicas": 1,
+      "selector": {
+        "matchLabels": {
+          "app": "multi-participant-2-2"
+        }
+      },
+      "strategy": {
+        "type": "Recreate"
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app": "multi-participant-2-2"
+          }
+        },
+        "spec": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "In",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "containers": [
+            {
+              "env": [
+                {
+                  "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
+                  "value": "postgres-2.multi-validator.svc.cluster.local"
+                },
+                {
+                  "name": "CANTON_PARTICIPANT_POSTGRES_DB",
+                  "value": "participant_2"
+                },
+                {
+                  "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
+                  "value": "cantonnet"
+                },
+                {
+                  "name": "CANTON_PARTICIPANT_POSTGRES_PASSWORD",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "postgresPassword",
+                      "name": "postgres-2-secret"
+                    }
+                  }
+                },
+                {
+                  "name": "LOG_LEVEL_CANTON",
+                  "value": "INFO"
+                },
+                {
+                  "name": "LOG_LEVEL_API_REQUEST",
+                  "value": "DEBUG"
+                },
+                {
+                  "name": "LOG_LEVEL_STDOUT",
+                  "value": "INFO"
+                },
+                {
+                  "name": "NUM_NODES",
+                  "value": "10"
+                },
+                {
+                  "name": "VALIDATOR_USERNAME_PREFIX",
+                  "value": "validator_user"
+                },
+                {
+                  "name": "AUTH_TARGET_AUDIENCE",
+                  "value": "https://canton.network.global"
+                },
+                {
+                  "name": "JAVA_TOOL_OPTIONS",
+                  "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                },
+                {
+                  "name": "MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS",
+                  "value": "canton.participants.participant_INDEX.storage.parameters.max-connections = 33"
+                }
+              ],
+              "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-participant:0.3.20",
+              "livenessProbe": {
+                "failureThreshold": 5,
+                "grpc": {
+                  "port": 5061,
+                  "service": "liveness"
+                },
+                "initialDelaySeconds": 60,
+                "periodSeconds": 60,
+                "timeoutSeconds": 10
+              },
+              "name": "multi-participant",
+              "ports": [
+                {
+                  "containerPort": 5001,
+                  "name": "lg-0",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5002,
+                  "name": "adm-0",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5101,
+                  "name": "lg-1",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5102,
+                  "name": "adm-1",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5201,
+                  "name": "lg-2",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5202,
+                  "name": "adm-2",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5301,
+                  "name": "lg-3",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5302,
+                  "name": "adm-3",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5401,
+                  "name": "lg-4",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5402,
+                  "name": "adm-4",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5501,
+                  "name": "lg-5",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5502,
+                  "name": "adm-5",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5601,
+                  "name": "lg-6",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5602,
+                  "name": "adm-6",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5701,
+                  "name": "lg-7",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5702,
+                  "name": "adm-7",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5801,
+                  "name": "lg-8",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5802,
+                  "name": "adm-8",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5901,
+                  "name": "lg-9",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5902,
+                  "name": "adm-9",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 10013,
+                  "name": "metrics"
+                },
+                {
+                  "containerPort": 9010,
+                  "name": "jmx"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "grpc": {
+                  "port": 5061
+                },
+                "initialDelaySeconds": 5,
+                "periodSeconds": 5,
+                "timeoutSeconds": 10
+              },
+              "resources": {
+                "limits": {
+                  "memory": "16Gi"
+                },
+                "requests": {
+                  "cpu": "1",
+                  "memory": "8Gi"
+                }
+              }
+            }
+          ],
+          "initContainers": [
+            {
+              "command": [
+                "bash",
+                "-c",
+                "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-2.multi-validator.svc.cluster.local --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_2_00\ncreateDb participant_2_01\ncreateDb participant_2_02\ncreateDb participant_2_03\ncreateDb participant_2_04\ncreateDb participant_2_05\ncreateDb participant_2_06\ncreateDb participant_2_07\ncreateDb participant_2_08\ncreateDb participant_2_09\n                      "
+              ],
+              "env": [
+                {
+                  "name": "PGPASSWORD",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "postgresPassword",
+                      "name": "postgres-2-secret"
+                    }
+                  }
+                }
+              ],
+              "image": "postgres:18",
+              "name": "pg-init"
+            }
+          ],
+          "securityContext": {
+            "fsGroup": 1001,
+            "runAsGroup": 1001,
+            "runAsUser": 1001
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "name": "multi-participant-2-2",
+  "provider": "",
+  "type": "kubernetes:apps/v1:Deployment"
+}

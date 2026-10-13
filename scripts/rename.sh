@@ -292,7 +292,7 @@ function subcmd_cleanup_full() {
 
   subcmd_cleanup_light
 
-  run_and_commit "cleanup: regenerate pulumi expected.json files" "make cluster/pulumi/update-expected"
+  run_and_commit "cleanup: regenerate pulumi expected files" "make cluster/pulumi/update-expected"
 }
 
 subcommand_whitelist[cleanup_light]='Cleanup: format all files and update non-cluster lock files'
@@ -1183,7 +1183,7 @@ subcommand_whitelist[no_illegal_daml_references]='Check for illegal daml referen
 function subcmd_no_illegal_daml_references() {
     local illegal_words=(
       currency founder founding leader collective consortium
-      coin cn whitepaper
+      coin whitepaper
       domain global
       DsoReward
       'google'
@@ -1226,18 +1226,17 @@ function subcmd_no_illegal_daml_references() {
     # TODO(tech-debt): create a proper top-level wrapper for these
     echo ""
     echo "Also checking frontend code:"
-    subcmd_no_amulet_in_ui
+    subcmd_no_ans_in_ui
 
     echo ""
     echo "Also checking repo-wide invariants:"
     subcmd_no_bad_things_repo_wide
 }
 
-subcommand_whitelist[no_amulet_in_ui]='Check for Amulet and ANS in user UI'
-function subcmd_no_amulet_in_ui() {
+subcommand_whitelist[no_ans_in_ui]='Check for ANS in user UI'
+function subcmd_no_ans_in_ui() {
     local illegal_patterns=(
       '(?<!TR)ANS(?!_LEDGER_NAME)'
-      "(?<!(Splice[./]|Config \())\bAmulet\b(?!( Rules| Config| to Issue|\)|'))"
       )
     for pattern in "${illegal_patterns[@]}"; do
         echo "Checking for occurences of '$pattern' in frontend code"

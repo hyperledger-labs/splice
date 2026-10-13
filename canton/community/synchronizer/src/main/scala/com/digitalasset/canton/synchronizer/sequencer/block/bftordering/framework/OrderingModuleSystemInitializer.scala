@@ -14,6 +14,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Pruning,
 }
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.BftOrderingMessage
+import com.digitalasset.canton.tracing.TraceContext
 
 import Module.{SystemInitializationResult, SystemInitializer}
 
@@ -36,7 +37,7 @@ class OrderingModuleSystemInitializer[
           P2PConnectionEventListener,
           ModuleRef[BftOrderingMessage],
       ) => P2PNetworkManagerT,
-  ): SystemInitializationResult[
+  )(implicit traceContext: TraceContext): SystemInitializationResult[
     E,
     P2PNetworkManagerT,
     BftOrderingMessage,
@@ -69,7 +70,7 @@ class OrderingModuleSystemInitializer[
       consensusRef,
       outputRef,
     )
-    val output = moduleFactories.output(availabilityRef, consensusRef)
+    val output = moduleFactories.output(availabilityRef, consensusRef, mempoolRef)
     val consensus =
       moduleFactories.consensus(p2pNetworkOutRef, availabilityRef, outputRef)
 
@@ -95,7 +96,6 @@ class OrderingModuleSystemInitializer[
       mempoolRef,
       p2pNetworkInRef,
       p2pNetworkOutRef,
-      consensusRef,
       outputRef,
       pruningRef,
       p2pNetworkManager,
@@ -138,6 +138,7 @@ object OrderingModuleSystemInitializer {
       output: (
           ModuleRef[Availability.Message[E]],
           ModuleRef[Consensus.Message[E]],
+          ModuleRef[Mempool.Message],
       ) => Output[E],
       pruning: () => Pruning[E],
   )

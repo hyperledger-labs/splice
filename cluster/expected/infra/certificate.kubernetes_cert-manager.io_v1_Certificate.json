@@ -1,0 +1,69 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "cert-manager.io/v1",
+    "kind": "Certificate",
+    "metadata": {
+      "name": "cn-test-stack-certificate",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "dnsNames": [
+        "mock.network.canton.global",
+        "*.mock.network.canton.global",
+        "*.validator.mock.network.canton.global",
+        "*.validator1.mock.network.canton.global",
+        "*.splitwell.mock.network.canton.global",
+        "*.sv.mock.network.canton.global",
+        "*.sv-2.mock.network.canton.global",
+        "*.sv-2-eng.mock.network.canton.global",
+        "*.sv-3-eng.mock.network.canton.global",
+        "*.sv-4-eng.mock.network.canton.global",
+        "*.sv-5-eng.mock.network.canton.global",
+        "*.sv-6-eng.mock.network.canton.global",
+        "*.sv-7-eng.mock.network.canton.global",
+        "*.sv-8-eng.mock.network.canton.global",
+        "*.sv-9-eng.mock.network.canton.global",
+        "*.sv-10-eng.mock.network.canton.global",
+        "*.sv-11-eng.mock.network.canton.global",
+        "*.sv-12-eng.mock.network.canton.global",
+        "*.sv-13-eng.mock.network.canton.global",
+        "*.sv-14-eng.mock.network.canton.global",
+        "*.sv-15-eng.mock.network.canton.global",
+        "*.sv-16-eng.mock.network.canton.global",
+        "*.sv-1.mock.network.canton.global",
+        "mock.global.canton.network.digitalasset.com",
+        "*.mock.global.canton.network.digitalasset.com",
+        "*.validator.mock.global.canton.network.digitalasset.com",
+        "*.validator1.mock.global.canton.network.digitalasset.com",
+        "*.splitwell.mock.global.canton.network.digitalasset.com",
+        "*.sv.mock.global.canton.network.digitalasset.com",
+        "*.sv-2.mock.global.canton.network.digitalasset.com",
+        "*.sv-2-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-3-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-4-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-5-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-6-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-7-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-8-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-9-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-10-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-11-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-12-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-13-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-14-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-15-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-16-eng.mock.global.canton.network.digitalasset.com",
+        "*.sv-1.mock.global.canton.network.digitalasset.com"
+      ],
+      "issuerRef": {
+        "name": "letsencrypt-production"
+      },
+      "secretName": "cn-test-stacknet-tls"
+    }
+  },
+  "name": "certificate",
+  "provider": "",
+  "type": "kubernetes:cert-manager.io/v1:Certificate"
+}

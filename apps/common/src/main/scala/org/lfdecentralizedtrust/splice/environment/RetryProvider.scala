@@ -169,6 +169,7 @@ final class RetryProvider(
               // No work done here, as we are only interested in the scheduling notification
               ()
             },
+            "schedule_after_unless_shutdown",
             java.time.Duration.ofNanos(delayNanos),
           )
       )

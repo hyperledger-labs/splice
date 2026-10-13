@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   metadatav1,
   transferinstructionv1,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletallocationCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.testing.apps.tradingapp
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.console.{
@@ -410,6 +411,21 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
 
     CreateAllocationRequestResult(trade, aliceRequest, bobRequest)
   }
+
+  def waitForAllocationsOnParticipant(
+      participant: ParticipantClientReference,
+      party: PartyId,
+      allocationIds: allocationv1.Allocation.ContractId*
+  ): Unit =
+    allocationIds.foreach { allocationId =>
+      clue(s"Wait for allocation $allocationId to be visible to $party on ${participant.id}") {
+        participant.ledger_api_extensions.acs
+          .awaitJava(amuletallocationCodegen.AmuletAllocation.COMPANION)(
+            party,
+            predicate = c => c.id.contractId == allocationId.contractId,
+          )
+      }
+    }
 
   def listAllocationRequests(
       walletClient: WalletAppClientReference

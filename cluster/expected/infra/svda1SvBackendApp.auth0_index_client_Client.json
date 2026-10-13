@@ -1,0 +1,12 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "appType": "non_interactive",
+    "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the SV backend for SV sv-da-1 on test-stack",
+    "name": "SVDA1 SV Backend (Pulumi managed, test-stack)"
+  },
+  "name": "svda1SvBackendApp",
+  "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+  "type": "auth0:index/client:Client"
+}

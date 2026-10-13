@@ -19,6 +19,7 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.data.{CantonTimestamp, ViewConfirmationParameters, ViewType}
 import com.digitalasset.canton.error.MediatorError
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
@@ -33,6 +34,7 @@ import com.digitalasset.canton.sequencing.{HandlerResult, UnthrottledAsync}
 import com.digitalasset.canton.synchronizer.mediator.store.MediatorState
 import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.EitherUtil.RichEither
@@ -93,9 +95,19 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
       event: MediatorEvent
   )(implicit traceContext: TraceContext): HandlerResult = {
     val requestTimestamp = event.requestId.unwrap
+    // No topology state exists at or before the initial topology sequencing time, so a request id
+    // in that range can never be serviced. Note that topology snapshots use a strict
+    // `validFrom < ts` check, which makes both `MinValue` and its immediate successor unserviceable.
+    val minimumRequestTimestamp = SignedTopologyTransaction.InitialTopologySequencingTime
     if (requestTimestamp > event.sequencingTimestamp) {
       val error = MediatorError.MalformedMessage.Reject(
         s"Received a mediator message for request $requestTimestamp with earlier sequencing time ${event.sequencingTimestamp}. Discarding the message."
+      )
+      error.report()
+      HandlerResult.done
+    } else if (requestTimestamp <= minimumRequestTimestamp) {
+      val error = MediatorError.MalformedMessage.Reject(
+        s"Received a mediator message for request $requestTimestamp at or before the synchronizer's initial topology sequencing time $minimumRequestTimestamp. Discarding the message."
       )
       error.report()
       HandlerResult.done
@@ -326,7 +338,13 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
                       decisionTime,
                     )
                   _ <- mediatorState.add(
-                    FinalizedResponse(requestId, request, requestId.unwrap, verdict)(traceContext)
+                    FinalizedResponse(
+                      requestId,
+                      request,
+                      requestId.unwrap,
+                      verdict,
+                      firstResponseReceived = None,
+                    )(traceContext)
                   )
                 } yield UnthrottledAsync.immediate // Already persisted above; nothing more to wait for
 
@@ -757,17 +775,9 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
               OptionT.liftF(FutureUnlessShutdown.failed(grpcError))
             } else OptionT.some[FutureUnlessShutdown](())
 
-          snapshot <- OptionT.liftF(crypto.awaitSnapshot(responses.requestId.unwrap))
-          _ <- signedResponses
-            .verifySignature(snapshot, responses.sender)
-            .leftMap(err =>
-              MediatorError.MalformedMessage
-                .Reject(
-                  s"$psid (timestamp: $ts): invalid signature from ${responses.sender} with $err"
-                )
-                .report()
-            )
-            .toOption
+          // The checks below do not depend on the topology state, so they run before the topology
+          // snapshot is queried at the sender-supplied request timestamp. Any of them discards a
+          // message that we would not act upon anyway.
           _ <-
             if (signedResponses.psid == psid)
               OptionT.some[FutureUnlessShutdown](())
@@ -819,6 +829,18 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
               }
             }
           }
+
+          snapshot <- OptionT.liftF(crypto.awaitSnapshot(responses.requestId.unwrap))
+          _ <- signedResponses
+            .verifySignature(snapshot, responses.sender)
+            .leftMap(err =>
+              MediatorError.MalformedMessage
+                .Reject(
+                  s"$psid (timestamp: $ts): invalid signature from ${responses.sender} with $err"
+                )
+                .report()
+            )
+            .toOption
 
           responseAggregation <- mediatorState.fetch(responses.requestId).orElse {
             val logErrorOnUnknownRequestIdF =

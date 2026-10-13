@@ -8,5 +8,9 @@
   "devDependencies": {
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
+  },
+  "allowScripts": {
+    "msw": true,
+    "file:../../dependencies/canton-json-api-v2/openapi-ts-client": true
   }
 }

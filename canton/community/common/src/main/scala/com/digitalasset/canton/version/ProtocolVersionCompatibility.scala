@@ -4,7 +4,6 @@
 package com.digitalasset.canton.version
 
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.ErrorCategory.SecurityAlert
 import com.digitalasset.base.error.{ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -15,6 +14,7 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion.InvalidProtocolVersion
 import com.digitalasset.canton.version.ProtocolVersionCompatibility.UnsupportedVersion
+import com.digitalasset.nonempty.NonEmpty
 import io.grpc.Status
 import pureconfig.error.FailureReason
 import pureconfig.{ConfigReader, ConfigWriter}
@@ -31,10 +31,17 @@ object ProtocolVersionCompatibility {
       release: ReleaseVersion = ReleaseVersion.current,
   ): NonEmpty[List[ProtocolVersion]] = {
     val unstableAndBeta =
-      if (cantonNodeParameters.alphaVersionSupport && cantonNodeParameters.nonStandardConfig)
-        ProtocolVersion.alpha ++ ReleaseVersionToProtocolVersions
-          .getBetaProtocolVersions(release)
-      else if (cantonNodeParameters.betaVersionSupport)
+      if (cantonNodeParameters.nonStandardConfig) {
+        val devVersions =
+          if (cantonNodeParameters.devVersionSupport) List(ProtocolVersion.dev) else List.empty
+        val alphaVersions =
+          if (cantonNodeParameters.alphaVersionSupport) ProtocolVersion.alpha
+          else List.empty
+
+        devVersions ++ alphaVersions ++ ReleaseVersionToProtocolVersions.getBetaProtocolVersions(
+          release
+        )
+      } else if (cantonNodeParameters.betaVersionSupport)
         ReleaseVersionToProtocolVersions.getBetaProtocolVersions(release)
       else List.empty
 
@@ -52,6 +59,7 @@ object ProtocolVersionCompatibility {
   /** Returns the protocol versions supported by the release.
     */
   def supportedProtocols(
+      includeDevVersion: Boolean,
       includeAlphaVersions: Boolean,
       includeBetaVersions: Boolean,
       release: ReleaseVersion,
@@ -66,12 +74,17 @@ object ProtocolVersionCompatibility {
         ProtocolVersion.alpha
       else List.empty
 
+    val dev =
+      if (includeDevVersion)
+        List(ProtocolVersion.dev)
+      else List.empty
+
     val supportedPVs = ReleaseVersionToProtocolVersions.getOrElse(
       release,
       sys.error(
         s"Please review the supported protocol versions of release version $release in `ReleaseVersionToProtocolVersions.scala`."
       ),
-    ) ++ beta ++ alpha
+    ) ++ beta ++ alpha ++ dev
 
     // If the release contains an unstable, alpha or beta protocol version, it is mentioned twice in the result
     supportedPVs.distinct
@@ -232,6 +245,7 @@ object SynchronizerProtocolVersion {
           // the safety flag during config validation
           ProtocolVersionCompatibility
             .supportedProtocols(
+              includeDevVersion = true,
               includeAlphaVersions = true,
               includeBetaVersions = true,
               release = ReleaseVersion.current,
@@ -241,6 +255,7 @@ object SynchronizerProtocolVersion {
           UnsupportedVersion(
             version,
             ProtocolVersionCompatibility.supportedProtocols(
+              includeDevVersion = true,
               includeAlphaVersions = true,
               includeBetaVersions = true,
               release = ReleaseVersion.current,
@@ -274,6 +289,7 @@ object ParticipantProtocolVersion {
           // same as synchronizer: support parsing of dev
           ProtocolVersionCompatibility
             .supportedProtocols(
+              includeDevVersion = true,
               includeAlphaVersions = true,
               includeBetaVersions = true,
               release = ReleaseVersion.current,
@@ -283,6 +299,7 @@ object ParticipantProtocolVersion {
           UnsupportedVersion(
             version,
             ProtocolVersionCompatibility.supportedProtocols(
+              includeDevVersion = true,
               includeAlphaVersions = true,
               includeBetaVersions = true,
               release = ReleaseVersion.current,

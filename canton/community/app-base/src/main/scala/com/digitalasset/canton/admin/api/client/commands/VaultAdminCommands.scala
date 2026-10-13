@@ -5,18 +5,20 @@ package com.digitalasset.canton.admin.api.client.commands
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
   TimeoutType,
 }
-import com.digitalasset.canton.crypto.admin.grpc.PrivateKeyMetadata
+import com.digitalasset.canton.crypto.admin.grpc.{BaseVaultRequest, PrivateKeyMetadata}
 import com.digitalasset.canton.crypto.admin.v30
 import com.digitalasset.canton.crypto.admin.v30.ListPublicKeysRequest
 import com.digitalasset.canton.crypto.admin.v30.VaultServiceGrpc.VaultServiceStub
-import com.digitalasset.canton.crypto.{PublicKeyWithName, v30 as cryptoproto, *}
+import com.digitalasset.canton.crypto.{PublicKeyWithName, v30 as cryptoprotoV30, *}
 import com.digitalasset.canton.util.OptionUtil
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
+import com.digitalasset.canton.validation.ProtoValidation
+import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation, ReleaseVersion}
+import com.digitalasset.nonempty.NonEmpty
 import com.google.protobuf.ByteString
 import io.grpc.ManagedChannel
 
@@ -33,10 +35,12 @@ object VaultAdminCommands {
 
   // list keys in my key vault
   final case class ListMyKeys(
+      baseRequest: BaseVaultRequest,
       filterFingerprint: String,
       filterName: String,
       filterPurpose: Set[KeyPurpose] = Set.empty,
       filterUsage: Set[SigningKeyUsage] = Set.empty,
+      serverVersion: Option[ReleaseVersion],
   ) extends BaseVaultAdminCommand[
         v30.ListMyKeysRequest,
         v30.ListMyKeysResponse,
@@ -44,18 +48,25 @@ object VaultAdminCommands {
       ] {
 
     override protected def createRequest(): Either[String, v30.ListMyKeysRequest] =
-      Right(
-        v30.ListMyKeysRequest(
-          Some(
-            v30.ListKeysFilters(
-              fingerprint = filterFingerprint,
-              name = filterName,
-              purpose = filterPurpose.map(_.toProtoEnum).toSeq,
-              usage = filterUsage.map(_.toProtoEnum).toSeq,
-            )
+      filterUsage.toSeq
+        .traverse(_.toProtoEnumV30)
+        .map(serializedFilterUsage =>
+          v30.ListMyKeysRequest(
+            baseRequest = Some(baseRequest.toProtoV30),
+            filters = Some(
+              v30.ListKeysFilters(
+                fingerprint = filterFingerprint,
+                name = filterName,
+                purpose = filterPurpose.map(_.toProtoEnum).toSeq,
+                usageV30 =
+                  if (ReleaseVersion.Feature.signingKeyUsageProtoV31.supported(serverVersion))
+                    Seq()
+                  else
+                    serializedFilterUsage,
+              )
+            ),
           )
         )
-      )
 
     override protected def submitRequest(
         service: VaultServiceStub,
@@ -66,15 +77,24 @@ object VaultAdminCommands {
     override protected def handleResponse(
         response: v30.ListMyKeysResponse
     ): Either[String, Seq[PrivateKeyMetadata]] =
-      response.privateKeysMetadata.traverse(PrivateKeyMetadata.fromProtoV30).leftMap(_.toString)
+      ProtoValidation
+        .validateLengthThen(
+          response.privateKeysMetadata,
+          "private_keys_metadata",
+          ProtocolVersionValidation.AlwaysValidation,
+          ProtoValidation.MaxCollectionSize,
+        )((entry, _) => PrivateKeyMetadata.fromProtoV30(entry))
+        .leftMap(_.toString)
   }
 
   // list public keys in key registry
   final case class ListPublicKeys(
+      baseRequest: BaseVaultRequest,
       filterFingerprint: String,
       filterName: String,
       filterPurpose: Set[KeyPurpose] = Set.empty,
       filterUsage: Set[SigningKeyUsage] = Set.empty,
+      serverVersion: Option[ReleaseVersion] = None,
   ) extends BaseVaultAdminCommand[
         v30.ListPublicKeysRequest,
         v30.ListPublicKeysResponse,
@@ -82,18 +102,25 @@ object VaultAdminCommands {
       ] {
 
     override protected def createRequest(): Either[String, ListPublicKeysRequest] =
-      Right(
-        v30.ListPublicKeysRequest(
-          Some(
-            v30.ListKeysFilters(
-              fingerprint = filterFingerprint,
-              name = filterName,
-              purpose = filterPurpose.map(_.toProtoEnum).toSeq,
-              usage = filterUsage.map(_.toProtoEnum).toSeq,
-            )
+      filterUsage.toSeq
+        .traverse(_.toProtoEnumV30)
+        .map(serializedFilterUsage =>
+          v30.ListPublicKeysRequest(
+            baseRequest = Some(baseRequest.toProtoV30),
+            filters = Some(
+              v30.ListKeysFilters(
+                fingerprint = filterFingerprint,
+                name = filterName,
+                purpose = filterPurpose.map(_.toProtoEnum).toSeq,
+                usageV30 =
+                  if (ReleaseVersion.Feature.signingKeyUsageProtoV31.supported(serverVersion))
+                    Seq()
+                  else
+                    serializedFilterUsage,
+              )
+            ),
           )
         )
-      )
 
     override protected def submitRequest(
         service: VaultServiceStub,
@@ -104,7 +131,14 @@ object VaultAdminCommands {
     override protected def handleResponse(
         response: v30.ListPublicKeysResponse
     ): Either[String, Seq[PublicKeyWithName]] =
-      response.publicKeys.traverse(PublicKeyWithName.fromProto30).leftMap(_.toString)
+      ProtoValidation
+        .validateLengthThen(
+          response.publicKeysV30,
+          "public_keys_v30",
+          ProtocolVersionValidation.AlwaysValidation,
+          ProtoValidation.MaxCollectionSize,
+        )((entry, _) => PublicKeyWithName.fromProto30(entry))
+        .leftMap(_.toString)
   }
 
   abstract class BaseImportPublicKey
@@ -123,7 +157,15 @@ object VaultAdminCommands {
     override protected def handleResponse(
         response: v30.ImportPublicKeyResponse
     ): Either[String, Fingerprint] =
-      Fingerprint.fromProtoPrimitive(response.fingerprint).leftMap(_.toString)
+      ProtoValidation
+        .validateThen(
+          response.fingerprint,
+          "fingerprint",
+          ProtocolVersionValidation.AlwaysValidation,
+        )(
+          Fingerprint.fromProtoPrimitive
+        )
+        .leftMap(_.toString)
   }
 
   // upload a public key into the key registry
@@ -131,29 +173,44 @@ object VaultAdminCommands {
       extends BaseImportPublicKey {
 
     override protected def createRequest(): Either[String, v30.ImportPublicKeyRequest] =
-      Right(v30.ImportPublicKeyRequest(publicKey = publicKey, name = name.getOrElse("")))
+      Right(
+        v30.ImportPublicKeyRequest(
+          publicKey = publicKey,
+          name = name.getOrElse("").toProtoUnvalidated,
+        )
+      )
   }
 
   final case class GenerateSigningKey(
+      baseRequest: BaseVaultRequest,
       name: String,
       usage: NonEmpty[Set[SigningKeyUsage]],
       keySpec: Option[SigningKeySpec],
+      serverVersion: Option[ReleaseVersion],
   ) extends BaseVaultAdminCommand[
         v30.GenerateSigningKeyRequest,
         v30.GenerateSigningKeyResponse,
         SigningPublicKey,
       ] {
 
+    import cats.syntax.traverse.*
     override protected def createRequest(): Either[String, v30.GenerateSigningKeyRequest] =
-      Right(
-        v30.GenerateSigningKeyRequest(
-          name = name,
-          usage = usage.map(_.toProtoEnum).toSeq,
-          keySpec = keySpec.fold[cryptoproto.SigningKeySpec](
-            cryptoproto.SigningKeySpec.SIGNING_KEY_SPEC_UNSPECIFIED
-          )(_.toProtoEnum),
+      usage.forgetNE.toSeq
+        .traverse(_.toProtoEnumV30)
+        .map(serializedUsage =>
+          v30.GenerateSigningKeyRequest(
+            baseRequest = Some(baseRequest.toProtoV30),
+            name = name,
+            usageV30 =
+              if (ReleaseVersion.Feature.signingKeyUsageProtoV31.supported(serverVersion))
+                Seq()
+              else
+                serializedUsage,
+            keySpec = keySpec.fold[cryptoprotoV30.SigningKeySpec](
+              cryptoprotoV30.SigningKeySpec.SIGNING_KEY_SPEC_UNSPECIFIED
+            )(_.toProtoEnum),
+          )
         )
-      )
 
     override protected def submitRequest(
         service: VaultServiceStub,
@@ -164,9 +221,11 @@ object VaultAdminCommands {
     override protected def handleResponse(
         response: v30.GenerateSigningKeyResponse
     ): Either[String, SigningPublicKey] =
-      response.publicKey
-        .toRight("No public key returned")
-        .flatMap(k => SigningPublicKey.fromProtoV30(k).leftMap(_.toString))
+      response.publicKey match {
+        case v30.GenerateSigningKeyResponse.PublicKey.V30(k) =>
+          SigningPublicKey.fromProtoV30(k).leftMap(_.toString)
+        case _ => Left("No public key returned")
+      }
 
     // may take some time if we need to wait for entropy
     override def timeoutType: TimeoutType = DefaultUnboundedTimeout
@@ -184,8 +243,8 @@ object VaultAdminCommands {
       Right(
         v30.GenerateEncryptionKeyRequest(
           name = name,
-          keySpec = keySpecO.fold[cryptoproto.EncryptionKeySpec](
-            cryptoproto.EncryptionKeySpec.ENCRYPTION_KEY_SPEC_UNSPECIFIED
+          keySpec = keySpecO.fold[cryptoprotoV30.EncryptionKeySpec](
+            cryptoprotoV30.EncryptionKeySpec.ENCRYPTION_KEY_SPEC_UNSPECIFIED
           )(_.toProtoEnum),
         )
       )
@@ -209,9 +268,11 @@ object VaultAdminCommands {
   }
 
   final case class RegisterKmsSigningKey(
+      baseRequest: BaseVaultRequest,
       kmsKeyId: String,
       usage: NonEmpty[Set[SigningKeyUsage]],
       name: String,
+      serverVersion: Option[ReleaseVersion],
   ) extends BaseVaultAdminCommand[
         v30.RegisterKmsSigningKeyRequest,
         v30.RegisterKmsSigningKeyResponse,
@@ -219,13 +280,20 @@ object VaultAdminCommands {
       ] {
 
     override protected def createRequest(): Either[String, v30.RegisterKmsSigningKeyRequest] =
-      Right(
-        v30.RegisterKmsSigningKeyRequest(
-          kmsKeyId = kmsKeyId,
-          usage = usage.map(_.toProtoEnum).toSeq,
-          name = name,
+      usage.forgetNE.toSeq
+        .traverse(_.toProtoEnumV30)
+        .map(serializedUsage =>
+          v30.RegisterKmsSigningKeyRequest(
+            baseRequest = Some(baseRequest.toProtoV30),
+            kmsKeyId = kmsKeyId,
+            usageV30 =
+              if (ReleaseVersion.Feature.signingKeyUsageProtoV31.supported(serverVersion))
+                Seq()
+              else
+                serializedUsage,
+            name = name,
+          )
         )
-      )
 
     override protected def submitRequest(
         service: VaultServiceStub,
@@ -236,9 +304,11 @@ object VaultAdminCommands {
     override protected def handleResponse(
         response: v30.RegisterKmsSigningKeyResponse
     ): Either[String, SigningPublicKey] =
-      response.publicKey
-        .toRight("No public key returned")
-        .flatMap(k => SigningPublicKey.fromProtoV30(k).leftMap(_.toString))
+      response.publicKey match {
+        case v30.RegisterKmsSigningKeyResponse.PublicKey.V30(k) =>
+          SigningPublicKey.fromProtoV30(k).leftMap(_.toString)
+        case _ => Left("No public key returned")
+      }
 
   }
 
@@ -320,7 +390,13 @@ object VaultAdminCommands {
     override protected def handleResponse(
         response: v30.GetWrapperKeyIdResponse
     ): Either[String, String] =
-      Right(response.wrapperKeyId)
+      ProtoValidation
+        .validate(
+          response.wrapperKeyId,
+          "wrapper_key_id",
+          ProtocolVersionValidation.AlwaysValidation,
+        )
+        .leftMap(_.message)
 
   }
 

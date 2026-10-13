@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
       tsconfigPaths: true,
     },
     test: {
-      globalSetup: path.resolve(__dirname, 'vitest.global-setup.ts'),
+      globalSetup: path.resolve(import.meta.dirname, 'vitest.global-setup.ts'),
       setupFiles: ['./src/__tests__/setup/setup.ts'],
       reporters: [
         'default',

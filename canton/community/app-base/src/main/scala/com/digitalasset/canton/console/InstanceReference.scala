@@ -994,7 +994,9 @@ abstract class SequencerReference(
         val currentActive = currentMediators.item.active
         val currentObservers = currentMediators.item.observers
         val current = currentActive ++ currentObservers
-        val serial = currentMediators.context.serial.increment
+        val serial = currentMediators.context.serial.increment.getOrElse(
+          consoleEnvironment.raiseError("Mediator synchronizer state max serial reached")
+        )
 
         val newMediators =
           (additionalActive ++ additionalObservers).filterNot(m => current.contains(m.id))
@@ -1398,6 +1400,8 @@ abstract class SequencerReference(
           sequencingParameters.pbftViewChangeTimeout,
           SegmentLength(sequencingParameters.segmentLength),
           sequencingParameters.blacklistLeaderSelectionPolicyConfig,
+          sequencingParameters.maxRequestsInBatch,
+          sequencingParameters.maxBatchesPerProposal,
         )(physical_synchronizer_id.protocolVersion)
         .toByteString
 
@@ -1499,6 +1503,7 @@ object MediatorReference {
 
 abstract class MediatorReference(val consoleEnvironment: ConsoleEnvironment, name: String)
     extends InstanceReference
+    with SequencerConnectionAdministration
     with ConsoleCommandGroup {
   override type Status = MediatorStatus
 
@@ -1580,7 +1585,6 @@ abstract class MediatorReference(val consoleEnvironment: ConsoleEnvironment, nam
 class LocalMediatorReference(consoleEnvironment: ConsoleEnvironment, val name: String)
     extends MediatorReference(consoleEnvironment, name)
     with LocalInstanceReference
-    with SequencerConnectionAdministration
     with BaseInspection[MediatorNode] {
 
   override protected[canton] def executionContext: ExecutionContext =

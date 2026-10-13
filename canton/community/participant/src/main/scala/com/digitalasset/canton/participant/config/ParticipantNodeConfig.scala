@@ -7,9 +7,8 @@ import cats.syntax.option.*
 import com.daml.jwt.JwtTimestampLeeway
 import com.daml.tls.TlsServerConfig
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.DeprecatedConfigUtils.DeprecatedFieldsFor
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.*
-import com.digitalasset.canton.config.{ReplicationConfig, *}
 import com.digitalasset.canton.http.{JsonApiConfig, JsonClientConfig}
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.participant.admin.AdminWorkflowConfig
@@ -28,7 +27,7 @@ import com.digitalasset.canton.platform.config.{
   PartyManagementServiceConfig,
   StateServiceConfig,
   TopologyAwarePackageSelectionConfig,
-  TrafficEnforcementConfig,
+  TrafficAccountingConfig,
   UpdateServiceConfig,
   UserManagementServiceConfig,
 }
@@ -41,7 +40,8 @@ import com.digitalasset.canton.version.{ParticipantProtocolVersion, ProtocolVers
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext
 import monocle.macros.syntax.lens.*
 
-import scala.concurrent.duration.DurationInt
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 /** Base for all participant configs - both local and remote */
 trait BaseParticipantConfig extends NodeConfig with Product with Serializable {
@@ -50,6 +50,7 @@ trait BaseParticipantConfig extends NodeConfig with Product with Serializable {
 
 final case class ParticipantProtocolConfig(
     minimumProtocolVersion: Option[ProtocolVersion],
+    override val devVersionSupport: Boolean,
     override val alphaVersionSupport: Boolean,
     override val betaVersionSupport: Boolean,
     override val dontWarnOnDeprecatedPV: Boolean,
@@ -96,7 +97,7 @@ final case class ParticipantNodeConfig(
     override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig(),
     override val topology: TopologyConfig = TopologyConfig(),
     alphaDynamic: DeclarativeParticipantConfig = DeclarativeParticipantConfig(),
-    trafficEnforcement: TrafficEnforcementConfig = TrafficEnforcementConfig(),
+    trafficAccounting: TrafficAccountingConfig = TrafficAccountingConfig(),
 ) extends LocalNodeConfig
     with BaseParticipantConfig
     with ConfigDefaults[Option[DefaultPorts], ParticipantNodeConfig] {
@@ -130,33 +131,6 @@ final case class ParticipantNodeConfig(
       .modify(ReplicationConfig.withDefaultO(storage, _))
 }
 
-object ParticipantNodeConfig {
-  trait ParticipantNodeConfigDeprecationsImplicits {
-    implicit def deprecatedParticipantNodeConfig[X <: ParticipantNodeConfig]
-        : DeprecatedFieldsFor[X] = new DeprecatedFieldsFor[ParticipantNodeConfig] {
-      override def movedFields: List[DeprecatedConfigUtils.MovedConfigPath] = List(
-        DeprecatedConfigUtils.MovedConfigPath(
-          "http-ledger-api.server",
-          since = "3.4.0",
-          to = Seq("http-ledger-api"),
-        ),
-        DeprecatedConfigUtils.MovedConfigPath(
-          "features.profileDir",
-          since = "3.5.0",
-          to = Seq("parameters.engine"),
-        ),
-        DeprecatedConfigUtils.MovedConfigPath(
-          "features.snapshotDir",
-          since = "3.5.0",
-          to = Seq("parameters.engine"),
-        ),
-      )
-    }
-  }
-
-  object DeprecatedImplicits extends ParticipantNodeConfigDeprecationsImplicits
-}
-
 /** Participant features configuration */
 final case class ParticipantFeaturesConfig()
 
@@ -178,9 +152,11 @@ final case class RemoteParticipantConfig(
     ledgerApi: FullClientConfig,
     ledgerJsonApi: Option[JsonClientConfig] = None,
     token: Option[String] = None,
+    httpHealth: Option[HttpHealthServerConfig] = None,
 ) extends BaseParticipantConfig {
   override def clientAdminApi: ClientConfig = adminApi
   override def clientLedgerApi: ClientConfig = ledgerApi
+  override def httpHealthClientConfig: Option[HttpHealthServerConfig] = httpHealth
 }
 
 /** Canton configuration case class to pass-through configuration options to the ledger api server
@@ -208,8 +184,6 @@ final case class RemoteParticipantConfig(
   *   config for ledger api server when using postgres
   * @param databaseConnectionTimeout
   *   database connection timeout
-  * @param initSyncTimeout
-  *   ledger api server startup delay
   * @param indexService
   *   configurations pertaining to the ledger api server's internal "index service"
   * @param commandService
@@ -242,6 +216,9 @@ final case class LedgerApiServerConfig(
     ),
     maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
     maxInboundMetadataSize: NonNegativeInt = ServerConfig.defaultMaxInboundMetadataSize,
+    override val flowControlWindow: Option[PositiveInt] = ServerConfig.defaultFlowControlWindow,
+    override val initialFlowControlWindow: Option[PositiveInt] =
+      ServerConfig.defaultInitialFlowControlWindow,
     maxConcurrentCallsPerConnection: NonNegativeInt =
       ServerConfig.defaultMaxConcurrentCallsPerConnection,
     rateLimit: Option[RateLimitingConfig] = Some(DefaultRateLimit),
@@ -264,7 +241,7 @@ final case class LedgerApiServerConfig(
       InteractiveSubmissionServiceConfig.Default,
     topologyAwarePackageSelection: TopologyAwarePackageSelectionConfig =
       TopologyAwarePackageSelectionConfig.Default,
-    maxTokenLifetime: NonNegativeDuration = config.NonNegativeDuration(5.minutes),
+    maxTokenLifetime: config.NonNegativeDuration = config.NonNegativeDuration(5.minutes),
     jwksCacheConfig: JwksCacheConfig = JwksCacheConfig(),
     limits: Option[ActiveRequestLimitsConfig] = None,
 ) extends ServerConfig // We can't currently expose enterprise server features at the ledger api anyway
@@ -312,12 +289,6 @@ object TestingTimeServiceConfig {
   *
   * @param adminWorkflow
   *   Configuration options for Canton admin workflows
-  * @param partyChangeNotification
-  *   Determines how eagerly the participant nodes notify the ledger api of party changes. By
-  *   default ensure that parties are added via at least one synchronizer before ACKing party
-  *   creation to ledger api server indexer. This not only avoids flakiness in tests, but reflects
-  *   that a party is not actually usable in canton until it's available through at least one
-  *   synchronizer.
   * @param maxUnzippedDarSize
   *   maximum allowed size of unzipped DAR files (in bytes) the participant can accept for
   *   uploading. Defaults to 1GB.
@@ -331,9 +302,13 @@ object TestingTimeServiceConfig {
   * @param minimumProtocolVersion
   *   The minimum protocol version that this participant will speak when connecting to a
   *   synchronizer
-  * @param alphaVersionSupport
+  * @param devVersionSupport
   *   If set to true, will allow the participant to connect to a synchronizer with dev protocol
-  *   version and will turn on unsafe Daml LF versions.
+  *   version, it will turn on Daml LF dev version, and applies the dev database schema, which does
+  *   not provide data continuity and must not be used in production.
+  * @param alphaVersionSupport
+  *   If set to true, will allow the participant to connect to a synchronizer with alpha protocol
+  *   version.
   * @param dontWarnOnDeprecatedPV
   *   If true, then this participant will not emit a warning when connecting to a sequencer using a
   *   deprecated protocol version (such as 2.0.0).
@@ -342,6 +317,8 @@ object TestingTimeServiceConfig {
   *   interval, the participant will log a warning.
   * @param journalGarbageCollectionDelay
   *   How much time to delay the canton journal garbage collection
+  * @param journalGarbageCollectionMinimumGap
+  *   The minimum gap in observed sequencing times between two journal garbage collection runs.
   * @param disableUpgradeValidation
   *   Disable the package upgrade verification on DAR upload
   * @param enableStrictDarValidation
@@ -394,14 +371,19 @@ object TestingTimeServiceConfig {
   * Note: If multi-synchronizer is enabled via the EnableMultiSynchronizer flag, then Assigned and
   * Unassigned event will be emitted when processing reassignments messages from the synchronizer
   * regardless of the value of enableAllLedgerApiReassignments.
-  * @param commitAfterFailedActivenessCheck
-  *   For internal testing only. Do not enable this in production.
+  * @param crashAfterFailedValidation
+  *   If true (default), the participant crashes when it detects a protocol violation that a correct
+  *   node cannot cause, such as an approved request whose activeness check failed locally. The
+  *   corresponding `SyncServiceAlarm` is logged either way. Temporary, until availability under
+  *   attack is supported.
   * @param validateLegacyContractsV11
   *   Enables an extra validation for contracts with contract id version V11. Keep this enabled in
   *   production.
   * @param connectToSynchronizersOnStartup
   *   If true, connects to synchronizers that have manualConnect=false on startup. Default: true.
   *   Has impact only if manual-start is false.
+  * @param acsCommitments
+  *   Configuration options for ACS commitments
   */
 final case class ParticipantNodeParameterConfig(
     adminWorkflow: AdminWorkflowConfig = AdminWorkflowConfig(),
@@ -412,6 +394,7 @@ final case class ParticipantNodeParameterConfig(
     minimumProtocolVersion: Option[ParticipantProtocolVersion] = Some(
       ParticipantProtocolVersion(ProtocolVersion.v34)
     ),
+    devVersionSupport: Boolean = false,
     alphaVersionSupport: Boolean = false,
     betaVersionSupport: Boolean = false,
     dontWarnOnDeprecatedPV: Boolean = false,
@@ -422,6 +405,8 @@ final case class ParticipantNodeParameterConfig(
     engine: CantonEngineConfig = CantonEngineConfig(),
     journalGarbageCollectionDelay: config.NonNegativeFiniteDuration =
       config.NonNegativeFiniteDuration.ofSeconds(0),
+    journalGarbageCollectionMinimumGap: config.PositiveFiniteDuration =
+      config.PositiveFiniteDuration.ofMinutes(30),
     disableUpgradeValidation: Boolean = false,
     enableStrictDarValidation: Boolean = true,
     watchdog: Option[WatchdogConfig] = None,
@@ -440,11 +425,203 @@ final case class ParticipantNodeParameterConfig(
     commitmentUseDbSnapshotForParticipantLookup: Boolean = false,
     autoSyncProtocolFeatureFlags: Boolean = true,
     enableAllLedgerApiReassignments: Boolean = false,
-    commitAfterFailedActivenessCheck: Boolean = false,
+    crashAfterFailedValidation: Boolean = true,
     lsu: LsuConfig = LsuConfig(),
     validateLegacyContractsV11: Boolean = true,
     connectToSynchronizersOnStartup: Boolean = true,
+    acsCommitments: AcsCommitmentConfig = AcsCommitmentConfig(),
 ) extends LocalNodeParametersConfig
+
+/** Config for the ACS commitment processing pipeline.
+  *
+  * @param enableNewAcsCommitmentProcessor
+  *   whether the new ACS digest processor should be enabled or not. Default is false.
+  * @param disableOldAcsCommitmentProcessor
+  *   whether the old ACS commitment processor should be disabled. Default is on new protocol
+  *   versions.
+  * @param maxNumUpdatesBetweenCheckpoints
+  *   the maximum number of acs updates after which a checkpoint should be written. Default is
+  *   100000.
+  * @param counterpartyBatchSize
+  *   how many counterparties get their digest updated at a time in case of a local party onboarding
+  *   or offboarding. With the assumption that a party may have a lot of counterparties, but each
+  *   counterparty is only hosted on a small number of participants, this parameter essentially
+  *   limits how many digests are loaded into memory: `numDigestsInMemory = counterPartyBatchSize *
+  *   hostingParticipantsOfCounterparties`. Default is 1000.
+  * @param tracing
+  *   the tracing mode. Default is disabled.
+  * @param receivedCommitmentValidationParallelism
+  *   the number of parallel threads to use for verifying incoming commitments. Default is 1.
+  * @param reinitializingJournalTombstonesBatchSize
+  *   the number of digest updates in a batch during the ACS digest reinitializing process. Default
+  *   is 1000.
+  * @param sender
+  *   the settings for the [[com.digitalasset.canton.participant.commitment.AcsCommitmentSender]]
+  *   class. They currently include:
+  *   - max batch size (default is 100)
+  *   - parallelism (default is 10)
+  * @param useSequentialDigestAccumulator
+  *   whether to use the sequential or the batching digest accumulator. Default is true.
+  * @param loadBatching
+  *   the batching config for loading digests in the digest accumulator.
+  * @param maxNumLoadedDigests
+  *   the maximum number of digests that may be loaded into memory during processing. Default is
+  *   10000.
+  * @param digestUpdatePersistenceBatchFactor
+  *   the maximum size of digest update batches is calculated by multiplying `maxNumLoadedDigests *
+  *   digestUpdatePersistenceBatchFactor`. Default is 2.
+  * @param digestLoadParallelism
+  *   The maximum number of concurrently buffered reads for loading digests. Default is 1000. If
+  *   [[com.digitalasset.canton.participant.config.AcsCommitmentConfig.loadBatching]] enables
+  *   batching, this number should be at least as large as the batch size times the batch
+  *   parallelism; otherwise batches will not be filled up. If batching is disabled, this number
+  *   directly controls the number of parallel DB reads and should therefore be much smaller.
+  * @param digestComputeParallelism
+  *   The maximum number of parallel digest computations. Default is 8.
+  * @param digestPipelineBufferSize
+  *   The size of intermediate buffers in the digest processor pipeline. If the size is 0, no
+  *   buffers are added. These buffers implicitly increase the `digestLoadParallelism` by twice the
+  *   configured size. Default is 0.
+  * @param matchingParallelism
+  *   the maximum number of parallel processing of received ACS commitments for matching against
+  *   locally computed commitments. Default is 20.
+  * @param contractChangeClassificationBatchSize
+  *   the maximum number of batched contract change classifications. Should be at most
+  *   `maxNumLoadedDigests`. Default is 100. These classifications can be batched in 3 situations:
+  *   - When processing an
+  *     [[com.digitalasset.canton.ledger.participant.state.InternalIndexService.AcsUpdate.AcsChangeUpdate]]
+  *   - When ingesting active contracts during reinitialization
+  *   - When ingesting active contracts while processing a locally onboarded party
+  * @param contractChangeClassificationParallelism
+  *   the number of concurrent contract change classifications when loading the ACS for parties.
+  *   Default is 8.
+  * @param classificationParallelism
+  *   the number of concurrent ACS update classifications. Default is 8.
+  * @param acsFetchParallelism
+  *   the number of concurrent acs streams that are prepared. This counteracts the high fixed cost
+  *   of establishing an ACS stream for many parties. The ACS stream of the first batch of
+  *   counterparties is fully consumed before the pipeline starts to consume the ACS stream of the
+  *   second batch of counterparties.
+  * @param maxParallelActiveIdQueries
+  *   the number of parallel queries to fetch the IDs of active contracts. The higher the
+  *   parallelism, the higher the potential load on the DB. Default is 12.
+  * @param maxParallelPayloadCreateQueries
+  *   the number of parallel queries to fetch the contract payload of active contracts. The * higher
+  *   the parallelism, the higher the potential load on the DB. Default is 6.
+  */
+final case class AcsCommitmentConfig(
+    enableNewAcsCommitmentProcessor: Boolean = true,
+    disableOldAcsCommitmentProcessor: AcsCommitmentConfig.DisableOldAcsCommitmentProcessor =
+      AcsCommitmentConfig.DisableOldAcsCommitmentProcessor.OnNewProtocolVersions,
+    maxNumUpdatesBetweenCheckpoints: PositiveInt = PositiveInt.tryCreate(100_000),
+    counterpartyBatchSize: PositiveInt = PositiveInt.tryCreate(1000),
+    tracing: AcsDigestTracingMode = AcsDigestTracingMode.Disabled,
+    receivedCommitmentValidationParallelism: PositiveInt = PositiveInt.tryCreate(1),
+    reinitializingJournalTombstonesBatchSize: PositiveInt = PositiveInt.tryCreate(1000),
+    sender: AcsCommitmentSenderConfig = AcsCommitmentSenderConfig(),
+    consistencyCheck: AcsCommitmentConsistencyCheckConfig = AcsCommitmentConsistencyCheckConfig(),
+    periodStore: AcsCommitmentPeriodConfig = AcsCommitmentPeriodConfig(),
+    useSequentialDigestAccumulator: Boolean = false,
+    loadBatching: BatchAggregatorConfig = BatchAggregatorConfig(),
+    maxNumLoadedDigests: PositiveInt = PositiveInt.tryCreate(10_000),
+    digestUpdatePersistenceBatchFactor: PositiveInt = PositiveInt.two,
+    digestLoadParallelism: PositiveInt = PositiveInt.tryCreate(1000),
+    digestComputeParallelism: PositiveInt = PositiveInt.tryCreate(8),
+    digestPipelineBufferSize: NonNegativeInt = NonNegativeInt.zero,
+    matchingParallelism: PositiveInt = PositiveInt.tryCreate(20),
+    contractChangeClassificationBatchSize: PositiveInt = PositiveInt.tryCreate(100),
+    contractChangeClassificationParallelism: PositiveInt = PositiveInt.tryCreate(8),
+    classificationParallelism: PositiveInt = PositiveInt.tryCreate(8),
+    acsFetchParallelism: PositiveInt = PositiveInt.tryCreate(16),
+    maxParallelActiveIdQueries: PositiveInt = PositiveInt.tryCreate(12),
+    maxParallelPayloadCreateQueries: PositiveInt = PositiveInt.tryCreate(6),
+)
+
+object AcsCommitmentConfig {
+
+  /** Determines the protocol versions for which the old ACS commitment processor is disabled */
+  sealed trait DisableOldAcsCommitmentProcessor extends Product with Serializable
+  object DisableOldAcsCommitmentProcessor {
+
+    /** The ACS commitment processor is disabled for all protocol versions. Do not use in
+      * production!
+      */
+    case object Always extends DisableOldAcsCommitmentProcessor
+
+    /** The ACS commitment processor is disabled on protocol versions that support the new
+      * commitments.
+      */
+    case object OnNewProtocolVersions extends DisableOldAcsCommitmentProcessor
+
+    /** The ACS commitment processor is running on all protocol versions. */
+    case object Never extends DisableOldAcsCommitmentProcessor
+
+    private[canton] def isOldProcessorEnabled(
+        state: DisableOldAcsCommitmentProcessor,
+        protocolVersion: ProtocolVersion,
+    ): Boolean =
+      state match {
+        case Always => false
+        case Never => true
+        case OnNewProtocolVersions => protocolVersion < ProtocolVersion.acsCommitmentRedesign
+      }
+  }
+}
+
+/** Config for [[com.digitalasset.canton.participant.commitment.AcsCommitmentSender]]
+  *
+  * @param maxBatchSize
+  *   the max number of envelopes that will be put in a submission request.
+  * @param parallelism
+  *   the number of parallel threads to use when parallelism is used (at the moment signing messages
+  *   only). Default is 10.
+  * @param minSendDelayFraction
+  *   the fraction of the reconciliation interval to minimally delay the sending of a commitment
+  *   beyond the period end. Default is 0.
+  * @param maxSendDelayFraction
+  *   The fraction of the reconciliation interval to maximally delay the sending of a commitment
+  *   beyond the period end. If the commitment production is delayed, this fraction may be exceeded.
+  *   Default is 0.9.
+  */
+final case class AcsCommitmentSenderConfig(
+    maxBatchSize: PositiveInt = AcsCommitmentSenderConfig.defaultMaxBatchSize,
+    parallelism: PositiveInt = AcsCommitmentSenderConfig.defaultParallelism,
+    maxRetryDelay: config.NonNegativeFiniteDuration =
+      AcsCommitmentSenderConfig.defaultMaxRetryDelay,
+    minSendDelayFraction: Double = AcsCommitmentSenderConfig.defaultMinSendDelayFraction,
+    maxSendDelayFraction: Double = AcsCommitmentSenderConfig.defaultMaxSendDelayFraction,
+)
+
+object AcsCommitmentSenderConfig {
+  val defaultMaxBatchSize: PositiveInt = PositiveInt.tryCreate(100)
+  val defaultParallelism: PositiveInt = PositiveInt.tryCreate(10)
+  val defaultMaxRetryDelay: config.NonNegativeFiniteDuration =
+    config.NonNegativeFiniteDuration(FiniteDuration(10, TimeUnit.SECONDS))
+  val defaultMinSendDelayFraction: Double = 0.0d
+  val defaultMaxSendDelayFraction: Double = 0.9d
+}
+
+/** @param journalSnapshotQueryLimit
+  *   The limit (page size) passed to the
+  *   [[com.digitalasset.canton.participant.store.AcsDigestStore.DigestJournal#snapshot]] when
+  *   retrieving ACS digest updates continously. Default is 100.
+  */
+final case class AcsCommitmentConsistencyCheckConfig(
+    journalSnapshotQueryLimit: PositiveInt =
+      AcsCommitmentConsistencyCheckConfig.defaultJournalSnapshotQueryLimit
+)
+
+object AcsCommitmentConsistencyCheckConfig {
+  val defaultJournalSnapshotQueryLimit: PositiveInt = PositiveInt.tryCreate(100)
+}
+
+final case class AcsCommitmentPeriodConfig(
+    writerPageSize: PositiveInt = AcsCommitmentPeriodConfig.defaultWriterPageSize
+)
+
+object AcsCommitmentPeriodConfig {
+  lazy val defaultWriterPageSize: PositiveInt = PositiveInt.tryCreate(100)
+}
 
 /** Config for LSU.
   *
@@ -591,16 +768,18 @@ object JournalPruningConfig {
   * @param contractIdSeeding
   *   test-only way to override the contract-id seeding scheme. Must be Strong in production (and
   *   Strong is the default). Only configurable to reduce the amount of secure random numbers
-  *   consumed by tests and to avoid flaky timeouts during continuous integration.
+  *   consumed by tests and to avoid flaky timeouts during continuous integration. **This parameter
+  *   is deprecated and no longer used** (see `ledgerApiServerParametersConfigReader` in
+  *   CantonConfig.scala). The seeding is now always of the `Strong` type.
   * @param indexer
   *   parameters how the participant populates the index db used to serve the ledger api
   * @param tokenExpiryGracePeriodForStreams
   *   grace periods for streams that postpone termination beyond the JWT expiry
   */
 final case class LedgerApiServerParametersConfig(
-    contractIdSeeding: Seeding = Seeding.Strong,
+    contractIdSeeding: Seeding = Seeding.Strong, // TODO(i33818): Remove
     indexer: IndexerConfig = IndexerConfig(),
-    tokenExpiryGracePeriodForStreams: Option[NonNegativeDuration] = None,
+    tokenExpiryGracePeriodForStreams: Option[config.NonNegativeDuration] = None,
     contractLoader: ContractLoaderConfig = ContractLoaderConfig(),
 )
 

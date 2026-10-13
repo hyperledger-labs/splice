@@ -26,7 +26,12 @@ import com.digitalasset.canton.environment.Environment.*
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.MetricsConfig.JvmMetrics
-import com.digitalasset.canton.metrics.{CantonHistograms, DbStorageHistograms, MetricsRegistry}
+import com.digitalasset.canton.metrics.{
+  CantonHistograms,
+  DbStorageHistograms,
+  MetricsRegistry,
+  OtlpReporter,
+}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.participant.config.ParticipantNodeConfig
@@ -96,7 +101,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
       case Some(Left(error)) =>
         logger.error(s"Failed to load new dynamic configuration: $error")
         pokeDeclarativeApis(Left(()))
-      case Some(Right(newConfig)) if currentConfig.get().parameters.alphaVersionSupport =>
+      case Some(Right(newConfig)) if currentConfig.get().parameters.devOrAlphaVersionSupport =>
         logger.info(
           s"Loaded new configuration. Static node changes will only be applied after a node restart."
         )
@@ -124,13 +129,16 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
     config.monitoring.metrics.globalFilters,
     config.monitoring.metrics.qualifiers.toSet,
   )
+
+  private val otlpExporterFactory = new OtlpReporter.ExporterFactory
+
   lazy val configuredOpenTelemetry: ConfiguredOpenTelemetry =
     OpenTelemetryFactory.initializeOpenTelemetry(
       initializeGlobalOpenTelemetry = testingConfig.initializeGlobalOpenTelemetry,
       testingSupportAdhocMetrics = testingConfig.supportAdhocMetrics,
       metricsEnabled = config.monitoring.metrics.reporters.nonEmpty,
       attachReporters = MetricsRegistry
-        .registerReporters(config.monitoring.metrics, loggerFactory),
+        .registerReporters(config.monitoring.metrics, loggerFactory, otlpExporterFactory),
       config = config.monitoring.tracing.tracer,
       histogramInventory = histogramInventory,
       histogramFilter = baseFilter,
@@ -318,6 +326,8 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
   }
 
   private val testingTimeService = new TestingTimeService(clock, () => simClocks)
+
+  otlpExporterFactory.initialize(clock)
 
   lazy val participants =
     new ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode](
@@ -621,7 +631,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
         closeHeadlessHealthAdministration :+ executionSequencerFactory :+ closeActorSystem :+ closeExecutionContext :+
         closeScheduler
     logger.info("Closing environment...")
-    LifeCycle.close((instances.toSeq)*)(logger)
+    LifeCycle.close(instances)(logger)
   })
 }
 

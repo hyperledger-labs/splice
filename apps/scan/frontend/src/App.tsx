@@ -1,10 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { ErrorRouterPage, theme } from '@canton-network/splice-common-frontend';
+import { ErrorRouterPage, QueryDevtools, theme } from '@canton-network/splice-common-frontend';
 import { replaceEqualDeep } from '@canton-network/splice-common-frontend-utils';
 import { ScanClientProvider } from '@canton-network/splice-common-frontend/scan-api';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import React from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from 'react-router';
@@ -38,7 +37,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     <ScanClientProvider baseScanUrl={config.services.scan.url}>
       <TokenMetadataClientProvider scanUrl={config.services.scan.url}>
         <QueryClientProvider client={queryClient}>
-          <ReactQueryDevtools initialIsOpen={false} />
+          <QueryDevtools />
           <ScanAppVotesHooksProvider>{children}</ScanAppVotesHooksProvider>
         </QueryClientProvider>
       </TokenMetadataClientProvider>

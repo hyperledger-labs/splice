@@ -12,6 +12,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.{SyncCryptoApi, SyncCryptoClient, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   CloseContext,
   FlagCloseable,
@@ -143,7 +144,7 @@ class SequencerRateLimitManagerImpl(
     trafficPurchasedManager
       .getTrafficPurchasedAt(member, timestamp, lastBalanceUpdateTimestamp, warnIfApproximate)
       .leftMap { case TrafficPurchasedManager.TrafficPurchasedAlreadyPruned(member, timestamp) =>
-        logger.warn(
+        logger.info(
           s"Failed to retrieve traffic purchased entry for $member at $timestamp as it was already pruned"
         )
         SequencerRateLimitError.TrafficNotFound(member)

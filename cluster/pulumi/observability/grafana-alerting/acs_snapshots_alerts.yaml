@@ -64,7 +64,7 @@ groups:
           summary: Saving an ACS snapshot took longer than {{ humanizeDuration $ACS_SNAPSHOT_SAVE_LATENCY_THRESHOLD_SECONDS }} in {{ index $labels "namespace" }}'s Scan
         labels:
           "": ""
-          gcloud_filter: resource.labels.namespace_name=%22{{ index  "namespace" }}%22%0A
+          gcloud_filter: resource.labels.namespace_name=%22{{ index $$labels "namespace" }}%22%0A
         isPaused: false
       - uid: t2ln0sn2bdfmcd
         title: Updating ACS snapshot taking too long
@@ -125,5 +125,5 @@ groups:
           summary: Updating an ACS snapshot took longer than {{ humanizeDuration $ACS_SNAPSHOT_UPDATE_LATENCY_THRESHOLD_SECONDS }} on average over the past 10min in {{ index $labels "namespace" }}'s Scan
         labels:
           "": ""
-          gcloud_filter: resource.labels.namespace_name=%22{{ index  "namespace" }}%22%0A
+          gcloud_filter: resource.labels.namespace_name=%22{{ index $$labels "namespace" }}%22%0A
         isPaused: false

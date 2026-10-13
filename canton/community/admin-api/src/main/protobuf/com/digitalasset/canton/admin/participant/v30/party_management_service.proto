@@ -19,7 +19,7 @@ import "scalapb/scalapb.proto";
  * and must not be combined.
  */
 service PartyManagementService {
-  // Online party replication endpoint.
+  // Online party replication (Sequencer Channel) endpoint.
   //
   // Initiate adding a party already hosted on one or more source participants to this
   // target participant in the specified synchronizer.
@@ -31,11 +31,11 @@ service PartyManagementService {
   // a specific, intermediate step, and therefore the target participant signature must not
   // already be in place prior to the call.
   //
-  //  This operation assumes full trust in the source participant to provide a complete and
-  //  untampered state. Because the target participant cannot independently verify
-  //  the historical provenance of the imported contracts,
-  //  validation is performed on a best-effort basis.
-  //  Use only when the source participant is a known, trusted authority.
+  // This operation assumes full trust in the source participant to provide a complete and
+  // untampered state. Because the target participant cannot independently verify the
+  // historical provenance of the imported contracts, validation is performed on a
+  // best-effort basis.
+  // Use only when the source participant is a known, trusted authority.
   //
   // Returns a 'request_id' that is stable across each retry with the same request parameters.
   rpc AddPartyAsync(AddPartyAsyncRequest) returns (AddPartyAsyncResponse);
@@ -69,12 +69,12 @@ service PartyManagementService {
   // successfully.
   rpc GetAddPartyStatus(GetAddPartyStatusRequest) returns (GetAddPartyStatusResponse);
 
-  // Online and offline party replication ACS export.
+  // Offline party replication focussed ACS export.
   //
   // Exports the ACS of a single party from a source participant, so that the party can be
   // replicated onto a target participant.
   //
-  // This endpoint works in conjunction with the AddPartyWithAcs and ImportPartyAcs endpoints.
+  // This endpoint works in conjunction with the ImportPartyAcs endpoint.
   rpc ExportPartyAcs(ExportPartyAcsRequest) returns (stream ExportPartyAcsResponse);
 
   // Offline party replication focused ACS import.
@@ -170,6 +170,7 @@ message AddPartyWithAcsAsyncRequest {
   // Required
   bytes acs_snapshot = 1;
 
+  // Arguments common among AddPartyAsync and AddPartyWithAcs requests.
   // The add party arguments used for request validation and initialization.
   // Required for the first message of the stream, should be empty for subsequent messages.
   AddPartyArguments arguments = 2;
@@ -302,12 +303,13 @@ message ExportPartyAcsRequest {
   // Required
   string party_id = 1;
 
-  // The identifier of the synchronizer managing the contract to be exported. This scopes the ACS export to only
-  // contracts assigned to this synchronizer.
+  // The identifier of the synchronizer managing the contracts to be exported.
+  // Scopes the ACS export to contracts assigned to this synchronizer.
   // Required
   string synchronizer_id = 2;
 
   // The unique identifier of the target participant where the party will be replicated.
+  // Scopes the ACS export to contracts missing from this participant.
   // Required
   string target_participant_uid = 3;
 

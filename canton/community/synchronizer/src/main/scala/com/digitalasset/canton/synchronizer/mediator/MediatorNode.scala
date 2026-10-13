@@ -26,6 +26,7 @@ import com.digitalasset.canton.crypto.{
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.health.*
 import com.digitalasset.canton.health.admin.data.{WaitingForExternalInput, WaitingForInitialization}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.Outcome
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasCloseContext, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -66,7 +67,8 @@ import com.digitalasset.canton.synchronizer.metrics.MediatorMetrics
 import com.digitalasset.canton.synchronizer.service.GrpcSequencerConnectionService
 import com.digitalasset.canton.time.{Clock, HasUptime, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.admin.grpc.PsidLookup
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreInitializationStatus.Initialized
+import com.digitalasset.canton.topology.admin.grpc.{PsidLookup, TopologyStoreInitializationStatus}
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
 import com.digitalasset.canton.topology.processing.{
   InitialTopologySnapshotValidator,
@@ -84,7 +86,6 @@ import com.digitalasset.canton.version.{
 }
 import com.google.common.annotations.VisibleForTesting
 import io.grpc.ServerServiceDefinition
-import monocle.Lens
 import monocle.macros.syntax.lens.*
 import org.apache.pekko.actor.ActorSystem
 
@@ -137,6 +138,7 @@ object DelayedVerdictSenderConfig {
   *   deprecated protocol version.
   */
 final case class MediatorNodeParameterConfig(
+    override val devVersionSupport: Boolean = false,
     override val alphaVersionSupport: Boolean = false,
     override val betaVersionSupport: Boolean = false,
     override val dontWarnOnDeprecatedPV: Boolean = false,
@@ -167,8 +169,10 @@ final case class MediatorNodeParameters(
 final case class RemoteMediatorConfig(
     adminApi: FullClientConfig,
     token: Option[String] = None,
+    httpHealth: Option[HttpHealthServerConfig] = None,
 ) extends NodeConfig {
   override def clientAdminApi: ClientConfig = adminApi
+  override def httpHealthClientConfig: Option[HttpHealthServerConfig] = httpHealth
 }
 
 /** Mediator Node configuration that defaults to auto-init
@@ -237,11 +241,13 @@ class MediatorNodeBootstrap(
   private def synchronizerTopologyManager: Option[SynchronizerTopologyManager] =
     getNode.flatMap(_.replicaManager.mediatorRuntime).map(_.mediator.topologyManager)
 
-  override protected def sequencedTopologyStores: Seq[TopologyStore[SynchronizerStore]] =
-    synchronizerTopologyManager.map(_.store).toList
+  override protected def sequencedTopologyStores
+      : Seq[TopologyStoreInitializationStatus[SynchronizerStore, TopologyStore]] =
+    synchronizerTopologyManager.map(_.store).toList.map(Initialized(_))
 
-  override protected def sequencedTopologyManagers: Seq[SynchronizerTopologyManager] =
-    synchronizerTopologyManager.toList
+  override protected def sequencedTopologyManagers
+      : Seq[TopologyStoreInitializationStatus[SynchronizerStore, TopologyManager.Aux]] =
+    synchronizerTopologyManager.toList.map(Initialized[SynchronizerStore, TopologyManager.Aux](_))
 
   override protected def lookupTopologyClient(
       psid: PhysicalSynchronizerId
@@ -271,23 +277,25 @@ class MediatorNodeBootstrap(
   override protected def mkNodeHealthService(
       storage: Storage
   ): (DependenciesHealthService, LivenessHealthService) = {
-    val readiness =
-      DependenciesHealthService(
-        "mediator",
-        logger,
-        timeouts,
-        criticalDependencies = Seq(storage),
-        softDependencies = Eval.always(
-          deferredSequencerClientHealth +:
-            deferredSequencerConnectionPoolHealthRef.get.apply()
-        ),
-      )
-
     val liveness = LivenessHealthService(
       logger,
       timeouts,
       fatalDependencies = Seq(deferredSequencerClientHealth),
     )
+    val readiness =
+      DependenciesHealthService(
+        "mediator",
+        logger,
+        timeouts,
+        criticalDependencies = Seq(
+          storage
+        ),
+        softDependencies = Eval.always(
+          deferredSequencerConnectionPoolHealthRef.get.apply() ++ Seq(deferredSequencerClientHealth)
+        ),
+        serviceCriticalDependencies = Seq(liveness),
+      )
+
     (readiness, liveness)
   }
 
@@ -438,7 +446,7 @@ class MediatorNodeBootstrap(
               connectionPoolFactory
                 .createFromOldConfig(
                   request.sequencerConnections,
-                  expectedPsidO = None,
+                  expectedPsidO = Some(request.synchronizerId),
                   tracingConfig = parameters.tracing,
                   name = "temp",
                 )
@@ -460,6 +468,7 @@ class MediatorNodeBootstrap(
               staticParameters,
               request.sequencerConnections,
             )
+
             _ <- EitherT.right(synchronizerConfigurationStore.saveConfiguration(configToStore))
           } yield (
             staticParameters,
@@ -677,6 +686,7 @@ class MediatorNodeBootstrap(
       connectionPoolAndSequencerConnections <-
         GrpcSequencerConnectionService.waitUntilSequencerConnectionIsValidWithPool(
           connectionPoolFactory = connectionPoolFactory,
+          psid = psid,
           tracingConfig = parameters.tracing,
           flagCloseable = this,
           loadConfig = getSequencerConnectionFromStore,
@@ -701,13 +711,9 @@ class MediatorNodeBootstrap(
 
       sequencerClientRef =
         GrpcSequencerConnectionService
-          .setup[MediatorSynchronizerConfiguration](
+          .setup(
             adminServerRegistry,
-            () => synchronizerConfigurationStore.fetchConfiguration(),
-            config => synchronizerConfigurationStore.saveConfiguration(config),
-            Lens[MediatorSynchronizerConfiguration, SequencerConnections](_.sequencerConnections)(
-              connection => conf => conf.copy(sequencerConnections = connection)
-            ),
+            synchronizerConfigurationStore,
             connectionPoolFactory,
             sequencerClient,
             parameters.tracing,

@@ -5,9 +5,9 @@ import { GlobalStyles, ThemeProvider } from '@mui/material';
 import { PartyId, theme } from '@canton-network/splice-common-frontend';
 import { describe, expect, test } from 'vitest';
 
-import CopyableIdentifier from '../../components/beta/CopyableIdentifier';
-import MemberIdentifier from '../../components/beta/MemberIdentifier';
-import { partyIdScrollGlobalStyles } from '../../components/beta/identifierStyles';
+import CopyableIdentifier from '../../components/ui/CopyableIdentifier';
+import MemberIdentifier from '../../components/ui/MemberIdentifier';
+import { partyIdScrollGlobalStyles } from '../../components/ui/identifierStyles';
 import PartyIdScrollTracks from '../../components/PartyIdScrollTracks';
 
 const LONG_CONTRACT_ID =

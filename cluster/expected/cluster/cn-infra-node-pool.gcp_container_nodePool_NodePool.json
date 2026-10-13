@@ -1,0 +1,30 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "autoscaling": {
+      "locationPolicy": "ANY",
+      "maxNodeCount": 3,
+      "minNodeCount": 1
+    },
+    "cluster": "cn-mocknet",
+    "initialNodeCount": 1,
+    "nodeConfig": {
+      "labels": {
+        "cn_infra": "true"
+      },
+      "loggingVariant": "DEFAULT",
+      "machineType": "n4d-standard-8",
+      "taints": [
+        {
+          "effect": "NO_SCHEDULE",
+          "key": "cn_infra",
+          "value": "true"
+        }
+      ]
+    }
+  },
+  "name": "cn-infra-node-pool",
+  "provider": "",
+  "type": "gcp:container/nodePool:NodePool"
+}

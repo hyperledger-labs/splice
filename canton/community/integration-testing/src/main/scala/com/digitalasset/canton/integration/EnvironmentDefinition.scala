@@ -73,7 +73,10 @@ final case class EnvironmentDefinition(
     ) {
 
   def withManualStart: EnvironmentDefinition =
-    copy(baseConfig = baseConfig.focus(_.parameters.manualStart).replace(true))
+    setManualStart(true)
+
+  def setManualStart(manualStart: Boolean): EnvironmentDefinition =
+    copy(baseConfig = baseConfig.focus(_.parameters.manualStart).replace(manualStart))
 
   /** Enable traffic control on all configured synchronizers
     * @param syncSynchronizerOwnersTime
@@ -460,6 +463,13 @@ object EnvironmentDefinition extends LazyLogging {
       new NetworkBootstrapper(S2M1())
     }
 
+  /**   - 0 participants
+    *   - 2 sequencers
+    *   - 2 mediators
+    */
+  lazy val P0S2M2_Manual: EnvironmentDefinition =
+    P0S2M2_Config.withManualStart
+
   lazy val P0S2M2_Config: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 0,
@@ -470,6 +480,12 @@ object EnvironmentDefinition extends LazyLogging {
   lazy val P1S1M1_Config = buildBaseEnvironmentDefinition(
     numParticipants = 1,
     numSequencers = 1,
+    numMediators = 1,
+  )
+
+  lazy val P1S4M1_Config: EnvironmentDefinition = buildBaseEnvironmentDefinition(
+    numParticipants = 1,
+    numSequencers = 4,
     numMediators = 1,
   )
 

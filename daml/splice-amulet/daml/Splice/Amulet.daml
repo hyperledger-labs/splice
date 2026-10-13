@@ -742,6 +742,10 @@ instance HasCheckedFetch RewardCouponV2 ForOwner where
 instance HasCheckedFetch RewardCouponV2 ForDso where
   contractGroupId RewardCouponV2{..} = ForDso with dso
 
+instance HasCheckedFetch Api.RewardAssignmentV1.RewardCouponView ForOwner where
+  contractGroupId Api.RewardAssignmentV1.RewardCouponView{..} =
+    ForOwner with dso; owner = fromOptional provider beneficiary
+
 instance HasCheckedFetch SvRewardCoupon ForOwner where
   contractGroupId SvRewardCoupon{..} = ForOwner with dso; owner = beneficiary
 

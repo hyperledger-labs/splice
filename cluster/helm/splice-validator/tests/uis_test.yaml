@@ -58,6 +58,17 @@ tests:
           path: spec.template.spec.containers[?(@.name=="wallet-web-ui")].image
           pattern: "^secure-registry\\.com/custom-wallet-ui:"
 
+  - it: "uses custom secret name when validatorWebUi.secretName is set"
+    set:
+      validatorWebUi.secretName: "my-wallet-ui-secret"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=="wallet-web-ui")].env[?(@.name=="SPLICE_APP_UI_AUTH_CLIENT_ID")].valueFrom.secretKeyRef.name
+          value: my-wallet-ui-secret
+
   - it: "allows overriding wallet-web-ui secret env vars with raw strings"
     set:
       validatorWebUi.secretOverrides.clientId: "vault:kv/data/wallet-ui/client-id"

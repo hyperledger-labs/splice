@@ -1,0 +1,31 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "telemetry.istio.io/v1alpha1",
+    "kind": "Telemetry",
+    "metadata": {
+      "name": "access-logging",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "accessLogging": [
+        {
+          "providers": [
+            {
+              "name": "envoy"
+            }
+          ]
+        }
+      ],
+      "selector": {
+        "matchLabels": {
+          "app": "istio-ingress"
+        }
+      }
+    }
+  },
+  "name": "access-logging",
+  "provider": "",
+  "type": "kubernetes:telemetry.istio.io/v1alpha1:Telemetry"
+}

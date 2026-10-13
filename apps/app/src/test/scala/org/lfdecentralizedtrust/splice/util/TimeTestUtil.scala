@@ -7,8 +7,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
 }
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  TestCommon,
   SpliceTestConsoleEnvironment,
+  TestCommon,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.UpdateExternalPartyConfigStateTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig
@@ -19,8 +19,8 @@ import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 
-import java.time.Duration
-import scala.annotation.nowarn
+import java.time.{Duration, Instant}
+import scala.annotation.{nowarn, tailrec}
 import scala.concurrent.duration.*
 
 trait TimeTestUtil extends TestCommon {
@@ -113,6 +113,16 @@ trait TimeTestUtil extends TestCommon {
     )
   }
 
+  @tailrec
+  final def advanceRoundsUntil(
+      target: Instant
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    if (!getLedgerTime.toInstant.isAfter(target)) {
+      advanceRoundsToNextRoundOpening
+      advanceRoundsUntil(target)
+    }
+  }
+
   /** The amount of time to advance in order to reach the next mining round opening. */
   private def durationToNextRoundOpening(implicit
       env: SpliceTestConsoleEnvironment
@@ -138,7 +148,7 @@ trait TimeTestUtil extends TestCommon {
     val Seq(lowestOpen, middleOpen, highestOpen) =
       previousOpenRounds.map(_.contract.payload.round.number)
 
-    actAndCheck()("advancing time", advanceTime(advanceWith))(
+    actAndCheck(timeUntilSuccess = 90.seconds)("advancing time", advanceTime(advanceWith))(
       s"waiting for open round automation (should create OpenMiningRound ${highestOpen + 1})",
       _ => {
         val (newOpenRounds, _) = sv1ScanBackend.getOpenAndIssuingMiningRounds()

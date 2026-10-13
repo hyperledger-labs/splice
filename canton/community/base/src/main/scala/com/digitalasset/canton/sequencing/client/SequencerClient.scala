@@ -8,14 +8,14 @@ import cats.data.{EitherT, Nested}
 import cats.implicits.catsSyntaxOptionId
 import cats.syntax.alternative.*
 import cats.syntax.either.*
-import cats.syntax.functor.*
+import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.metrics.Timed
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.MetricsContext.withExtraMetricLabels
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{LoggingConfig, ProcessingTimeout, TestingConfigInternal}
@@ -32,6 +32,7 @@ import com.digitalasset.canton.health.{
   HealthQuasiComponent,
 }
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.LifeCycle.toCloseableOption
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.pretty.{CantonPrettyPrinter, Pretty, PrettyPrinting}
@@ -113,6 +114,7 @@ import com.digitalasset.canton.util.TryUtil.*
 import com.digitalasset.canton.util.collection.IterableUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{SequencerAlias, SequencerCounter, time}
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -327,14 +329,42 @@ abstract class SequencerClientImpl(
     // We're ignoring the size of the SignedContent wrapper here.
     // TODO(#12320) Look into what we really want to do here
     val serializedRequestSize = request.toProtoVersioned.serializedSize
-    Either.cond(
-      serializedRequestSize <= maxRequestSize.unwrap,
-      (),
-      SendAsyncClientError.RequestInvalid(
-        s"Batch size ($serializedRequestSize bytes) is exceeding maximum size ($maxRequestSize bytes) for synchronizer $psid"
-      ),
-    )
+    for {
+      _ <- Either.cond(
+        serializedRequestSize <= maxRequestSize.unwrap,
+        (),
+        SendAsyncClientError.RequestInvalid(
+          s"Batch size ($serializedRequestSize bytes) is exceeding maximum size ($maxRequestSize bytes) for synchronizer $psid"
+        ),
+      )
+      _ <- checkUncompressedRequestSize(request, maxRequestSize)
+    } yield ()
   }
+
+  /** From protocol version 36 on, the receiving end decompresses the batch's envelopes within a
+    * single cumulative budget of `maxRequestSize` bytes, so a request must also fit in
+    * `maxRequestSize` in uncompressed form. Checking this here rejects an oversized request at the
+    * sender instead of failing its decompression downstream.
+    */
+  private def checkUncompressedRequestSize(
+      request: SubmissionRequest,
+      maxRequestSize: MaxRequestSize,
+  ): Either[SendAsyncClientError, Unit] =
+    if (protocolVersion <= ProtocolVersion.v35) Either.unit
+    else
+      for {
+        uncompressedBatch <- request.batch.toClosedUncompressedBatchResult.leftMap(err =>
+          SendAsyncClientError.RequestInvalid(s"Unable to compute uncompressed batch size: $err")
+        )
+        uncompressedRequestSize = uncompressedBatch.envelopes.map(_.uncompressedByteSize.toLong).sum
+        _ <- Either.cond(
+          uncompressedRequestSize <= maxRequestSize.unwrap.toLong,
+          (),
+          SendAsyncClientError.RequestInvalid(
+            s"Uncompressed batch size ($uncompressedRequestSize bytes) is exceeding maximum size ($maxRequestSize bytes) for synchronizer $psid"
+          ),
+        )
+      } yield ()
   @nowarn("cat=deprecation")
   private def sendAsyncInternal(
       batch: Batch[DefaultOpenEnvelope],
@@ -481,9 +511,9 @@ abstract class SequencerClientImpl(
             .checkSenderAndRecipientsAreRegistered(request, snapshot)
             .leftMap(_.toSendAsyncClientError)
           acceptableSequencersO <- EitherT.right(getAcceptableSequencers(snapshot))
-          _ <- EitherT.liftF(
-            cost.parTraverse_(c => trafficCostValidator.validate(c.cost.unwrap, traceContext))
-          )
+          _ <- cost
+            .traverse_(c => trafficCostValidator.validate(c.cost.unwrap, traceContext))
+            .leftMap[SendAsyncClientError](SendAsyncClientError.TrafficEnforcementRejected.apply)
           latestAttemptRef <- EitherT.fromEither[FutureUnlessShutdown](trackSend)
           _ = recorderO.foreach(_.recordSubmission(request))
           res <- performSend(
@@ -700,10 +730,10 @@ abstract class SequencerClientImpl(
           case _: SendAsyncClientError.RequestFailed =>
             // We currently do not have proper error codes for this type of error
             "RequestFailed"
-
+          case SendAsyncClientError.RequestAlreadyExists(_) =>
+            "RequestAlreadyExists"
           case SendAsyncClientError.RequestRefused(SendAsyncError.SendAsyncErrorGrpc(grpcError)) =>
             grpcError.decodedCantonError.map(_.code.id).getOrElse("Unknown gRPC error")
-
           case SendAsyncClientError.RequestRefused(_: SendAsyncError.SendAsyncErrorDirect) =>
             // We currently do not have proper error codes for this type of error
             "SendAsyncErrorDirect"
@@ -769,6 +799,17 @@ abstract class SequencerClientImpl(
             // Trust the single sequencer to determine whether the request should indeed be refused and give up.
             // TODO(#12377) Do not trust the sequencer and instead retry sensibly
             Right(Left(error))
+
+          case err: SendAsyncClientError.RequestAlreadyExists =>
+            logger.debug(
+              s"Send request with message id $messageId was deduped by $sequencerId: ${err.message}"
+            )
+            // Trust the single sequencer to determine whether the request should indeed be refused and give up.
+            // TODO(#12377) Do not trust the sequencer (I wouldn't retry but I would track the
+            //   the request and track the failures associated to a sequencer, and use that
+            //   to start proper blacklisting of sequencers
+            Right(Left(error))
+
         }
       }
 
@@ -831,8 +872,9 @@ abstract class SequencerClientImpl(
             )
             FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
               clock
-                .scheduleAfter(
+                .scheduleAfterCancelledOnShutdown(
                   _ => maybeResendAfterPatience(sendInFlight = sendInFlight),
+                  s"${getClass.getName}: scheduling amplification",
                   durationToWait.toJava,
                 )
                 .flatten,
@@ -894,6 +936,8 @@ abstract class SequencerClientImpl(
             case (_, Left(error)) =>
               handleSyncError(error, sequencerId, sequencerAlias)
           }
+
+        case None if isClosing => FutureUnlessShutdown.abortedDueToShutdown
 
         case None =>
           // We don't have any connection available
@@ -1477,17 +1521,20 @@ class RichSequencerClientImpl(
           .putIfAbsent(postAggregationHandler)
           .foreach(_ => ErrorUtil.invalidState("Post aggregation handler already exists"))
 
-        val sequencerAggregator =
-          new SequencerAggregator(
-            postAggregationHandler,
-            syncCryptoClient.pureCrypto,
-            config.eventInboxSize,
-            loggerFactory,
-            MessageAggregationConfig(sequencerTransports.sequencerTrustThreshold),
-            updateSendTracker = sendTracker.update,
-            timeouts,
-            futureSupervisor,
-          )
+        val sequencerAggregator = SequencerAggregator.create(
+          config.useNewAggregator,
+          postAggregationHandler,
+          syncCryptoClient.pureCrypto,
+          config.eventInboxSize,
+          config.pastEventsCacheSize,
+          loggerFactory,
+          MessageAggregationConfig.fromSequencerTransports(sequencerTransports),
+          updateSendTracker = sendTracker.update,
+          notifyNewEvent =
+            event => sequencerSubscriptionPoolRef.get.foreach(_.checkLiveness(event)),
+          timeouts,
+          futureSupervisor,
+        )
         sequencerAggregatorRef
           .putIfAbsent(sequencerAggregator)
           .foreach(_ => ErrorUtil.invalidState("Sequencer aggregator already exists"))
@@ -1608,13 +1655,13 @@ class RichSequencerClientImpl(
     * [[applicationHandlerFailure]] contains an error.
     */
   private def processEventBatch[
-      Box[+X <: Envelope[?]] <: ProcessingSequencedEvent[X],
+      Box[+B <: GenBatch[?]] <: ProcessingSequencedEvent[B],
       Env <: Envelope[?],
   ](
       eventHandler: UnthrottledApplicationHandler[Lambda[
-        `+X <: Envelope[_]` => Traced[Seq[Box[X]]]
+        `+X <: Envelope[_]` => Traced[Seq[Box[Batch[X]]]]
       ], Env],
-      eventBatch: Seq[Box[Env]],
+      eventBatch: Seq[Box[Batch[Env]]],
   ): EitherT[FutureUnlessShutdown, ApplicationHandlerFailure, Unit] =
     NonEmpty
       .from(eventBatch)
@@ -1653,7 +1700,7 @@ class RichSequencerClientImpl(
             //   the application handler.
             // - Ongoing invocations of this method are not affected by clearing the queue,
             //   because the events processed by the ongoing invocation have been drained from the queue before clearing.
-            sequencerAggregatorRef.get.foreach(_.eventQueue.clear())
+            sequencerAggregatorRef.get.foreach(_.clearEventQueue())
             failure
           }
 
@@ -1696,18 +1743,15 @@ class RichSequencerClientImpl(
                     future.transformIntoSuccess { innerResult =>
                       innerResult match {
                         case Success(value) =>
-                          value.onShutdown {
-                            logger
-                              .debug("Unthrottled async event processing aborted due to shutdown")
+                          value.onShutdown(
                             putApplicationHandlerFailure(ApplicationHandlerShutdown).discard
-                          }
+                          )
                         case Failure(error) =>
                           handleException(error, eventType = "Unthrottled").discard
                       }
                       UnlessShutdown.unit
                     }
                   case Success(AbortedDueToShutdown) =>
-                    logger.debug("Async event processing aborted due to shutdown")
                     FutureUnlessShutdown
                       .pure(putApplicationHandlerFailure(ApplicationHandlerShutdown).discard)
                   case Failure(error) =>
@@ -1721,7 +1765,6 @@ class RichSequencerClientImpl(
                 UnlessShutdown.Outcome(Either.unit)
 
               case Success(UnlessShutdown.AbortedDueToShutdown) =>
-                logger.debug("Synchronous event processing aborted due to shutdown")
                 putApplicationHandlerFailure(ApplicationHandlerShutdown).discard
                 UnlessShutdown.Outcome(Left(ApplicationHandlerShutdown))
               case Failure(ex) =>
@@ -1757,7 +1800,7 @@ class RichSequencerClientImpl(
       }
       sequencerAggregatorRef.get.foreach(
         _.changeMessageAggregationConfig(
-          MessageAggregationConfig(sequencerTransports.sequencerTrustThreshold)
+          MessageAggregationConfig.fromSequencerTransports(sequencerTransports)
         )
       )
       sequencersTransportState.changeTransport(sequencerTransports)
@@ -2107,7 +2150,7 @@ class SequencerClientImplPekko[E: Pretty](
             val (subscriptionKillSwitch, (doneF, health)) = subscriptionMat
             val combinedKillSwitch =
               new CombinedKillSwitch(replayedKillSwitch, subscriptionKillSwitch)
-            (combinedKillSwitch, FutureUnlessShutdown.outcomeF(doneF), health)
+            (combinedKillSwitch, FutureUnlessShutdown.recoverFromAbortException(doneF), health)
         }
 
         type F2[+X] = WithKillSwitch[F1[X]]
@@ -2147,19 +2190,23 @@ class SequencerClientImplPekko[E: Pretty](
               error
           }
           .toMat(Sink.lastOption) { (matEventSource, lastF) =>
-            val extractedFailureF = lastF.map {
+            val extractedFailureF = FutureUnlessShutdown.recoverFromAbortException(lastF).flatMap {
               case None =>
                 logger.debug("sequencer subscription stream terminated normally")
-                AbortedDueToShutdown
+                FutureUnlessShutdown.abortedDueToShutdown
               case Some(error) =>
                 logger.debug(s"sequencer subscription stream terminated abnormally: $error")
-                Outcome(error)
+                FutureUnlessShutdown.pure(error)
             }
-            matEventSource -> FutureUnlessShutdown(extractedFailureF)
+            matEventSource -> extractedFailureF
           }
 
         val ((killSwitch, subscriptionDoneF, health), completion) =
-          PekkoUtil.runSupervised(stream, errorLogMessagePrefix = "Sequencer subscription failed")
+          PekkoUtil.runSupervised(
+            stream,
+            errorLogMessagePrefix = "Sequencer subscription failed",
+            reportExceptionAtInfo = UnlessShutdown.isAbortedDueToShutdownException,
+          )
         val handle = SubscriptionHandle(killSwitch, subscriptionDoneF, completion)
         subscriptionHandle.getAndSet(Some(handle)).foreach { _ =>
           // TODO(#13789) Clean up the error logging.
@@ -2287,6 +2334,7 @@ object SequencerClient {
       sequencerLivenessMargin: NonNegativeInt,
       submissionRequestAmplification: SubmissionRequestAmplification,
       sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
+      subscriptionLivenessLimits: SubscriptionLivenessLimits,
   )
 
   object SequencerTransports {
@@ -2295,12 +2343,14 @@ object SequencerClient {
         sequencerLivenessMargin: NonNegativeInt,
         submissionRequestAmplification: SubmissionRequestAmplification,
         sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
+        subscriptionLivenessLimits: SubscriptionLivenessLimits,
     ): SequencerTransports =
       SequencerTransports(
         sequencerTrustThreshold = sequencerSignatureThreshold,
         sequencerLivenessMargin = sequencerLivenessMargin,
         submissionRequestAmplification = submissionRequestAmplification,
         sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
+        subscriptionLivenessLimits = subscriptionLivenessLimits,
       )
 
     def default: SequencerTransports =
@@ -2309,6 +2359,7 @@ object SequencerClient {
         sequencerLivenessMargin = NonNegativeInt.zero,
         SubmissionRequestAmplification.NoAmplification,
         SequencerConnectionPoolDelays.default,
+        SubscriptionLivenessLimits.default,
       )
   }
 
@@ -2356,7 +2407,10 @@ object SequencerClient {
       * Practically, this is relevant for requests from submitting participants that perform traffic
       * enforcement against local user traffic accounts.
       */
-    def validate(trafficCost: Long, traceContext: TraceContext): FutureUnlessShutdown[Unit]
+    def validate(
+        trafficCost: Long,
+        traceContext: TraceContext,
+    ): EitherT[FutureUnlessShutdown, RpcError, Unit]
   }
 
   object TrafficCostValidator {
@@ -2364,8 +2418,10 @@ object SequencerClient {
       override def validate(
           @unused trafficCost: Long,
           @unused traceContext: TraceContext,
-      ): FutureUnlessShutdown[Unit] =
-        FutureUnlessShutdown.unit
+      ): EitherT[FutureUnlessShutdown, RpcError, Unit] =
+        EitherT[FutureUnlessShutdown, RpcError, Unit](
+          FutureUnlessShutdown.pure(Right(()))
+        )
     }
   }
 }

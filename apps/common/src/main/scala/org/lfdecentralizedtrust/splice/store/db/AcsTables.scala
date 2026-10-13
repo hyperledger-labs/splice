@@ -22,7 +22,7 @@ trait AcsTables extends AcsJdbcTypes {
   class StoreDescriptors(_tableTag: Tag)
       extends profile.api.Table[StoreDescriptorsRow](_tableTag, "store_descriptors") {
     def * = (id, descriptor).<>(
-      StoreDescriptorsRow.tupled,
+      (StoreDescriptorsRow.apply _).tupled,
       StoreDescriptorsRow.unapply,
     )
 

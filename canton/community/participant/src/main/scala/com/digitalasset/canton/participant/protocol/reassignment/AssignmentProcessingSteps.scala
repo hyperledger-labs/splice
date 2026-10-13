@@ -7,7 +7,6 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.crypto.{DecryptionError as _, EncryptionError as _, *}
@@ -15,6 +14,7 @@ import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.ViewType.AssignmentViewType
 import com.digitalasset.canton.ledger.participant.state.SequencedEventUpdate
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
@@ -49,6 +49,7 @@ import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.{ContractValidator, EitherTUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter, checked}
+import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
 import com.google.protobuf.ByteString
 
 import java.util.UUID
@@ -247,8 +248,8 @@ private[reassignment] class AssignmentProcessingSteps(
         .encryptView(AssignmentViewType)(
           fullTree,
           viewsToKeyMap.keyAndEncryptedRandomnessByRecipients(recipients),
+          submittingParticipantSignature,
           recentSnapshot,
-          Some(signingTimestampOverrides),
           protocolVersion.unwrap,
         )
         .leftMap[ReassignmentProcessorError](
@@ -324,7 +325,7 @@ private[reassignment] class AssignmentProcessingSteps(
   }
 
   override def createSubmissionResult(
-      deliver: Deliver[Envelope[?]],
+      deliver: Deliver[Batch[Envelope[?]]],
       pendingSubmission: PendingSubmissionData,
   ): SubmissionResult =
     SubmissionResult(pendingSubmission.value.reassignmentCompletion.future)
@@ -354,6 +355,7 @@ private[reassignment] class AssignmentProcessingSteps(
         sessionKeyStore,
         message,
         participantId,
+        protocolVersion.value,
       )(deserializeTree)
       .flatMap { multiView =>
         EitherT.cond(
@@ -386,10 +388,7 @@ private[reassignment] class AssignmentProcessingSteps(
       )
       val activenessSet = ActivenessSet(
         contracts = contractCheck,
-        reassignmentIds =
-          if (parsedRequest.fullViewTree.isReassigningParticipant(participantId))
-            Set(parsedRequest.reassignmentId)
-          else Set.empty,
+        reassignmentIds = Set(parsedRequest.reassignmentId),
       )
       Right(activenessSet)
     } else
@@ -424,8 +423,6 @@ private[reassignment] class AssignmentProcessingSteps(
   ] = {
     val reassignmentId = parsedRequest.reassignmentId
     val sourceSynchronizer = parsedRequest.fullViewTree.sourceSynchronizer
-    val isReassigningParticipant =
-      parsedRequest.fullViewTree.isReassigningParticipant(participantId)
 
     for {
       reassignmentDataE <- EitherT.right[ReassignmentProcessorError](
@@ -442,33 +439,12 @@ private[reassignment] class AssignmentProcessingSteps(
 
     } yield {
       val confirmationResponseF =
-        if (assignmentValidationResult.hostedConfirmingReassigningParties.isEmpty) {
-          logger.debug(
-            "Not sending a verdict because the list of hosted confirming parties is empty"
-          )
-          FutureUnlessShutdown.pure(None)
-        } else if (
-          assignmentValidationResult.reassigningParticipantValidationResult.isUnassignmentDataNotFound && isReassigningParticipant
-        ) {
-          logger.info(
-            s"Sending an abstain verdict for ${assignmentValidationResult.hostedConfirmingReassigningParties} because unassignment data is not found in the reassignment store"
-          )
-          val confirmationResponses = createAbstainResponse(
-            parsedRequest.requestId,
-            assignmentValidationResult.rootHash,
-            s"Unassignment data not found when processing assignment $reassignmentId.",
-            assignmentValidationResult.hostedConfirmingReassigningParties,
-          )
-
-          FutureUnlessShutdown.pure(confirmationResponses)
-        } else {
-          createConfirmationResponses(
-            parsedRequest.requestId,
-            parsedRequest.malformedPayloads,
-            protocolVersion.unwrap,
-            assignmentValidationResult,
-          )
-        }
+        createConfirmationResponses(
+          parsedRequest.requestId,
+          parsedRequest.malformedPayloads,
+          protocolVersion.unwrap,
+          assignmentValidationResult,
+        )
 
       val responseF = confirmationResponseF.map(_.map((_, Recipients.cc(parsedRequest.mediator))))
 
@@ -515,7 +491,7 @@ private[reassignment] class AssignmentProcessingSteps(
   }
 
   override def getCommitSetAndContractsToBeStoredAndEventFactory(
-      event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
+      event: WithOpeningErrors[SignedContent[Deliver[Batch[DefaultOpenEnvelope]]]],
       verdict: Verdict,
       pendingRequestData: PendingAssignment,
       pendingSubmissionMap: PendingSubmissions,
@@ -568,7 +544,9 @@ private[reassignment] class AssignmentProcessingSteps(
         .getOrElse(errorDetails)
 
     for {
-      rejectionFromPhase3 <- EitherT.right(checkPhase7Validations(assignmentValidationResult))
+      rejectionFromPhase3 <- EitherT.right(
+        checkPhase7Validations(assignmentValidationResult.commonValidationResult)
+      )
 
       // Additional validation requested during security audit as DIA-003-013.
       // Activeness of the mediator already gets checked in Phase 3,

@@ -1,0 +1,11 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "name": "cn-test-stack-out",
+    "networkTier": "PREMIUM"
+  },
+  "name": "cn-test-stack-out",
+  "provider": "",
+  "type": "gcp:compute/address:Address"
+}

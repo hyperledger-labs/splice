@@ -3,13 +3,11 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
-import cats.data.NonEmptyList
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
-import org.apache.pekko.util.ByteString
 import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.scan.admin.http.{ScanHttpEncodings, ScanJsonSupport}
 import org.lfdecentralizedtrust.splice.store.{
@@ -23,8 +21,8 @@ import org.lfdecentralizedtrust.splice.store.{
 import io.circe.syntax.*
 import org.apache.pekko.actor.ActorSystem
 
-import java.nio.charset.StandardCharsets
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.*
 import scala.math.Ordering.Implicits.*
 
 case class UpdatesSegment(
@@ -56,15 +54,23 @@ class UpdateHistorySegmentBulkStorage(
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
-  private def getUpdatesChunk(
-      afterTs: TimestampWithMigrationId
-  )(implicit
-      actorSystem: ActorSystem
-  ): Future[Option[(TimestampWithMigrationId, Seq[TreeUpdateWithMigrationId])]] = {
+  private case class GetUpdatesResult(
+      updates: Seq[TreeUpdateWithMigrationId],
+      lastTimestamp: TimestampWithMigrationId,
+      doneWithSegment: Boolean,
+  )
+
+  private def getUpdates(
+      afterTs: TimestampWithMigrationId,
+      limit: PageLimit,
+  ): Future[GetUpdatesResult] = {
     for {
       updates <- updateHistory.getUpdatesWithoutImportUpdates(
         Some(TimestampWithMigrationId(afterTs.timestamp, afterTs.migrationId)),
-        PageLimit.tryCreate(storageConfig.bulkDbReadChunkSize),
+        limit,
+      )
+      _ = logger.debug(
+        s"Fetched ${updates.length} updates from record time ${afterTs.timestamp} (limit was $limit)"
       )
       updatesInSegment = updates.filter(update =>
         TimestampWithMigrationId(
@@ -73,11 +79,13 @@ class UpdateHistorySegmentBulkStorage(
         ) <= segment.toTimestamp
       )
       result <-
-        if (
-          updatesInSegment.length < updates.length || updates.length == storageConfig.bulkDbReadChunkSize
-        ) {
+        if (updates.isEmpty) {
+          logger.debug(
+            s"No updates found after record time ${afterTs.timestamp} yet, but we don't know if we're done with the segment"
+          )
+          Future.successful(GetUpdatesResult(Seq.empty, afterTs, doneWithSegment = false))
+        } else {
           if (updatesInSegment.nonEmpty) {
-            // Found enough updates to add
             logger.debug(
               s"Adding ${updatesInSegment.length} updates, between record time ${updatesInSegment.headOption
                   .map(_.update.update.recordTime)} and ${updatesInSegment.lastOption.map(_.update.update.recordTime)}"
@@ -86,11 +94,11 @@ class UpdateHistorySegmentBulkStorage(
               throw new RuntimeException("Unexpected failure")
             )
             Future.successful(
-              Some(
-                (
-                  TimestampWithMigrationId(last.update.update.recordTime, last.migrationId),
-                  updatesInSegment,
-                )
+              GetUpdatesResult(
+                updatesInSegment,
+                TimestampWithMigrationId(last.update.update.recordTime, last.migrationId),
+                // If the query result contains updates outside the segment, then we know we're done with the segment
+                doneWithSegment = updates.length > updatesInSegment.length,
               )
             )
           } else {
@@ -98,18 +106,7 @@ class UpdateHistorySegmentBulkStorage(
             logger.debug(
               "No more updates inside the segment, done dumping updates from this segment"
             )
-            Future.successful(None)
-          }
-        } else {
-          logger.debug(
-            s"Not enough updates yet (queried for ${storageConfig.bulkDbReadChunkSize}, found ${updates.length}. Last update is from ${updates.lastOption
-                .map(_.update.update.recordTime)}, migration ${updates.lastOption.map(_.migrationId)}), sleeping..."
-          )
-          after(
-            appConfig.updatesPollingInterval.underlying,
-            actorSystem.scheduler,
-          ) {
-            Future.successful(Some((afterTs, Nil)))
+            Future.successful(GetUpdatesResult(Seq.empty, afterTs, doneWithSegment = true))
           }
         }
     } yield {
@@ -117,45 +114,83 @@ class UpdateHistorySegmentBulkStorage(
     }
   }
 
-  private def encodeUpdates(
-      updates: NonEmptyList[TreeUpdateWithMigrationId],
+  private def encodeUpdate(
+      update: TreeUpdateWithMigrationId,
       encoding: ScanStorageConfig.Encoding,
-  ): ByteString = {
-    val encoded = updates.toList.map(update =>
-      ScanHttpEncodings.encodeUpdateV2(
-        update,
-        encoding.damlValueEncoding,
-        ScanHttpEncodings.V1,
-      )
+  ): String = {
+    logger.trace(
+      s"encoding an update from DB with encoding ${encoding.key}, with timestamp ${update.update.update.recordTime}"
     )
     // Import custom encoders that omit null OmitNullString fields.
     // When we add new optional OmitNullString fields, they will be None until a coordinated
     // switching point.  The custom encoders ensure the null keys are absent from the JSON so that
     // SVs adopting a new version asynchronously do not break BFT guarantees.
     import ScanJsonSupport.*
-    val updatesStr = encoded
-      .map(u => u.asJson.noSpacesSortKeys)
-      .mkString("\n") + "\n"
-    val updatesBytes = ByteString(updatesStr.getBytes(StandardCharsets.UTF_8))
-    logger.debug(
-      s"Read and encoded ${encoded.length} updates from DB, to a bytestring of size ${updatesBytes.length} bytes, with encoding ${encoding.key}. Timestamps are ${updates.head.update.update.recordTime} to ${updates.last.update.update.recordTime}"
+    ScanHttpEncodings
+      .encodeUpdateV2(
+        update,
+        encoding.damlValueEncoding,
+        ScanHttpEncodings.V1,
+      )
+      .asJson
+      .noSpacesSortKeys
+  }
+
+  private def updatesSource(implicit
+      actorSystem: ActorSystem
+  ): Source[Seq[TreeUpdateWithMigrationId], NotUsed] = {
+
+    final case class State(
+        afterTs: TimestampWithMigrationId,
+        sleepBeforeNextFetch: Boolean,
+        done: Boolean,
     )
-    updatesBytes
+
+    Source.unfoldAsync(State(segment.fromTimestamp, sleepBeforeNextFetch = false, done = false)) {
+      state =>
+        if (state.done) {
+          logger.debug(
+            s"Done dumping updates from segment ${segment.fromTimestamp}-${segment.toTimestamp}"
+          )
+          Future.successful(None)
+        } else {
+          def call(): Future[Option[(State, Seq[TreeUpdateWithMigrationId])]] =
+            getUpdates(state.afterTs, PageLimit.tryCreate(appConfig.dbReadChunkSize))
+              .map[Option[(State, Seq[TreeUpdateWithMigrationId])]] {
+                case GetUpdatesResult(updates, nextTs, doneWithSegment) =>
+                  Some(
+                    (
+                      State(
+                        nextTs,
+                        sleepBeforeNextFetch = updates.length < appConfig.dbReadChunkSize,
+                        done = doneWithSegment,
+                      ),
+                      updates,
+                    )
+                  )
+              }
+
+          if (state.sleepBeforeNextFetch) {
+            // Previous call did not return a full page (but did not reach the end of the segment yet),
+            // so we sleep for a while before the next query
+            after(appConfig.updatesPollingInterval.underlying, actorSystem.scheduler)(call())
+          } else call()
+        }
+    }
   }
 
   private def getSource(implicit
       actorSystem: ActorSystem
   ): Source[Seq[String], NotUsed] = {
-    Source
-      .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
+    updatesSource
       .map(updates => {
         historyMetrics.BulkStorage.incUpdatesCount(updates.length)
         updates
       })
+      .mapConcat(identity)
       .via(
         MultiEncodingBulkStorageFlow(
-          (updates, encoding) =>
-            NonEmptyList.fromFoldable(updates).fold(ByteString.empty)(encodeUpdates(_, encoding)),
+          encodeUpdate,
           encoding =>
             // We use lazyFlow, so that in the case where no updates are emitted, we don't instantiate the S3ZstdObjects at all,
             // since it assumes that it gets at least one chunk to write.

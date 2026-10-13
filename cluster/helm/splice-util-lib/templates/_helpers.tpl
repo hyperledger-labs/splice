@@ -19,10 +19,11 @@ valueFrom:
 {{- $app := .appName }}
 {{- $keyName := .keyName }}
 {{- $fixedTokens := .fixedTokens }}
+{{- $secretName := .secretName | default (printf "splice-app-%s-ledger-api-auth" $keyName) }}
 - name: "SPLICE_APP_{{ $app | upper }}_LEDGER_API_AUTH_USER_NAME"
-{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "ledgerApiUser" "secretName" (printf "splice-app-%s-ledger-api-auth" $keyName) "secretKey" "ledger-api-user" "optional" false) | indent 2 }}
+{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "ledgerApiUser" "secretName" $secretName "secretKey" "ledger-api-user" "optional" false) | indent 2 }}
 - name: "SPLICE_APP_{{ $app | upper }}_LEDGER_API_AUTH_AUDIENCE"
-{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "audience" "secretName" (printf "splice-app-%s-ledger-api-auth" $keyName) "secretKey" "audience" "optional" false) | indent 2 }}
+{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "audience" "secretName" $secretName "secretKey" "audience" "optional" false) | indent 2 }}
 {{- if .fixedTokens }}
 - name: ADDITIONAL_CONFIG_AUTH
   value: |
@@ -32,16 +33,16 @@ valueFrom:
       token = ${SPLICE_APP_{{ $app | upper }}_LEDGER_API_AUTH_TOKEN}
     }
 - name: "SPLICE_APP_{{ $app | upper }}_LEDGER_API_AUTH_TOKEN"
-{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "token" "secretName" (printf "splice-app-%s-ledger-api-auth" $keyName) "secretKey" "token" "optional" false) | indent 2 }}
+{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "token" "secretName" $secretName "secretKey" "token" "optional" false) | indent 2 }}
 {{ else }}
 - name: "SPLICE_APP_{{ $app | upper }}_LEDGER_API_AUTH_URL"
-{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "url" "secretName" (printf "splice-app-%s-ledger-api-auth" $keyName) "secretKey" "url" "optional" false) | indent 2 }}
+{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "url" "secretName" $secretName "secretKey" "url" "optional" false) | indent 2 }}
 - name: "SPLICE_APP_{{ $app | upper }}_LEDGER_API_AUTH_CLIENT_ID"
-{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "clientId" "secretName" (printf "splice-app-%s-ledger-api-auth" $keyName) "secretKey" "client-id" "optional" false) | indent 2 }}
+{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "clientId" "secretName" $secretName "secretKey" "client-id" "optional" false) | indent 2 }}
 - name: "SPLICE_APP_{{ $app | upper }}_LEDGER_API_AUTH_CLIENT_SECRET"
-{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "clientSecret" "secretName" (printf "splice-app-%s-ledger-api-auth" $keyName) "secretKey" "client-secret" "optional" false) | indent 2 }}
+{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "clientSecret" "secretName" $secretName "secretKey" "client-secret" "optional" false) | indent 2 }}
 - name: "SPLICE_APP_{{ $app | upper }}_LEDGER_API_AUTH_SCOPE"
-{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "scope" "secretName" (printf "splice-app-%s-ledger-api-auth" $keyName) "secretKey" "scope" "optional" true) | indent 2 }}
+{{ include "splice-util-lib.secret" (dict "overrides" .secretOverrides "overrideKey" "scope" "secretName" $secretName "secretKey" "scope" "optional" true) | indent 2 }}
 {{- end }}
 {{- end -}}
 {{- define "splice-util-lib.auth0-user-env-var" -}}

@@ -8,7 +8,7 @@ import { useLocation } from 'react-router';
 
 import { useFeatureSupport } from '../contexts/SvContext';
 import { useSvConfig } from '../utils';
-import { partyIdScrollGlobalStyles } from './beta/identifierStyles';
+import { partyIdScrollGlobalStyles } from './ui/identifierStyles';
 import PartyIdScrollTracks from './PartyIdScrollTracks';
 import SvNavigationShell from './layout/SvNavigationShell';
 import { SvNavLinkItem } from './layout/SvNavLink';

@@ -6,6 +6,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
   HistoryMetrics,
   PageLimit,
   StoreTestBase,
@@ -13,11 +14,12 @@ import org.lfdecentralizedtrust.splice.store.{
   UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.scan.store.db.{DbAppActivityRecordStore, DbScanVerdictStore}
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{TrafficSummaryT, EnvelopeT}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{EnvelopeT, TrafficSummaryT}
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import io.circe.Json
+import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 import scala.concurrent.Future
@@ -920,6 +922,43 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
     }
   }
 
+  "DbScanVerdictStore.listTransactionViews" should {
+
+    "return a verdict's views in view_id order, failing past the limit" in {
+      for {
+        ctx <- newEventStore()
+        verdictStore = ctx.verdictStore
+        _ <- verdictStore.insertVerdictAndTransactionViews(
+          Seq(
+            mkVerdict(verdictStore, "update1", CantonTimestamp.MinValue.plusSeconds(1L)) -> {
+              (rowId: Long) =>
+                Seq(2, 0, 1).map(viewId =>
+                  new verdictStore.TransactionViewT(
+                    verdictRowId = rowId,
+                    viewId = viewId,
+                    informees = Seq(dsoParty.toProtoPrimitive),
+                    confirmingParties = Json.arr(),
+                    subViews = Seq.empty,
+                  )
+                )
+            }
+          )
+        )
+        verdict <- verdictStore.getVerdictByUpdateId("update1")
+        rowId = verdict.value.rowId
+        all <- verdictStore.listTransactionViews(rowId)
+        atLimit <- verdictStore.listTransactionViews(rowId, HardLimit.tryCreate(3))
+        overLimit <- verdictStore.listTransactionViews(rowId, HardLimit.tryCreate(2)).failed
+      } yield {
+        all.map(_.viewId) shouldBe Seq(0, 1, 2)
+        atLimit shouldBe all
+        overLimit.getMessage should include(
+          "Size of the result exceeded the limit in scanVerdict.listTransactionViews"
+        ).and(include("Result size: 3. Limit: 2"))
+      }
+    }
+  }
+
   private def newUpdateHistory(
       migrationId: Long
   ): Future[UpdateHistory] = {
@@ -932,6 +971,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       dsoParty,
       BackfillingRequirement.BackfillingNotRequired,
       internedStringStore(storage),
+      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
       loggerFactory,
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = true,
@@ -1091,6 +1131,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       informees.map(_.toProtoPrimitive),
       Seq(viewId),
       summary,
+      None,
     )
   }
 

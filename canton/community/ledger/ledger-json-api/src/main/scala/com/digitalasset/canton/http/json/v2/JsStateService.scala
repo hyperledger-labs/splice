@@ -69,6 +69,7 @@ class JsStateService(
       getActiveContractsStream,
     ),
     withServerLogic(JsStateService.activeContractsPageEndpoint, getActiveContractsPage),
+    withServerLogic(JsStateService.queryActiveContractsPageEndpoint, getActiveContractsPage),
     withServerLogic(JsStateService.getConnectedSynchronizersEndpoint, getConnectedSynchronizers),
     withServerLogic(
       JsStateService.getLedgerEndEndpoint,
@@ -102,14 +103,14 @@ class JsStateService(
 
   private def getLedgerEnd(
       callerContext: CallerContext
-  ): TracedInput[Unit] => Future[
+  ): TracedInput[List[String]] => Future[
     Either[JsCantonError, state_service.GetLedgerEndResponse]
   ] = {
     implicit val traceContext: TraceContext = callerContext.traceContext()
 
-    _ =>
+    req =>
       stateServiceClient(callerContext.token())
-        .getLedgerEnd(state_service.GetLedgerEndRequest())
+        .getLedgerEnd(state_service.GetLedgerEndRequest(req.in))
         .resultToRight
   }
 
@@ -240,7 +241,20 @@ object JsStateService extends DocumentationEndpoints {
     )
     .inStreamListParamsAndDescription()
 
+  // GET with body: kept for backwards compatibility; do not add new endpoints with this pattern
+  @SuppressWarnings(Array("com.digitalasset.canton.GetEndpointWithBody"))
   val activeContractsPageEndpoint = state.get
+    .in(sttp.tapir.stringToPath("active-contracts-page"))
+    .in(jsonBody[state_service.GetActiveContractsPageRequest])
+    .out(jsonBody[JsGetActiveContractsPageResponse])
+    .deprecated()
+    .description(s"""|
+           |Deprecated
+           |
+           |Use POST version of this endpoint
+       """.stripMargin.trim)
+
+  val queryActiveContractsPageEndpoint = state.post
     .in(sttp.tapir.stringToPath("active-contracts-page"))
     .in(jsonBody[state_service.GetActiveContractsPageRequest])
     .out(jsonBody[JsGetActiveContractsPageResponse])
@@ -256,6 +270,7 @@ object JsStateService extends DocumentationEndpoints {
 
   val getLedgerEndEndpoint = state.get
     .in(sttp.tapir.stringToPath("ledger-end"))
+    .in(query[List[String]]("synchronizer_id"))
     .out(jsonBody[state_service.GetLedgerEndResponse])
     .protoRef(state_service.StateServiceGrpc.METHOD_GET_LEDGER_END)
 
@@ -268,6 +283,7 @@ object JsStateService extends DocumentationEndpoints {
     activeContractsEndpoint,
     activeContractsListEndpoint,
     activeContractsPageEndpoint,
+    queryActiveContractsPageEndpoint,
     getConnectedSynchronizersEndpoint,
     getLedgerEndEndpoint,
     getLastPrunedOffsetsEndpoint,

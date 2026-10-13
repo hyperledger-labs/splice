@@ -1,0 +1,129 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-global-domain",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "global-domain-10",
+    "namespace": "sv-da-1",
+    "timeout": 600,
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "apiRequestLogLevel": "DEBUG",
+      "cluster": {
+        "dnsName": "mock.global.canton.network.digitalasset.com",
+        "fixedTokens": false,
+        "hostname": "mock.global.canton.network.digitalasset.com",
+        "name": "cn-mocknet"
+      },
+      "enableAntiAffinity": true,
+      "enablePostgresMetrics": true,
+      "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+      "logAsyncFlush": false,
+      "logLevel": "INFO",
+      "logLevelStdout": "DEBUG",
+      "mediator": {
+        "additionalEnvVars": [
+          {
+            "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+            "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+          }
+        ],
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomMediatorJvmFlag",
+        "persistence": {
+          "databaseName": "global_domain_10_mediator",
+          "port": 5432,
+          "postgresName": "mediator-10-pg",
+          "secretName": "mediator-10-pg-secrets"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
+        }
+      },
+      "metrics": {
+        "enable": true,
+        "migration": {
+          "id": 10
+        }
+      },
+      "sequencer": {
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_SEQUENCER_RATE_LIMITS",
+            "value": "canton.sequencers.sequencer.sequencer.block.throughput-cap.messages.confirmation-request {\n  global-tps-cap = 2\n  per-client-tps-cap = 1\n  global-kbps-cap = 200\n  per-client-kbps-cap = 100\n}\ncanton.sequencers.sequencer.sequencer.block.throughput-cap.messages.confirmation-response {\n  global-tps-cap = 6\n  per-client-tps-cap = 5\n  global-kbps-cap = 600\n  per-client-kbps-cap = 500\n}\ncanton.sequencers.sequencer.sequencer.block.throughput-cap.messages.topology {\n  global-tps-cap = 4\n  per-client-tps-cap = 3\n  global-kbps-cap = 400\n  per-client-kbps-cap = 300\n}"
+          },
+          {
+            "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+            "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+          }
+        ],
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSequencerJvmFlag",
+        "driver": {
+          "externalAddress": "sequencer-p2p-10.sv-1.mock.global.canton.network.digitalasset.com",
+          "externalPort": 443,
+          "persistence": {
+            "databaseName": "sequencer_10_dabft",
+            "secretName": "sequencer-bft-10-pg-secrets"
+          },
+          "type": "cantonbft"
+        },
+        "persistence": {
+          "databaseName": "global_domain_10_sequencer",
+          "port": 5432,
+          "postgresName": "sequencer-10-pg",
+          "secretName": "sequencer-10-pg-secrets"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
+        }
+      },
+      "serviceAccountName": "sv-canton-migration-10",
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "0.3.21"
+  },
+  "name": "sv-da-1-global-domain-10",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

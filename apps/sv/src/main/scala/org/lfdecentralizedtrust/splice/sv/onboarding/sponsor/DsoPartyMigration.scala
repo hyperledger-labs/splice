@@ -55,7 +55,7 @@ class DsoPartyMigration(
 
   def authorizeParticipantForHostingDsoParty(
       participantId: ParticipantId
-  )(implicit tc: TraceContext): EitherT[Future, DsoPartyMigrationFailure, ByteString] = {
+  )(implicit tc: TraceContext): EitherT[Future, DsoPartyMigrationFailure, Seq[ByteString]] = {
     logger.info(s"Sponsor SV authorizing DSO party to participant $participantId")
     for {
       dsoRules <- EitherT.liftF(dsoStore.getDsoRules())
@@ -103,7 +103,7 @@ class DsoPartyMigration(
       targetParticipantId: ParticipantId,
       activationTime: Instant,
       decentralizedSynchronizer: SynchronizerId,
-  )(implicit tc: TraceContext): Future[ByteString] = {
+  )(implicit tc: TraceContext): Future[Seq[ByteString]] = {
 
     def submitDummyTransaction(): Future[Unit] =
       svStoreWithIngestion

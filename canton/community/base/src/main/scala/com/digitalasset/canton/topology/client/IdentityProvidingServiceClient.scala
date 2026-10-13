@@ -4,9 +4,7 @@
 package com.digitalasset.canton.topology.client
 
 import cats.data.EitherT
-import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.concurrent.HasFutureSupervision
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -20,6 +18,7 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.{
@@ -27,6 +26,7 @@ import com.digitalasset.canton.protocol.{
   DynamicSynchronizerParametersWithValidity,
   SequencingParametersWithValidity,
   StaticSynchronizerParameters,
+  SynchronizerLimits,
 }
 import com.digitalasset.canton.sequencing.TrafficControlParameters
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
@@ -46,6 +46,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.SingleUseCell
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.immutable
@@ -89,10 +90,8 @@ class IdentityProvidingServiceClient(
   def forSynchronizer(synchronizerId: PhysicalSynchronizerId): Option[SynchronizerTopologyClient] =
     synchronizers.get(synchronizerId)
 
-  override def close(): Unit = {
-    val instances: Seq[AutoCloseable] = synchronizers.values.toSeq
-    LifeCycle.close(instances*)(logger)
-  }
+  override def close(): Unit =
+    LifeCycle.close(synchronizers.values)(logger)
 
 }
 
@@ -271,6 +270,14 @@ trait SynchronizerTopologyClient extends TopologyClientApi[TopologySnapshot] wit
   def awaitUS(condition: TopologySnapshot => FutureUnlessShutdown[Boolean], timeout: Duration)(
       implicit traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean]
+
+  /** Return the size limits to be used for validating collection sizes on this synchronizer
+    *
+    * The current implementation uses the static synchronizer parameters. Even though it is
+    * therefore not related to the topology, we keep this interface here to facilitate a switch to
+    * dynamic synchronizer parameters if / when needed.
+    */
+  def getSynchronizerLimits: SynchronizerLimits
 }
 
 trait BaseTopologySnapshotClient {
@@ -471,6 +478,10 @@ trait ParticipantTopologySnapshotClient {
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean]
 
+  def activeParticipants(participantIds: Seq[ParticipantId])(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Seq[ParticipantId]]
+
   def participantsWithSupportedFeature(
       participants: Set[ParticipantId],
       feature: SynchronizerTrustCertificate.ParticipantTopologyFeatureFlag,
@@ -487,7 +498,6 @@ trait ParticipantTopologySnapshotClient {
       participantId: ParticipantId,
       timestamp: CantonTimestamp,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean]
-
 }
 
 /** The subset of the topology client providing mediator state information */
@@ -592,7 +602,7 @@ trait VettedPackagesSnapshotClient {
       participantId: ParticipantId,
       packages: Set[PackageId],
       ledgerTime: CantonTimestamp,
-      // TODO(#29834): Extract a `loadUnvettedPackages` instead of overloading this method with this flag
+      // TODO(#33919): Remove flag once support for PV34 (checkDependencyVetting=true) is removed
       checkDependencyVetting: Boolean,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[UnknownOrUnvettedPackages]
 
@@ -681,7 +691,12 @@ trait MembersTopologySnapshotClient {
   )
   def knownMembers()(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[Member]]
 
-  /** Convenience method to check `isMemberKnown` for several members. */
+  /** Determines if the members are known on the synchronizer (through a
+    * [[com.digitalasset.canton.topology.transaction.SynchronizerTrustCertificate]],
+    * [[com.digitalasset.canton.topology.transaction.MediatorSynchronizerState]], or
+    * [[com.digitalasset.canton.topology.transaction.SequencerSynchronizerState]]). Note that a
+    * "known" member is not necessarily authorized to use the synchronizer.
+    */
   def areMembersKnown(members: Set[Member])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Set[Member]]
@@ -703,7 +718,7 @@ trait SynchronizerUpgradeClient {
   /** Returns the known sequencer connection details for the successor synchronizer as published by
     * the sequencers.
     */
-  def sequencerConnectionSuccessors(successorPsid: PhysicalSynchronizerId)(implicit
+  def sequencerConnectionSuccessors(successorPsid: OpaquePhysicalSynchronizerId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[
     Map[SequencerId, TopologyTransaction[Replace, LsuSequencerConnectionSuccessor]]
@@ -733,6 +748,9 @@ trait SynchronizerTopologyClientWithInit
     with HasFutureSupervision
     with NamedLogging {
 
+  override def getSynchronizerLimits: SynchronizerLimits =
+    staticSynchronizerParameters.synchronizerLimits
+
   /** Updates the topology client with the topology store state and optionally with externally
     * provided timestamps during startup.
     *
@@ -743,15 +761,19 @@ trait SynchronizerTopologyClientWithInit
     *   - max timestamp that exists in the store (including proposals & rejected)
     *   - sequencer snapshot timestamp (if provided)
     *   - synchronizer upgrade time (if provided)
+    *   - the clean synchronizer record time (if provided)
     *
     * @param sequencerSnapshotTimestamp
     *   lastTs from sequencer snapshot
     * @param synchronizerUpgradeTime
     *   upgradeTime from the predecessor synchronizer
+    * @param cleanSynchronizerRecordTime
+    *   the clean synchronizer record time, up to which the indexer has processed events
     */
   def updateKnownTimestampsDuringStartup(
       sequencerSnapshotTimestamp: Option[SequencedTime] = None,
       synchronizerUpgradeTime: Option[SequencedTime] = None,
+      cleanSynchronizerRecordTime: Option[CantonTimestamp] = None,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit]
@@ -900,6 +922,13 @@ private[client] trait ParticipantTopologySnapshotLoader extends ParticipantTopol
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean] =
     findParticipantState(participantId).map(_.isDefined)
+
+  override def activeParticipants(
+      participantIds: Seq[ParticipantId]
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[ParticipantId]] =
+    loadParticipantStates(participantIds).map { loadedStates =>
+      participantIds.filter(loadedStates.isDefinedAt)
+    }
 
   override def participantsWithSupportedFeature(
       participants: Set[ParticipantId],

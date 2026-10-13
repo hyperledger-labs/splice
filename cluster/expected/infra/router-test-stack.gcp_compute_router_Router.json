@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "network": "projects/da-cn-devnet/global/networks/default"
+  },
+  "name": "router-test-stack",
+  "provider": "",
+  "type": "gcp:compute/router:Router"
+}

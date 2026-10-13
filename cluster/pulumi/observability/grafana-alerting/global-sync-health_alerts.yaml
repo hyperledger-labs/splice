@@ -56,7 +56,7 @@ groups:
         panelId: 10
         noDataState: OK
         execErrState: OK
-        for: 10m
+        for: 15m
         annotations:
           __dashboardUid__: fe8wt04z620aof
           __panelId__: "10"

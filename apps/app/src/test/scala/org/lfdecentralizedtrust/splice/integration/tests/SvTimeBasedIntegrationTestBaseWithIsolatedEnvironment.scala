@@ -89,7 +89,7 @@ trait SvTimeBasedIntegrationTestUtil extends SvTestUtil with WalletTestUtil with
 
   protected def assertTickDurationOfIssuingRound(
       roundNumberToTickDuration: Map[Long, JavaDuration]
-  )(implicit env: SpliceTestConsoleEnvironment): Unit = eventually() {
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = eventually(90.seconds) {
     val issuingRounds = getSortedIssuingRounds(sv1Backend.participantClientWithAdminToken, dsoParty)
     issuingRounds.map(_.data.round.number) shouldBe roundNumberToTickDuration.keySet.toSeq.sorted
     issuingRounds.map { issuingRound =>

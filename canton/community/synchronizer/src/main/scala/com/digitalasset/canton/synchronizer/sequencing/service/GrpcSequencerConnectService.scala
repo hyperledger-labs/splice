@@ -5,15 +5,15 @@ package com.digitalasset.canton.synchronizer.sequencing.service
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext
-import com.digitalasset.canton.ProtoDeserializationError.ProtoDeserializationFailure
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
+import com.digitalasset.canton.protocol
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencer.api.v30 as proto
 import com.digitalasset.canton.sequencer.api.v30.SequencerConnect
@@ -30,6 +30,7 @@ import com.digitalasset.canton.sequencer.api.v30.SequencerConnect.{
   VerifyActiveResponse,
 }
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerLimits
 import com.digitalasset.canton.synchronizer.sequencer.time.LsuSequencingBounds
 import com.digitalasset.canton.synchronizer.sequencing.authentication.grpc.IdentityContextHelper
 import com.digitalasset.canton.synchronizer.service.HandshakeValidator
@@ -46,7 +47,9 @@ import com.digitalasset.canton.topology.transaction.{
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{EitherTUtil, EitherUtil, OptionUtil}
+import com.digitalasset.canton.validation.{ProtoUnvalidatedSeq, ProtoValidation}
 import com.digitalasset.canton.version.{ProtoVersion, ProtocolVersion, ProtocolVersionValidation}
+import com.google.common.annotations.VisibleForTesting
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -63,6 +66,7 @@ class GrpcSequencerConnectService(
     cryptoApi: SynchronizerCryptoClient,
     clock: Clock,
     lsuSequencingBounds: Option[LsuSequencingBounds],
+    sequencerLimits: SequencerLimits,
     sanitizePublicErrorMessages: Boolean,
     disableReleaseVersionHandshakeCheck: Boolean,
     metrics: SequencerMetrics,
@@ -71,8 +75,12 @@ class GrpcSequencerConnectService(
     extends proto.SequencerConnectServiceGrpc.SequencerConnectService
     with NamedLogging {
 
+  import GrpcSequencerConnectService.*
+
   protected val serverProtocolVersion: ProtocolVersion =
     staticSynchronizerParameters.protocolVersion
+
+  private val pvv = ProtocolVersionValidation(serverProtocolVersion)
 
   override def getSynchronizerId(
       request: GetSynchronizerIdRequest
@@ -146,23 +154,42 @@ class GrpcSequencerConnectService(
       metrics.publicApi.handshakes.mark()(MetricsContext("member" -> member, "status" -> status))
     }
 
+    val maxClientProtocolVersions = sequencerLimits.maxClientProtocolVersions.value
+
     mapErrorEither(
-      HandshakeValidator
-        .clientIsCompatible(
-          serverProtocolVersion,
-          request.clientProtocolVersions,
-          request.minimumProtocolVersion,
-          OptionUtil.emptyStringAsNone(request.clientVersion),
-          disableReleaseVersionHandshakeCheck,
-        )
-        .tap(reportHandshakeStatus)
-        .map { _ =>
-          HandshakeResponse(
-            serverProtocolVersion.toProtoPrimitive,
-            HandshakeResponse.Value
-              .Success(SequencerConnect.HandshakeResponse.Success()),
+      for {
+        clientProtocolVersions <- ProtoValidation
+          .validateLength(
+            request.clientProtocolVersions,
+            "client_protocol_versions",
+            pvv,
+            maxClientProtocolVersions,
           )
-        }
+          .leftMap(err => invalidArgument(err.message))
+        clientVersion <- ProtoValidation
+          .validate(
+            request.clientVersion,
+            "client_version",
+            pvv,
+          )
+          .leftMap(err => Status.INVALID_ARGUMENT.withDescription(err.toString))
+        response <- HandshakeValidator
+          .clientIsCompatible(
+            serverProtocolVersion,
+            clientProtocolVersions,
+            request.minimumProtocolVersion,
+            OptionUtil.emptyStringAsNone(clientVersion),
+            disableReleaseVersionHandshakeCheck,
+          )
+          .tap(reportHandshakeStatus)
+          .map { _ =>
+            HandshakeResponse(
+              serverProtocolVersion.toProtoPrimitive,
+              HandshakeResponse.Value
+                .Success(SequencerConnect.HandshakeResponse.Success()),
+            )
+          }
+      } yield response
     )
   }
 
@@ -210,26 +237,9 @@ class GrpcSequencerConnectService(
         failedPrecondition("Synchronizer is locked for onboarding."),
       )
 
-      transactions <-
-        EitherT.fromEither[Future](
-          request.topologyTransactions
-            .traverse(
-              SignedTopologyTransaction
-                .fromProtoV30(ProtocolVersionValidation(serverProtocolVersion), _)
-            )
-            .leftMap(ProtoDeserializationFailure.Wrap(_))
-            .map(_.distinctBy(_.mapping.uniqueKey))
-            .leftMap(_.asGrpcError.getStatus)
-        )
-
       // Perform validations on the transactions
-      // Pass a limit of 7 for total number of transactions
-      // We enforce exactly 1 OTK and STC. An allowance of 5 NSDs
-      // should more than suffice during onboarding. Assuming even one NSD for each of
-      // the other mappings (STC, OTK), one to manage them, plus one root mapping
-      // requires 4 NSDs in total. More mappings can be added after onboarding
-      _ <- EitherT.fromEither[Future](
-        validateOnboardingTransactions(participantId, transactions, PositiveInt.tryCreate(7))
+      transactions <- EitherT.fromEither[Future](
+        parseAndValidateOnboardingTransactions(participantId, request.topologyTransactions)
       )
 
       // query whether the participant has ever onboarded before (regardless of whether it is presently active)
@@ -271,31 +281,50 @@ class GrpcSequencerConnectService(
     } yield RegisterOnboardingTopologyTransactionsResponse.defaultInstance)
   }
 
+  private[service] def parseAndValidateOnboardingTransactions(
+      participantId: ParticipantId,
+      topologyTransactions: ProtoUnvalidatedSeq[protocol.v30.SignedTopologyTransaction],
+  ): Either[Status, Seq[GenericSignedTopologyTransaction]] =
+    for {
+      _ <-
+        // Below PV36 the bound is not enforced, so keep the previous length check
+        if (serverProtocolVersion < ProtocolVersion.v36) {
+          EitherUtil.condUnit(
+            topologyTransactions.sizeIs <= maxOnboardingTransactions.value,
+            invalidArgument(
+              s"Too many topology transactions. Limit: ${maxOnboardingTransactions.value}, Found: ${topologyTransactions.size}"
+            ),
+          )
+        } else Either.unit
+      transactions <-
+        ProtoValidation
+          .validateLengthThen(
+            topologyTransactions,
+            "topology_transactions",
+            pvv,
+            maxOnboardingTransactions.value,
+          )((tx, _) =>
+            SignedTopologyTransaction
+              .fromProtoV30(pvv, tx)
+          )
+          .map(_.distinctBy(_.mapping.uniqueKey))
+          .leftMap(err => invalidArgument(err.message))
+      _ <- validateOnboardingTransactions(participantId, transactions)
+    } yield transactions
+
+  @VisibleForTesting
   private[service] def validateOnboardingTransactions(
       participantId: ParticipantId,
       transactions: Seq[GenericSignedTopologyTransaction],
-      maxMappings: PositiveInt,
   ): Either[Status, Unit] = {
 
     val expectedMappings = TopologyStore.initialParticipantDispatchingSet.forgetNE
+    val stcCount = transactions.count(
+      _.mapping.code == TopologyMapping.Code.SynchronizerTrustCertificate
+    )
+    val otks = transactions.flatMap(_.mapping.select[OwnerToKeyMapping])
 
     for {
-      _ <- {
-        // 0. Reject the transactions if the number exceeds the limit
-        val totalCount = transactions.size
-        EitherUtil.condUnit(
-          totalCount <= maxMappings.value,
-          invalidArgument(
-            s"Too many topology transactions. Limit: ${maxMappings.value}, Found: $totalCount"
-          ),
-        )
-      }
-
-      stcCount = transactions.count(
-        _.mapping.code == TopologyMapping.Code.SynchronizerTrustCertificate
-      )
-      otks = transactions.flatMap(_.mapping.select[OwnerToKeyMapping])
-
       // 1. Participants must have exactly 1 STC
       _ <- EitherUtil.condUnit(
         stcCount == 1,
@@ -456,4 +485,17 @@ class GrpcSequencerConnectService(
 
   private def mapErrorEither[A](f: Either[Status, A]): Future[A] =
     Future.fromTry(f.leftMap(_.asRuntimeException()).toTry)
+}
+
+object GrpcSequencerConnectService {
+
+  /** Pass a limit of 7 for total number of transactions.
+    *
+    * We enforce exactly 1 OTK and STC. An allowance of 5 NSDs should more than suffice during
+    * onboarding. Assuming even one NSD for each of the other mappings (STC, OTK), one to manage
+    * them, plus one root mapping requires 4 NSDs in total. More mappings can be added after
+    * onboarding
+    */
+  val maxOnboardingTransactions: PositiveInt = PositiveInt.tryCreate(7)
+
 }

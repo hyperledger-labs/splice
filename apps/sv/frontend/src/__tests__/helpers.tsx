@@ -10,7 +10,7 @@ import {
 import { replaceEqualDeep } from '@canton-network/splice-common-frontend-utils';
 import { ThemeProvider } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router';
 import { Toaster } from 'sonner';
 import { expect } from 'vitest';
@@ -67,47 +67,7 @@ export const Wrapper: React.FC<{
   );
 };
 
-// Strong type for syntax hints
-type ActionName =
-  | 'SRARC_OffboardSv'
-  | 'SRARC_GrantFeaturedAppRight'
-  | 'SRARC_RevokeFeaturedAppRight'
-  | 'SRARC_SetConfig'
-  | 'CRARC_SetConfig'
-  | 'SRARC_UpdateSvRewardWeight'
-  | 'SRARC_CreateUnallocatedUnclaimedActivityRecord'
-  | (string & {});
-
-export async function changeAction(actionName: ActionName = 'SRARC_SetConfig'): Promise<void> {
-  const dropdown = screen.getByTestId('display-actions');
-  expect(dropdown).toBeDefined();
-  fireEvent.change(dropdown, { target: { value: actionName } });
-
-  const actionChangeDialog = screen.getByTestId('action-change-dialog');
-  expect(actionChangeDialog).toBeDefined();
-  const actionChangeDialogProceed = screen.getByTestId('action-change-dialog-proceed');
-  expect(actionChangeDialogProceed).toBeDefined();
-  fireEvent.click(actionChangeDialogProceed);
-
-  switch (actionName) {
-    case 'SRARC_SetConfig':
-      await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
-      break;
-    case 'CRARC_SetConfig':
-      await waitFor(() =>
-        expect(screen.getByTestId('set-amulet-rules-config-header')).toBeDefined()
-      );
-      break;
-  }
-}
-
 export async function navigateToGovernancePage(user: UserEvent): Promise<void> {
   expect(await screen.findByTestId('navlink-governance')).toBeInTheDocument();
   await user.click(screen.getByTestId('navlink-governance'));
-}
-
-export async function navigateToLegacyGovernancePage(): Promise<void> {
-  window.history.pushState({}, '', '/governance-old');
-  window.dispatchEvent(new PopStateEvent('popstate'));
-  expect(await screen.findByText('Vote Requests')).toBeDefined();
 }

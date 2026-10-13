@@ -1,0 +1,99 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-info",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "info",
+    "namespace": "sv-da-1",
+    "timeout": 600,
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "cluster": {
+        "dnsName": "mock.global.canton.network.digitalasset.com",
+        "fixedTokens": false,
+        "hostname": "mock.global.canton.network.digitalasset.com",
+        "name": "cn-mocknet"
+      },
+      "deploymentDetails": {
+        "configDigest": {
+          "allowedIpRanges": {
+            "type": "md5",
+            "value": "90eedde4a8599204a45dcb972e212c8b"
+          },
+          "approvedSvIdentities": {
+            "type": "md5",
+            "value": "6c876b92df2d92fe7ba83e883d031386"
+          }
+        },
+        "network": "test",
+        "sv": {
+          "version": "0.3.20"
+        },
+        "synchronizer": {
+          "current": {
+            "chainIdSuffix": "4",
+            "migrationId": 2,
+            "synchronizerSerialId": 9,
+            "version": "0.3.20"
+          },
+          "legacy": {
+            "chainIdSuffix": "4",
+            "migrationId": 2,
+            "synchronizerSerialId": 8,
+            "version": "0.3.20"
+          },
+          "successor": {
+            "chainIdSuffix": "4",
+            "migrationId": 2,
+            "synchronizerSerialId": 10,
+            "version": "0.3.21"
+          }
+        }
+      },
+      "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+      "istioVirtualService": {
+        "gateway": "cluster-ingress/cn-http-gateway",
+        "host": "info.sv-1.mock.global.canton.network.digitalasset.com"
+      },
+      "runtimeDetails": {
+        "scanUrl": "http://scan-app.sv-da-1:5012",
+        "synchronizerSerialId": 9
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "0.3.20"
+  },
+  "name": "sv-da-1-info",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

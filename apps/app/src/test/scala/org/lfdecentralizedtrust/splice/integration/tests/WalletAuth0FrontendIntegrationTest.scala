@@ -102,8 +102,8 @@ class WalletAuth0FrontendIntegrationTest
           }
 
           clue("User has to login again") {
-            go to s"http://localhost:3000/confirm-payment/${paymentRequestContractId.contractId}"
-            loginViaAuth0InCurrentPage(
+            completeAuth0LoginWithAuthorization(
+              s"http://localhost:3000/confirm-payment/${paymentRequestContractId.contractId}",
               auth0User.email,
               auth0User.password,
               () => find(id("confirm-payment")) should not be None,

@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.protocol.validation
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.LedgerEffectAbsolutizer.ViewAbsoluteLedgerEffect
 import com.digitalasset.canton.participant.protocol.validation.ExtractUsedAndCreated.{
@@ -78,6 +79,7 @@ object ExtractUsedAndCreated {
       participantId: ParticipantId,
       viewAbsoluteLedgerEffect: Seq[ViewAbsoluteLedgerEffect],
       topologySnapshot: TopologySnapshot,
+      filterForOnboardingParties: Boolean,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       ec: ExecutionContext,
@@ -85,17 +87,40 @@ object ExtractUsedAndCreated {
   ): FutureUnlessShutdown[UsedAndCreated] = {
     val partyIds = extractPartyIds(viewAbsoluteLedgerEffect)
     fetchHostedParties(partyIds, participantId, topologySnapshot).map { hostedParties =>
-      new ExtractUsedAndCreated(hostedParties, loggerFactory)
+      new ExtractUsedAndCreated(hostedParties, filterForOnboardingParties, loggerFactory)
         .usedAndCreated(viewAbsoluteLedgerEffect)
     }
   }
 
+  /** Created contracts broken out by different types of interactions with a transaction.
+    *
+    * @param createdContractsOfHostedInformees
+    *   contracts created by locally hosted stakeholders. May be None if contract creation was
+    *   rolled back. If applicable, includes onboarding stakeholders.
+    * @param witnessed
+    *   witnessed contracts created without a locally hosted stakeholder
+    */
   private[validation] final case class CreatedContractPrep(
-      // The contract will be optional if it has been rolled back
       createdContractsOfHostedInformees: Map[LfContractId, Option[NewContractInstance]],
       witnessed: Map[LfContractId, GenContractInstance],
   )
 
+  /** Input contracts broken out by different types of interactions in a transaction.
+    *
+    * @param used
+    *   all input contracts
+    * @param divulged
+    *   divulged input contracts, observed in subtransactions that the participant would otherwise
+    *   not have been informed about
+    * @param consumedOfHostedStakeholders
+    *   consumed input contracts of hosted stakeholders
+    * @param contractIdsOfHostedInformeeStakeholder
+    *   input contracts of hosted stakeholders that are also informees of the node that uses the
+    *   contract
+    * @param contractIdsAllowedToBeUnknown
+    *   contract ids of contracts that may not be known to the participant due to party onboarding
+    *   and pending ACS import
+    */
   private[validation] final case class InputContractPrep(
       used: Map[LfContractId, GenContractInstance],
       divulged: Map[LfContractId, GenContractInstance],
@@ -108,6 +133,7 @@ object ExtractUsedAndCreated {
 
 private[validation] class ExtractUsedAndCreated(
     hostedParties: Map[LfPartyId, Option[ParticipantAttributes]],
+    filterForOnboardingParties: Boolean,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit traceContext: TraceContext)
     extends NamedLogging {
@@ -121,6 +147,9 @@ private[validation] class ExtractUsedAndCreated(
     UsedAndCreated(
       contracts = usedAndCreatedContracts(createdContracts, inputContracts, transientContracts),
       hostedWitnesses = hostedParties.filter(_._2.nonEmpty).keySet,
+      hostedOnboardingInformees =
+        if (filterForOnboardingParties) hostedParties.filter(_._2.exists(_.onboarding)).keySet
+        else Set.empty,
     )
   }
 
@@ -148,6 +177,15 @@ private[validation] class ExtractUsedAndCreated(
         if (hostsAny(informeeStakeholders)) {
           contractIdsOfHostedInformeeStakeholderB += contract.contractId
         }
+        // Track input contracts that might legitimately be unknown (due to party onboarding).
+        val hostedStakeholderParticipantAttribs =
+          stakeholders.iterator.flatMap(p => lookupParty(p).map(p -> _)).toMap
+        if (
+          hostedStakeholderParticipantAttribs.nonEmpty && hostedStakeholderParticipantAttribs
+            .forall { case (_, attribs) => attribs.onboarding }
+        ) {
+          contractIdsAllowedToBeUnknownB += contract.contractId
+        }
         // We do not need to include in consumedInputsOfHostedStakeholders the contracts created in the core
         // because they are not inputs even if they are consumed.
         if (inputContractWithMetadata.consumed) {
@@ -156,10 +194,6 @@ private[validation] class ExtractUsedAndCreated(
             consumedOfHostedStakeholdersB +=
               contract.contractId -> stakeholders
           }
-        }
-        // Track input contracts that might legitimately be unknown (due to party onboarding).
-        if (areAllHostedStakeholdersOnboarding(stakeholders)) {
-          contractIdsAllowedToBeUnknownB += contract.contractId
         }
       } else {
         divulgedB += (contract.contractId -> contract)
@@ -280,10 +314,4 @@ private[validation] class ExtractUsedAndCreated(
           None
         },
       )
-
-  /** Indicate whether all (non-empty) hosted parties are onboarding. */
-  private def areAllHostedStakeholdersOnboarding(parties: IterableOnce[LfPartyId]): Boolean = {
-    val hostedPartyParticipantAttribs = parties.iterator.flatMap(lookupParty(_))
-    hostedPartyParticipantAttribs.nonEmpty && hostedPartyParticipantAttribs.forall(_.onboarding)
-  }
 }

@@ -15,12 +15,13 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,
   SvOnboardingRequest,
 }
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_public as http}
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvStreamClient
 import org.lfdecentralizedtrust.splice.sv.http.SvHttpClient.BaseCommandPublic
 import org.lfdecentralizedtrust.splice.util.{Codec, TemplateJsonDecoder}
 
-import java.util.Base64
 import scala.concurrent.Future
 
 object HttpSvPublicAppClient {
@@ -186,20 +187,25 @@ object HttpSvPublicAppClient {
   ) extends QuietNonRetryableException(
         s"Party migration failed as required proposals were not found. Found base mappings: PartyToParticipant($partyToParticipantMappingSerial)"
       )
+
   case class OnboardSvPartyMigrationAuthorizeResponse(
-      acsSnapshot: ByteString
+      acsSnapshot: Seq[ByteString]
   )
 
   case class OnboardSvPartyMigrationAuthorize(
       participantId: ParticipantId,
       candidate: PartyId,
-  ) extends BaseCommandPublic[
-        http.OnboardSvPartyMigrationAuthorizeResponse,
+  ) extends HttpCommand[
+        SvStreamClient.OnboardSvPartyMigrationAuthorizeResponse,
         Either[
           OnboardSvPartyMigrationAuthorizeProposalNotFound,
           OnboardSvPartyMigrationAuthorizeResponse,
         ],
+        SvStreamClient,
       ] {
+    override val createGenClientFn = (fn, host, ec, mat) =>
+      SvStreamClient.httpClient(fn, host)(ec, mat)
+
     override val nonErrorStatusCodes = Set(StatusCodes.BadRequest)
 
     override def submitRequest(
@@ -208,7 +214,7 @@ object HttpSvPublicAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.OnboardSvPartyMigrationAuthorizeResponse] =
+    ], SvStreamClient.OnboardSvPartyMigrationAuthorizeResponse] =
       client.onboardSvPartyMigrationAuthorize(
         body = definitions.OnboardSvPartyMigrationAuthorizeRequest(
           candidate.toProtoPrimitive
@@ -219,14 +225,14 @@ object HttpSvPublicAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = {
-      case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(
+      case SvStreamClient.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(
             definitions.OnboardSvPartyMigrationAuthorizeErrorResponse.members
               .AcceptedStateNotFoundErrorResponse(
                 response
               )
           ) =>
         Left(response.acceptedStateNotFound.error)
-      case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(
+      case SvStreamClient.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(
             definitions.OnboardSvPartyMigrationAuthorizeErrorResponse.members
               .ProposalNotFoundErrorResponse(
                 response
@@ -239,15 +245,11 @@ object HttpSvPublicAppClient {
             )
           )
         )
-      case http.OnboardSvPartyMigrationAuthorizeResponse.OK(
-            definitions.OnboardSvPartyMigrationAuthorizeResponse(
-              encodedAcsSnapshot
-            )
-          ) =>
+      case SvStreamClient.OnboardSvPartyMigrationAuthorizeResponse.OK(acsSnapshotChunks) =>
         Right(
           Right(
             OnboardSvPartyMigrationAuthorizeResponse(
-              ByteString.copyFrom(Base64.getDecoder.decode(encodedAcsSnapshot))
+              acsSnapshotChunks.map(chunk => ByteString.copyFrom(chunk.asByteBuffer))
             )
           )
         )
@@ -256,10 +258,13 @@ object HttpSvPublicAppClient {
 
   case class OnboardSvSequencer(
       sequencerId: SequencerId
-  ) extends BaseCommandPublic[
-        http.OnboardSvSequencerResponse,
-        ByteString,
+  ) extends HttpCommand[
+        SvStreamClient.OnboardSvSequencerResponse,
+        Seq[ByteString],
+        SvStreamClient,
       ] {
+    override val createGenClientFn = (fn, host, ec, mat) =>
+      SvStreamClient.httpClient(fn, host)(ec, mat)
 
     override def submitRequest(
         client: Client,
@@ -267,7 +272,7 @@ object HttpSvPublicAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.OnboardSvSequencerResponse] =
+    ], SvStreamClient.OnboardSvSequencerResponse] =
       client.onboardSvSequencer(
         body = definitions.OnboardSvSequencerRequest(
           Codec.encode(sequencerId)
@@ -276,10 +281,10 @@ object HttpSvPublicAppClient {
       )
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.OnboardSvSequencerResponse.OK(
-            definitions.OnboardSvSequencerResponse(onboardingState)
-          ) =>
-        Right(ByteString.copyFrom(Base64.getDecoder().decode(onboardingState)))
+      case SvStreamClient.OnboardSvSequencerResponse.OK(onboardingStateChunks) =>
+        Right(onboardingStateChunks.map(chunk => ByteString.copyFrom(chunk.asByteBuffer)))
+      case SvStreamClient.OnboardSvSequencerResponse.BadRequest(response) =>
+        Left(response.error)
     }
   }
 

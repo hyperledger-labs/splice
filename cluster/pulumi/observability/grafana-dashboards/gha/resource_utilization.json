@@ -131,7 +131,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(container_memory_working_set_bytes{container!=\"\", image!=\"\"}) by(pod) * on(pod) group_left(test_suite) gha_runner_info{test_suite=~\"$test_suite\"})",
+          "expr": "(sum(container_memory_rss{container!=\"\", image!=\"\"}) by(pod) * on(pod) group_left(test_suite) gha_runner_info{test_suite=~\"$test_suite\"})",
           "hide": false,
           "legendFormat": "__auto",
           "range": true,

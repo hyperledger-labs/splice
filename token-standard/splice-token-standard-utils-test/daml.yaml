@@ -5,7 +5,7 @@ sdk-version: 3.5.2
 name: splice-token-standard-utils-test
 description: |
   Tests of the token-standard-utils library.
-version: 1.0.3
+version: 1.0.4
 source: daml
 dependencies:
   - daml-prim

@@ -172,18 +172,6 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           "http://localhost:5408",
         )
       }
-      clue("backwards compatible synchronizers configs is set") {
-        val allSequencerConfigs = nodeStates.map(_.sequencer.toScala.value)
-        allSequencerConfigs.size shouldBe 4
-        allSequencerConfigs.map(_.migrationId).toSeq.distinct.loneElement shouldBe java.lang.Long
-          .valueOf(0)
-        allSequencerConfigs.map(_.url) should contain theSameElementsAs Seq(
-          "http://localhost:5108",
-          "http://localhost:5208",
-          "http://localhost:5308",
-          "http://localhost:5408",
-        )
-      }
     } finally {
       // Remove the sequencer again, otherwise the logic for resetting the namespace to only contain
       // sv1 will fail.

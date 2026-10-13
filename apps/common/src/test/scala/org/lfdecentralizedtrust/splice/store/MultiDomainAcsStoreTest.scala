@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
   IndexColumnValue,
 }
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, ContractWithState}
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.daml.lf.language.Ast
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.data.CantonTimestamp

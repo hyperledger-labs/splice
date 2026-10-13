@@ -1,0 +1,11 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "audience": "https://sv.sv-da-1.test-stack.canton.network/api",
+    "scopes": []
+  },
+  "name": "svda1SvBackendAppAppGrant",
+  "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+  "type": "auth0:index/clientGrant:ClientGrant"
+}

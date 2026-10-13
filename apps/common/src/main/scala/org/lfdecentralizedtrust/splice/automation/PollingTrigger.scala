@@ -238,6 +238,8 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var pausedVar: Boolean = false
 
+  def isPaused: Boolean = pausedVar
+
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var runningTaskFinishedVar: Option[Promise[Unit]] = None
 

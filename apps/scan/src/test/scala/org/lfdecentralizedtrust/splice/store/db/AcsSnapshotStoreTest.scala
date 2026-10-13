@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.store.db
 
 import cats.data.NonEmptyVector
-import com.daml.ledger.javaapi.data.{Unit as damlUnit}
+import com.daml.ledger.javaapi.data.Unit as damlUnit
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.environment.DarResources
@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.store.{
   UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.FutureUnlessShutdownOps
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
@@ -32,8 +33,13 @@ import java.time.Instant
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import StoreTestBase.*
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
+  IncrementalAcsSnapshotTable,
+  PerTableAcsSnapshot,
+}
+import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
 
-class AcsSnapshotStoreTest
+trait AcsSnapshotStoreTest
     extends StoreTestBase
     with HasExecutionContext
     with StoreErrors
@@ -42,12 +48,36 @@ class AcsSnapshotStoreTest
     with AcsJdbcTypes
     with AcsTables {
 
-  private val DefaultMigrationId = 0L
-  private val timestamp1 = CantonTimestamp.Epoch.plusSeconds(3600)
-  private val timestamp2 = CantonTimestamp.Epoch.plusSeconds(3600 * 2)
-  private val timestamp3 = CantonTimestamp.Epoch.plusSeconds(3600 * 3)
-  private val timestamp4 = CantonTimestamp.Epoch.plusSeconds(3600 * 4)
-  private val timestamps = Seq(timestamp1, timestamp2, timestamp3, timestamp4)
+  val nextTable: IncrementalAcsSnapshotTable
+
+  protected val DefaultMigrationId = 0L
+  protected val timestamp1 = CantonTimestamp.Epoch.plusSeconds(3600)
+  protected val timestamp2 = CantonTimestamp.Epoch.plusSeconds(3600 * 2)
+  protected val timestamp3 = CantonTimestamp.Epoch.plusSeconds(3600 * 3)
+  protected val timestamp4 = CantonTimestamp.Epoch.plusSeconds(3600 * 4)
+  protected val timestamps = Seq(timestamp1, timestamp2, timestamp3, timestamp4)
+
+  protected def indexSnapshot(
+      store: AcsSnapshotStore,
+      migrationId: Long,
+      snapshotRecordTime: CantonTimestamp,
+  ) = for {
+    snapshot <- store.lookupSnapshotAtOrBefore(
+      migrationId,
+      snapshotRecordTime,
+    )
+    _ <- snapshot match {
+      case Some(snapshot: PerTableAcsSnapshot) =>
+        store.indexSnapshotStakeholdersTable(snapshot)
+      case Some(_) => Future.unit
+      case None =>
+        Future.failed(
+          io.grpc.Status.FAILED_PRECONDITION
+            .withDescription("This should've been just created")
+            .asRuntimeException()
+        )
+    }
+  } yield ()
 
   "AcsSnapshotStoreTest" should {
 
@@ -77,7 +107,7 @@ class AcsSnapshotStoreTest
             amuletRules(),
             timestamp1.minusSeconds(1L),
           )
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           result <- store.lookupSnapshotAtOrBefore(migrationId = 1L, CantonTimestamp.MaxValue)
         } yield result should be(None)
       }
@@ -93,7 +123,7 @@ class AcsSnapshotStoreTest
             amuletRules(),
             timestamp1.minusSeconds(1L),
           )
-          _ <- originalStore.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- originalStore.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           result <- activeStore.lookupSnapshotAtOrBefore(
             migrationId = activeStore.currentMigrationId,
             CantonTimestamp.MaxValue,
@@ -112,8 +142,8 @@ class AcsSnapshotStoreTest
                 openMiningRound(dsoParty, 0L, 1.0),
                 timestamp.minusSeconds(1L),
               )
-              snapshot <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp)
-            } yield snapshot
+              _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp)
+            } yield ()
           }
           resultBefore4 <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp4)
           firstResult <- store.lookupSnapshotAfter(DefaultMigrationId, CantonTimestamp.MinValue)
@@ -141,36 +171,21 @@ class AcsSnapshotStoreTest
             amuletRules(),
             timestamp1.minusSeconds(1L),
           )
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
-          result <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1).transform {
-            case Success(_) =>
-              Failure(new RuntimeException("This insert shouldn't have succeeded!"))
-            case Failure(ex)
-                if ex.getMessage.contains(
-                  "ERROR: duplicate key value violates unique constraint \"acs_snapshot_pkey\""
-                ) =>
-              Success("OK")
-            case Failure(ex) =>
-              Failure(ex)
-          }
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
+          result <- store
+            .insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
+            .transform {
+              case Success(_) =>
+                Failure(new RuntimeException("This insert shouldn't have succeeded!"))
+              case Failure(ex)
+                  if ex.getMessage.contains(
+                    "ERROR: duplicate key value violates unique constraint \"acs_snapshot_pkey\""
+                  ) || ex.getMessage.matches(".*relation .* already exists.*") =>
+                Success("OK")
+              case Failure(ex) =>
+                Failure(ex)
+            }
         } yield result should be("OK")
-      }
-
-      "allow two snapshots with the same record time, different migration_ids" in {
-        MonadUtil
-          .sequentialTraverse(Seq(1, 2)) { migrationId =>
-            for {
-              updateHistory <- mkUpdateHistory(migrationId = migrationId.toLong)
-              store = mkStore(updateHistory, migrationId = migrationId.toLong)
-              _ <- ingestCreate(
-                updateHistory,
-                amuletRules(),
-                timestamp1.minusSeconds(1L),
-              )
-              _ <- store.insertNewSnapshot(None, migrationId.toLong, timestamp1)
-            } yield succeed
-          }
-          .map(_ => succeed)
       }
 
       "build snapshots incrementally" in {
@@ -194,7 +209,7 @@ class AcsSnapshotStoreTest
                 contracts(i),
                 timestamp.minusSeconds(10L).plusSeconds(i.toLong),
               )
-              _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp)
+              _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp)
               contractsInSnapshot <- queryAll(store, timestamp)
             } yield contractsInSnapshot.createdEventsInPage.map(_.event.getContractId) should be(
               expectedContractsPerTimestamp(timestamp).map(_.contractId.contractId)
@@ -221,7 +236,7 @@ class AcsSnapshotStoreTest
             omr1,
             timestamp1,
           )
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           // t2
           _ <- ingestCreate(
             updateHistory,
@@ -229,7 +244,7 @@ class AcsSnapshotStoreTest
             timestamp2,
           )
           lastSnapshot <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp2)
-          _ <- store.insertNewSnapshot(lastSnapshot, DefaultMigrationId, timestamp2)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp2)
           result <- queryAll(store, timestamp2)
         } yield result.createdEventsInPage.map(_.event.getContractId) should be(
           (acs ++ Seq(omr1, omr2)).map(_.contractId.contractId)
@@ -249,14 +264,14 @@ class AcsSnapshotStoreTest
           // t1
           _ <- ingestCreate(updateHistory, alwaysThere, timestamp1.minusSeconds(2L))
           _ <- ingestCreate(updateHistory, toArchive, timestamp1.minusSeconds(1L))
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           // t2
           _ <- ingestArchive(updateHistory, toArchive, timestamp2.minusSeconds(2L))
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp2)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp2)
           // t3
           _ <- ingestCreate(updateHistory, toCreateT3, timestamp3.minusSeconds(2L))
           _ <- ingestNonConsuming(updateHistory, toCreateT3, timestamp3.minusSeconds(1L))
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp3)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp3)
           // querying at the end to prove anything happening in between doesn't matters
           afterT1 <- queryAll(store, timestamp1)
           afterT2 <- queryAll(store, timestamp2)
@@ -304,7 +319,7 @@ class AcsSnapshotStoreTest
             timestamp1.minusSeconds(1L),
             signatories = Seq(providerParty(1), providerParty(2)),
           )
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           resultParty1 <- store.queryAcsSnapshot(
             DefaultMigrationId,
             timestamp1,
@@ -361,7 +376,7 @@ class AcsSnapshotStoreTest
             timestamp1.minusSeconds(1L),
             signatories = Seq(dsoParty),
           )
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           resultTemplate1 <- store.queryAcsSnapshot(
             DefaultMigrationId,
             timestamp1,
@@ -414,7 +429,7 @@ class AcsSnapshotStoreTest
             timestamp1.minusSeconds(1L),
             signatories = Seq(providerParty(1)),
           )
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           result <- store.queryAcsSnapshot(
             DefaultMigrationId,
             timestamp1,
@@ -470,7 +485,7 @@ class AcsSnapshotStoreTest
               timestamp1.minusSeconds(10L - i.toLong),
             )
           }
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           result <- queryRecursive(store, None, Vector.empty, Seq.empty, Seq.empty)
         } yield {
           result should be(contracts.map(_.contractId.contractId))
@@ -512,7 +527,7 @@ class AcsSnapshotStoreTest
               signatories = Seq(okParty, dsoParty),
             )
           }
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           result <- queryRecursive(
             store,
             None,
@@ -526,6 +541,55 @@ class AcsSnapshotStoreTest
           )
         } yield {
           result should be(ok.map(_.contractId.contractId))
+        }
+      }
+
+      "paginate without duplicates when contracts match several parties" in {
+        val contracts = (1 to 5).map(n => openMiningRound(dsoParty, n.toLong, 1.0))
+        val onlyParty1 = openMiningRound(dsoParty, 6L, 1.0)
+        for {
+          updateHistory <- mkUpdateHistory()
+          store = mkStore(updateHistory)
+          _ <- MonadUtil.sequentialTraverse(contracts.zipWithIndex) { case (contract, i) =>
+            ingestCreate(
+              updateHistory,
+              contract,
+              timestamp1.minusSeconds(100L - i.toLong),
+              signatories = Seq(providerParty(1), dsoParty, providerParty(2)),
+            )
+          }
+          _ <- ingestCreate(
+            updateHistory,
+            onlyParty1,
+            timestamp1.minusSeconds(1L),
+            signatories = Seq(providerParty(1), dsoParty),
+          )
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
+          result <- queryRecursive(
+            store,
+            None,
+            Vector.empty,
+            Seq(providerParty(1), providerParty(2)),
+            Seq.empty,
+          )
+          resultWithDso <- queryRecursive(
+            store,
+            None,
+            Vector.empty,
+            Seq(providerParty(1), dsoParty, providerParty(2)),
+            Seq.empty,
+          )
+          resultWithDsoOnly <- queryRecursive(
+            store,
+            None,
+            Vector.empty,
+            Seq(dsoParty),
+            Seq.empty,
+          )
+        } yield {
+          result should be((contracts :+ onlyParty1).map(_.contractId.contractId))
+          result should be(resultWithDso)
+          result should be(resultWithDsoOnly)
         }
       }
 
@@ -566,7 +630,7 @@ class AcsSnapshotStoreTest
                 Seq(PartyId.tryFromProtoPrimitive(locked.payload.amulet.owner), dsoParty),
               )
           }
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           resultDso <- store.getHoldingsState(
             DefaultMigrationId,
             timestamp1,
@@ -602,7 +666,7 @@ class AcsSnapshotStoreTest
             timestamp1.minusSeconds(10L),
             Seq(owner, holder),
           )
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           resultOwner <- store.getHoldingsState(
             DefaultMigrationId,
             timestamp1,
@@ -645,7 +709,7 @@ class AcsSnapshotStoreTest
             timestamp1.minusSeconds(10L),
             Seq(owner, holder),
           )
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           _result <- store.getHoldingsState(
             DefaultMigrationId,
             timestamp1,
@@ -692,7 +756,7 @@ class AcsSnapshotStoreTest
                 Seq(PartyId.tryFromProtoPrimitive(locked.payload.amulet.owner)),
               )
           }
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           summaryAtRound0 <- store.getHoldingsSummary(
             DefaultMigrationId,
             timestamp1,
@@ -828,7 +892,7 @@ class AcsSnapshotStoreTest
             timestamp1.minusSeconds(10L),
             Seq(partyWithHoldings),
           )
-          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
           summary <- store.getHoldingsSummary(
             DefaultMigrationId,
             timestamp1,
@@ -860,7 +924,7 @@ class AcsSnapshotStoreTest
             amuletRules(),
             timestamp1.minusSeconds(1L),
           )
-          _ <- store1.insertNewSnapshot(None, firstMigration, timestamp1)
+          _ <- store1.insertNewSnapshot(nextTable, firstMigration, timestamp1)
 
           // Second migration. This is missing the import update corresponding to the create above.
           updateHistory2 <- mkUpdateHistory(
@@ -875,7 +939,7 @@ class AcsSnapshotStoreTest
           )
 
           // This snapshot on the second migration is corrupt, it should be possible to detect and delete it
-          _ <- store2.insertNewSnapshot(None, secondMigration, timestamp2)
+          _ <- store2.insertNewSnapshot(nextTable, secondMigration, timestamp2)
 
           migrationsWithCorruptSnapshots2 <- store2.updateHistory.migrationsWithCorruptSnapshots()
           _ = migrationsWithCorruptSnapshots2 shouldBe Set(secondMigration)
@@ -899,7 +963,7 @@ class AcsSnapshotStoreTest
             amuletRules(),
             CantonTimestamp.MinValue,
           )
-          _ <- store2.insertNewSnapshot(None, secondMigration, timestamp2)
+          _ <- store2.insertNewSnapshot(nextTable, secondMigration, timestamp2)
 
           migrationsWithCorruptSnapshots3 <- store2.updateHistory.migrationsWithCorruptSnapshots()
           _ = migrationsWithCorruptSnapshots3 shouldBe Set.empty
@@ -943,7 +1007,7 @@ class AcsSnapshotStoreTest
           }
           _ <- ingestCreate(
             updateHistory,
-            illegalDsoLocked,
+            illegalDsoUnlocked,
             snapshotTimestamp.minusSeconds(2L),
             Seq(PartyId.tryFromProtoPrimitive(illegalDsoUnlocked.payload.dso)),
           )
@@ -953,11 +1017,7 @@ class AcsSnapshotStoreTest
             snapshotTimestamp.minusSeconds(1L),
             Seq(PartyId.tryFromProtoPrimitive(illegalDsoLocked.payload.amulet.dso)),
           )
-          _ <- store.insertNewSnapshot(
-            None,
-            DefaultMigrationId,
-            snapshotTimestamp,
-          )
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, snapshotTimestamp)
           snapshotOpt <- store.lookupSnapshotAtOrBefore(domainMigrationId, snapshotTimestamp)
         } yield {
           val snapshot = snapshotOpt.valueOrFail("Snapshot not found")
@@ -1029,11 +1089,7 @@ class AcsSnapshotStoreTest
                 snapshotTimestamp = createUnlocked._2.plusSeconds(
                   1L
                 )
-                _ <- store.insertNewSnapshot(
-                  None,
-                  DefaultMigrationId,
-                  snapshotTimestamp,
-                )
+                _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, snapshotTimestamp)
                 snapshotOpt <- store.lookupSnapshotAtOrBefore(domainMigrationId, snapshotTimestamp)
               } yield {
                 val snapshot = snapshotOpt.valueOrFail("Snapshot not found")
@@ -1053,11 +1109,7 @@ class AcsSnapshotStoreTest
             CantonTimestamp.Epoch.plusSeconds(1000L * 123),
             Seq(providerParty(123), dsoParty),
           )
-          _ <- store.insertNewSnapshot(
-            None,
-            DefaultMigrationId,
-            CantonTimestamp.now(), // surely way after the Epoch
-          )
+          _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, CantonTimestamp.now())
           snapshotOpt <- store.lookupSnapshotAtOrBefore(domainMigrationId, CantonTimestamp.now())
         } yield {
           val snapshot = snapshotOpt.valueOrFail("Snapshot not found")
@@ -1077,105 +1129,13 @@ class AcsSnapshotStoreTest
         for {
           updateHistory <- mkUpdateHistory()
           store = mkStore(updateHistory)
-          incrementalSnapshotN <- store.getIncrementalSnapshot(
-            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
-          )
+          incrementalSnapshotN <- store.getIncrementalSnapshot(nextTable)
           incrementalSnapshotB <- store.getIncrementalSnapshot(
             AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill
           )
         } yield {
           incrementalSnapshotN should be(None)
           incrementalSnapshotB should be(None)
-        }
-      }
-
-      "initialize from snapshot" in {
-        val c1 = amuletRules()
-        val c2 = amulet(providerParty(2), 1, 1L, 0.1)
-        val c3 = amulet(providerParty(3), 1, 1L, 0.1)
-
-        for {
-          updateHistory <- mkUpdateHistory()
-          store = mkStore(updateHistory)
-
-          snapshot1 <- clueF(s"Create non-incremental snapshot")(for {
-            _ <- ingestCreate(
-              updateHistory,
-              c1,
-              timestamp1.minusSeconds(3L),
-            )
-            _ <- ingestCreate(
-              updateHistory,
-              c2,
-              timestamp1.minusSeconds(2L),
-            )
-            _ <- ingestCreate(
-              updateHistory,
-              c3,
-              timestamp1.minusSeconds(1L),
-            )
-            _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
-            snapshot1 <- store.lookupSnapshotAtOrBefore(
-              DefaultMigrationId,
-              CantonTimestamp.MaxValue,
-            )
-          } yield snapshot1)
-
-          _ <- store.initializeIncrementalSnapshot(
-            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
-            snapshot1.value,
-            timestamp2,
-          )
-
-          incrementalSnapshotN <- store.getIncrementalSnapshot(
-            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
-          )
-          incrementalSnapshotB <- store.getIncrementalSnapshot(
-            AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill
-          )
-
-          _ <- clueF(s"Update snapshot")(for {
-            snapshot <- store.getIncrementalSnapshot(
-              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
-            )
-            _ <- store.updateIncrementalSnapshot(
-              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
-              snapshot.value,
-              timestamp2,
-            )
-          } yield ())
-
-          _ <- clueF(s"Save snapshot")(for {
-            snapshot <- store.getIncrementalSnapshot(
-              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
-            )
-            _ <- store.saveIncrementalSnapshot(
-              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
-              snapshot.value,
-              nextSnapshotTargetRecordTime = timestamp3,
-            )
-          } yield ())
-
-          snapshotContent <- store.queryAcsSnapshot(
-            DefaultMigrationId,
-            timestamp2,
-            None,
-            PageLimit.tryCreate(10),
-            Seq.empty,
-            Seq.empty,
-          )
-        } yield {
-          incrementalSnapshotB shouldBe None
-
-          incrementalSnapshotN should not be empty
-          snapshot1 should not be empty
-          incrementalSnapshotN.value.recordTime shouldBe snapshot1.value.snapshotRecordTime
-          incrementalSnapshotN.value.migrationId shouldBe snapshot1.value.migrationId
-          incrementalSnapshotN.value.targetRecordTime shouldBe timestamp2
-
-          snapshotContent.createdEventsInPage.map(
-            _.event.getContractId
-          ) should contain theSameElementsInOrderAs Seq(c1, c2, c3).map(_.contractId.contractId)
         }
       }
 
@@ -1193,13 +1153,13 @@ class AcsSnapshotStoreTest
 
           snapshotRecordTime = timestamp1.minusSeconds(1L)
           _ <- store.initializeIncrementalSnapshotFromImportUpdates(
-            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+            nextTable,
             snapshotRecordTime,
             timestamp2,
             DefaultMigrationId,
           )
           incrementalSnapshotN <- store.getIncrementalSnapshot(
-            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+            nextTable
           )
           incrementalSnapshotB <- store.getIncrementalSnapshot(
             AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill
@@ -1253,7 +1213,7 @@ class AcsSnapshotStoreTest
 
           _ <- clueF(s"Snapshot A: start from import updates at T0")(
             storeM1.initializeIncrementalSnapshotFromImportUpdates(
-              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+              nextTable,
               recordTime = timestamp1,
               targetRecordTime = timestamp1.plusSeconds(9L),
               1L,
@@ -1266,10 +1226,10 @@ class AcsSnapshotStoreTest
             for {
               (_, cid1) <- ingestHistory(updateHistoryM1, 0L)
               snapshot <- storeM1.getIncrementalSnapshot(
-                AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+                nextTable
               )
               _ <- storeM1.updateIncrementalSnapshot(
-                AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+                nextTable,
                 snapshot.value,
                 // Note: there is no event at exactly T9
                 timestamp1.plusSeconds(9L),
@@ -1279,14 +1239,15 @@ class AcsSnapshotStoreTest
 
           _ <- clueF(s"Snapshot A: finalize snapshot at T9")(for {
             snapshot <- storeM1.getIncrementalSnapshot(
-              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+              nextTable
             )
             _ = snapshot.value.recordTime shouldBe timestamp1.plusSeconds(9L)
             _ <- storeM1.saveIncrementalSnapshot(
-              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+              nextTable,
               snapshot.value,
               nextSnapshotTargetRecordTime = timestamp1.plusSeconds(20L),
             )
+            _ <- indexSnapshot(storeM1, snapshot.value.migrationId, snapshot.value.targetRecordTime)
           } yield ())
 
           _ <- clueF(s"Snapshot A: should return correct result at T9")(for {
@@ -1311,10 +1272,10 @@ class AcsSnapshotStoreTest
           )(for {
             (_, cid2) <- ingestHistory(updateHistoryM1, 12L)
             snapshot <- storeM1.getIncrementalSnapshot(
-              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+              nextTable
             )
             _ <- storeM1.updateIncrementalSnapshot(
-              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+              nextTable,
               snapshot.value,
               // Note: there is an event at exactly T20
               timestamp1.plusSeconds(20L),
@@ -1323,14 +1284,15 @@ class AcsSnapshotStoreTest
 
           _ <- clueF(s"Snapshot B: finalize snapshot at T20")(for {
             snapshot <- storeM1.getIncrementalSnapshot(
-              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+              nextTable
             )
             _ = snapshot.value.recordTime shouldBe timestamp1.plusSeconds(20L)
             _ <- storeM1.saveIncrementalSnapshot(
-              AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+              nextTable,
               snapshot.value,
               nextSnapshotTargetRecordTime = timestamp1.plusSeconds(30L),
             )
+            _ <- indexSnapshot(storeM1, snapshot.value.migrationId, snapshot.value.targetRecordTime)
           } yield ())
 
           _ <- clueF(s"Snapshot B: should return correct result at T20")(for {
@@ -1364,23 +1326,23 @@ class AcsSnapshotStoreTest
           _ <- ingestCreate(updateHistory, amuletRules(), CantonTimestamp.MinValue)
 
           _ <- store.initializeIncrementalSnapshotFromImportUpdates(
-            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+            nextTable,
             timestamp2,
             timestamp3,
             DefaultMigrationId,
           )
 
           incrementalSnapshotBefore <- store.getIncrementalSnapshot(
-            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+            nextTable
           )
 
           _ <- store.deleteIncrementalSnapshot(
-            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+            nextTable,
             incrementalSnapshotBefore.value,
           )
 
           incrementalSnapshotAfter <- store.getIncrementalSnapshot(
-            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+            nextTable
           )
         } yield {
           incrementalSnapshotAfter shouldBe None
@@ -1389,7 +1351,7 @@ class AcsSnapshotStoreTest
     }
   }
 
-  private def mkUpdateHistory(
+  protected def mkUpdateHistory(
       migrationId: Long = DefaultMigrationId,
       participantId: String = "whatever",
       // Default to backfilling being always complete, to avoid unnecessary complexity in the tests
@@ -1403,6 +1365,7 @@ class AcsSnapshotStoreTest
       dsoParty,
       backfillingRequired,
       internedStringStore(storage),
+      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
       loggerFactory,
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = true,
@@ -1411,7 +1374,7 @@ class AcsSnapshotStoreTest
     updateHistory.ingestionSink.initialize().map(_ => updateHistory)
   }
 
-  private def mkStore(
+  protected def mkStore(
       updateHistory: UpdateHistory,
       dsoPartyForStore: PartyId = dsoParty,
       migrationId: Long = DefaultMigrationId,
@@ -1427,7 +1390,7 @@ class AcsSnapshotStoreTest
     )
   }
 
-  private def ingestCreate[TCid <: ContractId[T], T](
+  protected def ingestCreate[TCid <: ContractId[T], T](
       updateHistory: UpdateHistory,
       create: Contract[TCid, T],
       recordTime: CantonTimestamp,
@@ -1531,4 +1494,319 @@ class AcsSnapshotStoreTest
       _ <- resetAllAppTables(storage)
     } yield ()
 
+  override def beforeEach(): Unit = {
+    import storage.api.jdbcProfile.api.*
+    super.beforeEach()
+    scala.concurrent.Await.result(
+      storage.queryAndUpdate(
+        for {
+          dynamicAcsSnapshotTables <- sql"""
+              select tablename
+              from pg_tables
+              where schemaname = current_schema()
+                and (
+                  tablename like 'acs_snapshot_creates_v1%'
+                  or tablename like 'acs_snapshot_stakeholders_v1%'
+                )
+                and tablename not in (
+                  'acs_snapshot_creates_v1_template',
+                  'acs_snapshot_stakeholders_v1_template'
+                )
+            """.as[String]
+          _ <- DBIO.sequence(
+            dynamicAcsSnapshotTables.map { tableName =>
+              logger.info(s"Dropping table $tableName")
+              sqlu"drop table if exists #$tableName cascade"
+            }
+          )
+        } yield (),
+        "dropDynamicAcsSnapshotTables",
+      ),
+      scala.concurrent.duration.Duration("10s"),
+    )
+  }
+}
+
+class LegacyAcsSnapshotStoreTest extends AcsSnapshotStoreTest {
+  override val nextTable: IncrementalAcsSnapshotTable = IncrementalAcsSnapshotTable.Next
+
+  "same-contract rows have consecutive row_ids" in {
+    import storage.api.jdbcProfile.api.*
+
+    val contracts = (1 to 20).map(n =>
+      amulet(providerParty(n), n, n.toLong, 0.1) -> Seq(
+        providerParty(n - 1),
+        providerParty(n),
+        dsoParty,
+        providerParty(n + 1),
+      )
+    )
+    for {
+      updateHistory <- mkUpdateHistory()
+      store = mkStore(updateHistory)
+      _ <- MonadUtil.sequentialTraverse(contracts.zipWithIndex) {
+        case ((contract, stakeholders), i) =>
+          ingestCreate(
+            updateHistory,
+            contract,
+            timestamp1.minusSeconds(i.toLong),
+            signatories = stakeholders,
+          )
+      }
+      _ <- store.insertNewSnapshot(IncrementalAcsSnapshotTable.Next, DefaultMigrationId, timestamp1)
+      rowIds <- storage
+        .query(
+          sql"select create_id, row_id from acs_snapshot_data".as[(Int, Int)],
+          "get_row_ids",
+        )
+        .failOnShutdown
+    } yield {
+      rowIds should have size 20 * 4
+      forAll(rowIds.groupBy(_._1).values) { rows =>
+        val sortedRowIds = rows.map(_._2).sorted
+        forAll(sortedRowIds.zip(sortedRowIds.drop(1))) { case (first, second) =>
+          second shouldBe first + 1
+        }
+      }
+    }
+  }
+
+}
+
+class TablePerAcsSnapshotStoreTest extends AcsSnapshotStoreTest {
+  override val nextTable: IncrementalAcsSnapshotTable = IncrementalAcsSnapshotTable.NextV2
+
+  "initialize from legacy snapshot" in {
+    val c1 = amuletRules()
+    val c2 = amulet(providerParty(2), 1, 1L, 0.1)
+    val c3 = amulet(providerParty(3), 1, 1L, 0.1)
+
+    for {
+      updateHistory <- mkUpdateHistory()
+      store = mkStore(updateHistory)
+
+      snapshot1 <- clueF(s"Create non-incremental snapshot")(for {
+        _ <- ingestCreate(
+          updateHistory,
+          c1,
+          timestamp1.minusSeconds(3L),
+        )
+        _ <- ingestCreate(
+          updateHistory,
+          c2,
+          timestamp1.minusSeconds(2L),
+        )
+        _ <- ingestCreate(
+          updateHistory,
+          c3,
+          timestamp1.minusSeconds(1L),
+        )
+        _ <- store.insertNewSnapshot(
+          IncrementalAcsSnapshotTable.Next,
+          DefaultMigrationId,
+          timestamp1,
+        )
+        snapshot1 <- store.lookupSnapshotAtOrBefore(
+          DefaultMigrationId,
+          CantonTimestamp.MaxValue,
+        )
+      } yield snapshot1)
+
+      _ <- store.initializeIncrementalSnapshot(
+        nextTable,
+        snapshot1.value,
+        timestamp2,
+      )
+
+      incrementalSnapshotN <- store.getIncrementalSnapshot(
+        nextTable
+      )
+      incrementalSnapshotB <- store.getIncrementalSnapshot(
+        AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill
+      )
+
+      _ <- clueF(s"Update snapshot")(for {
+        snapshot <- store.getIncrementalSnapshot(
+          nextTable
+        )
+        _ <- store.updateIncrementalSnapshot(
+          nextTable,
+          snapshot.value,
+          timestamp2,
+        )
+      } yield ())
+
+      _ <- clueF(s"Save snapshot")(for {
+        snapshot <- store.getIncrementalSnapshot(
+          nextTable
+        )
+        _ <- store.saveIncrementalSnapshot(
+          nextTable,
+          snapshot.value,
+          nextSnapshotTargetRecordTime = timestamp3,
+        )
+        _ <- indexSnapshot(store, snapshot.value.migrationId, snapshot.value.targetRecordTime)
+      } yield ())
+
+      snapshotContent <- store.queryAcsSnapshot(
+        DefaultMigrationId,
+        timestamp2,
+        None,
+        PageLimit.tryCreate(10),
+        Seq.empty,
+        Seq.empty,
+      )
+    } yield {
+      incrementalSnapshotB shouldBe None
+
+      incrementalSnapshotN should not be empty
+      snapshot1 should not be empty
+      incrementalSnapshotN.value.recordTime shouldBe snapshot1.value.snapshotRecordTime
+      incrementalSnapshotN.value.migrationId shouldBe snapshot1.value.migrationId
+      incrementalSnapshotN.value.targetRecordTime shouldBe timestamp2
+
+      snapshotContent.createdEventsInPage.map(
+        _.event.getContractId
+      ) should contain theSameElementsInOrderAs Seq(c1, c2, c3).map(_.contractId.contractId)
+    }
+  }
+
+  "idempotently index the stakeholders table" in {
+    import storage.api.jdbcProfile.api.*
+
+    for {
+      updateHistory <- mkUpdateHistory()
+      store = mkStore(updateHistory)
+      _ <- ingestCreate(
+        updateHistory,
+        amuletRules(),
+        timestamp1.minusSeconds(1L),
+      )
+      _ <- store.insertNewSnapshot(
+        nextTable,
+        DefaultMigrationId,
+        timestamp1,
+        // Index as part of this test
+        shouldIndexSnapshot = false,
+      )
+      snapshotOpt <- store.lookupSnapshotAtOrBefore(
+        migrationId = DefaultMigrationId,
+        CantonTimestamp.MaxValue,
+      )
+      snapshot = snapshotOpt.valueOrFail("snapshot should've just been created")
+      oldestUnindexedOpt <- store.lookupOldestUnindexedSnapshot()
+      oldestUnindexed = oldestUnindexedOpt.valueOrFail("snapshot should be unindexed")
+      _ = oldestUnindexed should be(snapshot)
+      _ <- store.indexSnapshotStakeholdersTable(oldestUnindexed)
+      expectedIndexNames = Set(
+        AcsSnapshotStore.AcsSnapshotDDL.stakeholderIndexName(
+          oldestUnindexed.historyId,
+          oldestUnindexed.snapshotRecordTime,
+        ),
+        AcsSnapshotStore.AcsSnapshotDDL.stakeholderTemplateIdIndexName(
+          oldestUnindexed.historyId,
+          oldestUnindexed.snapshotRecordTime,
+        ),
+      )
+      _ = expectedIndexNames should have size 2
+      indexNames <- storage
+        .query(
+          sql"""
+            select indexname
+            from pg_indexes
+            where schemaname = current_schema()
+              and tablename = ${oldestUnindexed.stakeholdersTableName}
+          """.as[String],
+          "listAcsSnapshotStakeholderIndexes",
+        )
+        .toFuture
+      oldestAfter <- store.lookupOldestUnindexedSnapshot()
+      // idempotency check, shouldn't fail
+      _ <- store.indexSnapshotStakeholdersTable(oldestUnindexed)
+    } yield {
+      indexNames.toSet should contain allElementsOf expectedIndexNames
+      oldestAfter should be(None)
+    }
+  }
+
+  "skip snapshots whose indexes are not created yet in lookupSnapshotAtOrBefore with onlyIndexed" in {
+    for {
+      updateHistory <- mkUpdateHistory()
+      store = mkStore(updateHistory)
+      _ <- ingestCreate(
+        updateHistory,
+        openMiningRound(dsoParty, 0L, 1.0),
+        timestamp1.minusSeconds(1L),
+      )
+      _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
+      _ <- ingestCreate(
+        updateHistory,
+        openMiningRound(dsoParty, 1L, 1.0),
+        timestamp2.minusSeconds(1L),
+      )
+      _ <- store.insertNewSnapshot(
+        nextTable,
+        DefaultMigrationId,
+        timestamp2,
+        shouldIndexSnapshot = false,
+      )
+      latest <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, CantonTimestamp.MaxValue)
+      latestIndexed <- store.lookupSnapshotAtOrBefore(
+        DefaultMigrationId,
+        CantonTimestamp.MaxValue,
+        onlyIndexed = true,
+      )
+      _ <- indexSnapshot(store, DefaultMigrationId, timestamp2)
+      latestIndexedAfterIndexing <- store.lookupSnapshotAtOrBefore(
+        DefaultMigrationId,
+        CantonTimestamp.MaxValue,
+        onlyIndexed = true,
+      )
+    } yield {
+      latest.map(_.snapshotRecordTime) should be(Some(timestamp2))
+      latestIndexed.map(_.snapshotRecordTime) should be(Some(timestamp1))
+      latestIndexedAfterIndexing.map(_.snapshotRecordTime) should be(Some(timestamp2))
+    }
+  }
+
+  "not allow querying unindexed snapshots" in {
+    for {
+      updateHistory <- mkUpdateHistory()
+      store = mkStore(updateHistory)
+      _ <- ingestCreate(
+        updateHistory,
+        amuletRules(),
+        timestamp1.minusSeconds(1L),
+      )
+      _ <- store.insertNewSnapshot(
+        nextTable,
+        DefaultMigrationId,
+        timestamp1,
+        // Index as part of this test
+        shouldIndexSnapshot = false,
+      )
+      beforeIndex <- store
+        .queryAcsSnapshot(
+          DefaultMigrationId,
+          timestamp1,
+          None,
+          PageLimit.tryCreate(10),
+          Seq.empty,
+          Seq.empty,
+        )
+        .failed
+      _ <- indexSnapshot(store, DefaultMigrationId, timestamp1)
+      afterIndex <- store.queryAcsSnapshot(
+        DefaultMigrationId,
+        timestamp1,
+        None,
+        PageLimit.tryCreate(10),
+        Seq.empty,
+        Seq.empty,
+      )
+    } yield {
+      beforeIndex.getMessage should include("Failed to find ACS snapshot")
+      afterIndex.createdEventsInPage should not be empty
+    }
+  }
 }

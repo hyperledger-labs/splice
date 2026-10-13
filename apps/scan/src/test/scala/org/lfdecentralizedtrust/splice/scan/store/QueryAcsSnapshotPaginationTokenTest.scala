@@ -4,12 +4,17 @@
 package org.lfdecentralizedtrust.splice.scan.store
 
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotPaginationToken
-import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotPaginationToken.RowIdQueryAcsSnapshotPaginationToken
-import org.scalatest.wordspec.AnyWordSpec
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotPaginationToken.{
+  CreatedAtContractIdAcsSnapshotPaginationToken,
+  RowIdQueryAcsSnapshotPaginationToken,
+}
+import org.lfdecentralizedtrust.splice.store.StoreTestBase
+
 import scala.util.Try
 
-class QueryAcsSnapshotPaginationTokenTest extends AnyWordSpec with BaseTest {
+class QueryAcsSnapshotPaginationTokenTest extends StoreTestBase with BaseTest {
 
   "RowIdQueryAcsSnapshotPaginationToken" should {
 
@@ -25,6 +30,26 @@ class QueryAcsSnapshotPaginationTokenTest extends AnyWordSpec with BaseTest {
       val token2 = RowIdQueryAcsSnapshotPaginationToken(2L)
       token1.encodeToBase64 should not equal token2.encodeToBase64
     }
+  }
+
+  "CreatedAtContractIdAcsSnapshotPaginationToken" should {
+
+    "encode to base64 and decode back" in {
+      val token = CreatedAtContractIdAcsSnapshotPaginationToken(CantonTimestamp.now(), nextCid())
+      val encoded = token.encodeToBase64
+      val decoded = QueryAcsSnapshotPaginationToken.tryDecodeFromBase64(encoded)
+      decoded shouldBe token
+    }
+
+    "produce different encoded values for different tokens" in {
+      val token1 = CreatedAtContractIdAcsSnapshotPaginationToken(CantonTimestamp.now(), nextCid())
+      val token2 = CreatedAtContractIdAcsSnapshotPaginationToken(
+        CantonTimestamp.now().plusSeconds(42L),
+        nextCid(),
+      )
+      token1.encodeToBase64 should not equal token2.encodeToBase64
+    }
+
   }
 
   "QueryAcsSnapshotPaginationToken.decodeFromBase64" should {

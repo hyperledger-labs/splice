@@ -10,6 +10,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{BatchAggregatorConfig, ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.AsyncResult
@@ -67,6 +68,7 @@ class TopologyStateProcessorImpl private[processing] (
     outboxQueue: Option[SynchronizerOutboxQueue],
     topologyMappingChecksFactory: TopologyStateLookup => TopologyMappingChecks,
     pureCrypto: CryptoPureApi,
+    warnAboutDanglingKeys: Boolean,
     loggerFactoryParent: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends TopologyStateProcessor
@@ -88,12 +90,13 @@ class TopologyStateProcessorImpl private[processing] (
       // if transactions are put directly into a store (ie there is no outbox queue)
       // then the authorization validation is final.
       validationIsFinal = outboxQueue.isEmpty,
+      warnAboutDanglingKeys,
       loggerFactory.append("role", if (outboxQueue.isEmpty) "incoming" else "outgoing"),
     )
 
   override def close(): Unit = cache.close()
 
-  def validateAndApplyAuthorization(
+  override def validateAndApplyAuthorization(
       sequenced: SequencedTime,
       effective: EffectiveTime,
       transactions: Seq[GenericSignedTopologyTransaction],
@@ -302,13 +305,15 @@ class TopologyStateProcessorImpl private[processing] (
       toValidate: GenericSignedTopologyTransaction,
   ): Either[TopologyTransactionRejection, Unit] = inStore match {
     case Some(value) =>
-      val expected = value.serial.increment
-      Either.cond(
-        expected == toValidate.serial,
-        (),
-        TopologyTransactionRejection.Processor
-          .SerialMismatch(actual = toValidate.serial, expected = expected),
-      )
+      for {
+        expected <- value.nextSerialOrRejection
+        _ <- Either.cond(
+          expected == toValidate.serial,
+          (),
+          TopologyTransactionRejection.Processor
+            .SerialMismatch(actual = toValidate.serial, expected = expected),
+        )
+      } yield ()
     // TODO(#32311): Re-enable validation that newly added proposals start with serial 1
     case None => Either.unit
   }
@@ -449,6 +454,7 @@ object TopologyStateProcessor {
       outboxQueue,
       topologyMappingChecksFactory,
       pureCrypto,
+      warnAboutDanglingKeys = true,
       loggerFactoryParent,
     )
 
@@ -480,6 +486,7 @@ object TopologyStateProcessor {
       outboxQueue = None,
       topologyMappingChecksFactory,
       pureCrypto,
+      warnAboutDanglingKeys = false,
       loggerFactoryParent,
     )
 
@@ -499,6 +506,7 @@ object TopologyStateProcessor {
       outboxQueue = None,
       topologyMappingChecksFactory,
       pureCrypto,
+      warnAboutDanglingKeys = false,
       loggerFactoryParent,
     )
 }

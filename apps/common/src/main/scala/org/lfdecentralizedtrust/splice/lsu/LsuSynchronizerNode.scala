@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.lsu
 import com.digitalasset.canton.admin.api.client.data.{
   SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
+  SubscriptionLivenessLimits,
 }
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
@@ -24,6 +25,8 @@ trait LsuSynchronizerNode {
   def mediatorSequencerAmplification: SubmissionRequestAmplification
 
   def mediatorSequencerConnectionPoolDelays: SequencerConnectionPoolDelays
+
+  def mediatorSubscriptionLivenessLimits: SubscriptionLivenessLimits
 
   def staticSynchronizerParameters(serial: NonNegativeInt): StaticSynchronizerParameters
 }

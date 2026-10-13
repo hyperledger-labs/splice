@@ -7,8 +7,6 @@ import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
 import com.daml.metrics.CacheMetrics
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.NonEmptyReturningOps.*
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
@@ -16,6 +14,7 @@ import com.digitalasset.canton.crypto.SynchronizerCryptoPureApi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.CantonNodeParameters
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
@@ -46,6 +45,8 @@ import com.digitalasset.canton.topology.transaction.{LsuAnnouncement, TopologyCh
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, TopologyManagerError}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil, SimpleExecutionQueue}
+import com.digitalasset.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmptyReturningOps.*
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.{ExecutionContext, Future}
@@ -84,7 +85,12 @@ class TopologyTransactionProcessor(
       store,
       cache,
       lookup =>
-        RequiredTopologyMappingChecks(Some(staticSynchronizerParameters), lookup, loggerFactory),
+        RequiredTopologyMappingChecks(
+          Some(staticSynchronizerParameters),
+          staticSynchronizerParameters.protocolVersion,
+          lookup,
+          loggerFactory,
+        ),
       pureCrypto,
       loggerFactory,
     )
@@ -321,7 +327,8 @@ class TopologyTransactionProcessor(
     }
   }
 
-  override def onClosed(): Unit = LifeCycle.close(cache, serializer)(logger)
+  override def onClosed(): Unit =
+    LifeCycle.close(cache, serializer)(logger)
 
   private val maxSequencedTimeAtInitializationF =
     TraceContext.withNewTraceContext("max_sequenced_time")(implicit traceContext =>
@@ -495,6 +502,7 @@ object TopologyTransactionProcessor {
       cache,
       synchronizerUpgradeTime = upgradeTimeFromPredecessor,
       sequencerSnapshotTimestamp = sequencerSnapshotTimestamp,
+      cleanSynchronizerRecordTime = None, // not available for synchronizer nodes
       NoPackageDependencies,
       parameters.cachingConfigs,
       parameters.enableAdditionalConsistencyChecks,

@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.lsu
 
-import cats.implicits.{catsSyntaxOptionId, toTraverseOps}
+import cats.implicits.toTraverseOps
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.transaction.{LsuAnnouncement, TopologyChangeOp}
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
@@ -90,7 +90,7 @@ class LsuTrigger(
             _ <- participantAdminConnection
               .performManualLsu(
                 currentPsid,
-                task.work.announcement.successorSynchronizerId,
+                task.work.announcement.successorSynchronizerId.tryAsPhysical,
                 Some(task.work.announcement.upgradeTime),
                 Map(
                   successorSequencerId -> initializer.successorConnection
@@ -103,7 +103,7 @@ class LsuTrigger(
           Future.unit
         }
       _ <- reconciler.reconcileSynchronizerNodeConfigIfRequired(
-        localSynchronizerNodes.some,
+        localSynchronizerNodes,
         currentPsid.logical,
         OnboardedImmediately,
       )
@@ -125,14 +125,14 @@ class LsuTrigger(
               .lookupSequencerSuccessors(
                 announcement.successorSynchronizerId.logical,
                 sequencerId,
-                Some(announcement.successorSynchronizerId),
+                Some(announcement.successorSynchronizerId.tryAsPhysical),
                 Some(TopologyChangeOp.Replace),
               )
               .map(_.isEmpty)
             participantPsid <- participantAdminConnection
               .getPhysicalSynchronizerId(currentPsid.logical)
           } yield {
-            hasNoSuccessor && !hasBftSequencerConnections && participantPsid != announcement.successorSynchronizerId
+            hasNoSuccessor && !hasBftSequencerConnections && participantPsid.opaque != announcement.successorSynchronizerId
           }
         case None => Future.successful(false)
       }

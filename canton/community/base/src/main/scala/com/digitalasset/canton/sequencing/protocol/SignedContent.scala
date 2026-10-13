@@ -6,15 +6,15 @@ package com.digitalasset.canton.sequencing.protocol
 import cats.Functor
 import cats.data.EitherT
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
-import com.digitalasset.canton.protocol.v30
+import com.digitalasset.canton.protocol.{SynchronizerLimits, v30}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{
   BytestringWithCryptographicEvidence,
@@ -24,15 +24,18 @@ import com.digitalasset.canton.serialization.{
 }
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.validation.ProtoValidation
 import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
   OriginalByteString,
   ProtoVersion,
   ProtocolVersion,
+  ProtocolVersionValidation,
   RepresentativeProtocolVersion,
   VersionedProtoCodec,
   VersioningCompanionMemoization2,
 }
+import com.digitalasset.nonempty.NonEmpty
 import com.google.protobuf.ByteString
 
 import scala.concurrent.ExecutionContext
@@ -131,7 +134,7 @@ object SignedContent
 
   override val versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.SignedContent)(
-      supportedProtoVersionMemoized(_)(fromProtoV30),
+      supportedProtoVersionMemoizedPVV(_)(fromProtoV30),
       _.toProtoV30,
     )
   )
@@ -263,17 +266,20 @@ object SignedContent
       .valueOr(err => throw new IllegalStateException(s"Failed to create signed content: $err"))
 
   def fromProtoV30(
-      signedValueP: v30.SignedContent
+      pvv: ProtocolVersionValidation,
+      signedValueP: v30.SignedContent,
   )(
       bytes: ByteString
   ): ParsingResult[SignedContent[BytestringWithCryptographicEvidence]] = {
     val v30.SignedContent(content, signatures, timestampOfSigningKey) = signedValueP
     for {
       contentB <- ProtoConverter.required("content", content)
+      signaturesSeq <- ProtoValidation
+        .validateLength(signatures, "signature", pvv, ProtoValidation.MaxCollectionSize)
       signatures <- ProtoConverter.parseRequiredNonEmpty(
         Signature.fromProtoV30,
         "signature",
-        signatures,
+        signaturesSeq,
       )
       ts <- timestampOfSigningKey.traverse(CantonTimestamp.fromProtoPrimitive)
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
@@ -298,12 +304,13 @@ object SignedContent
     )
   }
 
-  def openEnvelopes(event: SignedContent[SequencedEvent[ClosedEnvelope]])(
+  def openEnvelopes(event: SignedContent[DecompressedSequencedEvent[ClosedEnvelope]])(
       protocolVersion: ProtocolVersion,
       hashOps: HashOps,
-  ): WithOpeningErrors[SignedContent[SequencedEvent[DefaultOpenEnvelope]]] = {
+      synchronizerLimits: SynchronizerLimits,
+  ): WithOpeningErrors[SignedContent[DecompressedSequencedEvent[DefaultOpenEnvelope]]] = {
     val (openSequencedEvent, openingErrors) =
-      SequencedEvent.openEnvelopes(event.content)(protocolVersion, hashOps)
+      SequencedEvent.openEnvelopes(event.content)(protocolVersion, hashOps, synchronizerLimits)
     WithOpeningErrors(
       // The signature is still valid
       event.copy(content = openSequencedEvent),

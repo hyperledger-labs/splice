@@ -5,7 +5,6 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 
 import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -40,8 +39,10 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 
+import java.time.Instant
 import scala.collection.immutable.ListMap
 
 import EpochState.Epoch
@@ -66,11 +67,11 @@ class EpochState[E <: Env[E]](
     with FlagCloseable {
 
   private val metricsAccumulator = new EpochMetricsAccumulator()
-  def emitEpochStats(metrics: BftOrderingMetrics, nextEpoch: EpochInfo): Unit =
-    IssConsensusModuleMetrics.emitEpochStats(
+  def emitEpochMetrics(metrics: BftOrderingMetrics, prevEpoch: Epoch): Unit =
+    IssConsensusModuleMetrics.emitEpochMetrics(
       metrics,
-      nextEpoch,
-      epoch,
+      epoch.info,
+      prevEpoch,
       metricsAccumulator.viewsCount,
       metricsAccumulator.discardedMessages,
       metricsAccumulator.retransmittedMessages,
@@ -112,6 +113,9 @@ class EpochState[E <: Env[E]](
 
   private lazy val mySegmentModule = segmentModules.get(epoch.currentMembership.myId)
   private val mySegment = epoch.segments.find(_.originalLeader == epoch.currentMembership.myId)
+  private lazy val otherSegmentModules = segmentModules.collect {
+    case (leader, module) if leader != epoch.currentMembership.myId => module
+  }
 
   private lazy val blockToSegmentModule: Map[BlockNumber, E#ModuleRefT[ConsensusSegment.Message]] =
     (epoch.info.startBlockNumber to epoch.info.lastBlockNumber).map { n =>
@@ -167,9 +171,9 @@ class EpochState[E <: Env[E]](
       )
     }
 
-  def startSegmentModules(): Unit =
+  def startSegmentModules()(implicit traceContext: TraceContext): Unit =
     segmentModules.foreach { case (_, module) =>
-      module.asyncSendNoTrace(ConsensusSegment.Start)
+      module.asyncSend(ConsensusSegment.Start)
     }
 
   def confirmBlockCompleted(
@@ -180,10 +184,17 @@ class EpochState[E <: Env[E]](
     sendMessageToSegmentModules(
       ConsensusSegment.ConsensusMessage.BlockOrdered(
         blockMetadata,
-        isEmpty = commitCertificate.prePrepare.message.block.proofs.isEmpty,
+        commitCertificate.prePrepare.message.block.proofs.isEmpty,
       )
     )
   }
+
+  def notifyLedSegmentCompletionToSegments(epochNumber: EpochNumber, timeWhenItCompleted: Instant)(
+      implicit traceContext: TraceContext
+  ): Unit =
+    sendMessageToSegmentModules(
+      ConsensusSegment.ConsensusMessage.CompletedLedSegment(epochNumber, timeWhenItCompleted)
+    )
 
   def notifyEpochCompletionToSegments(epochNumber: EpochNumber)(implicit
       traceContext: TraceContext
@@ -217,6 +228,7 @@ class EpochState[E <: Env[E]](
       lastBlockCommitMessagesOption = Some(commitCertificate.commits)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.PartialFunctionApply"))
   private def sendMessageToSegmentModules(
       msg: ConsensusSegment.ConsensusMessage
   )(implicit traceContext: TraceContext): Unit =
@@ -240,6 +252,8 @@ class EpochState[E <: Env[E]](
           // the segment submodule whose segment we're the leader of needs to keep track of block completion for all segments
           // in order to figure out whether it is blocking epoch progress and thus should use empty blocks
           .foreach(_.asyncSend(msg))
+      case ConsensusSegment.ConsensusMessage.CompletedLedSegment(_, _) =>
+        otherSegmentModules.foreach(_.asyncSend(msg))
     }).onShutdown {
       logger.info(
         s"At epoch ${epoch.info.number} received message after closing, so discarding $msg"

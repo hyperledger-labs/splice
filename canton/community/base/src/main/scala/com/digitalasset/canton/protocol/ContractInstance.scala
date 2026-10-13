@@ -7,10 +7,11 @@ import cats.syntax.either.*
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.version.ProtocolVersionValidation
 import com.digitalasset.daml.lf.transaction.{
+  ContractInstanceCoder,
   CreationTime,
   FatContractInstance,
-  TransactionCoder,
   Versioned,
 }
 import com.google.common.annotations.VisibleForTesting
@@ -42,8 +43,10 @@ sealed trait GenContractInstance extends PrettyPrinting {
 
   def encoded: ByteString = serialization
 
-  def contractAuthenticationData: Either[String, ContractAuthenticationData] =
-    ContractInstance.contractAuthenticationData(inst)
+  def contractAuthenticationData(
+      pvv: ProtocolVersionValidation
+  ): Either[String, ContractAuthenticationData] =
+    ContractInstance.contractAuthenticationData(pvv, inst)
 
   def traverseCreatedAt[NewCreatedAtTime <: CreationTime](
       f: InstCreatedAtTime => Either[String, NewCreatedAtTime]
@@ -78,43 +81,23 @@ object ContractInstance {
     Some((contractInstance.inst, contractInstance.metadata, contractInstance.serialization))
 
   def contractAuthenticationData(
-      inst: FatContractInstance
+      pvv: ProtocolVersionValidation,
+      inst: FatContractInstance,
   ): Either[String, ContractAuthenticationData] =
     CantonContractIdVersion
       .extractCantonContractIdVersion(inst.contractId)
-      .flatMap(contractAuthenticationData(_, inst))
+      .flatMap(contractAuthenticationData(pvv, _, inst))
 
   private[protocol] def contractAuthenticationData(
+      pvv: ProtocolVersionValidation,
       contractIdVersion: CantonContractIdVersion,
       inst: FatContractInstance,
   ): Either[String, contractIdVersion.AuthenticationData] =
     if (inst.authenticationData.toByteArray.nonEmpty)
       ContractAuthenticationData
-        .fromLfBytes(contractIdVersion, inst.authenticationData)
+        .fromLfBytes(pvv, contractIdVersion, inst.authenticationData)
         .leftMap(err => s"Failed parsing disclosed contract authentication data: $err")
     else Left("Missing authentication data in provided disclosed contract")
-
-  def toSerializableContract(inst: LfFatContractInst): Either[String, SerializableContract] =
-    for {
-      contractIdVersion <- CantonContractIdVersion
-        .extractCantonContractIdVersion(inst.contractId)
-        .leftMap(err => s"Invalid disclosed contract id: ${err.toString}")
-      authenticationData <- contractAuthenticationData(contractIdVersion, inst)
-      metadata <- ContractMetadata.create(
-        signatories = inst.signatories,
-        stakeholders = inst.stakeholders,
-        maybeKeyWithMaintainersVersioned =
-          inst.contractKeyWithMaintainers.map(Versioned(inst.version, _)),
-      )
-      serializable <- SerializableContract(
-        contractId = inst.contractId,
-        contractInstance = inst.toCreateNode.versionedCoinst,
-        metadata = metadata,
-        ledgerTime = CantonTimestamp(inst.createdAt.time),
-        authenticationData = authenticationData,
-      ).leftMap(err => s"Failed creating serializable contract from disclosed contract: $err")
-
-    } yield serializable
 
   def create[Time <: CreationTime](
       inst: FatContractInstance { type CreatedAtTime <: Time }
@@ -132,20 +115,9 @@ object ContractInstance {
       )
     } yield ContractInstanceImpl[inst.CreatedAtTime](inst, metadata, serialization)
 
-  def fromSerializable(serializable: SerializableContract): Either[String, ContractInstance] = {
-    val inst = FatContractInstance.fromCreateNode(
-      serializable.toLf,
-      serializable.ledgerCreateTime,
-      serializable.authenticationData.toLfBytes,
-    )
-    for {
-      serialization <- encodeInst(inst)
-    } yield ContractInstanceImpl(inst, serializable.metadata, serialization)
-  }
-
   def decode(bytes: ByteString): Either[String, GenContractInstance] =
     for {
-      decoded <- TransactionCoder
+      decoded <- ContractInstanceCoder
         .decodeFatContractInstance(bytes)
         .leftMap(e => s"Failed to decode contract instance: $e")
       contract <- create[decoded.CreatedAtTime](decoded)
@@ -171,7 +143,7 @@ object ContractInstance {
     }
 
   private def encodeInst(inst: FatContractInstance): Either[String, ByteString] =
-    TransactionCoder
+    ContractInstanceCoder
       .encodeFatContractInstance(inst)
       .leftMap(e => s"Failed to encode contract instance: $e")
 

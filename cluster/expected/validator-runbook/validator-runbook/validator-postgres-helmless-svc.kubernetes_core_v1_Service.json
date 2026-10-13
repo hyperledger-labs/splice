@@ -1,0 +1,27 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+      "name": "postgres-helmless",
+      "namespace": "validator"
+    },
+    "spec": {
+      "ports": [
+        {
+          "name": "postgresdb",
+          "port": 5432,
+          "protocol": "TCP"
+        }
+      ],
+      "selector": {
+        "app": "postgres-helmless"
+      }
+    }
+  },
+  "name": "validator-postgres-helmless-svc",
+  "provider": "",
+  "type": "kubernetes:core/v1:Service"
+}

@@ -1,0 +1,15 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "kind": "Namespace",
+    "metadata": {
+      "labels": {},
+      "name": "operator"
+    }
+  },
+  "name": "operator",
+  "provider": "",
+  "type": "kubernetes:core/v1:Namespace"
+}

@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "name": "cantonnet"
+  },
+  "name": "sv-db-mediator-6-pg-cantonnet",
+  "provider": "",
+  "type": "gcp:sql/database:Database"
+}

@@ -91,6 +91,9 @@ extraInitContainers: []
 ansWebUi:
   enabled: true
   imageName: "ans-web-ui"
+  # Optional: override the K8s secret name this component reads OIDC credentials from.
+  # Default: "splice-app-cns-ui-auth".
+  secretName: ""
   # Optional: Provide raw strings to override the default Kubernetes secret injection.
   # This is useful for integrating with external secret management tools.
   # Note: Ensure you have the appropriate mutating webhook/injector installed in your cluster.
@@ -100,6 +103,9 @@ ansWebUi:
 # set if validator-web-ui should be deployed
 validatorWebUi:
   enabled: true
+  # Optional: override the K8s secret name this component reads OIDC credentials from.
+  # Default: "splice-app-wallet-ui-auth".
+  secretName: ""
   # Optional: Provide raw strings to override the default Kubernetes secret injection.
   # This is useful for integrating with external secret management tools.
   # Note: Ensure you have the appropriate mutating webhook/injector installed in your cluster.
@@ -111,6 +117,9 @@ validatorWebUi:
 disableAuth: false
 
 #auth:
+#  # Optional: override the K8s secret name the validator app reads ledger API credentials from.
+#  # Default: "splice-app-validator-ledger-api-auth".
+#  secretName: ""
 #  secretOverrides:
 #    ledgerApiUser: ""
 #    audience: ""
@@ -119,6 +128,12 @@ disableAuth: false
 #    clientId: ""
 #    clientSecret: ""
 #    scope: ""
+
+# Optional: override Deployment and Service names.
+appLabels:
+  validatorApp: ""   # default: "validator-app"
+  walletWebUi: ""    # default: "wallet-web-ui"
+  ansWebUi: ""       # default: "ans-web-ui"
 
 logLevel: DEBUG
 

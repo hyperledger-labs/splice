@@ -147,52 +147,47 @@ class UnclaimedActivityRecordIntegrationTest
     }
 
     setTriggersWithin(
-      triggersToPauseAtStart = mergeAmuletsTrigger(
-        aliceValidatorBackend,
-        aliceUserName,
-      ) +: (expiredUnallocatedTriggers ++ expiredUnclaimedTriggers),
-      triggersToResumeAtStart = Seq.empty,
+      triggersToPauseAtStart = Seq(mergeAmuletsTrigger(aliceValidatorBackend, aliceUserName))
     ) {
-      actAndCheck(
-        "Creating vote request", {
-          val action = new ARC_DsoRules(
-            new SRARC_CreateUnallocatedUnclaimedActivityRecord(
-              new DsoRules_CreateUnallocatedUnclaimedActivityRecord(
-                aliceParty.toProtoPrimitive,
-                BigDecimal(amountToMint).bigDecimal,
-                "alice is doing great - vote",
-                Instant.now().plus(10, ChronoUnit.SECONDS),
+      setTriggersWithin(
+        triggersToPauseAtStart = expiredUnallocatedTriggers ++ expiredUnclaimedTriggers
+      ) {
+        actAndCheck(
+          "Creating vote request", {
+            val action = new ARC_DsoRules(
+              new SRARC_CreateUnallocatedUnclaimedActivityRecord(
+                new DsoRules_CreateUnallocatedUnclaimedActivityRecord(
+                  aliceParty.toProtoPrimitive,
+                  BigDecimal(amountToMint).bigDecimal,
+                  "alice is doing great - vote",
+                  Instant.now().plus(10, ChronoUnit.SECONDS),
+                )
               )
             )
-          )
-          sv1Backend.createVoteRequest(
-            sv1Party.toProtoPrimitive,
-            action,
-            "url",
-            "alice is doing great",
-            sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-            None,
-          )
-        },
-      )(
-        "UnclaimedActivityRecord has been created",
-        _ => {
-          sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(UnclaimedActivityRecord.COMPANION)(
-              dsoParty
-            ) should not be empty withClue "UnclaimedActivityRecord"
-          sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(UnclaimedReward.COMPANION)(
-              dsoParty
-            ) shouldBe empty withClue "UnclaimedReward"
-        },
-      )
-    }
+            sv1Backend.createVoteRequest(
+              sv1Party.toProtoPrimitive,
+              action,
+              "url",
+              "alice is doing great",
+              sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+              None,
+            )
+          },
+        )(
+          "UnclaimedActivityRecord has been created",
+          _ => {
+            sv1Backend.participantClient.ledger_api_extensions.acs
+              .filterJava(UnclaimedActivityRecord.COMPANION)(
+                dsoParty
+              ) should not be empty withClue "UnclaimedActivityRecord"
+            sv1Backend.participantClient.ledger_api_extensions.acs
+              .filterJava(UnclaimedReward.COMPANION)(
+                dsoParty
+              ) shouldBe empty withClue "UnclaimedReward"
+          },
+        )
+      }
 
-    setTriggersWithin(
-      triggersToPauseAtStart = Seq(mergeAmuletsTrigger(aliceValidatorBackend, aliceUserName)),
-      triggersToResumeAtStart = Seq.empty,
-    ) {
       clue("UnclaimedActivityRecord gets archived") {
         eventually() {
           sv1Backend.participantClient.ledger_api_extensions.acs

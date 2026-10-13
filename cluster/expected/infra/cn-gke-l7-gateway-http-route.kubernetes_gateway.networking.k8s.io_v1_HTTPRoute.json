@@ -1,0 +1,35 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "gateway.networking.k8s.io/v1",
+    "kind": "HTTPRoute",
+    "metadata": {
+      "name": "cn-gke-l7-gateway-http-route",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "parentRefs": [
+        {
+          "name": "cn-gke-l7-gateway",
+          "namespace": "cluster-ingress",
+          "sectionName": "listen-https"
+        }
+      ],
+      "rules": [
+        {
+          "backendRefs": [
+            {
+              "name": "istio-ingress",
+              "namespace": "cluster-ingress",
+              "port": 80
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "name": "cn-gke-l7-gateway-http-route",
+  "provider": "",
+  "type": "kubernetes:gateway.networking.k8s.io/v1:HTTPRoute"
+}

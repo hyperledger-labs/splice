@@ -8,6 +8,7 @@ import cats.syntax.either.*
 import cats.{Applicative, Functor}
 import com.daml.metrics.api.MetricHandle.Timer
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.Outcome
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -198,13 +199,4 @@ object EitherTUtil {
 
   def unitUS[A]: EitherT[FutureUnlessShutdown, A, Unit] =
     EitherT(FutureUnlessShutdown.pure(Either.unit))
-
-  object syntax {
-    implicit class FunctorToEitherT[F[_]: Functor, T](f: F[T]) {
-
-      /** Converts any F[T] into EitherT[F, A, T] */
-      def toEitherTRight[A]: EitherT[F, A, T] =
-        EitherT.right[A](f)
-    }
-  }
 }

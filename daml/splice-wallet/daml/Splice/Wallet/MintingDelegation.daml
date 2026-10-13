@@ -92,6 +92,8 @@ template MintingDelegation
       do
         assertWithinDeadline "expiresAt" expiresAt
 
+        _ <- fetchCheckedInterface (ForOwner with dso; owner = beneficiary) couponCid
+
         -- Assign reward coupons to new beneficiaries
         assignResult <- exercise couponCid assignBeneficiaries
 

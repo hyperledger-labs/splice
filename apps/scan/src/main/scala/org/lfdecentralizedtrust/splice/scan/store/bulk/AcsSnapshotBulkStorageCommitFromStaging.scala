@@ -58,6 +58,7 @@ class AcsSnapshotBulkStorageCommitFromStaging(
             case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
               Seq.empty
           },
+      _.timestamp,
       appConfig,
       scanConnection,
       loggerFactory,

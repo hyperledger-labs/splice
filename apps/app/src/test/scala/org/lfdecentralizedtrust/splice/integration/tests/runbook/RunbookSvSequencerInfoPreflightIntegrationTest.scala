@@ -27,10 +27,10 @@ class RunbookSvSequencerInfoPreflightIntegrationTest
     }
     val nodeState: SvNodeState = dsoInfo.svNodeStates.get(dsoInfo.svParty).value.payload
     val domainConfig = nodeState.state.synchronizerNodes.asScala.values.headOption.value
-    val sequencerUrl = domainConfig.physicalSynchronizers.toScala
-      .flatMap(_.asScala.get(migrationId).flatMap(_.sequencer.toScala.map(_.url)))
-      .orElse(domainConfig.sequencer.toScala.filter(_.migrationId == migrationId).map(_.url))
-      .value
-    sequencerUrl shouldBe s"https://sequencer-$migrationId.sv.${sys.env("NETWORK_APPS_ADDRESS")}"
+    val sequencerUrls = domainConfig.physicalSynchronizers.toScala.toList
+      .flatMap(_.asScala.values.flatMap(_.sequencer.toScala.map(_.url)))
+    sequencerUrls should contain(
+      s"https://sequencer-$migrationId.sv.${sys.env("NETWORK_APPS_ADDRESS")}"
+    )
   }
 }

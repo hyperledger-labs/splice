@@ -7,12 +7,12 @@ import {
   isDomainConnectionError,
   PackageIdResolver,
   JsonApiError,
+  QueryDevtools,
   retryQuery,
 } from '@canton-network/splice-common-frontend';
 import { replaceEqualDeep } from '@canton-network/splice-common-frontend-utils';
 import { ScanClientProvider } from '@canton-network/splice-common-frontend/scan-api';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import React from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from 'react-router';
@@ -80,7 +80,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
       <AuthProvider authConf={config.auth}>
         <ScanClientProvider baseScanUrl={config.services.scan.url}>
           <QueryClientProvider client={queryClient}>
-            <ReactQueryDevtools initialIsOpen={false} />
+            <QueryDevtools />
             <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
               <SplitwellClientProvider url={config.services.splitwell.url}>
                 <SplitwellLedgerApiClientProvider

@@ -1,0 +1,43 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "alertStrategy": {
+      "autoClose": "3600s",
+      "notificationChannelStrategies": [
+        {
+          "notificationChannelNames": [
+            null
+          ],
+          "renotifyInterval": "14400s"
+        }
+      ]
+    },
+    "combiner": "OR",
+    "conditions": [
+      {
+        "conditionPrometheusQueryLanguage": {
+          "duration": "0s",
+          "evaluationInterval": "30s",
+          "query": "sum by (gateway_name) ((router_googleapis_com:nat_port_usage{monitored_resource=\"nat_gateway\", gateway_name=~\"nat-mock-gw.*\"} / 64512) * 100) > 80"
+        },
+        "displayName": "NAT port usage high in mock"
+      }
+    ],
+    "displayName": "NAT port usage high in mock",
+    "documentation": {
+      "content": "Cloud NAT port usage exceeded 80% of the maximum for at least one NAT gateway in cluster mock. Consider increasing NAT IPs or ports per VM.",
+      "mimeType": "text/markdown",
+      "subject": "NAT port usage high in mock"
+    },
+    "notificationChannels": [
+      null
+    ],
+    "userLabels": {
+      "cluster": "mock"
+    }
+  },
+  "name": "natPortUsageAlert",
+  "provider": "",
+  "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+}

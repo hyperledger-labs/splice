@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.cometbft
 
+import cats.syntax.either.*
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
@@ -94,10 +95,18 @@ object CometBftRequestSigner {
                 .asRuntimeException()
             )
         val pubKey = SubjectPublicKeyInfo.getInstance(
-          keyPair.publicKey.toProtoPublicKeyV30.getSigningPublicKey.publicKey.toByteArray
+          keyPair.publicKey.toProtoPublicKeyV30
+            .valueOr(err => throw new IllegalStateException(s"Failed to convert public key: $err"))
+            .getSigningPublicKey
+            .publicKey
+            .toByteArray
         )
         val privateKey = PrivateKeyInfo.getInstance(
-          keyPair.privateKey.toProtoPrivateKey.getSigningPrivateKey.privateKey.toByteArray
+          keyPair.privateKey.toProtoPrivateKey
+            .valueOr(err => throw new IllegalStateException(s"Failed to convert private key: $err"))
+            .getSigningPrivateKey
+            .privateKey
+            .toByteArray
         )
         val privateKeyData =
           ASN1OctetString.getInstance(privateKey.getPrivateKey.getOctets).getOctets

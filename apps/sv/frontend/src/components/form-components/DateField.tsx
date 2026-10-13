@@ -19,7 +19,7 @@ import { DATE_TIME_PLACEHOLDER } from '../../utils/constants';
 export interface DateFieldProps {
   title?: string;
   description?: string;
-  minDate?: Dayjs;
+  minDate?: Dayjs | null;
   id: string;
 }
 
@@ -47,7 +47,7 @@ export const DateField: React.FC<DateFieldProps> = props => {
         <DesktopDateTimePicker
           value={dateValue}
           format={dateTimeFormatISO}
-          minDateTime={minDate || dayjs()}
+          minDateTime={minDate === null ? undefined : (minDate ?? dayjs())}
           ampm={false}
           onClose={() => field.handleBlur()}
           onChange={newDate => field.handleChange(newDate?.format(dateTimeFormatISO)!)}

@@ -8,14 +8,18 @@ import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.networking.Endpoint
+import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 import com.digitalasset.canton.synchronizer.sequencer.AuthenticationServices
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PEndpointConfig
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.stub.StreamObserver
 
+import scala.concurrent.ExecutionContextExecutor
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -36,7 +40,7 @@ object P2PGrpcNetworking {
     *     network output module would have to be split into a networked and a non-networked part and
     *     networked-only functionality should be tested separately.
     */
-  sealed trait P2PEndpoint extends Product {
+  sealed trait P2PEndpoint extends Product with Serializable {
 
     def address: String
     def port: Port
@@ -62,7 +66,7 @@ object P2PGrpcNetworking {
         Id.unapply(this).compare(Id.unapply(that))
 
       override protected def pretty: Pretty[Id] =
-        prettyOfClass(param("url", _.url.doubleQuoted), param("tls", _.transportSecurity))
+        prettyOfClassWithName("P2PUrl")(unnamedParam(_.url.doubleQuoted))
     }
 
     def fromEndpointConfig(
@@ -129,6 +133,22 @@ object P2PGrpcNetworking {
       serverToClientAuthenticationEndpoint: Option[P2PEndpoint],
       clock: Clock,
   )
+
+  private[grpc] def createNettyClientChannelBuilder(
+      clientChannelBuilder: ClientChannelBuilder,
+      endpointConfig: P2PEndpointConfig,
+  )(implicit executionContextExecutor: ExecutionContextExecutor) =
+    clientChannelBuilder.create(
+      endpoint = Endpoint(endpointConfig.address, endpointConfig.port),
+      useTls = endpointConfig.tlsConfig.exists(_.enabled),
+      executor = executionContextExecutor,
+      trustCertificate = endpointConfig.tlsConfig.flatMap(_.trustCollectionFile).map(_.pemBytes),
+      params = endpointConfig.channel,
+      // We don't support load balancing nor health-checking for P2P connections,
+      //  as the ordering protocol itself provides resilience.
+      loadBalancingPolicy = None,
+      healthCheck = false,
+    )
 
   private[grpc] def completeGrpcStreamObserver(
       streamObserver: StreamObserver[?],

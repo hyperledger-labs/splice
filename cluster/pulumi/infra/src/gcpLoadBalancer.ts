@@ -5,10 +5,10 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
 import { CLUSTER_BASENAME, ExactNamespace } from '@canton-network/splice-pulumi-common';
+import { CloudArmorLoggingConfig } from '@canton-network/splice-pulumi-common/src/config/cloudArmorConfig';
 import { local } from '@pulumi/command';
 
 import { CloudArmorPolicy } from './cloudArmor';
-import { CloudArmorLoggingConfig } from './config';
 
 /*
 Any cluster that uses this must first run
@@ -64,6 +64,17 @@ interface L7GatewayConfig {
 
 const httpListenerName = 'listen-http';
 const httpsListenerName = 'listen-https';
+
+// For HTTP/2 backends the GCP backend service timeout acts as a max stream duration,
+// not an idle timeout, so the default of 30s tears down every long-lived gRPC stream
+// (e.g. the sequencer public API subscriptions) mid-flight. Those show up as
+// `proxyStatus: error="connection_terminated"` in the load balancer logs.
+const BACKEND_TIMEOUT_SECONDS = 3600;
+
+// Stop sending new requests to a removed backend endpoint and let the in-flight ones
+// finish instead of cutting them. Must stay consistent with the preStop drain on the
+// istio-ingress pods, see PRE_STOP_DRAIN_SECONDS in istio.ts.
+const BACKEND_DRAINING_TIMEOUT_SECONDS = 60;
 
 // enforced by the HTTPRoute CRD: spec.hostnames must have at most 16 items
 const MAX_HOSTNAMES_PER_HTTP_ROUTE = 16;
@@ -182,9 +193,15 @@ function attachBackendPolicy(
       },
       spec: {
         default: {
+          timeoutSec: BACKEND_TIMEOUT_SECONDS,
+          connectionDraining: {
+            drainingTimeoutSec: BACKEND_DRAINING_TIMEOUT_SECONDS,
+          },
           // backend service request logging must be enabled for Cloud Armor
-          // rule decisions to show up in Cloud Logging
-          ...(config.backendLogging?.enabled
+          // rule decisions to show up in Cloud Logging. Without a policy there are no
+          // rejections, so nothing to log if only those are wanted.
+          ...(config.backendLogging?.enabled &&
+          !(config.backendLogging.excludeAcceptedRequests && !policy)
             ? {
                 logging: {
                   enabled: true,

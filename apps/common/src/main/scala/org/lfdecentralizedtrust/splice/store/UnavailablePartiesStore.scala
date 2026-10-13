@@ -13,11 +13,8 @@ trait UnavailablePartiesStore {
   // Adds or updates parties as of now
   def addParties(parties: Seq[PartyId])(implicit tc: TraceContext): Future[Unit]
 
-  // Removes specific parties from the store
-  def removeParties(parties: Seq[PartyId])(implicit tc: TraceContext): Future[Int]
-
-  // Removes parties from the table with matching store ID
-  def removePartiesUpToStoreId(storeId: Long)(implicit tc: TraceContext): Future[Int]
+  // Removes specific parties from the store, returning the parties that were actually removed
+  def removeParties(parties: Seq[PartyId])(implicit tc: TraceContext): Future[Seq[PartyId]]
 
   // Lists parties that are being ignored as of now
   def listParties()(implicit tc: TraceContext): Future[Seq[PartyId]]

@@ -8,6 +8,7 @@ import {
   initDumpConfig,
   SecretsFixtureMap,
   svRunbookAuth0Config,
+  withDumpConfigStack,
 } from '../common/src/dump-config-common';
 
 async function main() {
@@ -26,14 +27,16 @@ async function main() {
   const installNode = await import('./src/installNode');
   const secrets = new SecretsFixtureMap();
   for (const sv of allSvsToDeploy) {
-    await installNode.installNode(sv.nodeName, {
-      getSecrets: () => Promise.resolve(secrets),
+    await withDumpConfigStack(sv.nodeName, () =>
+      installNode.installNode(sv.nodeName, {
+        getSecrets: () => Promise.resolve(secrets),
 
-      getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
-        Promise.resolve('access_token'),
-      getCfg: () => (sv.nodeName === 'sv' ? svRunbookAuth0Config : cantonNetworkAuth0Config),
-      reuseNamespaceConfig: (fromNamespace: string, toNamespace: string) => {},
-    });
+        getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
+          Promise.resolve('access_token'),
+        getCfg: () => (sv.nodeName === 'sv' ? svRunbookAuth0Config : cantonNetworkAuth0Config),
+        reuseNamespaceConfig: (fromNamespace: string, toNamespace: string) => {},
+      })
+    );
   }
 }
 

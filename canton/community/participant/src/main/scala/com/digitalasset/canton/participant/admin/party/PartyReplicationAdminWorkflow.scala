@@ -14,12 +14,12 @@ import com.daml.ledger.api.v2.transaction.Transaction
 import com.daml.ledger.api.v2.transaction_filter.EventFormat
 import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.javaapi.data.{CreatedEvent as JavaCreatedEvent, Identifier as JavaIdentifier}
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.ledger.client.{LedgerClient, LedgerClientUtils}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.AdminWorkflowService
@@ -37,6 +37,7 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.ExecutionContext
@@ -126,21 +127,26 @@ class PartyReplicationAdminWorkflow(
       LedgerClient.traceContextFromLedgerApi(tx.traceContext)
 
     tx.events
-      .collect {
-        case Event(Event.Event.Created(event))
-            if event.templateId.exists(isTemplatePartyReplicationRelated) =>
-          event
+      .foreach {
+        case Event(Event.Event.Created(createdEvent))
+            if createdEvent.templateId.exists(isTemplatePartyReplicationRelated) =>
+          createEventHandler(
+            processProposalAtSourceParticipant(tx.synchronizerId, _),
+            processAgreementAtSourceOrTargetParticipant(
+              tx.synchronizerId,
+              _,
+              mightNotRememberAgreement = false,
+            ),
+          )(createdEvent)
+        case Event(Event.Event.Archived(archivedEvent))
+            if archivedEvent.templateId.contains(agreementTemplate) =>
+          archivedEvent.templateId match {
+            case Some(`agreementTemplate`) =>
+              processAgreementArchive(archivedEvent.contractId)
+            case _ => ()
+          }
+        case _ => ()
       }
-      .foreach(
-        createEventHandler(
-          processProposalAtSourceParticipant(tx.synchronizerId, _),
-          processAgreementAtSourceOrTargetParticipant(
-            tx.synchronizerId,
-            _,
-            mightNotRememberAgreement = false,
-          ),
-        )
-      )
   }
 
   private def processProposalAtSourceParticipant(
@@ -206,6 +212,13 @@ class PartyReplicationAdminWorkflow(
         respondToProposal,
       )
     }
+  }
+
+  private def processAgreementArchive(
+      contractId: String
+  )(implicit traceContext: TraceContext): Unit = {
+    logger.info(s"Received archival of party replication agreement $contractId.")
+    partyReplicator.processPartyReplicationAgreementArchival(contractId)
   }
 
   private def processAgreementAtSourceOrTargetParticipant(

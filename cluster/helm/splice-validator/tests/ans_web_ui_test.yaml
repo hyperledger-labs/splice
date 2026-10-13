@@ -23,6 +23,17 @@ set:
     audience: "mock_audience"
 
 tests:
+  - it: "uses custom secret name when ansWebUi.secretName is set"
+    set:
+      ansWebUi.secretName: "my-cns-ui-secret"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=="ans-web-ui")].env[?(@.name=="SPLICE_APP_UI_AUTH_CLIENT_ID")].valueFrom.secretKeyRef.name
+          value: my-cns-ui-secret
+
   - it: "allows overriding ans-web-ui secret env vars with raw strings"
     set:
       ansWebUi.secretOverrides.clientId: "vault:kv/data/cns-ui/client-id"

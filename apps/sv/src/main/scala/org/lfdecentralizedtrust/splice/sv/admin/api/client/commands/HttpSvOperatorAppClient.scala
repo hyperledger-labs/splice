@@ -235,6 +235,34 @@ object HttpSvOperatorAppClient {
     }
   }
 
+  case class ListVoteRequestsByTrackingCid(voteRequestCids: Seq[VoteRequest.ContractId])
+      extends BaseCommand[http.ListVoteRequestsByTrackingCidResponse, Seq[
+        Contract[VoteRequest.ContractId, VoteRequest]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListVoteRequestsByTrackingCidResponse] =
+      client.listVoteRequestsByTrackingCid(
+        body = definitions.BatchListVotesByVoteRequestsRequest(
+          voteRequestContractIds = voteRequestCids.map(_.contractId).toVector
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListVoteRequestsByTrackingCidResponse.OK(response) =>
+      response.voteRequests
+        .traverse(req => Contract.fromHttp(VoteRequest.COMPANION)(req))
+        .leftMap(_.toString)
+    }
+  }
+
   case class LookupVoteRequest(trackingCid: VoteRequest.ContractId)()
       extends BaseCommand[
         http.LookupDsoRulesVoteRequestResponse,

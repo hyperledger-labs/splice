@@ -14,9 +14,15 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAllScanAppConfigs_,
   updateAutomationConfig,
 }
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardV2TestUtil.ExpectedTrafficCost
+import org.lfdecentralizedtrust.splice.scan.automation.{
+  AcsSnapshotBackfillingTrigger,
+  AcsSnapshotTrigger,
+}
 import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
@@ -26,6 +32,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
   TransferTxLogEntry,
   TxLogEntry,
 }
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.time.Instant
 import java.util.UUID
@@ -49,6 +56,13 @@ class TokenStandardV2TransferIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(
+          ConfigurableApp.Scan
+        )( // we force snapshots (via getTotalAmuletBalance) half-way through the test
+          _.withPausedTrigger[AcsSnapshotTrigger].withPausedTrigger[AcsSnapshotBackfillingTrigger]
         )(config)
       )
       .addConfigTransforms((_, config) =>
@@ -462,6 +476,78 @@ class TokenStandardV2TransferIntegrationTest
           aliceWalletClient.balance().unlockedQty should be(aliceBalanceBefore - 10)
           aliceValidatorWalletClient.balance().unlockedQty should be(BigDecimal(10))
         },
+      )
+    }
+
+    "support preapproved transfers across participants" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+
+      createTransferPreapprovalEnsuringItExists(bobWalletClient, bobValidatorBackend)
+
+      aliceWalletClient.tap(100)
+      val aliceBalanceBefore = aliceWalletClient.balance().unlockedQty
+      val bobBalanceBefore = bobWalletClient.balance().unlockedQty
+
+      val aliceAmuletHoldings = aliceWalletClient
+        .list()
+        .amulets
+        .map(_.contract.contractId.toInterface(holdingv2.Holding.INTERFACE))
+      aliceAmuletHoldings should have size 1
+
+      val (context, kind) =
+        sv1ScanBackend.getTransferFactoryV2(
+          new transferinstructionv2.TransferFactory_Transfer(
+            new transferinstructionv2.Transfer(
+              basicAccount(aliceUserParty),
+              basicAccount(bobUserParty),
+              BigDecimal(10).bigDecimal,
+              new holdingv2.InstrumentId(dsoParty.toProtoPrimitive, amuletInstrumentIdName),
+              Instant.now(),
+              Instant.now().plusSeconds(3600L),
+              aliceAmuletHoldings.asJava,
+              emptyMetadata,
+            ),
+            /* actors */ Seq(aliceUserParty).map(_.toProtoPrimitive).asJava,
+            emptyExtraArgs,
+          )
+        )
+      kind shouldBe transferinstruction.v2.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct
+
+      val transferUpdate = context.factoryId.exerciseTransferFactory_Transfer(context.args)
+      val (transferTx, _) = actAndCheck(
+        "Alice transfers to Bob's preapproval", {
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitJava(
+              userId = aliceWalletClient.config.ledgerApiUser,
+              actAs = Seq(aliceUserParty),
+              readAs = Seq(aliceUserParty),
+              commands = transferUpdate.commands.asScala.toSeq,
+              disclosedContracts = context.disclosedContracts,
+            )
+        },
+      )(
+        "The balances are updated",
+        _ => {
+          aliceWalletClient.balance().unlockedQty should be(aliceBalanceBefore - 10)
+          bobWalletClient.balance().unlockedQty should be(bobBalanceBefore + 10)
+        },
+      )
+
+      inside(
+        SpliceLedgerConnection
+          .decodeExerciseResult(transferUpdate, transferTx)
+          .exerciseResult
+          .output
+      ) { case _: TransferInstructionResult_Completed => () }
+
+      // The reference traffic cost was recorded by running this test on PV=36
+      // On PV=35, the traffic costs are:
+      // 5,133 bytes in integration test, and
+      // 8,552 bytes on DevNet (14 SVs, Splice 0.8.0, 167% of the reference cost)
+      // tx: https://lighthouse.devnet.cantonloop.com/transactions/1220e05b82ba62455190c29a845272faabb45eeb02253e33a07e40079ac5ebfe4f6c
+      checkTrafficCosts(
+        Seq(transferTx.getUpdateId -> ExpectedTrafficCost("Preapproved CC transfer", 5152))
       )
     }
 

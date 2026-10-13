@@ -7,13 +7,14 @@ import cats.data.EitherT
 import com.daml.nameof.NameOf.functionFullName
 import org.lfdecentralizedtrust.splice.SpliceMetrics
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{DbConfig, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap, CantonNodeParameters}
 import com.digitalasset.canton.lifecycle.{HasCloseContext, LifeCycle, UnlessShutdown}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.{DbStorage, StorageFactory}
+import com.digitalasset.canton.resource.{DbMigrations, DbStorage, StorageFactory}
+import com.digitalasset.canton.resource.DbStorage.RetryConfig
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
@@ -166,12 +167,40 @@ abstract class NodeBootstrapBase[
     */
   def start(): EitherT[Future, String, Unit] = {
     warnIfDataChecksumsDisabled()
-    initialize(httpAdminService).leftMap { err =>
+    (for {
+      _ <- EitherT(Future(checkAndMigrateDatabase()))
+      _ <- initialize(httpAdminService)
+    } yield ()).leftMap { err =>
       logger.info(s"Failed to initialize node, trying to clean up: $err")
       close()
       err
     }
   }
+
+  /** Canton used to run this in `ManagedNodes` before creating the node; it now runs it as a
+    * bootstrap stage of `CantonNodeBootstrapImpl`, which Splice nodes don't extend.
+    * Migrates a fresh database, or any database if `migrate-and-start` is set.
+    */
+  private def checkAndMigrateDatabase(): Either[String, Unit] =
+    nodeConfig.storage match {
+      case dbConfig: DbConfig =>
+        logger.info(s"Setting up database schemas for $name")
+        val retryConfig =
+          if (dbConfig.parameters.failFastOnStartup) RetryConfig.failFast
+          else RetryConfig.forever
+        DbMigrations
+          .create(
+            dbConfig,
+            devVersionSupport = parameterConfig.devVersionSupport,
+            timeouts,
+            loggerFactory,
+          )
+          .checkAndMigrate(parameterConfig, retryConfig)
+          .leftMap(err => s"Failed to check and migrate database schemas for $name: $err")
+          .value
+          .onShutdown(Left(s"DB migration check for $name interrupted due to shutdown"))
+      case _ => Right(())
+    }
 
   private def warnIfDataChecksumsDisabled(): Unit =
     storage
@@ -201,7 +230,7 @@ abstract class NodeBootstrapBase[
       if (isRunningVar.getAndSet(false)) {
         val stores = List()
         val instances =
-          grpcAdminServers ++ getNode.toList ++ stores ++ List(clock, httpAdminService)
+          List(httpAdminService) ++ grpcAdminServers ++ getNode.toList ++ stores ++ List(clock)
         LifeCycle.close(instances*)(logger)
         logger.debug(s"Successfully completed shutdown of $name")
       } else {

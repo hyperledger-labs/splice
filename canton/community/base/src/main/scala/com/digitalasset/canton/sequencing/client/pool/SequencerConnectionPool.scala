@@ -7,7 +7,6 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.health.{
@@ -15,9 +14,11 @@ import com.digitalasset.canton.health.{
   ComponentHealthState,
   HealthQuasiComponent,
 }
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
+  HasCloseContext,
   HasRunOnClosing,
   OnShutdownRunner,
 }
@@ -32,6 +33,7 @@ import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.stream.Materializer
 
@@ -64,7 +66,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
   * ID will be determined by consensus once trust-threshold-many connections (to different logical
   * sequencers) report the same synchronizer.
   */
-trait SequencerConnectionPool extends FlagCloseable with NamedLogging {
+trait SequencerConnectionPool extends FlagCloseable with HasCloseContext with NamedLogging {
   import SequencerConnectionPool.*
 
   /** Return the synchronizer ID to which the connections in the pool are connected. Empty if the

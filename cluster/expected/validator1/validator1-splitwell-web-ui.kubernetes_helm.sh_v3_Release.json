@@ -1,0 +1,67 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-splitwell-web-ui",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "splitwell-web-ui",
+    "namespace": "validator1",
+    "timeout": 600,
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "auth": {
+        "audience": "https://canton.network.global"
+      },
+      "cluster": {
+        "dnsName": "mock.global.canton.network.digitalasset.com",
+        "fixedTokens": false,
+        "hostname": "mock.global.canton.network.digitalasset.com",
+        "name": "cn-mocknet"
+      },
+      "clusterUrl": "mock.global.canton.network.digitalasset.com",
+      "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+      "spliceInstanceNames": {
+        "amuletName": "Amulet",
+        "amuletNameAcronym": "AMT",
+        "nameServiceName": "Amulet Name Service",
+        "nameServiceNameAcronym": "ANS",
+        "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+        "networkName": "Splice"
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "0.3.20"
+  },
+  "name": "validator1-splitwell-web-ui",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

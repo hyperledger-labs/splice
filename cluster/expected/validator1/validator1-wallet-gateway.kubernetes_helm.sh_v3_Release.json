@@ -1,0 +1,143 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/wallet-gateway/helm/wallet-gateway",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "wallet-gateway",
+    "namespace": "validator1",
+    "timeout": 600,
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "config": {
+        "bootstrap": {
+          "idps": [
+            {
+              "configUrl": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration",
+              "id": "idp-auth0",
+              "issuer": "https://canton-network-dev.us.auth0.com/",
+              "type": "oauth"
+            }
+          ],
+          "networks": [
+            {
+              "adminAuth": {
+                "audience": "https://canton.network.global",
+                "clientId": "validator1-client-id",
+                "clientSecretEnv": "OAUTH2_ADMIN_CLIENT_SECRET",
+                "method": "client_credentials",
+                "scope": "daml_ledger_api"
+              },
+              "auth": {
+                "audience": "https://canton.network.global",
+                "clientId": "validator1-wallet-gateway-ui-client-id",
+                "method": "authorization_code",
+                "scope": "openid daml_ledger_api offline_access"
+              },
+              "description": "Splice validator1 wallet gateway network",
+              "id": "canton:validator1",
+              "identityProviderId": "idp-auth0",
+              "ledgerApi": {
+                "baseUrl": "http://participant:7575"
+              },
+              "name": "Splice validator1"
+            }
+          ]
+        },
+        "kernel": {
+          "clientType": "remote",
+          "id": "splice-validator1",
+          "publicUrl": "https://walletgateway.validator1.mock.global.canton.network.digitalasset.com"
+        },
+        "logging": {
+          "level": "debug"
+        },
+        "server": {
+          "allowedOrigins": [
+            "https://portfolio.validator1.mock.global.canton.network.digitalasset.com"
+          ],
+          "dappPath": "/api/v0/dapp",
+          "port": 3030,
+          "requestRateLimit": 10000,
+          "requestSizeLimit": "5mb",
+          "signingWorker": {
+            "pollInterval": 5000
+          },
+          "trustProxy": 1,
+          "userPath": "/api/v0/user"
+        },
+        "signingStore": {
+          "connection": {
+            "database": "wg_signing_store",
+            "passwordEnv": "WG_STORE_PASSWORD",
+            "port": 5432,
+            "type": "postgres",
+            "user": "cnadmin"
+          }
+        },
+        "store": {
+          "connection": {
+            "database": "wg_store",
+            "passwordEnv": "WG_STORE_PASSWORD",
+            "port": 5432,
+            "type": "postgres",
+            "user": "cnadmin"
+          }
+        }
+      },
+      "extraEnv": [
+        {
+          "name": "WG_STORE_PASSWORD",
+          "valueFrom": {
+            "secretKeyRef": {
+              "key": "postgresPassword",
+              "name": "validator-pg-secrets"
+            }
+          }
+        }
+      ],
+      "oauthSecrets": {
+        "OAUTH2_ADMIN_CLIENT_SECRET": {
+          "secretRef": {
+            "key": "client-secret",
+            "name": "splice-app-wallet-gateway-admin-oauth"
+          }
+        }
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "1.11.1"
+  },
+  "name": "validator1-wallet-gateway",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

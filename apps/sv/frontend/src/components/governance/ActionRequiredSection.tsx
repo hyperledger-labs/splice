@@ -5,7 +5,7 @@ import { ContractId } from '@daml/types';
 import { East } from '@mui/icons-material';
 import { Alert, Box, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
-import { CopyableIdentifier, PageSectionHeader } from '../../components/beta';
+import { CopyableIdentifier, PageSectionHeader } from '../../components/ui';
 import {
   CREATE_PROPOSAL_LABEL_PROPOSAL_TYPE,
   VOTE_PROPOSAL_CONTRACT_ID_LABEL,
@@ -13,6 +13,7 @@ import {
 import React from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { formatDatetimeWithOffset } from '../../utils/dateFormat';
 
 dayjs.extend(relativeTime);
 
@@ -154,7 +155,7 @@ const ActionCard = (props: ActionCardProps) => {
         />
         <ActionCardSegment
           title="VOTE CREATED"
-          content={createdAt}
+          content={formatDatetimeWithOffset(createdAt)}
           data-testid="action-required-created-at"
         />
         <ActionCardSegment

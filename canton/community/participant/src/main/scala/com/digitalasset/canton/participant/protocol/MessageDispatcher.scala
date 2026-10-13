@@ -6,11 +6,9 @@ package com.digitalasset.canton.participant.protocol
 import cats.data.Chain
 import cats.syntax.alternative.*
 import cats.syntax.foldable.*
-import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
 import cats.{Foldable, Monoid}
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.ViewType.{
@@ -22,6 +20,7 @@ import com.digitalasset.canton.data.{CantonTimestamp, ViewType}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.participant.state.Update.SequencerIndexMoved
 import com.digitalasset.canton.ledger.participant.state.{SequencedEventUpdate, SequencedUpdate}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   PromiseUnlessShutdown,
@@ -29,6 +28,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.commitment.ReceivedAcsCommitmentValidator
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.metrics.ConnectedSynchronizerMetrics
 import com.digitalasset.canton.participant.protocol.MessageDispatcher.TicksAfter.{
@@ -65,6 +65,7 @@ import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{Checked, ErrorUtil, OptionUtil}
 import com.digitalasset.canton.{RequestCounter, SequencerCounter}
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import com.google.rpc.status.Status
 import io.opentelemetry.api.trace.Tracer
@@ -99,7 +100,8 @@ trait MessageDispatcher { this: NamedLogging =>
 
   protected def topologyProcessor: ParticipantTopologyProcessor
   protected def trafficProcessor: TrafficControlProcessor
-  protected def acsCommitmentProcessor: AcsCommitmentProcessor.ProcessorType
+  protected def legacyAcsCommitmentProcessorO: Option[AcsCommitmentProcessor.ProcessorType]
+  protected def acsCommitmentValidator: ReceivedAcsCommitmentValidator
   protected def requestCounterAllocator: RequestCounterAllocator
   protected def recordOrderPublisher: RecordOrderPublisher
   protected def badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor
@@ -111,35 +113,95 @@ trait MessageDispatcher { this: NamedLogging =>
 
   def handleAll(events: Traced[Seq[WithOpeningErrors[PossiblyIgnoredProtocolEvent]]]): HandlerResult
 
-  private def processAcsCommitmentEnvelope(
+  private def processLegacyAcsCommitmentEnvelope(
       envelopes: Seq[DefaultOpenEnvelope],
       sc: SequencerCounter,
       ts: CantonTimestamp,
+  )(implicit traceContext: TraceContext): ProcessingResult =
+    legacyAcsCommitmentProcessorO.fold(pureProcessingResult) { legacyAcsCommitmentProcessor =>
+      val acsCommitments =
+        envelopes.mapFilter(select[SignedProtocolMessage[messages.LegacyAcsCommitment]])
+      if (acsCommitments.nonEmpty) {
+        // When a participant receives an ACS commitment from a counter-participant, the counter-participant
+        // expects to receive the corresponding commitment from the local participant.
+        // However, the local participant may not have seen neither an ACS change nor a time proof
+        // since the commitment's interval end. So we signal an empty ACS change to the ACS commitment processor
+        // at the commitment sequencing time (which is after the interval end for an honest counter-participant)
+        // so that this triggers an ACS commitment computation on the local participant if necessary.
+        //
+        // This ACS commitment may be bundled with a request that may lead to a non-empty ACS change at this timestamp.
+        // It is nevertheless OK to schedule the empty ACS change
+        // because we use a different tie breaker for the empty ACS commitment.
+        // This is also why we must not tick the record order publisher here.
+        FutureUnlessShutdown
+          .lift(
+            recordOrderPublisher.scheduleEmptyAcsChangePublication(sc, ts)
+          )
+          .flatMap(_ =>
+            doProcess(
+              AcsCommitment(
+                None,
+                { () =>
+                  logger.debug(s"Processing ACS commitments for timestamp $ts")
+                  legacyAcsCommitmentProcessor(ts, Traced(acsCommitments))
+                },
+              )
+            )
+          )
+      } else pureProcessingResult
+    }
+
+  private def processAcsCommitmentEnvelopes(
+      envelopes: Seq[DefaultOpenEnvelope],
+      ts: CantonTimestamp,
   )(implicit traceContext: TraceContext): ProcessingResult = {
-    val acsCommitments = envelopes.mapFilter(select[SignedProtocolMessage[messages.AcsCommitment]])
-    if (acsCommitments.nonEmpty) {
-      // When a participant receives an ACS commitment from a counter-participant, the counter-participant
-      // expects to receive the corresponding commitment from the local participant.
-      // However, the local participant may not have seen neither an ACS change nor a time proof
-      // since the commitment's interval end. So we signal an empty ACS change to the ACS commitment processor
-      // at the commitment sequencing time (which is after the interval end for an honest counter-participant)
-      // so that this triggers an ACS commitment computation on the local participant if necessary.
-      //
-      // This ACS commitment may be bundled with a request that may lead to a non-empty ACS change at this timestamp.
-      // It is nevertheless OK to schedule the empty ACS change
-      // because we use a different tie breaker for the empty ACS commitment.
-      // This is also why we must not tick the record order publisher here.
-      FutureUnlessShutdown
-        .lift(
-          recordOrderPublisher.scheduleEmptyAcsChangePublication(sc, ts)
-        )
-        .flatMap(_ =>
-          doProcess(AcsCommitment { () =>
-            logger.debug(s"Processing ACS commitments for timestamp $ts")
-            acsCommitmentProcessor(ts, Traced(acsCommitments))
-          })
-        )
-    } else pureProcessingResult
+    val acsCommitments = envelopes.mapFilter(select[AcsCommitmentProtocolMessage])
+    NonEmpty.from(acsCommitments) match {
+      case None => pureProcessingResult
+      case Some(acsCommitmentsNE) =>
+        // ACS commitments should not be bundled up with confirmation requests.
+        // If they are, then we discard the ACS commitment envelopes in such a request.
+        // This ensures that we publish at most one single `SequencedUpdate` for each sequencer counter.
+        // We overapproximate whether the other envelopes could contain a confirmation request
+        // by looking for a `RootHashMessage`.
+        //
+        // It is OK to discard the ACS commitment in this case because commitments are messages
+        // exchanged bilaterally. It would be wrong to discard the confirmation request instead
+        // because not all other recipients of the confirmation request see the bundled ACS commitment envelope.
+        // So they would not discard the confirmation request.
+        val rootHashMessages =
+          envelopes.mapFilter(select[RootHashMessage[SerializedRootHashMessagePayload]])
+        if (rootHashMessages.nonEmpty) {
+          val senders = acsCommitmentsNE.map(_.protocolMessage.acsCommitment.sender).distinct
+          SyncServiceAlarm
+            .Warn(
+              s"Received ACS commitment envelopes bundled up with a root hash message at $ts. Discarding the ACS commitment envelopes. Purported senders: ${senders
+                  .mkString(",")}"
+            )
+            .report()
+          pureProcessingResult
+        } else {
+          val publishUpdatePromise = promiseFactory.mkPromise[Option[SequencedEventUpdate]](
+            s"Publication promise for received ACS commitment at $ts",
+            // No need for supervision: This promise delays the ticking of the record order publisher
+            // whose task scheduler monitors missing ticks.
+            FutureSupervisor.Noop,
+          )
+          val publishUpdateHandle = new PublishUpdateViaRecordOrderPublisherImpl(
+            publishUpdatePromise
+          )
+          doProcess(
+            AcsCommitment(
+              Some(FutureEventPublication(Some(publishUpdatePromise.futureUS.map { eventO =>
+                val event = eventO.getOrElse(sequencerIndexMovedEvent(ts))
+                EventPublicationData(event, None)
+              }))),
+              () =>
+                acsCommitmentValidator.validateAndPublish(ts, acsCommitmentsNE, publishUpdateHandle),
+            )
+          )
+        }
+    }
   }
 
   private def tryProtocolProcessor(
@@ -185,7 +247,7 @@ trait MessageDispatcher { this: NamedLogging =>
     */
   protected def processBatch(
       sequencerCounter: SequencerCounter,
-      eventE: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
+      eventE: WithOpeningErrors[SignedContent[Deliver[Batch[DefaultOpenEnvelope]]]],
   )(implicit traceContext: TraceContext): ProcessingResult = {
     val deliver = eventE.event.content
     // TODO(#13883) Validate the topology timestamp
@@ -211,11 +273,12 @@ trait MessageDispatcher { this: NamedLogging =>
         envelopesWithCorrectSynchronizerId,
       )
       trafficResult <- processTraffic(ts, topologyTimestampO, envelopesWithCorrectSynchronizerId)
-      acsCommitmentResult <- processAcsCommitmentEnvelope(
+      legacyAcsCommitmentResult <- processLegacyAcsCommitmentEnvelope(
         envelopesWithCorrectSynchronizerId,
         sequencerCounter,
         ts,
       )
+      acsCommitmentResult <- processAcsCommitmentEnvelopes(envelopesWithCorrectSynchronizerId, ts)
       transactionReassignmentResult <- processTransactionAndReassignmentMessages(
         eventE,
         sequencerCounter,
@@ -226,6 +289,7 @@ trait MessageDispatcher { this: NamedLogging =>
       List(
         identityResult,
         trafficResult,
+        legacyAcsCommitmentResult,
         acsCommitmentResult,
         transactionReassignmentResult,
       )
@@ -256,7 +320,7 @@ trait MessageDispatcher { this: NamedLogging =>
     )
 
   private def processTransactionAndReassignmentMessages(
-      event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
+      event: WithOpeningErrors[SignedContent[Deliver[Batch[DefaultOpenEnvelope]]]],
       sc: SequencerCounter,
       ts: CantonTimestamp,
       envelopes: Seq[DefaultOpenEnvelope],
@@ -360,7 +424,7 @@ trait MessageDispatcher { this: NamedLogging =>
             goodRequest.rootHashMessage.viewType,
             publishUpdatePromise.futureUS.map { eventO =>
               val event = eventO.getOrElse(sequencerIndexMovedEvent(ts))
-              EventPublicationData(event, rc)
+              EventPublicationData(event, Some(rc))
             },
             () => processor.processRequest(ts, rc, sc, batch, publishUpdateHandle, trafficCost),
           )
@@ -659,7 +723,11 @@ trait MessageDispatcher { this: NamedLogging =>
   protected def sequencerIndexMovedEvent(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): SequencerIndexMoved =
-    SequencerIndexMoved(synchronizerId = synchronizerId.logical, recordTime = timestamp)
+    SequencerIndexMoved(
+      synchronizerId = synchronizerId.logical,
+      recordTime = timestamp,
+      traceContext = traceContext,
+    )
 
   protected def alarm(sc: SequencerCounter, ts: CantonTimestamp, msg: String)(implicit
       traceContext: TraceContext
@@ -680,11 +748,12 @@ trait MessageDispatcher { this: NamedLogging =>
       sc: SequencerCounter,
       ts: CantonTimestamp,
       msgId: Option[MessageId],
-      err: WithOpeningErrors[SequencedEvent[DefaultOpenEnvelope]],
+      err: WithOpeningErrors[DecompressedSequencedEvent[DefaultOpenEnvelope]],
   )(implicit traceContext: TraceContext): Unit =
     logger.info(
       show"Skipping faulty event at sc=$sc, ts=$ts${withMsgId(msgId)}, with errors=${err.openingErrors
-          .map(_.message)} and contents=${err.event.envelopes
+          .map(_.message)} and contents=${SequencedEvent
+          .envelopesOf(err.event)
           .map(_.protocolMessage)}"
     )
 
@@ -692,16 +761,17 @@ trait MessageDispatcher { this: NamedLogging =>
       sc: SequencerCounter,
       ts: CantonTimestamp,
       msgId: Option[MessageId],
-      evt: SignedContent[SequencedEvent[DefaultOpenEnvelope]],
-  )(implicit traceContext: TraceContext): Unit =
+      evt: SignedContent[DecompressedSequencedEvent[DefaultOpenEnvelope]],
+  )(implicit traceContext: TraceContext): Unit = {
+    val envelopes = SequencedEvent.envelopesOf(evt.content)
     if (logger.underlying.isDebugEnabled)
       logger.debug(
-        show"Processing event at sc=$sc, ts=$ts${withMsgId(msgId)}, with contents=${evt.content.envelopes
+        show"Processing event at sc=$sc, ts=$ts${withMsgId(msgId)}, with contents=${envelopes
             .map(_.protocolMessage)}"
       )
     else {
       val maxDisplay = 10 // whoever needs more should use debug logging
-      val dense = evt.content.envelopes.take(maxDisplay).map(c => (c, c.protocolMessage)).map {
+      val dense = envelopes.take(maxDisplay).map(c => (c, c.protocolMessage)).map {
         case (env, message: UnsignedProtocolMessage) =>
           message match {
             case RootHashMessage(rootHash, _, _, _, _) => s"root-hash=$rootHash"
@@ -710,24 +780,27 @@ trait MessageDispatcher { this: NamedLogging =>
                 .map(_ => ", with sig")
             case TopologyTransactionsBroadcast(_, transactions) =>
               s"topo-bcast with ntx=${transactions.transactions.size}"
+            case AcsCommitmentProtocolMessage(acsCommitment, signature) =>
+              s"commitment=${acsCommitment.sender} for ts=${acsCommitment.period.toInclusive}"
             case other => other.toString
           }
         case (_, SignedProtocolMessage(typedMessage, _)) =>
           typedMessage.content match {
-            case messages.AcsCommitment(_, sender, _, period, _) =>
+            case messages.LegacyAcsCommitment(_, sender, _, period, _) =>
               s"commitment=$sender for ts=${period.toInclusive}"
             case ConfirmationResultMessage(_, viewType, requestId, _, verdict) =>
               s"verdict=$requestId, type=$viewType, is=$verdict"
             case other => other.toString
           }
       }
-      val numEnvs = evt.content.envelopes.size
+      val numEnvs = envelopes.size
       logger.info(
         show"Processing event at sc=$sc, ts=$ts${withMsgId(msgId)}, with $numEnvs envelopes"
           + (if (dense.nonEmpty) "\n  " + dense.mkString("\n  ") else "")
           + (if (numEnvs > maxDisplay) "\n  ..." else "")
       )
     }
+  }
 
   protected def logDeliveryError(
       sc: SequencerCounter,
@@ -860,7 +933,7 @@ private[participant] object MessageDispatcher {
   object TicksAfter {
     final case class EventPublicationData(
         event: SequencedUpdate,
-        requestCounter: RequestCounter,
+        requestCounter: Option[RequestCounter],
     )
 
     final case class FutureEventPublication(
@@ -1023,7 +1096,10 @@ private[participant] object MessageDispatcher {
   final case class ResultKind(viewType: ViewType, run: () => HandlerResult) extends MessageKind {
     override protected def pretty: Pretty[ResultKind] = prettyOfParam(_.viewType)
   }
-  final case class AcsCommitment(run: () => HandlerResult) extends MessageKind
+  final case class AcsCommitment(
+      futureEventPublication: Option[FutureEventPublication],
+      run: () => HandlerResult,
+  ) extends MessageKind
   final case class MalformedMessage(run: () => FutureUnlessShutdown[Unit]) extends MessageKind
   final case class UnspecifiedMessageKind(run: () => FutureUnlessShutdown[Unit]) extends MessageKind
   final case class DeliveryMessageKind(run: () => FutureUnlessShutdown[Unit]) extends MessageKind
@@ -1050,7 +1126,8 @@ private[participant] object MessageDispatcher {
         requestProcessors: RequestProcessors,
         topologyProcessor: ParticipantTopologyProcessor,
         trafficProcessor: TrafficControlProcessor,
-        acsCommitmentProcessor: AcsCommitmentProcessor.ProcessorType,
+        legacyAcsCommitmentProcessorO: Option[AcsCommitmentProcessor.ProcessorType],
+        acsCommitmentValidator: ReceivedAcsCommitmentValidator,
         requestCounterAllocator: RequestCounterAllocator,
         recordOrderPublisher: RecordOrderPublisher,
         badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor,
@@ -1069,7 +1146,8 @@ private[participant] object MessageDispatcher {
         assignmentProcessor: AssignmentProcessor,
         topologyProcessor: TopologyTransactionProcessor,
         trafficProcessor: TrafficControlProcessor,
-        acsCommitmentProcessor: AcsCommitmentProcessor.ProcessorType,
+        legacyAcsCommitmentProcessorO: Option[AcsCommitmentProcessor.ProcessorType],
+        acsCommitmentValidator: ReceivedAcsCommitmentValidator,
         requestCounterAllocator: RequestCounterAllocator,
         recordOrderPublisher: RecordOrderPublisher,
         badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor,
@@ -1097,7 +1175,8 @@ private[participant] object MessageDispatcher {
         requestProcessors,
         topologyProcessor.processEnvelopes,
         trafficProcessor,
-        acsCommitmentProcessor,
+        legacyAcsCommitmentProcessorO,
+        acsCommitmentValidator,
         requestCounterAllocator,
         recordOrderPublisher,
         badRootHashMessagesRequestProcessor,

@@ -8,12 +8,11 @@ import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime}
 import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.*
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
@@ -36,8 +35,10 @@ import com.digitalasset.canton.util.BatchN.MaximizeBatchSize
 import com.digitalasset.canton.util.EitherUtil.*
 import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
+import com.digitalasset.canton.util.signalling.{EventSignaller, Notification}
 import com.digitalasset.canton.util.{BatchN, EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.*
@@ -192,7 +193,7 @@ object SequencerWriterSource {
       keepAliveInterval: Option[NonNegativeFiniteDuration],
       store: SequencerWriterStore,
       clock: Clock,
-      eventSignaller: EventSignaller,
+      eventSignaller: EventSignaller[SequencerMemberId, Unit],
       loggerFactory: NamedLoggerFactory,
       protocolVersion: ProtocolVersion,
       metrics: SequencerMetrics,
@@ -283,7 +284,7 @@ object SequencerWriterSource {
           tracedRight.map {
             _.map { right =>
               BatchWritten(
-                left.value.notifies.union(right.notifies),
+                Notification.union(left.value.notifies, right.notifies),
                 left.value.latestTimestamp.max(right.latestTimestamp),
                 left.value.events ++ right.events,
               )
@@ -541,7 +542,7 @@ object SequenceWritesFlow {
             event
           })
         val notifies =
-          events.fold[WriteNotification](WriteNotification.NoTarget)(WriteNotification.forEvents(_))
+          events.fold[WriteNotification](Notification.noTarget)(WriteNotification.forEvents(_))
         for {
           // if this write batch had any events then save them
           _ <- events.fold(FutureUnlessShutdown.unit)(eventsWithPayload =>
@@ -883,7 +884,7 @@ object UpdateWatermarkFlow {
 
 object NotifyEventSignallerFlow {
   def apply(
-      eventSignaller: EventSignaller
+      eventSignaller: EventSignaller[SequencerMemberId, Unit]
   ): Flow[Traced[BatchWritten], Traced[BatchWritten], NotUsed] =
     Flow[Traced[BatchWritten]].alsoTo(
       // `alsoTo` propagates backpressure coming from the sink, but backpressure shouldn't happen
@@ -894,9 +895,9 @@ object NotifyEventSignallerFlow {
         .addAttributes(Attributes.inputBuffer(1, 1))
         .map(_.value.notifies)
         // combine multiple event signals
-        .conflate(_ union _)
+        .conflate(Notification.union[SequencerMemberId])
         // this could also be dispatched in parallel
-        .map(eventSignaller.notifyOfLocalWrite)
+        .map(eventSignaller.notify(_, ()))
         .to(Sink.ignore)
     )
 

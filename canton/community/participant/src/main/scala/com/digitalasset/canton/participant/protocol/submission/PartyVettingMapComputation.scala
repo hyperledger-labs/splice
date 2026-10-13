@@ -10,6 +10,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.TransactionRoutingError.ConfigurationErrors.InvalidPrescribedSynchronizerId
 import com.digitalasset.canton.ledger.participant.state.RoutingSynchronizerState
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.submission.routing.AdmissibleSynchronizersComputation
 import com.digitalasset.canton.participant.sync.SyncServiceInjectionError
@@ -61,7 +62,7 @@ final class PartyVettingMapComputation(
       if (synchronizerState.existsReadySynchronizer()) FutureUnlessShutdown.unit
       else
         FutureUnlessShutdown.failed(
-          SyncServiceInjectionError.NotConnectedToAnySynchronizer.Error().asGrpcError
+          SyncServiceInjectionError.NotConnectedToAnySynchronizer.Error().toGrpcError
         )
 
     def toPhysicalSyncId(id: SynchronizerId): FutureUnlessShutdown[PhysicalSynchronizerId] =
@@ -75,7 +76,7 @@ final class PartyVettingMapComputation(
                 id,
                 s"cannot resolve to physical synchronizer; ensure the node is connected to $id",
               )
-              .asGrpcError
+              .toGrpcError
           )
         )
 
@@ -89,7 +90,7 @@ final class PartyVettingMapComputation(
         //               to reduce the search space in there
         partyHostingOnAllAdmissibleSyncs <- admissibleSynchronizersComputation
           .forParties(submitters, informees, synchronizerState)
-          .leftSemiflatMap(err => FutureUnlessShutdown.failed(err.asGrpcError))
+          .leftSemiflatMap(err => FutureUnlessShutdown.failed(err.toGrpcError))
           .merge
         withPrescribedPsidConsidered <- prescribedPsidO match {
           case Some(psid) =>
@@ -104,7 +105,7 @@ final class PartyVettingMapComputation(
                       physicalSynchronizerId = psid,
                       synchronizersOfAllInformees = admissibleSyncshronizers,
                     )
-                    .asGrpcError
+                    .toGrpcError
                 )
               )
           case None => FutureUnlessShutdown.pure(partyHostingOnAllAdmissibleSyncs.forgetNE)
@@ -150,7 +151,7 @@ final class PartyVettingMapComputation(
   ): FutureUnlessShutdown[(PhysicalSynchronizerId, Map[ParticipantId, Set[PackageId]])] =
     for {
       topologySnapshot <- FutureUnlessShutdown
-        .fromTry(synchronizerState.getTopologySnapshotFor(sync).left.map(_.asGrpcError).toTry)
+        .fromTry(synchronizerState.getTopologySnapshotFor(sync).left.map(_.toGrpcError).toTry)
       vettedPackages <- topologySnapshot.loadVettedPackages(involvedParticipants)
       validVettedPackages = vettedPackages.view.mapValues {
         _.collect {

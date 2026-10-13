@@ -8,9 +8,11 @@ import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.parallel.*
 import com.digitalasset.canton.*
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{HashOps, HmacOps, Salt, SaltSeed}
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.TransactionViewDecomposition.{NewView, SameView}
+import com.digitalasset.canton.data.TransactionViewDecompositionFactory.TransactionTreeDepthLimitExceeded
 import com.digitalasset.canton.data.ViewConfirmationParameters.InvalidViewConfirmationParameters
 import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -19,7 +21,6 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.participant.protocol.submission.NextGenTransactionTreeFactory.*
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.*
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.RollbackContext.RollbackScope
 import com.digitalasset.canton.protocol.WellFormedTransaction.{
   WithAbsoluteSuffixes,
   WithoutSuffixes,
@@ -31,15 +32,18 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PackageConsumer.PackageResolver
 import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.canton.util.{ContractHasher, ErrorUtil, LfTransactionUtil, MonadUtil}
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.transaction.CreationTime
 import io.scalaland.chimney.dsl.*
+import io.scalaland.chimney.dsl.TransformerConfiguration.UpdateFlag
+import io.scalaland.chimney.internal.runtime.TransformerFlags
 
 import java.util.UUID
 import scala.annotation.{nowarn, tailrec}
-import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
+import scala.math.Ordered.orderingToOrdered
 
 class NextGenTransactionTreeFactory(
     participantId: ParticipantId,
@@ -52,10 +56,27 @@ class NextGenTransactionTreeFactory(
     extends TransactionTreeFactory
     with NamedLogging {
 
+  private implicit val cfg: UpdateFlag[
+    TransformerFlags.Enable[TransformerFlags.MethodAccessors, TransformerFlags.Default]
+  ] = TransformerConfiguration.default.enableMethodAccessors
+
   private val protocolVersion = psid.protocolVersion
   private val contractIdSuffixer: ContractIdSuffixer =
     new ContractIdSuffixer(cryptoOps, cantonContractIdVersion)
   private val transactionViewDecompositionFactory = TransactionViewDecompositionFactory
+  private val rollbackContextFactory = RollbackContextFactory(protocolVersion)
+
+  /** Check parse depth on submission, at confirmation request time the parse depth is checked using
+    * the DepthCounter
+    */
+  private def checkRootViewParseDepth(
+      maxTreeDepth: PositiveInt
+  )(view: TransactionView): EitherT[FutureUnlessShutdown, TransactionTreeDepthLimitExceeded, Unit] =
+    EitherT.cond(
+      view.parseDepth <= maxTreeDepth.value,
+      (),
+      TransactionTreeDepthLimitExceeded(view.parseDepth, maxTreeDepth.value),
+    )
 
   override def createTransactionTree(
       transaction: WellFormedTransaction[WithoutSuffixes],
@@ -66,9 +87,9 @@ class NextGenTransactionTreeFactory(
       transactionUuid: UUID,
       topologySnapshot: TopologySnapshot,
       contractOfId: ContractInstanceOfId,
-      legacyKeyResolver: LfGlobalKeyMapping,
       maxSequencingTime: CantonTimestamp,
       validatePackageVettings: Boolean,
+      limitConfig: TransactionViewLimitConfig,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, GenTransactionTree] = {
@@ -98,8 +119,11 @@ class NextGenTransactionTreeFactory(
       transactionViewDecompositionFactory.fromTransaction(
         topologySnapshot,
         transaction,
-        RollbackContext.empty,
+        rollbackContextFactory.empty,
         Some(participantId.adminParty.toLf),
+        rollbackContextFactory,
+        // Transaction view limits are applied on submission paths
+        Option.when(protocolVersion >= ProtocolVersion.v36)(limitConfig),
       )
 
     val commonMetadata = CommonMetadata
@@ -134,8 +158,9 @@ class NextGenTransactionTreeFactory(
         .leftMap(SubmitterMetadataError.apply)
         .toEitherT[FutureUnlessShutdown]
 
-      rootViewDecompositions <- EitherT
-        .liftF(rootViewDecompositionsF)
+      rootViewDecompositions <- rootViewDecompositionsF.leftMap[TransactionViewLimitError](
+        _.transformInto[TransactionViewLimitError]
+      )
 
       _ = if (logger.underlying.isDebugEnabled) {
         val numRootViews = rootViewDecompositions.length
@@ -151,6 +176,12 @@ class NextGenTransactionTreeFactory(
         contractOfId,
         topologySnapshot,
       )
+
+      _ <- MonadUtil
+        .sequentialTraverse(rootViews)(checkRootViewParseDepth(limitConfig.maxTreeDepth))
+        .leftMap[TransactionViewLimitError](
+          _.transformInto[TransactionViewLimitError]
+        )
 
       _ <-
         if (validatePackageVettings) {
@@ -297,19 +328,20 @@ class NextGenTransactionTreeFactory(
 
     // contract IDs have not yet been suffixed
     val coreOtherBuilder = List.newBuilder[((LfNodeId, LfActionNode), RollbackScope)]
+    val collectExternalCallResults = protocolVersion >= ProtocolVersion.v36
+    lazy val externalCallResultsBuilder =
+      List.newBuilder[ViewParticipantData.ViewExternalCallResult]
 
     val childViewsBuilder = Seq.newBuilder[TransactionView]
 
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     var viewKeyMaintainers = Map.empty[LfGlobalKey, LfVersioned[Set[LfPartyId]]]
 
-    // TODO(#31527): SPM can this be made a mutable.Map
-    val observedKeyContractIds = TrieMap.empty[LfGlobalKey, mutable.LinkedHashSet[LfContractId]]
+    val observedKeyContractIds = mutable.Map.empty[LfGlobalKey, mutable.LinkedHashSet[LfContractId]]
 
     def buildResolvedKeys(
         createdContractIds: Set[LfContractId]
     ): Map[LfGlobalKey, LfVersioned[KeyResolutionWithMaintainers]] =
-      // TODO(#31527): SPM will need to consider whether this is sufficient for NUCK
       viewKeyMaintainers.transform { (key, versioned) =>
         versioned.map { maintainers =>
           val cids = observedKeyContractIds
@@ -322,12 +354,17 @@ class NextGenTransactionTreeFactory(
 
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     var createIndex = 0
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    var exerciseIndex = 0
 
     val nbSubViews = view.allNodes.count {
       case _: TransactionViewDecomposition.NewView => true
       case _ => false
     }
     val subviewIndex = TransactionSubviews.indices(nbSubViews).iterator
+    def viewExternalCallResultsFromCollected(): Seq[ViewParticipantData.ViewExternalCallResult] =
+      if (collectExternalCallResults) externalCallResultsBuilder.result()
+      else Seq.empty
 
     for {
       // Compute salts
@@ -346,7 +383,6 @@ class NextGenTransactionTreeFactory(
           )
             .map { v =>
               childViewsBuilder += v
-              // TODO(#31527): SPM consider what to do when different nodes have different serialization versions
               v.viewParticipantData.tryUnwrap.keyResolution.foreach { case (key, resolution) =>
                 viewKeyMaintainers = viewKeyMaintainers + (key -> resolution.map(_.maintainers))
                 val observed =
@@ -378,6 +414,20 @@ class NextGenTransactionTreeFactory(
               case lfNode: LfActionNode =>
                 val suffixedNode = trySuffixNode(state)(nodeId -> lfNode)
                 coreOtherBuilder += ((nodeId, lfNode) -> rbScope)
+                lfNode match {
+                  case exercise: LfNodeExercises if collectExternalCallResults =>
+                    val currentExerciseIndex = NonNegativeInt.tryCreate(exerciseIndex)
+                    exerciseIndex += 1
+                    if (
+                      exercise.version >= LfSerializationVersion.V3 &&
+                      exercise.externalCallResults.nonEmpty
+                    )
+                      externalCallResultsBuilder ++= externalCallResultsFromCoreNode(
+                        currentExerciseIndex,
+                        exercise,
+                      )
+                  case _ => ()
+                }
                 EitherT.pure[FutureUnlessShutdown, TransactionTreeConversionError](suffixedNode)
             }
 
@@ -404,6 +454,7 @@ class NextGenTransactionTreeFactory(
       coreOtherNodes = coreOtherBuilder.result().map { case (nodeInfo, rbc) =>
         (checked(trySuffixNode(state)(nodeInfo)), rbc)
       }
+      externalCallResults = viewExternalCallResultsFromCollected()
       childViews = childViewsBuilder.result()
 
       suffixedRootNode: LfActionNode = coreOtherNodes.headOption
@@ -436,20 +487,23 @@ class NextGenTransactionTreeFactory(
         viewParticipantDataSalt,
         contractOfId,
         view.rbContext,
+        externalCallResults,
       )
 
-    } yield {
-      // Compute the result
-      val subviews = TransactionSubviews(childViews)(protocolVersion, cryptoOps)
-      val transactionView =
-        TransactionView.tryCreate(cryptoOps)(
-          viewCommonData,
-          viewParticipantData,
-          subviews,
-          protocolVersion,
-        )
-      transactionView
-    }
+      // A soft error rather than tryCreate: view validation can fail on submitted data (e.g.
+      // conflicting recorded external-call outputs, reachable from a crafted execute request or
+      // a non-deterministic extension service), which must reject the submission gracefully.
+      transactionView <- EitherT.fromEither[FutureUnlessShutdown](
+        TransactionView
+          .create(cryptoOps)(
+            viewCommonData,
+            viewParticipantData,
+            TransactionSubviews(childViews)(protocolVersion, cryptoOps),
+            protocolVersion,
+          )
+          .leftMap[TransactionTreeConversionError](InvalidTransactionViewError.apply)
+      )
+    } yield transactionView
   }
 
   private def updateStateWithContractCreation(
@@ -464,16 +518,17 @@ class NextGenTransactionTreeFactory(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, LfNodeCreate] = {
 
-    val cantonContractInst = checked(
+    val suffixedArg = checked(
       LfTransactionUtil
-        .suffixContractInst(state.suffixOfCreatedContract)(createNode.versionedCoinst)
+        .suffixArg(state.suffixOfCreatedContract)(createNode.arg)
         .valueOr(cid =>
           throw new IllegalStateException(
             s"Invalid contract id $cid found in contract instance of create node"
           )
         )
-    ).unversioned
-    val createNodeWithSuffixedArg = createNode.copy(arg = cantonContractInst.arg)
+    )
+
+    val createNodeWithSuffixedArg = createNode.copy(arg = suffixedArg)
 
     val contractSalt = cantonContractIdVersion match {
       case _: CantonContractIdV1Version =>
@@ -613,11 +668,12 @@ class NextGenTransactionTreeFactory(
       coreOtherNodes: List[(LfActionNode, RollbackScope)],
       childViews: Seq[TransactionView],
       createdContractInfo: collection.Map[LfContractId, NewContractInstance],
-      resolvedKeys: Map[LfGlobalKey, LfVersioned[KeyResolutionWithMaintainers]],
+      keyResolution: Map[LfGlobalKey, LfVersioned[KeyResolutionWithMaintainers]],
       actionDescription: ActionDescription,
       salt: Salt,
       contractOfId: ContractInstanceOfId,
       rbContextCore: RollbackContext,
+      externalCallResults: Seq[ViewParticipantData.ViewExternalCallResult],
   ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, ViewParticipantData] = {
 
     val consumedInCore =
@@ -676,10 +732,11 @@ class NextGenTransactionTreeFactory(
             coreInputs = coreInputsWithInstances,
             createdCore = created,
             createdInSubviewArchivedInCore = createdInSubviewArchivedInCore,
-            resolvedKeys = resolvedKeys,
+            keyResolution = keyResolution,
             actionDescription = actionDescription,
             rollbackContext = rbContextCore,
             salt = salt,
+            externalCallResults = externalCallResults,
             protocolVersion = protocolVersion,
           )
         )
@@ -698,7 +755,6 @@ class NextGenTransactionTreeFactory(
       topologySnapshot: TopologySnapshot,
       contractOfId: ContractInstanceOfId,
       rbContext: RollbackContext,
-      legacyKeyResolver: LfGlobalKeyMapping,
       absolutizer: ContractIdAbsolutizer,
   )(implicit traceContext: TraceContext): EitherT[
     FutureUnlessShutdown,
@@ -731,6 +787,8 @@ class NextGenTransactionTreeFactory(
         transaction,
         rbContext,
         submittingParticipantO.map(_.adminParty.toLf),
+        rollbackContextFactory,
+        None, // Transaction view limits are not applied on validation paths
       )
 
     val rolledBackEffect = rbContext.inRollback && transactionEffectful(transaction.unwrap)
@@ -739,9 +797,11 @@ class NextGenTransactionTreeFactory(
       _ <- EitherT.cond[FutureUnlessShutdown](
         !rolledBackEffect,
         (),
-        RolledBackEffect(rbContext, rootPosition),
+        RolledBackEffect(rootPosition),
       )
-      decompositions <- EitherT.right(decompositionsF)
+      decompositions <- decompositionsF.leftMap[TransactionViewLimitError](
+        _.transformInto[TransactionViewLimitError]
+      )
       decomposition = checked(decompositions.head)
       view <- createTransactionView(
         decomposition,
@@ -750,6 +810,7 @@ class NextGenTransactionTreeFactory(
         contractOfId,
         topologySnapshot,
       )
+
       suffixedNodes = state.suffixedNodes() transform {
         // Recover the children
         case (nodeId, ne: LfNodeExercises) =>
@@ -779,7 +840,12 @@ class NextGenTransactionTreeFactory(
         .leftMap(ContractIdAbsolutizationError(_): TransactionTreeConversionError)
     } yield {
       view -> checked(
-        WellFormedTransaction.checkOrThrow(absolutizedTx, metadata, WithAbsoluteSuffixes)
+        WellFormedTransaction.checkOrThrow(
+          absolutizedTx,
+          metadata,
+          WithAbsoluteSuffixes,
+          rollbackContextFactory,
+        )
       )
     }
   }
@@ -820,7 +886,23 @@ class NextGenTransactionTreeFactory(
 
 object NextGenTransactionTreeFactory {
 
-  // TODO(#31527): SPM add test for RolledBackEffect
+  private[submission] def externalCallResultsFromCoreNode(
+      exerciseIndex: NonNegativeInt,
+      exercise: LfNodeExercises,
+  ): Seq[ViewParticipantData.ViewExternalCallResult] = {
+    val checkingParties =
+      LfTransactionUtil.signatoriesOrMaintainers(exercise) |
+        LfTransactionUtil.actingParties(exercise)
+    exercise.externalCallResults.toSeq.zipWithIndex.map { case (result, callIndex) =>
+      ViewParticipantData.ViewExternalCallResult(
+        result = result,
+        exerciseIndex = exerciseIndex,
+        callIndex = NonNegativeInt.tryCreate(callIndex),
+        checkingParties = checkingParties,
+      )
+    }
+  }
+
   private def transactionEffectful(tx: LfVersionedTransaction): Boolean =
     tx.nodes.values.exists {
       case n: LfActionNode => LfTransactionUtil.isEffectful(n)

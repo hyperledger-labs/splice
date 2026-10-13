@@ -16,12 +16,13 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
-import com.digitalasset.canton.protocol.{v30, v31}
+import com.digitalasset.canton.protocol.{v30, v31, v32}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{ProtoConverter, ProtocolVersionedMemoizedEvidence}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.validation.ProtoValidation
 import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
 
@@ -49,6 +50,10 @@ final case class LsuSequencingTestMessage(
   override protected[messages] def toProtoSomeEnvelopeContentV31
       : v31.EnvelopeContent.SomeEnvelopeContent =
     v31.EnvelopeContent.SomeEnvelopeContent.LsuSequencingTestMessage(toProtoV30)
+
+  override protected[messages] def toProtoSomeEnvelopeContentV32
+      : v32.EnvelopeContent.SomeEnvelopeContent =
+    v32.EnvelopeContent.SomeEnvelopeContent.LsuSequencingTestMessage(toProtoV30)
 
   def toProtoV30: v30.LsuSequencingTestMessage =
     v30.LsuSequencingTestMessage(content.toByteString, signature.toProtoV30.some)
@@ -142,7 +147,7 @@ object LsuSequencingTestMessageContent
     ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(
       v30.LsuSequencingTestMessageContent
     )(
-      supportedProtoVersionMemoized(_)(fromProtoV30),
+      supportedProtoVersionMemoizedPVV(_)(fromProtoV30),
       _.toProtoV30,
     )
   )
@@ -151,17 +156,23 @@ object LsuSequencingTestMessageContent
     LsuSequencingTestMessageContent(psid, sender)(None)
 
   private[messages] def fromProtoV30(
-      message: v30.LsuSequencingTestMessageContent
+      pvv: ProtocolVersionValidation,
+      message: v30.LsuSequencingTestMessageContent,
   )(
       bytes: ByteString
   ): ParsingResult[LsuSequencingTestMessageContent] = {
     val v30.LsuSequencingTestMessageContent(synchronizerP, senderP) = message
 
     for {
-      psid <- PhysicalSynchronizerId
-        .fromProtoPrimitive(synchronizerP, "physical_synchronizer_id")
+      psid <- ProtoValidation.validateThen(
+        synchronizerP,
+        "physical_synchronizer_id",
+        pvv,
+      )(PhysicalSynchronizerId.fromProtoPrimitive)
 
-      sender <- Member.fromProtoPrimitive(senderP, "sender")
+      sender <- ProtoValidation.validateThen(senderP, "sender", pvv)(
+        Member.fromProtoPrimitive
+      )
     } yield LsuSequencingTestMessageContent(psid, sender)(Some(bytes))
   }
 }

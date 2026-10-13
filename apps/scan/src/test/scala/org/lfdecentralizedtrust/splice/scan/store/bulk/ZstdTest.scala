@@ -134,5 +134,39 @@ class ZstdTest extends StoreTestBase {
       sub.expectComplete()
       succeed
     }
+
+    "handle flushing the tmp buffer correctly" in {
+      def runWithTmpBufferSize(inputStr: String, tmpBufferSize: Int) = {
+        // We intentionally set a very large chunk size, we don't want to split the output into multiple objects,
+        // we want to test the underlying compression logic instead here.
+        val zstdChunkSize = 50000000L
+        val (pub, sub) = TestSource
+          .probe[ByteString]
+          .via(ZstdGroupedWeight(3, zstdChunkSize, tmpBufferSize))
+          .toMat(TestSink.probe[ByteString])(Keep.both)
+          .run()
+        val randInput = ByteString(inputStr.getBytes(StandardCharsets.UTF_8))
+        pub.sendNext(randInput)
+        pub.sendComplete()
+        sub.request(2)
+        val compressed = sub.expectNext(20.seconds)
+        val inputStream = new ByteArrayInputStream(compressed.toArray)
+        val uncompressed = ("zstd -d" #< inputStream).!!
+        uncompressed.length shouldBe inputStr.length
+        uncompressed shouldBe inputStr
+        sub.expectComplete()
+        compressed
+      }
+
+      // random string of 2 million characters, compresses into roughly 1.5 MB,
+      // so will fit without flushing in the (default) 10 MB tmp buffer,
+      // but will require flushing in a smaller 256 KB tmp buffer. This should
+      // not affect the content of the output, i.e. will not break BFT if configured locally.
+      val randInputStr = scala.util.Random.alphanumeric.take(2000000).mkString + "\n"
+      val c1 = runWithTmpBufferSize(randInputStr, 10 * 1024 * 1024)
+      val c2 = runWithTmpBufferSize(randInputStr, 256 * 1024)
+      c1 shouldBe c2
+    }
+
   }
 }

@@ -19,6 +19,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.GroupAddressResolver
 import com.digitalasset.canton.sequencing.protocol.*
@@ -306,7 +307,7 @@ private[update] final class SubmissionRequestValidator(
                     SequencerErrors.SubmissionRequestRefused("No sequencer group found"),
                   )
                 )
-              )(group => Right((group.active ++ group.passive).toSet))
+              )(group => Right((group.active.forgetNE ++ group.passive).toSet[Member]))
             )
         )
       } yield Map((SequencersOfSynchronizer: GroupRecipient) -> sequencers).values.toSet.flatten

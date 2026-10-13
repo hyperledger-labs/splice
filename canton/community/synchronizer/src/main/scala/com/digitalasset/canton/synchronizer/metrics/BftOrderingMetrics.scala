@@ -100,6 +100,20 @@ private[metrics] final class BftOrderingHistograms(val parent: MetricName)(impli
   private[metrics] val ingress = new IngressHistograms
 
   // Private constructor to avoid being instantiated multiple times by accident
+  private[metrics] final class AvailabilityHistograms private[BftOrderingHistograms] {
+    private[metrics] val prefix = BftOrderingHistograms.this.prefix :+ "availability"
+
+    private[metrics] val outputFetchLatency = Item(
+      prefix :+ "output-fetch-latency",
+      summary = "Output fetch latency",
+      description =
+        "Records the rate and latency it takes for one output fetch request to get an response (requests that timeout are not included)",
+      qualification = MetricQualification.Latency,
+    )
+  }
+  private[metrics] val availability = new AvailabilityHistograms
+
+  // Private constructor to avoid being instantiated multiple times by accident
   private[metrics] final class ConsensusHistograms private[BftOrderingHistograms] {
     private[metrics] val prefix = BftOrderingHistograms.this.prefix :+ "consensus"
 
@@ -115,6 +129,14 @@ private[metrics] final class BftOrderingHistograms(val parent: MetricName)(impli
       prefix :+ "view-change-progress-latency",
       summary = "View change progress latency",
       description = "Records the rate and latency it takes to make progress on a view.",
+      qualification = MetricQualification.Latency,
+    )
+
+    private[metrics] val relativeSegmentLatency: Item = Item(
+      prefix :+ "relative-segment-latency",
+      summary = "Relative segment latency",
+      description =
+        "Records the rate and latency it takes to complete a segment after the segment led by this node completed",
       qualification = MetricQualification.Latency,
     )
   }
@@ -176,18 +198,26 @@ private[metrics] final class BftOrderingHistograms(val parent: MetricName)(impli
     private[metrics] class SendMetrics private[P2PHistograms] {
       val prefix: MetricName = p2pPrefix :+ "send"
 
-      private[metrics] val networkWriteLatency: Item = Item(
+      private[metrics] val grpcOnNextLatency: Item = Item(
         prefix :+ "network-write-latency",
-        summary = "Message network write latency",
-        description = "Records the rate and latency when writing P2P messages to the network.",
+        summary = "P2P gRPC `onNext` latency",
+        description =
+          "Records the rate and latency when sending messages to the P2P stream via gRPC's `onNext`.",
         qualification = MetricQualification.Latency,
       )
 
       private[metrics] val grpcLatency: Item = Item(
         prefix :+ "grpc-latency",
-        summary = "Latency of a gRPC message send",
+        summary = "Total latency of a P2P gRPC message send",
         description =
           "Records the rate of gRPC message sends and their latency (up to receiving them on the other side).",
+        qualification = MetricQualification.Latency,
+      )
+
+      private[metrics] val grpcFlowControlNotReadyLatency: Item = Item(
+        prefix :+ "grpc-flow-control-not-ready",
+        summary = "Duration of gRPC flow control not being ready",
+        description = "Records the rate and duration of gRPC flow control not being ready.",
         qualification = MetricQualification.Latency,
       )
     }
@@ -266,6 +296,17 @@ class BftOrderingMetrics private[metrics] (
               //  it can be present multiple times for a given batch if it regresses due to topology changes
               val BatchDissemination = "batch-dissemination-total"
 
+              object hashing {
+                // Duration of computing a batch ID (i.e. hashing the whole batch payload) when a
+                //  batch is created locally; performed synchronously on the actor thread
+                val LocalBatchIdComputation = "availability-local-batch-id-computation"
+
+                // Duration of validating a batch ID (i.e. hashing the whole batch payload) of a
+                //  batch fetched from a remote node, e.g. during state transfer; performed
+                //  asynchronously off the actor thread
+                val FetchedBatchIdValidation = "availability-fetched-batch-id-validation"
+              }
+
               object dissemination {
                 // The following latencies can be present multiple times for a given batch
                 //  in case of multiple ack collections and regressions due to topology changes
@@ -308,6 +349,7 @@ class BftOrderingMetrics private[metrics] (
               val Fetch = "output-block-fetch-batches"
               val Inspection = "output-block-inspection"
               val Backpressure = "output-backpressure"
+              val OutputStageDuration = "output-stage-duration"
             }
           }
         }
@@ -631,6 +673,36 @@ class BftOrderingMetrics private[metrics] (
         new CacheMetrics("batch-cache", openTelemetryMetricsFactory)
     }
 
+    object outputFetch {
+      object labels {
+        val Leader = "Leader"
+        val From = "From"
+      }
+
+      val missingBatchesNeedOutputFetch: Meter = openTelemetryMetricsFactory.meter(
+        MetricInfo(
+          prefix :+ "missing-batches-need-output-fetch",
+          summary = "Missing batches that need output fetch",
+          description =
+            "Measures amount of batches from other nodes that we did not have locally so we need to fetch from network",
+          qualification = MetricQualification.Traffic,
+        )
+      )
+
+      val timeouts: Meter = openTelemetryMetricsFactory.meter(
+        MetricInfo(
+          prefix :+ "output-fetch-timeouts",
+          summary = "Output fetch timeouts",
+          description = "Measures amount of timeouts during output fetch",
+          qualification = MetricQualification.Errors,
+        )
+      )
+
+      val latency: Timer = openTelemetryMetricsFactory.timer(
+        histograms.availability.outputFetchLatency.info
+      )
+    }
+
     object regression {
       object labels {
         object stage {
@@ -668,7 +740,7 @@ class BftOrderingMetrics private[metrics] (
         val Sequencer: String = "sequencer"
 
         object violationType {
-          val Key: String = "violationType"
+          val Key: String = "violation-type"
 
           object values {
             sealed trait ViolationTypeValue extends PrettyNameOnlyCase
@@ -779,11 +851,23 @@ class BftOrderingMetrics private[metrics] (
         )
       )
 
+    val flushedBlocks: Meter = openTelemetryMetricsFactory.meter(
+      MetricInfo(
+        prefix :+ "flushed-blocks",
+        summary = "Flushed blocks",
+        description = "Total blocks flushed.",
+        qualification = MetricQualification.Debug,
+      )
+    )
+
     val commitLatency: Timer =
       openTelemetryMetricsFactory.timer(histograms.consensus.consensusCommitLatency.info)
 
     val viewChangeProgressLatency: Timer =
       openTelemetryMetricsFactory.timer(histograms.consensus.viewChangeProgressLatency.info)
+
+    val relativeSegmentLatency: Timer =
+      openTelemetryMetricsFactory.timer(histograms.consensus.relativeSegmentLatency.info)
 
     // Private constructor to avoid being instantiated multiple times by accident
     final class RetransmissionsMetrics private[BftOrderingMetrics] {
@@ -1044,14 +1128,23 @@ class BftOrderingMetrics private[metrics] (
     val queryLatency: Timer =
       openTelemetryMetricsFactory.timer(histograms.topology.queryLatency.info)
 
+    val blacklistedEpochsCounter: Counter =
+      openTelemetryMetricsFactory.counter(
+        MetricInfo(
+          prefix :+ "blacklisted-epochs",
+          "Number of epochs a node has been blacklisted for",
+          MetricQualification.Traffic,
+          "Number of epochs a node has been blacklisted for after failing to timely lead a segment",
+        )
+      )
+
     object labels {
       val sequencerId: String = "sequencer-id"
     }
-
     // We assign different values to different nodes just to make it easier to distinguish them in Grafana
     private val topologyGauges = mutable.Map[BftNodeId, Gauge[Int]]()
-    private val leadersGauges = mutable.Map[BftNodeId, Gauge[Int]]()
 
+    private val leadersGauges = mutable.Map[BftNodeId, Gauge[Int]]()
     private val maxToleratedFaultsGauge =
       openTelemetryMetricsFactory.gauge(
         MetricInfo(
@@ -1092,6 +1185,10 @@ class BftOrderingMetrics private[metrics] (
       maxToleratedFaultsGauge.updateValue(orderingTopology.maxToleratedFaults)
       weakQuorumGauge.updateValue(orderingTopology.weakQuorum)
       strongQuorumGauge.updateValue(orderingTopology.strongQuorum)
+
+      newMembership.blacklistedNodes.foreach { nodeId =>
+        blacklistedEpochsCounter.inc()(metricsContext.withExtraLabels(labels.sequencerId -> nodeId))
+      }
 
       {
         lock.exclusive {
@@ -1299,12 +1396,29 @@ class BftOrderingMetrics private[metrics] (
         val DroppedAsUnauthenticated: String = "dropped-as-unauthenticated"
 
         object targetModule {
-          val Key: String = "targetModule"
+          val Key: String = "target-module"
 
           object values {
             sealed trait TargetModuleValue extends PrettyNameOnlyCase
             case object Availability extends TargetModuleValue
             case object Consensus extends TargetModuleValue
+          }
+        }
+      }
+
+      object failure {
+        object labels {
+          object reason {
+            val Key: String = "send-failure-reason"
+
+            object values {
+              sealed trait SendFailureReasonValue extends PrettyNameOnlyCase
+              case object ConnectionInitError extends SendFailureReasonValue
+              case object FlowControl extends SendFailureReasonValue
+              case object SendError extends SendFailureReasonValue
+              case object Unauthenticated extends SendFailureReasonValue
+              case object NoAuthenticatedRecipientCandidates extends SendFailureReasonValue
+            }
           }
         }
       }
@@ -1331,17 +1445,28 @@ class BftOrderingMetrics private[metrics] (
         MetricInfo(
           prefix :+ "sends-retried",
           summary = "P2P sends retried",
-          description =
-            "Total P2P network sends retried after a delay due to missing connectivity.",
+          description = "Total P2P network sends retried after a delay.",
           qualification = MetricQualification.Latency,
         )
       )
 
-      val networkWriteLatency: Timer =
-        openTelemetryMetricsFactory.timer(histograms.p2p.send.networkWriteLatency.info)
+      val sendsDropped: Counter = openTelemetryMetricsFactory.counter(
+        MetricInfo(
+          prefix :+ "sends-dropped",
+          summary = "P2P sends dropped",
+          description = "Total P2P network sends dropped, labeled by reason.",
+          qualification = MetricQualification.Latency,
+        )
+      )
+
+      val grpcOnNextLatency: Timer =
+        openTelemetryMetricsFactory.timer(histograms.p2p.send.grpcOnNextLatency.info)
 
       val grpcLatency: Timer =
         openTelemetryMetricsFactory.timer(histograms.p2p.send.grpcLatency.info)
+
+      val grpcFlowControlNotReadyLatency: Timer =
+        openTelemetryMetricsFactory.timer(histograms.p2p.send.grpcFlowControlNotReadyLatency.info)
     }
     val send = new SendMetrics
 
@@ -1353,7 +1478,7 @@ class BftOrderingMetrics private[metrics] (
         val SourceSequencer: String = "source-sequencer"
 
         object source {
-          val Key: String = "targetModule"
+          val Key: String = "source"
 
           object values {
             sealed trait SourceValue extends PrettyNameOnlyCase

@@ -1,0 +1,222 @@
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package com.digitalasset.canton.participant.commitment
+
+import cats.syntax.foldable.*
+import com.digitalasset.canton.crypto.LtHash16Blake3
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.commitment.BaseDigestProcessor.*
+import com.digitalasset.canton.participant.config.AcsDigestTracingMode
+import com.digitalasset.canton.participant.digest.{DigestDelta, DigestOperation, DigestOps}
+import com.digitalasset.canton.participant.metrics.CommitmentMetrics
+import com.digitalasset.canton.participant.store.AcsDigestStore
+import com.digitalasset.canton.participant.store.AcsDigestStore.*
+import com.digitalasset.canton.platform.store.interning.StringInterning
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.util.PekkoUtil.syntax.*
+import com.digitalasset.canton.{LedgerParticipantId, LfPartyId}
+import com.google.common.annotations.VisibleForTesting
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Flow
+
+import scala.concurrent.ExecutionContext
+
+/** A digest accumulator processes
+  * [[com.digitalasset.canton.participant.commitment.BaseDigestProcessor.Classification]]s and
+  * updates the affected digests accordingly.
+  *
+  * This simplistic implementation loads each affected digest from the digest store, updates it, and
+  * then immediately writes it back to the store.
+  */
+class SequentialDigestAccumulator(
+    acsDigestStore: AcsDigestStore,
+    stringInterning: StringInterning,
+    tracingMode: AcsDigestTracingMode,
+    private[canton] val metrics: CommitmentMetrics,
+    protected override val loggerFactory: NamedLoggerFactory,
+)(implicit ec: ExecutionContext)
+    extends DigestAccumulator
+    with NamedLogging {
+  override def flow()(implicit traceContext: TraceContext): Flow[
+    DigestAccumulator_Input,
+    CheckpointToBeWritten,
+    NotUsed,
+  ] =
+    Flow[DigestAccumulator_Input]
+      .mapAsyncAndDrainUS(1)(process)
+      .collect { case Some(checkpointToBeWritten) => checkpointToBeWritten }
+
+  @VisibleForTesting
+  def process(
+      input: ProcessingContext[CheckpointFenceOr[Classification]]
+  ): FutureUnlessShutdown[Option[CheckpointToBeWritten]] = {
+    implicit val traceContext: TraceContext = input.traceContext
+    // for now use the offset as the tiebreaker
+    val result = input match {
+      case ProcessingContext(timepoint, CheckpointFence(tpe)) =>
+        FutureUnlessShutdown.pure(Some(CheckpointToBeWritten(timepoint, tpe)))
+
+      case ProcessingContext(_, NotCheckpointFence(_, classification)) =>
+        classification match {
+          case update: ContractChangeBatch =>
+            val deltas = DigestOps.computeDeltas(
+              update,
+              // if tracing is enabled, track the changes coming from the deltas
+              traceChanges = tracingMode != AcsDigestTracingMode.Disabled,
+            )
+            MonadUtil
+              .sequentialTraverse_(deltas) {
+                case DigestDelta.Party(partyId, digestDelta, operation) =>
+                  updateDigest(acsDigestStore.party)(
+                    input.timepoint,
+                    stringInterning.party.internalize(partyId),
+                    digestDelta,
+                    operation,
+                  )
+
+                case DigestDelta.Participant(participant, digestDelta, operation) =>
+                  updateDigest(acsDigestStore.participant)(
+                    input.timepoint,
+                    stringInterning.participantId.internalize(participant),
+                    digestDelta,
+                    operation,
+                  )
+              }
+              .map(_ => None)
+
+          case PartyAddedToParticipant(party, participant) =>
+            handleTopologyChange(
+              input.timepoint,
+              party,
+              participant,
+              isAddition = true,
+            ).map(_ => None)
+
+          case PartyRemovedFromParticipant(party, participant) =>
+            handleTopologyChange(
+              input.timepoint,
+              party,
+              participant,
+              isAddition = false,
+            ).map(_ => None)
+
+          case PartyOnboardingToParticipant(party, participant) =>
+            FutureUnlessShutdown.pure(None)
+        }
+    }
+
+    result.map { output =>
+      metrics.runningDigestProcessor.latestAccumulatedRecordTime.updateValue(
+        input.recordTime.toMicros
+      )
+      output
+    }
+  }
+
+  /** Generic logic for updating the digest for a party or participant.
+    */
+  private def updateDigest[Key](journal: DigestJournal[Key])(
+      timepoint: Timepoint,
+      key: Key,
+      update: TracedLtHash16Blake3,
+      operation: DigestOperation,
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+    val offset = timepoint.offset
+    journal
+      .lookup(key, offset)
+      .flatMap { acsDigestUpdateO =>
+        val (existingDigestO, existingOffsetO) = acsDigestUpdateO.map { digest =>
+          val isIncrementalChangeForSameOffset = digest.digestUpdate.offset == offset
+          val replacesOffset =
+            // if the offset of the digest update from the store is the same as the offset currently being processed,
+            // then this is another update to the digest at the same offset and we need to retain the "replaces_offset" value.
+            if (isIncrementalChangeForSameOffset) digest.replacesOffset
+            // otherwise, this update is a new link in the replacement chain.
+            else Some(digest.digestUpdate.offset)
+          digest.digestUpdate.digestO
+            .map { rawDigest =>
+              val trace =
+                // check whether the existing trace that was loaded from the store must be propagated
+                if (
+                  tracingMode == AcsDigestTracingMode.Full ||
+                  (tracingMode == AcsDigestTracingMode.Incremental && isIncrementalChangeForSameOffset)
+                ) digest.digestUpdate.trace
+                // otherwise, clear the previous tracing data for the new digest
+                else None
+              TracedLtHash16Blake3(LtHash16Blake3.tryCreate(rawDigest), trace) -> replacesOffset
+            }
+            .getOrElse(TracedLtHash16Blake3.empty -> replacesOffset)
+        }.unzip
+
+        val updatedDigest = existingDigestO.getOrElse(TracedLtHash16Blake3.empty)
+        operation match {
+          case DigestOperation.Add =>
+            updatedDigest.union(update)
+          case DigestOperation.Remove =>
+            updatedDigest.removeAll(update)
+        }
+        if (existingDigestO.isEmpty && updatedDigest.digest.isEmpty) {
+          // if there was no previous journal entry and the computed digest is empty,
+          // then there's no need to store anything
+          FutureUnlessShutdown.unit
+        } else {
+          journal.upsertDigestUpdates(
+            Seq(
+              AcsDigestUpdate(
+                AcsDigest(
+                  key,
+                  timepoint,
+                  Some(updatedDigest.digest.getByteString),
+                  updatedDigest.trace,
+                ),
+                replacesOffset = existingOffsetO.flatten,
+              )
+            )
+          )
+        }
+      }
+  }
+
+  /** Adding a party to a participant means the party's digest needs to be added to the
+    * participant's digest.
+    *
+    * Removing a party from a participant means the party's digest needs to be removed from the
+    * participant's digest.
+    */
+  private def handleTopologyChange(
+      timepoint: Timepoint,
+      party: LfPartyId,
+      participant: LedgerParticipantId,
+      isAddition: Boolean,
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+    val internedPid = stringInterning.participantId.internalize(participant)
+    for {
+      partyDigestUpdateO <- acsDigestStore.party.lookup(
+        stringInterning.party.internalize(party),
+        timepoint.offset,
+      )
+      nonEmptyPartyDigestO = partyDigestUpdateO
+        .flatMap(_.digestUpdate.digestO)
+        .map(LtHash16Blake3.tryCreate)
+        .filter(!_.isEmpty)
+
+      // only update the participant hash if there is a non-empty party hash
+      _ <- nonEmptyPartyDigestO.traverse_ { partyDigest =>
+        val partyTraceO = partyDigestUpdateO.flatMap(_.digestUpdate.trace)
+        val tracedPartyDigest = TracedLtHash16Blake3(partyDigest, partyTraceO)
+        updateDigest(acsDigestStore.participant)(
+          timepoint,
+          internedPid,
+          update =
+            if (isAddition) tracedPartyDigest.asBulkAddition(s"onboarded $party")
+            else tracedPartyDigest.asBulkRemoval(s"offboarded $party"),
+          if (isAddition) DigestOperation.Add else DigestOperation.Remove,
+        )
+      }
+    } yield ()
+  }
+}

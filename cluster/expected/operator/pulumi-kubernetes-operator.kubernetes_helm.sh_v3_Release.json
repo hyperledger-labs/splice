@@ -1,0 +1,66 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator",
+    "compat": "true",
+    "name": "pulumi-kubernetes-operator",
+    "namespace": "operator",
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "controller": {
+        "logFormat": "json",
+        "logLevel": "debug"
+      },
+      "image": {
+        "pullPolicy": "Always"
+      },
+      "imagePullSecrets": [
+        {
+          "name": "docker-reg-cred"
+        }
+      ],
+      "maxHistory": 10,
+      "resources": {
+        "limits": {
+          "cpu": 1,
+          "memory": "2G"
+        },
+        "requests": {
+          "cpu": 0.2,
+          "memory": "1G"
+        }
+      },
+      "serviceMonitor": {
+        "enabled": true
+      },
+      "terminationGracePeriodSeconds": 1800,
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_infra",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "2.6.0"
+  },
+  "name": "pulumi-kubernetes-operator",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

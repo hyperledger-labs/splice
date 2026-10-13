@@ -61,6 +61,14 @@ export default defineConfig([
           ignoreRestSiblings: true,
         },
       ],
+      "no-restricted-properties": [
+        "error",
+        {
+          property: "sort",
+          message:
+            "Array.prototype.sort() sorts in place. React-query caches query results and hands the same array to every consumer, so sorting one in place silently mutates the cached data for all other components and hooks. Use toSorted() instead, which returns a new array.",
+        },
+      ],
     },
   },
   {

@@ -68,7 +68,7 @@ final class SvConnection private (
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[ByteString] =
+  ): Future[Seq[ByteString]] =
     runHttpCmd(
       config.url,
       HttpSvPublicAppClient.OnboardSvSequencer(

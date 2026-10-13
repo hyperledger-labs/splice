@@ -1,0 +1,104 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "postgres-4",
+    "namespace": "multi-validator",
+    "timeout": 600,
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "appsAffinityAndTolerations": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "In",
+                      "values": [
+                        "hyperdisk"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "cluster": {
+        "dnsName": "mock.global.canton.network.digitalasset.com",
+        "fixedTokens": false,
+        "hostname": "mock.global.canton.network.digitalasset.com",
+        "name": "cn-mocknet"
+      },
+      "db": {
+        "maxConnections": 1000,
+        "pvcTemplateName": "pg-data-hd",
+        "volumeSize": "100Gi",
+        "volumeStorageClass": "hyperdisk-standard-rwo"
+      },
+      "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+      "persistence": {
+        "secretName": "postgres-4-secret"
+      },
+      "resources": {
+        "limits": {
+          "memory": "12Gi"
+        },
+        "requests": {
+          "memory": "5Gi"
+        }
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "0.3.20"
+  },
+  "name": "multi-validator-postgres-4",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

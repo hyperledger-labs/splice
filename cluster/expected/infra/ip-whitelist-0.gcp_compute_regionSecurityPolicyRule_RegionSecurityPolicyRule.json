@@ -1,0 +1,26 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "action": "allow",
+    "description": "Allow whitelisted source IPs (1 of 1)",
+    "match": {
+      "config": {
+        "srcIpRanges": [
+          "1.2.3.4/32",
+          "11.12.13.14/32",
+          "2.3.4.5/32",
+          "5.6.7.8/32",
+          "<internal IPs>"
+        ]
+      },
+      "versionedExpr": "SRC_IPS_V1"
+    },
+    "preview": true,
+    "priority": 200000000,
+    "securityPolicy": "waf-whitelist-throttle-ban-mock"
+  },
+  "name": "ip-whitelist-0",
+  "provider": "",
+  "type": "gcp:compute/regionSecurityPolicyRule:RegionSecurityPolicyRule"
+}

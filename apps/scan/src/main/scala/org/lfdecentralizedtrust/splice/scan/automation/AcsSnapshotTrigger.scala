@@ -27,6 +27,7 @@ class AcsSnapshotTrigger(
     store: AcsSnapshotStore,
     updateHistory: UpdateHistory,
     storageConfig: ScanStorageConfig,
+    perAcsSnapshotTablesEnabled: Boolean,
     override protected val context: TriggerContext,
 )(implicit
     ec: ExecutionContext,
@@ -35,7 +36,11 @@ class AcsSnapshotTrigger(
 ) extends AcsSnapshotTriggerBase(store, updateHistory, context) {
 
   override val snapshotTable: IncrementalAcsSnapshotTable =
-    AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+    if (perAcsSnapshotTablesEnabled) {
+      AcsSnapshotStore.IncrementalAcsSnapshotTable.NextV2
+    } else {
+      AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+    }
 
   override val snapshotMetrics: AcsSnapshotsMetrics = new HistoryMetrics(context.metricsFactory)(
     MetricsContext.Empty

@@ -15,7 +15,7 @@ import {
   fieldSectionTitleSx,
   singleLineFieldSx,
 } from '../../themes/fieldStyles';
-import { scrollableTextFieldSx } from '../beta/identifierStyles';
+import { scrollableTextFieldSx } from '../ui/identifierStyles';
 
 const searchTextFieldSx = (theme: Theme) => ({
   ...(typeof singleLineFieldSx === 'function' ? singleLineFieldSx(theme) : singleLineFieldSx),

@@ -26,12 +26,14 @@ import com.daml.ledger.javaapi.data.Transaction
 import java.time.Instant
 import java.util.Collections
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import UpdateHistory.UpdateHistoryResponse
 import StoreTestBase.*
 import cats.data.NonEmptyList
 import com.google.protobuf.ByteString
+import com.digitalasset.canton.config.NonNegativeDuration
 
 class UpdateHistoryTest extends UpdateHistoryTestBase {
 
@@ -49,6 +51,41 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
   "UpdateHistory" should {
 
     "ingestion" should {
+
+      "return no analyzable time window before ingesting an update" in {
+        val store = mkStore(
+          analyzableTimeWindowDuration = NonNegativeDuration.tryFromDuration(5.seconds)
+        )
+
+        store.startAnalyzableTimeWindow shouldBe None
+      }
+
+      "return no analyzable time window for an infinite duration" in {
+        val store = mkStore()
+
+        for {
+          _ <- initStore(store)
+          _ <- create(domain1, cid1, offset1, party1, store, time(10))
+        } yield store.startAnalyzableTimeWindow shouldBe None
+      }
+
+      "start the analyzable time window at the latest record time minus its duration" in {
+        val atwSeconds = 5L
+        val store = mkStore(
+          analyzableTimeWindowDuration = NonNegativeDuration.tryFromDuration(atwSeconds.seconds)
+        )
+
+        for {
+          _ <- initStore(store)
+          _ <- create(domain1, cid1, offset1, party1, store, time(10))
+          _ = store.startAnalyzableTimeWindow shouldBe Some(
+            time(10).minus(java.time.Duration.ofSeconds(atwSeconds))
+          )
+          _ <- create(domain1, cid2, offset2, party1, store, time(20))
+        } yield store.startAnalyzableTimeWindow shouldBe Some(
+          time(20).minus(java.time.Duration.ofSeconds(atwSeconds))
+        )
+      }
 
       "handle single create and query it by contract id" in {
         val store = mkStore()
@@ -899,7 +936,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         case u => fail(s"unexpected update $u")
       }
 
-    "getExternalTransactionHash" should {
+    "getTransactionHash" should {
       "return stored external transaction hash when empty" in {
         val store = mkStore()
         val externalTransactionHash = ByteString.EMPTY
@@ -920,9 +957,9 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         } yield {
           updates should have size 1
           val storedTransaction = extractTransactionTree(updates)
-          storedTransaction.getExternalTransactionHash should be(externalTransactionHash)
-          storedTransaction.getExternalTransactionHash should be(
-            expectedUpdate.getExternalTransactionHash
+          storedTransaction.getTransactionHash should be(externalTransactionHash)
+          storedTransaction.getTransactionHash should be(
+            expectedUpdate.getTransactionHash
           )
         }
       }
@@ -951,9 +988,9 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         } yield {
           updates should have size 1
           val storedTransaction = extractTransactionTree(updates)
-          storedTransaction.getExternalTransactionHash should be(externalTxnHashByteString)
-          storedTransaction.getExternalTransactionHash should be(
-            expectedUpdate.getExternalTransactionHash
+          storedTransaction.getTransactionHash should be(externalTxnHashByteString)
+          storedTransaction.getTransactionHash should be(
+            expectedUpdate.getTransactionHash
           )
         }
       }

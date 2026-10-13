@@ -131,10 +131,10 @@ describe('Inflight Vote Requests', () => {
     expect(action.textContent).toBe(data.actionName);
 
     const votingThresholdDeadline = screen.getByTestId(`${uniqueId}-row-voting-threshold-deadline`);
-    expect(votingThresholdDeadline.textContent).toBe(data.votingThresholdDeadline);
+    expect(votingThresholdDeadline.textContent).toBe(`${data.votingThresholdDeadline} (UTC+02:00)`);
 
     const voteTakesEffect = screen.getByTestId(`${uniqueId}-row-vote-takes-effect`);
-    expect(voteTakesEffect.textContent).toBe(data.voteTakesEffect);
+    expect(voteTakesEffect.textContent).toBe(`${data.voteTakesEffect} (UTC+02:00)`);
 
     const acceptedVoteStats = screen.getByTestId(`${uniqueId}-row-all-votes-stats-accepted`);
     expect(acceptedVoteStats.textContent).toBe('2 Accepted');
@@ -144,6 +144,37 @@ describe('Inflight Vote Requests', () => {
 
     const yourVote = screen.getByTestId(`${uniqueId}-row-your-vote`);
     expect(yourVote.textContent).toMatch(/No Vote/);
+  });
+
+  test('should render the Threshold sentinel verbatim for vote takes effect', () => {
+    const uniqueId = 'proposals-request';
+    const data = {
+      actionName: 'Feature Application',
+      contractId: sampleContractId,
+      requester: svPartyId,
+      votingThresholdDeadline: '2025-09-25 11:00',
+      voteTakesEffect: 'Threshold',
+      yourVote: 'no-vote',
+      status: 'In Progress',
+      voteStats: { accepted: 0, rejected: 0, 'no-vote': 0 },
+      acceptanceThreshold: BigInt(11),
+    } as ProposalListingData;
+
+    render(
+      <MemoryRouter>
+        <ProposalListingSection
+          sectionTitle="Inflight Vote Requests"
+          data={[data]}
+          noDataMessage="No Inflight Vote Requests available"
+          uniqueId={uniqueId}
+          showThresholdDeadline
+        />
+      </MemoryRouter>
+    );
+
+    // 'Threshold' is a sentinel, not a date: it must render verbatim, never 'Invalid Date (UTC...)'.
+    const voteTakesEffect = screen.getByTestId(`${uniqueId}-row-vote-takes-effect`);
+    expect(voteTakesEffect.textContent).toBe('Threshold');
   });
 
   test('should render submitted by column with full party id and copy button', () => {
@@ -336,7 +367,7 @@ describe('Vote history', () => {
     expect(action.textContent).toBe(data.actionName);
 
     const voteTakesEffect = screen.getByTestId(`${uniqueId}-row-vote-takes-effect`);
-    expect(voteTakesEffect.textContent).toBe(data.voteTakesEffect);
+    expect(voteTakesEffect.textContent).toBe(`${data.voteTakesEffect} (UTC+02:00)`);
 
     const status = screen.getByTestId(`${uniqueId}-row-status`);
     expect(status.textContent).toBe(data.status);

@@ -6,16 +6,19 @@ package com.digitalasset.canton.crypto
 import cats.Order
 import cats.data.EitherT
 import cats.syntax.either.*
-import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.provider.jce.JcePrivateCrypto
 import com.digitalasset.canton.crypto.store.{CryptoPrivateStoreError, CryptoPrivateStoreExtended}
 import com.digitalasset.canton.error.{CantonBaseError, CantonErrorGroups}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.metrics.DecryptionMetrics
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{
@@ -26,7 +29,9 @@ import com.digitalasset.canton.serialization.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
+import com.digitalasset.canton.validation.ProtoValidation
 import com.digitalasset.canton.version.*
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import slick.jdbc.GetResult
@@ -38,6 +43,8 @@ import scala.concurrent.ExecutionContext
   * provided keys.
   */
 trait EncryptionOps extends DecryptionMetricsSupport {
+
+  def encryptionParallelism: PositiveInt
 
   def defaultSymmetricKeyScheme: SymmetricKeyScheme
 
@@ -86,25 +93,12 @@ trait EncryptionOps extends DecryptionMetricsSupport {
       symmetricKey: SymmetricKey,
   ): Either[EncryptionError, ByteString]
 
-  /** Decrypts a message encrypted using `encryptWith`. Records latency for the decryption
-    * operation.
-    */
+  /** Decrypts a message encrypted asymmetrically. */
   def decryptWith[M](encrypted: AsymmetricEncrypted[M], privateKey: EncryptionPrivateKey)(
-      deserialize: ByteString => Either[DeserializationError, M]
-  ): Either[DecryptionError, M] =
-    decryptionMetrics.decryptLatency.time(decryptWithInternal(encrypted, privateKey)(deserialize))
-
-  /** Internal decryption primitive implemented by concrete backends. This bypasses higher-level
-    * wrappers (e.g. metrics and validation) and should only be used by internal decryption logic.
-    */
-  private[crypto] def decryptWithInternal[M](
-      encrypted: AsymmetricEncrypted[M],
-      privateKey: EncryptionPrivateKey,
-  )(
       deserialize: ByteString => Either[DeserializationError, M]
   ): Either[DecryptionError, M]
 
-  /** Decrypts a message encrypted using `encryptWith` */
+  /** Decrypts a message encrypted symmetrically. */
   def decryptWith[M](encrypted: Encrypted[M], symmetricKey: SymmetricKey)(
       deserialize: ByteString => Either[DeserializationError, M]
   ): Either[DecryptionError, M]
@@ -132,19 +126,6 @@ trait EncryptionPrivateOps extends DecryptionMetricsSupport {
   def decrypt[M](encrypted: AsymmetricEncrypted[M])(
       deserialize: ByteString => Either[DeserializationError, M]
   )(implicit
-      executionContext: ExecutionContext,
-      traceContext: TraceContext,
-  ): EitherT[FutureUnlessShutdown, DecryptionError, M] =
-    EitherTUtil.timed(decryptionMetrics.decryptLatency)(
-      decryptInternal(encrypted)(deserialize)
-    )
-
-  /** Internal decryption primitive implemented by concrete backends. This bypasses higher-level
-    * wrappers (e.g. metrics and validation) and should only be used by internal decryption logic.
-    */
-  private[crypto] def decryptInternal[M](encrypted: AsymmetricEncrypted[M])(
-      deserialize: ByteString => Either[DeserializationError, M]
-  )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, DecryptionError, M]
 
@@ -160,7 +141,7 @@ trait EncryptionPrivateStoreOps extends EncryptionPrivateOps {
   protected val encryptionOps: EncryptionOps
 
   /** Decrypts an encrypted message using the referenced private encryption key */
-  override private[crypto] def decryptInternal[M](encryptedMessage: AsymmetricEncrypted[M])(
+  override def decrypt[M](encryptedMessage: AsymmetricEncrypted[M])(
       deserialize: ByteString => Either[DeserializationError, M]
   )(implicit tc: TraceContext): EitherT[FutureUnlessShutdown, DecryptionError, M] =
     store
@@ -269,23 +250,32 @@ object AsymmetricEncrypted extends HasVersionedMessageCompanion[AsymmetricEncryp
       encryptedP: v30.AsymmetricEncrypted
   ): ParsingResult[AsymmetricEncrypted[T]] =
     for {
-      fingerprint <- Fingerprint.fromProtoPrimitive(encryptedP.fingerprint)
+      // TODO(#34479): validate the crypto key fingerprint once the negotiated pvv is threaded here.
+      fingerprint <- ProtoValidation.validateThen(
+        encryptedP.fingerprint,
+        "fingerprint",
+        ProtocolVersionValidation.NoValidation,
+      )(Fingerprint.fromProtoPrimitive)
       encryptionAlgorithmSpec <- EncryptionAlgorithmSpec.fromProtoEnum(
-        "encryption_algorithm_spec",
         encryptedP.encryptionAlgorithmSpec,
+        "encryption_algorithm_spec",
       )
       ciphertext = encryptedP.ciphertext
     } yield AsymmetricEncrypted(ciphertext, encryptionAlgorithmSpec, fingerprint)
 }
 
 /** An encryption key specification. */
-sealed trait EncryptionKeySpec extends Product with Serializable with PrettyPrinting {
+sealed trait EncryptionKeySpec
+    extends CryptoSpec
+    with Product
+    with Serializable
+    with PrettyPrintingFromCompanion {
   def name: String
   def toProtoEnum: v30.EncryptionKeySpec
-  override val pretty: Pretty[this.type] = prettyOfString(_.name)
+  override def prettyCompanion: PrettyPrintingCompanion[EncryptionKeySpec] = EncryptionKeySpec
 }
 
-object EncryptionKeySpec {
+object EncryptionKeySpec extends PrettyPrintingCompanion[EncryptionKeySpec] {
 
   implicit val encryptionKeySpecOrder: Order[EncryptionKeySpec] =
     Order.by[EncryptionKeySpec, String](_.name)
@@ -299,6 +289,7 @@ object EncryptionKeySpec {
       v30.EncryptionKeySpec.ENCRYPTION_KEY_SPEC_EC_P256
     // Name of the elliptic curve as expected by Java's ECGenParameterSpec (JCA standard name)
     override val jcaCurveName: String = "secp256r1"
+    override val experimental: Boolean = false
   }
 
   /** RSA key with 2048 bits */
@@ -308,11 +299,12 @@ object EncryptionKeySpec {
     val keySizeInBits: Int = 2048
     override def toProtoEnum: v30.EncryptionKeySpec =
       v30.EncryptionKeySpec.ENCRYPTION_KEY_SPEC_RSA_2048
+    override val experimental: Boolean = false
   }
 
   def fromProtoEnum(
-      field: String,
       schemeP: v30.EncryptionKeySpec,
+      field: String,
   ): ParsingResult[EncryptionKeySpec] =
     schemeP match {
       case v30.EncryptionKeySpec.ENCRYPTION_KEY_SPEC_UNSPECIFIED =>
@@ -331,10 +323,10 @@ object EncryptionKeySpec {
       keySchemeP: v30.EncryptionKeyScheme,
   ): ParsingResult[EncryptionKeySpec] =
     EncryptionKeySpec
-      .fromProtoEnum("key_spec", keySpecP)
+      .fromProtoEnum(keySpecP, "key_spec")
       .leftFlatMap {
         case ProtoDeserializationError.FieldNotSet(_) =>
-          EncryptionKeySpec.fromProtoEnumEncryptionKeyScheme("scheme", keySchemeP)
+          EncryptionKeySpec.fromProtoEnumEncryptionKeyScheme(keySchemeP, "scheme")
         case err => Left(err)
       }
 
@@ -342,8 +334,8 @@ object EncryptionKeySpec {
     * compatibility with existing data.
     */
   private def fromProtoEnumEncryptionKeyScheme(
-      field: String,
       schemeP: v30.EncryptionKeyScheme,
+      field: String,
   ): ParsingResult[EncryptionKeySpec] =
     schemeP match {
       case v30.EncryptionKeyScheme.ENCRYPTION_KEY_SCHEME_UNSPECIFIED =>
@@ -357,18 +349,25 @@ object EncryptionKeySpec {
       case v30.EncryptionKeyScheme.ENCRYPTION_KEY_SCHEME_RSA2048_OAEP_SHA256 =>
         Right(EncryptionKeySpec.Rsa2048)
     }
+  override protected val pretty: Pretty[EncryptionKeySpec] = prettyOfString(_.name)
 }
 
 /** Algorithm schemes for asymmetric/hybrid encryption. */
-sealed trait EncryptionAlgorithmSpec extends Product with Serializable with PrettyPrinting {
+sealed trait EncryptionAlgorithmSpec
+    extends CryptoSpec
+    with Product
+    with Serializable
+    with PrettyPrintingFromCompanion {
   def name: String
   def supportDeterministicEncryption: Boolean
   def supportedEncryptionKeySpecs: NonEmpty[Set[EncryptionKeySpec]]
   def toProtoEnum: v30.EncryptionAlgorithmSpec
-  override val pretty: Pretty[this.type] = prettyOfString(_.name)
+
+  override def prettyCompanion: PrettyPrintingCompanion[EncryptionAlgorithmSpec] =
+    EncryptionAlgorithmSpec
 }
 
-object EncryptionAlgorithmSpec {
+object EncryptionAlgorithmSpec extends PrettyPrintingCompanion[EncryptionAlgorithmSpec] {
 
   implicit val encryptionAlgorithmSpecOrder: Order[EncryptionAlgorithmSpec] =
     Order.by[EncryptionAlgorithmSpec, String](_.name)
@@ -385,6 +384,7 @@ object EncryptionAlgorithmSpec {
       NonEmpty.mk(Set, EncryptionKeySpec.EcP256)
     override def toProtoEnum: v30.EncryptionAlgorithmSpec =
       v30.EncryptionAlgorithmSpec.ENCRYPTION_ALGORITHM_SPEC_ECIES_HKDF_HMAC_SHA256_AES128CBC
+    override val experimental: Boolean = false
   }
 
   /* This public encryption scheme (https://datatracker.ietf.org/doc/html/rfc8017#section-7.1) is
@@ -399,11 +399,12 @@ object EncryptionAlgorithmSpec {
       NonEmpty.mk(Set, EncryptionKeySpec.Rsa2048)
     override def toProtoEnum: v30.EncryptionAlgorithmSpec =
       v30.EncryptionAlgorithmSpec.ENCRYPTION_ALGORITHM_SPEC_RSA_OAEP_SHA256
+    override val experimental: Boolean = false
   }
 
   def fromProtoEnum(
-      field: String,
       schemeP: v30.EncryptionAlgorithmSpec,
+      field: String,
   ): ParsingResult[EncryptionAlgorithmSpec] =
     schemeP match {
       case v30.EncryptionAlgorithmSpec.ENCRYPTION_ALGORITHM_SPEC_UNSPECIFIED =>
@@ -415,6 +416,7 @@ object EncryptionAlgorithmSpec {
       case v30.EncryptionAlgorithmSpec.ENCRYPTION_ALGORITHM_SPEC_RSA_OAEP_SHA256 =>
         Right(EncryptionAlgorithmSpec.RsaOaepSha256)
     }
+  override protected val pretty: Pretty[EncryptionAlgorithmSpec] = prettyOfString(_.name)
 }
 
 /** Required encryption algorithms and keys for asymmetric/hybrid encryption to be listed in the
@@ -430,36 +432,43 @@ final case class RequiredEncryptionSpecs(
     keys: NonEmpty[Set[EncryptionKeySpec]],
 ) extends Product
     with Serializable
-    with PrettyPrinting {
+    with PrettyPrintingFromCompanion {
   def toProtoV30: v30.RequiredEncryptionSpecs =
     v30.RequiredEncryptionSpecs(
       algorithms.forgetNE.map(_.toProtoEnum).toSeq,
       keys.forgetNE.map(_.toProtoEnum).toSeq,
     )
-  override val pretty: Pretty[this.type] = prettyOfClass(
-    param("algorithms", _.algorithms),
-    param("keys", _.keys),
-  )
+
+  override def prettyCompanion: PrettyPrintingCompanion[RequiredEncryptionSpecs] =
+    RequiredEncryptionSpecs
 }
 
-object RequiredEncryptionSpecs {
+object RequiredEncryptionSpecs extends PrettyPrintingCompanion[RequiredEncryptionSpecs] {
   def fromProtoV30(
-      requiredEncryptionSpecsP: v30.RequiredEncryptionSpecs
+      pvv: ProtocolVersionValidation,
+      requiredEncryptionSpecsP: v30.RequiredEncryptionSpecs,
   ): ParsingResult[RequiredEncryptionSpecs] =
     for {
-      keySpecs <- requiredEncryptionSpecsP.keys.traverse(keySpec =>
-        EncryptionKeySpec.fromProtoEnum("keys", keySpec)
-      )
-      algorithmSpecs <- requiredEncryptionSpecsP.algorithms
-        .traverse(algorithmSpec =>
-          EncryptionAlgorithmSpec.fromProtoEnum("algorithms", algorithmSpec)
-        )
+      keySpecs <- ProtoValidation
+        .validateLengthThen(
+          requiredEncryptionSpecsP.keys,
+          "keys",
+          pvv,
+          ProtoValidation.MaxCollectionSize,
+        )(EncryptionKeySpec.fromProtoEnum)
+      algorithmSpecs <- ProtoValidation
+        .validateLengthThen(
+          requiredEncryptionSpecsP.algorithms,
+          "algorithms",
+          pvv,
+          ProtoValidation.MaxCollectionSize,
+        )(EncryptionAlgorithmSpec.fromProtoEnum)
       keySpecsNE <- NonEmpty
         .from(keySpecs.toSet)
         .toRight(
           ProtoDeserializationError.InvariantViolation(
             "keys",
-            "no required encryption algorithm specification",
+            "no required encryption key specification",
           )
         )
       algorithmSpecsNE <- NonEmpty
@@ -467,21 +476,31 @@ object RequiredEncryptionSpecs {
         .toRight(
           ProtoDeserializationError.InvariantViolation(
             "algorithms",
-            "no required encryption key specification",
+            "no required encryption algorithm specification",
           )
         )
     } yield RequiredEncryptionSpecs(algorithmSpecsNE, keySpecsNE)
+
+  override protected val pretty: Pretty[RequiredEncryptionSpecs] = prettyOfClass(
+    param("algorithms", _.algorithms),
+    param("keys", _.keys),
+  )
 }
 
 /** Key schemes for symmetric encryption. */
-sealed trait SymmetricKeyScheme extends Product with Serializable with PrettyPrinting {
+sealed trait SymmetricKeyScheme
+    extends CryptoSpec
+    with Product
+    with Serializable
+    with PrettyPrintingFromCompanion {
   def name: String
   def toProtoEnum: v30.SymmetricKeyScheme
   def keySizeInBytes: Int
-  override protected def pretty: Pretty[this.type] = prettyOfString(_.name)
+
+  override def prettyCompanion: PrettyPrintingCompanion[SymmetricKeyScheme] = SymmetricKeyScheme
 }
 
-object SymmetricKeyScheme {
+object SymmetricKeyScheme extends PrettyPrintingCompanion[SymmetricKeyScheme] {
 
   implicit val symmetricKeySchemeOrder: Order[SymmetricKeyScheme] =
     Order.by[SymmetricKeyScheme, String](_.name)
@@ -492,11 +511,12 @@ object SymmetricKeyScheme {
     override def toProtoEnum: v30.SymmetricKeyScheme =
       v30.SymmetricKeyScheme.SYMMETRIC_KEY_SCHEME_AES128GCM
     override def keySizeInBytes: Int = 16
+    override def experimental: Boolean = false
   }
 
   def fromProtoEnum(
-      field: String,
       schemeP: v30.SymmetricKeyScheme,
+      field: String,
   ): ParsingResult[SymmetricKeyScheme] =
     schemeP match {
       case v30.SymmetricKeyScheme.SYMMETRIC_KEY_SCHEME_UNSPECIFIED =>
@@ -506,6 +526,8 @@ object SymmetricKeyScheme {
       case v30.SymmetricKeyScheme.SYMMETRIC_KEY_SCHEME_AES128GCM =>
         Right(SymmetricKeyScheme.Aes128Gcm)
     }
+
+  override protected val pretty: Pretty[SymmetricKeyScheme] = prettyOfString(_.name)
 }
 
 final case class SymmetricKey private (
@@ -548,8 +570,8 @@ object SymmetricKey extends HasVersionedMessageCompanion[SymmetricKey] {
 
   def fromProtoV30(keyP: v30.SymmetricKey): ParsingResult[SymmetricKey] =
     for {
-      format <- CryptoKeyFormat.fromProtoEnum("format", keyP.format)
-      scheme <- SymmetricKeyScheme.fromProtoEnum("scheme", keyP.scheme)
+      format <- CryptoKeyFormat.fromProtoEnum(keyP.format, "format")
+      scheme <- SymmetricKeyScheme.fromProtoEnum(keyP.scheme, "scheme")
       key <- SymmetricKey
         .create(format, keyP.key, scheme)
         .leftMap(err =>
@@ -573,8 +595,8 @@ final case class EncryptionKeyPair private (
   def toProtoV30: v30.EncryptionKeyPair =
     v30.EncryptionKeyPair(Some(privateKey.toProtoV30))
 
-  protected def toProtoCryptoKeyPairPairV30: v30.CryptoKeyPair.Pair =
-    v30.CryptoKeyPair.Pair.EncryptionKeyPair(toProtoV30)
+  protected def toProtoCryptoKeyPairPairV30: Either[String, v30.CryptoKeyPair.Pair] =
+    v30.CryptoKeyPair.Pair.EncryptionKeyPair(toProtoV30).asRight
 }
 
 object EncryptionKeyPair {
@@ -642,7 +664,7 @@ final case class EncryptionPublicKey private (
 )(
     override val migrated: Boolean = false
 ) extends PublicKey
-    with PrettyPrinting
+    with PrettyPrintingFromCompanion
     with HasVersionedWrapper[EncryptionPublicKey] {
 
   override type K = EncryptionPublicKey
@@ -661,6 +683,9 @@ final case class EncryptionPublicKey private (
 
   val purpose: KeyPurpose = KeyPurpose.Encryption
 
+  override def toByteStringE(version: ProtocolVersion): Either[String, ByteString] =
+    toByteString(version).asRight
+
   def toProtoV30: v30.EncryptionPublicKey =
     v30.EncryptionPublicKey(
       format = format.toProtoEnum,
@@ -670,11 +695,12 @@ final case class EncryptionPublicKey private (
       keySpec = keySpec.toProtoEnum,
     )
 
-  override protected def toProtoPublicKeyKeyV30: v30.PublicKey.Key =
-    v30.PublicKey.Key.EncryptionPublicKey(toProtoV30)
+  override protected def toProtoPublicKeyKeyV30: Either[String, v30.PublicKey.Key] =
+    v30.PublicKey.Key.EncryptionPublicKey(toProtoV30).asRight
+  override protected def toProtoPublicKeyKeyV31: Either[String, v31.PublicKey.Key] =
+    v31.PublicKey.Key.EncryptionPublicKey(toProtoV30).asRight
 
-  override val pretty: Pretty[EncryptionPublicKey] =
-    prettyOfClass(param("id", _.id), param("format", _.format), param("keySpec", _.keySpec))
+  override def prettyCompanion: PrettyPrintingCompanion[EncryptionPublicKey] = EncryptionPublicKey
 
   @nowarn("msg=Der in object CryptoKeyFormat is deprecated")
   private def migrate(): Option[EncryptionPublicKey] =
@@ -710,7 +736,8 @@ final case class EncryptionPublicKey private (
 
 object EncryptionPublicKey
     extends HasVersionedMessageCompanion[EncryptionPublicKey]
-    with HasVersionedMessageCompanionDbHelpers[EncryptionPublicKey] {
+    with HasVersionedMessageCompanionDbHelpers[EncryptionPublicKey]
+    with PrettyPrintingCompanion[EncryptionPublicKey] {
   override def name: String = "encryption public key"
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
@@ -719,6 +746,9 @@ object EncryptionPublicKey
       _.toProtoV30,
     )
   )
+
+  override protected val pretty: Pretty[EncryptionPublicKey] =
+    prettyOfClass(param("id", _.id), param("format", _.format), param("keySpec", _.keySpec))
 
   /** Creates a [[EncryptionPublicKey]] from the given parameters. Performs validations on usage and
     * format. If the [[EncryptionKeySpec]] is EC-based, it also validates that the public key lies
@@ -740,7 +770,7 @@ object EncryptionPublicKey
       publicKeyP: v30.EncryptionPublicKey
   ): ParsingResult[EncryptionPublicKey] =
     for {
-      format <- CryptoKeyFormat.fromProtoEnum("format", publicKeyP.format)
+      format <- CryptoKeyFormat.fromProtoEnum(publicKeyP.format, "format")
       keySpec <- EncryptionKeySpec.fromProtoEnumWithDefaultScheme(
         publicKeyP.keySpec,
         publicKeyP.scheme,
@@ -763,17 +793,20 @@ final case class EncryptionPublicKeyWithName(
     override val publicKey: EncryptionPublicKey,
     override val name: Option[KeyName],
 ) extends PublicKeyWithName
-    with PrettyPrinting {
+    with PrettyPrintingFromCompanion {
 
   type PK = EncryptionPublicKey
 
   override val id: Fingerprint = publicKey.id
 
-  override protected def pretty: Pretty[EncryptionPublicKeyWithName] =
-    prettyOfClass(param("publicKey", _.publicKey), param("name", _.name))
+  override def prettyCompanion: PrettyPrintingCompanion[EncryptionPublicKeyWithName] =
+    EncryptionPublicKeyWithName
 }
 
-object EncryptionPublicKeyWithName {
+object EncryptionPublicKeyWithName extends PrettyPrintingCompanion[EncryptionPublicKeyWithName] {
+  override protected val pretty: Pretty[EncryptionPublicKeyWithName] =
+    prettyOfClass(param("publicKey", _.publicKey), param("name", _.name))
+
   implicit def getResultEncryptionPublicKeyWithName(implicit
       getResultByteArray: GetResult[Array[Byte]]
   ): GetResult[EncryptionPublicKeyWithName] =
@@ -806,6 +839,9 @@ final case class EncryptionPrivateKey private (
       )
       .map(_ => this)
 
+  override def toByteStringE(version: ProtocolVersion): Either[String, ByteString] =
+    toByteString(version).asRight
+
   def toProtoV30: v30.EncryptionPrivateKey =
     v30.EncryptionPrivateKey(
       id = id.toProtoPrimitive,
@@ -816,8 +852,8 @@ final case class EncryptionPrivateKey private (
       keySpec = keySpec.toProtoEnum,
     )
 
-  override protected def toProtoPrivateKeyKeyV30: v30.PrivateKey.Key =
-    v30.PrivateKey.Key.EncryptionPrivateKey(toProtoV30)
+  override protected def toProtoPrivateKeyKeyV30: Either[String, v30.PrivateKey.Key] =
+    v30.PrivateKey.Key.EncryptionPrivateKey(toProtoV30).asRight
 
   @nowarn("msg=Der in object CryptoKeyFormat is deprecated")
   private def migrate(): Option[EncryptionPrivateKey] =
@@ -875,8 +911,13 @@ object EncryptionPrivateKey extends HasVersionedMessageCompanion[EncryptionPriva
       privateKeyP: v30.EncryptionPrivateKey
   ): ParsingResult[EncryptionPrivateKey] =
     for {
-      id <- Fingerprint.fromProtoPrimitive(privateKeyP.id)
-      format <- CryptoKeyFormat.fromProtoEnum("format", privateKeyP.format)
+      // TODO(#34479): validate the crypto key fingerprint once the negotiated pvv is threaded here.
+      id <- ProtoValidation.validateThen(
+        privateKeyP.id,
+        "id",
+        ProtocolVersionValidation.NoValidation,
+      )(Fingerprint.fromProtoPrimitive)
+      format <- CryptoKeyFormat.fromProtoEnum(privateKeyP.format, "format")
       keySpec <- EncryptionKeySpec.fromProtoEnumWithDefaultScheme(
         privateKeyP.keySpec,
         privateKeyP.scheme,
@@ -891,13 +932,17 @@ object EncryptionPrivateKey extends HasVersionedMessageCompanion[EncryptionPriva
     } yield epk
 }
 
-sealed trait EncryptionError extends Product with Serializable with PrettyPrinting
+sealed trait EncryptionError extends Product with Serializable with PrettyPrintingFromCompanion
 object EncryptionError {
   final case class UnsupportedAlgorithmSpec(
       algorithmSpec: EncryptionAlgorithmSpec,
       supportedAlgorithmSpec: Set[EncryptionAlgorithmSpec],
   ) extends EncryptionError {
-    override protected def pretty: Pretty[UnsupportedAlgorithmSpec] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedAlgorithmSpec] =
+      UnsupportedAlgorithmSpec
+  }
+  object UnsupportedAlgorithmSpec extends PrettyPrintingCompanion[UnsupportedAlgorithmSpec] {
+    override protected val pretty: Pretty[UnsupportedAlgorithmSpec] = prettyOfClass(
       param("algorithmSpec", _.algorithmSpec),
       param("supportedAlgorithmSpec", _.supportedAlgorithmSpec),
     )
@@ -906,35 +951,60 @@ object EncryptionError {
       keyFormat: CryptoKeyFormat,
       supportedKeyFormats: Set[CryptoKeyFormat],
   ) extends EncryptionError {
-    override protected def pretty: Pretty[UnsupportedKeyFormat] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedKeyFormat] =
+      UnsupportedKeyFormat
+  }
+  object UnsupportedKeyFormat extends PrettyPrintingCompanion[UnsupportedKeyFormat] {
+    override protected val pretty: Pretty[UnsupportedKeyFormat] = prettyOfClass(
       param("format", _.keyFormat),
       param("supportedKeyFormats", _.supportedKeyFormats),
     )
   }
   final case class UnsupportedSchemeForDeterministicEncryption(error: String)
       extends EncryptionError {
-    override protected def pretty: Pretty[UnsupportedSchemeForDeterministicEncryption] =
+    override def prettyCompanion
+        : PrettyPrintingCompanion[UnsupportedSchemeForDeterministicEncryption] =
+      UnsupportedSchemeForDeterministicEncryption
+  }
+  object UnsupportedSchemeForDeterministicEncryption
+      extends PrettyPrintingCompanion[UnsupportedSchemeForDeterministicEncryption] {
+    override protected val pretty: Pretty[UnsupportedSchemeForDeterministicEncryption] =
       prettyOfClass(
         unnamedParam(_.error.unquoted)
       )
+
   }
   final case class NoMatchingAlgorithmSpec(message: String) extends EncryptionError {
-    override protected def pretty: Pretty[NoMatchingAlgorithmSpec] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[NoMatchingAlgorithmSpec] =
+      NoMatchingAlgorithmSpec
+  }
+  object NoMatchingAlgorithmSpec extends PrettyPrintingCompanion[NoMatchingAlgorithmSpec] {
+    override protected val pretty: Pretty[NoMatchingAlgorithmSpec] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
   final case class FailedToEncrypt(error: String) extends EncryptionError {
-    override protected def pretty: Pretty[FailedToEncrypt] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[FailedToEncrypt] = FailedToEncrypt
+  }
+  object FailedToEncrypt extends PrettyPrintingCompanion[FailedToEncrypt] {
+    override protected val pretty: Pretty[FailedToEncrypt] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
   final case class InvalidSymmetricKey(error: String) extends EncryptionError {
-    override protected def pretty: Pretty[InvalidSymmetricKey] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[InvalidSymmetricKey] = InvalidSymmetricKey
+  }
+  object InvalidSymmetricKey extends PrettyPrintingCompanion[InvalidSymmetricKey] {
+    override protected val pretty: Pretty[InvalidSymmetricKey] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
   final case class InvalidEncryptionKey(error: String) extends EncryptionError {
-    override protected def pretty: Pretty[InvalidEncryptionKey] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[InvalidEncryptionKey] =
+      InvalidEncryptionKey
+  }
+  object InvalidEncryptionKey extends PrettyPrintingCompanion[InvalidEncryptionKey] {
+    override protected val pretty: Pretty[InvalidEncryptionKey] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
@@ -948,20 +1018,27 @@ object EncryptionError {
       viewSizeBytes: Int,
       maxRequestSizeBytes: NonNegativeInt,
   ) extends EncryptionError {
-    override protected def pretty: Pretty[MaxViewSizeExceeded] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[MaxViewSizeExceeded] = MaxViewSizeExceeded
+  }
+  object MaxViewSizeExceeded extends PrettyPrintingCompanion[MaxViewSizeExceeded] {
+    override protected val pretty: Pretty[MaxViewSizeExceeded] = prettyOfClass(
       param("view size (bytes)", _.viewSizeBytes),
       param("max request size configured (bytes)", _.maxRequestSizeBytes),
     )
   }
 }
 
-sealed trait DecryptionError extends Product with Serializable with PrettyPrinting
+sealed trait DecryptionError extends Product with Serializable with PrettyPrintingFromCompanion
 object DecryptionError {
   final case class UnsupportedAlgorithmSpec(
       algorithmSpec: EncryptionAlgorithmSpec,
       supportedAlgorithmSpecs: Set[EncryptionAlgorithmSpec],
   ) extends DecryptionError {
-    override protected def pretty: Pretty[UnsupportedAlgorithmSpec] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedAlgorithmSpec] =
+      UnsupportedAlgorithmSpec
+  }
+  object UnsupportedAlgorithmSpec extends PrettyPrintingCompanion[UnsupportedAlgorithmSpec] {
+    override protected val pretty: Pretty[UnsupportedAlgorithmSpec] = prettyOfClass(
       param("algorithmSpec", _.algorithmSpec),
       param("supportedAlgorithmSpecs", _.supportedAlgorithmSpecs),
     )
@@ -971,7 +1048,11 @@ object DecryptionError {
       algorithmSpec: EncryptionAlgorithmSpec,
       supportedKeySpecsByAlgo: Set[EncryptionKeySpec],
   ) extends DecryptionError {
-    override def pretty: Pretty[KeyAlgoSpecsMismatch] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[KeyAlgoSpecsMismatch] =
+      KeyAlgoSpecsMismatch
+  }
+  object KeyAlgoSpecsMismatch extends PrettyPrintingCompanion[KeyAlgoSpecsMismatch] {
+    override protected val pretty: Pretty[KeyAlgoSpecsMismatch] = prettyOfClass(
       param("encryptionKeySpec", _.encryptionKeySpec),
       param("algorithmSpec", _.algorithmSpec),
       param("supportedKeySpecsByAlgo", _.supportedKeySpecsByAlgo),
@@ -981,7 +1062,10 @@ object DecryptionError {
       encryptionKeySpec: EncryptionKeySpec,
       supportedKeySpecs: Set[EncryptionKeySpec],
   ) extends DecryptionError {
-    override protected def pretty: Pretty[UnsupportedKeySpec] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedKeySpec] = UnsupportedKeySpec
+  }
+  object UnsupportedKeySpec extends PrettyPrintingCompanion[UnsupportedKeySpec] {
+    override protected val pretty: Pretty[UnsupportedKeySpec] = prettyOfClass(
       param("encryptionKeySpec", _.encryptionKeySpec),
       param("supportedKeySpecs", _.supportedKeySpecs),
     )
@@ -990,7 +1074,11 @@ object DecryptionError {
       keyFormat: CryptoKeyFormat,
       supportedKeyFormats: Set[CryptoKeyFormat],
   ) extends DecryptionError {
-    override protected def pretty: Pretty[UnsupportedKeyFormat] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedKeyFormat] =
+      UnsupportedKeyFormat
+  }
+  object UnsupportedKeyFormat extends PrettyPrintingCompanion[UnsupportedKeyFormat] {
+    override protected val pretty: Pretty[UnsupportedKeyFormat] = prettyOfClass(
       param("format", _.keyFormat),
       param("supportedKeyFormats", _.supportedKeyFormats),
     )
@@ -999,48 +1087,79 @@ object DecryptionError {
       symmetricKeySpec: SymmetricKeyScheme,
       supportedKeySpecs: Set[SymmetricKeyScheme],
   ) extends DecryptionError {
-    override protected def pretty: Pretty[UnsupportedSymmetricKeySpec] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedSymmetricKeySpec] =
+      UnsupportedSymmetricKeySpec
+  }
+  object UnsupportedSymmetricKeySpec extends PrettyPrintingCompanion[UnsupportedSymmetricKeySpec] {
+    override protected val pretty: Pretty[UnsupportedSymmetricKeySpec] = prettyOfClass(
       param("symmetricKeySpec", _.symmetricKeySpec),
       param("supportedKeySpecs", _.supportedKeySpecs),
     )
   }
   final case class FailedToDecrypt(error: String) extends DecryptionError {
-    override protected def pretty: Pretty[FailedToDecrypt] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[FailedToDecrypt] = FailedToDecrypt
+  }
+  object FailedToDecrypt extends PrettyPrintingCompanion[FailedToDecrypt] {
+    override protected val pretty: Pretty[FailedToDecrypt] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
   final case class InvalidSymmetricKey(error: String) extends DecryptionError {
-    override protected def pretty: Pretty[InvalidSymmetricKey] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[InvalidSymmetricKey] = InvalidSymmetricKey
+  }
+  object InvalidSymmetricKey extends PrettyPrintingCompanion[InvalidSymmetricKey] {
+    override protected val pretty: Pretty[InvalidSymmetricKey] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
   final case class InvariantViolation(error: String) extends DecryptionError {
-    override protected def pretty: Pretty[InvariantViolation] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[InvariantViolation] = InvariantViolation
+  }
+  object InvariantViolation extends PrettyPrintingCompanion[InvariantViolation] {
+    override protected val pretty: Pretty[InvariantViolation] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
   final case class InvalidEncryptionKey(error: String) extends DecryptionError {
-    override protected def pretty: Pretty[InvalidEncryptionKey] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[InvalidEncryptionKey] =
+      InvalidEncryptionKey
+  }
+  object InvalidEncryptionKey extends PrettyPrintingCompanion[InvalidEncryptionKey] {
+    override protected val pretty: Pretty[InvalidEncryptionKey] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
   final case class UnknownEncryptionKey(keyId: Fingerprint) extends DecryptionError {
-    override protected def pretty: Pretty[UnknownEncryptionKey] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnknownEncryptionKey] =
+      UnknownEncryptionKey
+  }
+  object UnknownEncryptionKey extends PrettyPrintingCompanion[UnknownEncryptionKey] {
+    override protected val pretty: Pretty[UnknownEncryptionKey] = prettyOfClass(
       param("keyId", _.keyId)
     )
   }
   final case class DecryptionWithWrongKey(error: String) extends DecryptionError {
-    override protected def pretty: Pretty[DecryptionWithWrongKey] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[DecryptionWithWrongKey] =
+      DecryptionWithWrongKey
+  }
+  object DecryptionWithWrongKey extends PrettyPrintingCompanion[DecryptionWithWrongKey] {
+    override protected val pretty: Pretty[DecryptionWithWrongKey] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
   final case class FailedToDeserialize(error: DeserializationError) extends DecryptionError {
-    override protected def pretty: Pretty[FailedToDeserialize] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[FailedToDeserialize] = FailedToDeserialize
+  }
+  object FailedToDeserialize extends PrettyPrintingCompanion[FailedToDeserialize] {
+    override protected val pretty: Pretty[FailedToDeserialize] = prettyOfClass(
       unnamedParam(_.error)
     )
   }
   final case class KeyStoreError(error: String) extends DecryptionError {
-    override protected def pretty: Pretty[KeyStoreError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[KeyStoreError] = KeyStoreError
+  }
+  object KeyStoreError extends PrettyPrintingCompanion[KeyStoreError] {
+    override protected val pretty: Pretty[KeyStoreError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
@@ -1051,7 +1170,10 @@ object DecryptionError {
   * This means creating key material from scratch. Different from errors that happen when creating
   * keys from existing key material.
   */
-sealed trait EncryptionKeyGenerationError extends Product with Serializable with PrettyPrinting
+sealed trait EncryptionKeyGenerationError
+    extends Product
+    with Serializable
+    with PrettyPrintingFromCompanion
 object EncryptionKeyGenerationError extends CantonErrorGroups.CommandErrorGroup {
 
   @Explanation("This error indicates that an encryption key could not be created.")
@@ -1066,24 +1188,36 @@ object EncryptionKeyGenerationError extends CantonErrorGroups.CommandErrorGroup 
   }
 
   final case class GeneralError(error: Exception) extends EncryptionKeyGenerationError {
-    override protected def pretty: Pretty[GeneralError] = prettyOfClass(unnamedParam(_.error))
+    override def prettyCompanion: PrettyPrintingCompanion[GeneralError] = GeneralError
+  }
+  object GeneralError extends PrettyPrintingCompanion[GeneralError] {
+    override protected val pretty: Pretty[GeneralError] = prettyOfClass(unnamedParam(_.error))
   }
 
   final case class GeneralKmsError(error: String) extends EncryptionKeyGenerationError {
-    override protected def pretty: Pretty[GeneralKmsError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[GeneralKmsError] = GeneralKmsError
+  }
+  object GeneralKmsError extends PrettyPrintingCompanion[GeneralKmsError] {
+    override protected val pretty: Pretty[GeneralKmsError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
 
   final case class KeyCreationError(error: EncryptionKeyCreationError)
       extends EncryptionKeyGenerationError {
-    override protected def pretty: Pretty[KeyCreationError] = prettyOfParam(
+    override def prettyCompanion: PrettyPrintingCompanion[KeyCreationError] = KeyCreationError
+  }
+  object KeyCreationError extends PrettyPrintingCompanion[KeyCreationError] {
+    override protected val pretty: Pretty[KeyCreationError] = prettyOfParam(
       _.error
     )
   }
 
   final case class FingerprintError(error: String) extends EncryptionKeyGenerationError {
-    override protected def pretty: Pretty[FingerprintError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[FingerprintError] = FingerprintError
+  }
+  object FingerprintError extends PrettyPrintingCompanion[FingerprintError] {
+    override protected val pretty: Pretty[FingerprintError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
@@ -1092,15 +1226,23 @@ object EncryptionKeyGenerationError extends CantonErrorGroups.CommandErrorGroup 
       keySpec: EncryptionKeySpec,
       supportedKeySpecs: Set[EncryptionKeySpec],
   ) extends EncryptionKeyGenerationError {
-    override protected def pretty: Pretty[UnsupportedKeySpec] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedKeySpec] = UnsupportedKeySpec
+  }
+  object UnsupportedKeySpec extends PrettyPrintingCompanion[UnsupportedKeySpec] {
+    override protected val pretty: Pretty[UnsupportedKeySpec] = prettyOfClass(
       param("keySpec", _.keySpec),
       param("supportedKeySpecs", _.supportedKeySpecs),
     )
+
   }
 
   final case class EncryptionPrivateStoreError(error: CryptoPrivateStoreError)
       extends EncryptionKeyGenerationError {
-    override protected def pretty: Pretty[EncryptionPrivateStoreError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[EncryptionPrivateStoreError] =
+      EncryptionPrivateStoreError
+  }
+  object EncryptionPrivateStoreError extends PrettyPrintingCompanion[EncryptionPrivateStoreError] {
+    override protected val pretty: Pretty[EncryptionPrivateStoreError] = prettyOfClass(
       unnamedParam(_.error)
     )
   }
@@ -1112,7 +1254,10 @@ object EncryptionKeyGenerationError extends CantonErrorGroups.CommandErrorGroup 
   * This includes parsing, validating, or checking the key data. Different from errors that happen
   * during key generation (creating new key material).
   */
-sealed trait EncryptionKeyCreationError extends Product with Serializable with PrettyPrinting
+sealed trait EncryptionKeyCreationError
+    extends Product
+    with Serializable
+    with PrettyPrintingFromCompanion
 object EncryptionKeyCreationError extends CantonErrorGroups.CommandErrorGroup {
 
   @Explanation("This error indicates that an encryption key could not be created.")
@@ -1130,12 +1275,20 @@ object EncryptionKeyCreationError extends CantonErrorGroups.CommandErrorGroup {
   }
 
   final case class KeyParseAndValidateError(error: String) extends EncryptionKeyCreationError {
-    override protected def pretty: Pretty[KeyParseAndValidateError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[KeyParseAndValidateError.this.type] =
+      KeyParseAndValidateError
+  }
+  object KeyParseAndValidateError extends PrettyPrintingCompanion[KeyParseAndValidateError] {
+    override protected val pretty: Pretty[KeyParseAndValidateError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
   final case class DerivePublicKeyError(error: String) extends EncryptionKeyCreationError {
-    override protected def pretty: Pretty[DerivePublicKeyError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[DerivePublicKeyError] =
+      DerivePublicKeyError
+  }
+  object DerivePublicKeyError extends PrettyPrintingCompanion[DerivePublicKeyError] {
+    override protected val pretty: Pretty[DerivePublicKeyError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }

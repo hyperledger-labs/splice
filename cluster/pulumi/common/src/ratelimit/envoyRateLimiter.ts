@@ -135,6 +135,10 @@ export interface RateLimitEnvoyFilterArgs extends PerEndpointLimits {
 
   // the protocol spoken on the rate limited port, `http` by default
   protocol?: RateLimitProtocol;
+
+  // the number of X-Forwarded-For entries appended between the client and the sidecar,
+  // see `xffNumTrustedHops`. Defaults to `directIngressXffNumTrustedHops`.
+  xffNumTrustedHops?: number;
 }
 
 // The protocol the rate limited workload speaks. It determines how the configured path prefixes are
@@ -327,9 +331,10 @@ export function clientIpDescriptorValue(ip: string): string {
 // prepend arbitrary entries to it, and our gateway only appends to it, so
 // the header value is attacker controlled and per-IP limits could be evaded
 // by simply varying the header on every request.
-// masked_remote_address instead uses the address envoy trusts, which for the
-// sidecar is the last x-forwarded-for hop, i.e. the one appended by our own
-// ingress gateway.
+// masked_remote_address instead uses the address envoy trusts, i.e. the one it derives from
+// x-forwarded-for by skipping `xff_num_trusted_hops` entries from the *right*, which are
+// appended by our own infrastructure and hence cannot be spoofed (see
+// `buildXffNumTrustedHopsPatch`).
 const maskedRemoteAddressAction = {
   masked_remote_address: {
     // one bucket per client address
@@ -338,6 +343,50 @@ const maskedRemoteAddressAction = {
     v6_prefix_mask_len: 128,
   },
 };
+
+// The istio ingress gateway is exposed by a GCP NLB with `externalTrafficPolicy: Local`, which
+// preserves the client IP without adding a hop, so the gateway appends the client's address and
+// the sidecar sees it as the last (and only infrastructure appended) x-forwarded-for entry.
+export const directIngressXffNumTrustedHops = 1;
+
+// The GKE L7 gateway (required for Cloud Armor) adds a proxy in front of the istio ingress gateway, which appends its own address to x-forwarded-for, so the sidecar must trust two hops to get the client address.
+export const gkeL7GatewayNumTrustedProxies = 2;
+
+/**
+ * The `NETWORK_FILTER` config patch aligning the sidecar's `xff_num_trusted_hops` with the number
+ * of proxies in front of it, so that the per-client-IP limits are keyed on the actual client.
+ * Scoped to `inboundPort` like the HTTP filter patches, so that the workload's internal listeners
+ * keep the istio defaults.
+ */
+export function buildXffNumTrustedHopsPatch(
+  inboundPort: pulumi.Input<number>,
+  xffNumTrustedHops: number
+): unknown {
+  return {
+    applyTo: 'NETWORK_FILTER',
+    match: {
+      context: 'SIDECAR_INBOUND',
+      listener: {
+        portNumber: inboundPort,
+        filterChain: {
+          filter: {
+            name: 'envoy.filters.network.http_connection_manager',
+          },
+        },
+      },
+    },
+    patch: {
+      operation: 'MERGE',
+      value: {
+        typed_config: {
+          '@type':
+            'type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager',
+          xff_num_trusted_hops: xffNumTrustedHops,
+        },
+      },
+    },
+  };
+}
 
 export function buildGlobalPerIpRateLimitAction(): unknown {
   return { actions: [maskedRemoteAddressAction] };
@@ -715,7 +764,7 @@ export class RateLimitEnvoyFilter extends pulumi.ComponentResource {
   ) {
     super('splice:RateLimit', `splice-${args.namespace}-${name}`, args, opts);
     const effectiveRateLimits = validateEffectiveRateLimits(args);
-
+    const xffNumTrustedHops = args.xffNumTrustedHops ?? directIngressXffNumTrustedHops;
     // The global per-IP action comes last so that the more specific per-endpoint
     // descriptors are matched first.
     const rateLimitActions = buildRateLimitActions(effectiveRateLimits).concat([
@@ -743,6 +792,11 @@ export class RateLimitEnvoyFilter extends pulumi.ComponentResource {
             },
           },
           configPatches: [
+            // must come before the rate limit filters: they key their per-client-IP buckets on
+            // the address envoy derives from x-forwarded-for using this setting
+            ...(xffNumTrustedHops !== directIngressXffNumTrustedHops
+              ? [buildXffNumTrustedHopsPatch(args.inboundPort, xffNumTrustedHops)]
+              : []),
             ...buildHttpFilterPatches(rateLimitFilters, args.inboundPort),
             // Configure the rate limiting rules on the HTTP route.
             {

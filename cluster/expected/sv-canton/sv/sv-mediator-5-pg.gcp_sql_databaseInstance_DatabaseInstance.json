@@ -1,0 +1,68 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "databaseVersion": "POSTGRES_18",
+    "deletionProtection": false,
+    "region": "europe-west6",
+    "settings": {
+      "activationPolicy": "NEVER",
+      "backupConfiguration": {
+        "enabled": true,
+        "pointInTimeRecoveryEnabled": true
+      },
+      "databaseFlags": [
+        {
+          "name": "random_page_cost",
+          "value": "1.1"
+        },
+        {
+          "name": "temp_file_limit",
+          "value": "2147483647"
+        },
+        {
+          "name": "max_wal_size",
+          "value": "20480"
+        },
+        {
+          "name": "maintenance_work_mem",
+          "value": "2000000"
+        },
+        {
+          "name": "work_mem",
+          "value": "16384"
+        },
+        {
+          "name": "autovacuum_freeze_max_age",
+          "value": "500000000"
+        }
+      ],
+      "deletionProtectionEnabled": false,
+      "edition": "ENTERPRISE",
+      "insightsConfig": {
+        "enhancedQueryInsightsEnabled": false,
+        "queryInsightsEnabled": true
+      },
+      "ipConfiguration": {
+        "enablePrivatePathForGoogleCloudServices": true,
+        "ipv4Enabled": false,
+        "privateNetwork": "projects/test-project/global/networks/default"
+      },
+      "locationPreference": {
+        "zone": "europe-west6-a"
+      },
+      "maintenanceWindow": {
+        "day": 2,
+        "hour": 8
+      },
+      "tier": "db-custom-2-7680",
+      "userLabels": {
+        "cluster": "mock",
+        "migration_id": "5"
+      }
+    }
+  },
+  "name": "sv-mediator-5-pg",
+  "provider": "",
+  "type": "gcp:sql/databaseInstance:DatabaseInstance"
+}

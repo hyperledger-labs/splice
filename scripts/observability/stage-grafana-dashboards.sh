@@ -32,7 +32,7 @@ rm -rf "$sv_dest" "$val_dest"
 mkdir -p "$sv_dest" "$val_dest"
 
 # SV: include everything (JSON dashboards only)
-( cd "$src" && find . -type f -name '*.json' -print0 ) \
+( cd "$src" && find . -path ./gcp -prune -o -type f -name '*.json' -print0 ) \
   | while IFS= read -r -d '' rel; do
       rel=${rel#./}
       mkdir -p "$sv_dest/$(dirname "$rel")"

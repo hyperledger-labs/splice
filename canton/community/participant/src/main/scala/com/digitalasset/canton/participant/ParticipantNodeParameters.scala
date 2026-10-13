@@ -26,6 +26,7 @@ final case class ParticipantNodeParameters(
     ledgerApiServerParameters: LedgerApiServerParametersConfig,
     engine: CantonEngineConfig,
     journalGarbageCollectionDelay: time.NonNegativeFiniteDuration,
+    journalGarbageCollectionMinimumGap: time.PositiveFiniteDuration,
     disableUpgradeValidation: Boolean,
     enableStrictDarValidation: Boolean,
     commandProgressTracking: CommandProgressTrackerConfig,
@@ -42,13 +43,20 @@ final case class ParticipantNodeParameters(
     commitmentUseDbSnapshotForParticipantLookup: Boolean,
     autoSyncProtocolFeatureFlags: Boolean,
     enableAllLedgerApiReassignments: Boolean,
-    commitAfterFailedActivenessCheck: Boolean,
+    crashAfterFailedValidation: Boolean,
     validateLegacyContractsV11: Boolean,
+    acsCommitments: AcsCommitmentConfig,
 ) extends CantonNodeParameters
     with HasGeneralCantonNodeParameters {
   override def dontWarnOnDeprecatedPV: Boolean = protocolConfig.dontWarnOnDeprecatedPV
+
+  override def devVersionSupport: Boolean = protocolConfig.devVersionSupport
   override def alphaVersionSupport: Boolean = protocolConfig.alphaVersionSupport
   override def betaVersionSupport: Boolean = protocolConfig.betaVersionSupport
+
+  // Indexing of party onboarding events is deferred if OnPR indexer pausing is off.
+  def deferPartyOnboardingIndexing: Boolean =
+    alphaOnlinePartyReplicationSupport.exists(!_.pauseSynchronizerIndexingDuringPartyReplication)
 }
 
 object ParticipantNodeParameters {
@@ -85,6 +93,7 @@ object ParticipantNodeParameters {
     stores = ParticipantStoreConfig(),
     protocolConfig = ParticipantProtocolConfig(
       Some(testedProtocolVersion),
+      devVersionSupport = false,
       alphaVersionSupport = false,
       betaVersionSupport = true,
       dontWarnOnDeprecatedPV = false,
@@ -92,14 +101,13 @@ object ParticipantNodeParameters {
     ledgerApiServerParameters = LedgerApiServerParametersConfig(),
     engine = CantonEngineConfig(),
     journalGarbageCollectionDelay = time.NonNegativeFiniteDuration.Zero,
+    journalGarbageCollectionMinimumGap = time.PositiveFiniteDuration.tryOfSeconds(1),
     disableUpgradeValidation = false,
     enableStrictDarValidation = true,
     commandProgressTracking = CommandProgressTrackerConfig(),
     alphaOnlinePartyReplicationSupport = None,
     lsuConfig = LsuConfig(),
-    reassignmentsConfig = ReassignmentsConfig(
-      targetTimestampForwardTolerance = config.NonNegativeFiniteDuration.ofSeconds(30)
-    ),
+    reassignmentsConfig = ReassignmentsConfig(),
     doNotAwaitOnCheckingIncomingCommitments = false,
     disableOptionalTopologyChecks = false,
     commitmentAsynchronousInitialization = true,
@@ -110,7 +118,8 @@ object ParticipantNodeParameters {
     commitmentUseDbSnapshotForParticipantLookup = false,
     autoSyncProtocolFeatureFlags = true,
     enableAllLedgerApiReassignments = false,
-    commitAfterFailedActivenessCheck = false,
+    crashAfterFailedValidation = false,
     validateLegacyContractsV11 = true,
+    acsCommitments = AcsCommitmentConfig(),
   )
 }

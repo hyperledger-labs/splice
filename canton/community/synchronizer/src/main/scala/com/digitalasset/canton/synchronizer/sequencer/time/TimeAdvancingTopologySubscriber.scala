@@ -4,12 +4,12 @@
 package com.digitalasset.canton.synchronizer.sequencer.time
 
 import com.daml.metrics.api.MetricsContext
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.CantonRequireTypes.String73
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.TopologyTransactionsBroadcast
@@ -36,6 +36,7 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.Ge
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil, FutureUtil, LoggerUtil}
+import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
 import com.google.common.annotations.VisibleForTesting
 
 import java.util.UUID
@@ -94,7 +95,8 @@ final class TimeAdvancingTopologySubscriberV1(
               .doNotAwaitUnlessShutdown(
                 clock
                   .scheduleAfter(
-                    _ => broadcastToAdvanceTime(effectiveTimestamp),
+                    action = _ => broadcastToAdvanceTime(effectiveTimestamp),
+                    taskName = s"${getClass.getName}: broadcast to advance time",
                     // To become less prone to clock skew-related problems, wait for the topology change delay instead of
                     //  the effective time to elapse. This provides a better chance of sequencing and observing a broadcast
                     //  message before time proofs are triggered by sequencer clients.
@@ -298,10 +300,11 @@ final class TimeAdvancingTopologySubscriberV2(
     Option.when(needsATryNow(oldRetryCounter))(oldRetryCounter)
   }
 
-  private def scheduleNextPeriodicCheck()(implicit traceContext: TraceContext) =
+  private def scheduleNextPeriodicCheck()(implicit traceContext: TraceContext): Unit =
     FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-      clock.scheduleAfter(
+      clock.scheduleAfterCancelledOnShutdown(
         timestamp => periodicCheck(timestamp),
+        s"${getClass.getName}: periodic check",
         config.pollBackoff.asJava,
       ),
       "Time advancing topology subscriber periodic check",

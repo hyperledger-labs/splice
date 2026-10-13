@@ -18,7 +18,6 @@ module Splice.Testing.Apps.TradingAppV2_Backend
 
 import Daml.Script
 
-import DA.Action
 import DA.Foldable (foldMap, forA_)
 import DA.Map as Map hiding (filter)
 import DA.Optional
@@ -102,16 +101,16 @@ querySettleableTrades registries venue = do
   trades <- queryTradesWithAllocations venue
   agreements <- queryFilter @TradeSettlementAgreement venue (\a -> a.venue == venue)
   let agreementsByTrader = Map.fromList [ (a.trader, cid) | (cid, a) <- agreements ]
+  let hasTradeAgreement account = Map.member (regularAccountOwner account) agreementsByTrader
   fmap catOptionals $ forA trades $ \trade -> do
     -- check whether the required authorization are present
     let otcTrade = trade.otcTrade
-    let receiversWithAgreements = map basicAccount (Map.keys agreementsByTrader)
     let minimallyRequiredAuthorizations = Set.fromList $ do
           (authorizer, leg) <- concatMap (\tradeleg -> transferLegSidesWithAuthorizer tradeleg.leg) otcTrade.tradeLegs
           -- the venue can create their own allocations directly as part of settlement
           guard (regularAccountOwner authorizer /= venue)
           -- authorization is only required for outgoing transfers, and for receivers without trade agreements
-          guard (leg.side == V2.SenderSide || authorizer `notElem` receiversWithAgreements)
+          guard (leg.side == V2.SenderSide || not (hasTradeAgreement authorizer))
           pure (authorizer, leg)
 
     let actualAuthorizations = Set.fromList $
@@ -183,9 +182,13 @@ querySettleableTrades registries venue = do
             let missingAuthorizations = requiredAuthorizations `Set.difference` actualAuthorizations
             let missingByAuthorizer = groupAsMapBy fst $ Set.toList missingAuthorizations
             missingAllocations <- forA (Map.toList missingByAuthorizer) $ \(authorizer, missingLegs) -> do
-              unless (isBasicAccount authorizer || authorizer.owner == Some trade.otcTrade.venue) $
-                fail $ "unexpected internal failure: missing authorizer is a non-basic account " <> show authorizer
               let authorizerOwner = regularAccountOwner authorizer
+              authorizerAgreementCid <-
+                if authorizerOwner == trade.otcTrade.venue
+                  then pure None
+                  else case Map.lookup authorizerOwner agreementsByTrader of
+                    Some agreementCid -> pure (Some agreementCid)
+                    None -> fail $ "No settlement agreement found for account " <> show authorizer
               enrichedChoice <- RegistryApiV2.getAllocationFactory registry V2.AllocationFactory_Allocate with
                 settlement
                 allocation = V2.AllocationSpecification with
@@ -201,7 +204,7 @@ querySettleableTrades registries venue = do
                 extraArgs = emptyExtraArgs
                 actors = [authorizerOwner]
               pure $ MissingAllocation with
-                authorizerAgreementCid = Map.lookup authorizerOwner agreementsByTrader
+                authorizerAgreementCid
                 factoryCid = enrichedChoice.factoryCid
                 choiceArg = enrichedChoice.arg
             -- query off-ledger API of admin to get the settlement context.

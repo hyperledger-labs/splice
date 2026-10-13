@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.wallet.metrics
 
 import com.daml.metrics.api.MetricHandle.Gauge.CloseableGauge
-import com.daml.metrics.api.MetricHandle.{LabeledMetricsFactory, Timer}
+import com.daml.metrics.api.MetricHandle.{Histogram, LabeledMetricsFactory, Timer}
 import com.daml.metrics.api.MetricQualification.{Latency, Saturation}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.topology.PartyId
@@ -46,6 +46,14 @@ class TreasuryMetrics(
 
   def recordQueueLatency(latency: Duration): Unit =
     queueLatencyTimer.update(latency)(MetricsContext.Empty)
+
+  val batchSize: Histogram = metricsFactory.histogram(
+    MetricInfo(
+      name = prefix :+ "batch-size",
+      summary = "The size of batches processed by the treasury service",
+      Saturation,
+    )
+  )
 
   override def close(): Unit = queueSizeGauge.close()
 }

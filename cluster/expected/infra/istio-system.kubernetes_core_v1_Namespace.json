@@ -1,0 +1,14 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "kind": "Namespace",
+    "metadata": {
+      "name": "istio-system"
+    }
+  },
+  "name": "istio-system",
+  "provider": "",
+  "type": "kubernetes:core/v1:Namespace"
+}

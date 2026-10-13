@@ -6,7 +6,7 @@ groups:
     interval: 1m
     rules:
       - uid: a3f7c8e1d492
-        title: Sequencer Throughput Cap Rejections
+        title: Sequencer Throughput Cap Confirmation Request Rejections
         condition: rejection_rate_threshold
         data:
           - refId: rejection_rate
@@ -57,7 +57,121 @@ groups:
           __panelId__: "3"
           description: Sequencer throughput cap is rejecting confirmation requests on namespace {{ $labels.namespace }} job {{ $labels.job }}. This means members are exceeding their rate limits.
           severity: warning
-          summary: Sequencer throughput cap rejections detected on {{ $labels.namespace }} {{ $labels.job }}
+          summary: Sequencer throughput cap confirmation request rejections detected on {{ $labels.namespace }} {{ $labels.job }}
+        labels:
+          # if high => alert on #team-canton-network-high-prio-prod-alerts
+          priority: $SEQUENCER_RATE_LIMIT_REJECTION_RATE_PRIORITY
+        isPaused: false
+      - uid: a3f7c8e1d493
+        title: Sequencer Throughput Cap Confirmation Response Rejections
+        condition: rejection_rate_threshold
+        data:
+          - refId: rejection_rate
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum by (namespace, job)(rate(daml_sequencer_throughput_cap_confirmation_response_rejections_total[5m]))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: rejection_rate
+          - refId: rejection_rate_threshold
+            datasourceUid: __expr__
+            model:
+              conditions:
+                  - evaluator:
+                      params:
+                          - $SEQUENCER_RATE_LIMIT_REJECTION_RATE_THRESHOLD
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params: []
+                    reducer:
+                      params: []
+                      type: avg
+                    type: query
+              datasource:
+                  name: Expression
+                  type: __expr__
+                  uid: __expr__
+              expression: rejection_rate
+              hide: false
+              refId: rejection_rate_threshold
+              type: threshold
+        dashboardUid: eb26bc60-6c26-408a-b0de-befc19f6915c
+        panelId: 3
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          __dashboardUid__: eb26bc60-6c26-408a-b0de-befc19f6915c
+          __panelId__: "3"
+          description: Sequencer throughput cap is rejecting confirmation responses on namespace {{ $labels.namespace }} job {{ $labels.job }}. This means members are exceeding their rate limits.
+          severity: warning
+          summary: Sequencer throughput cap confirmation response rejections detected on {{ $labels.namespace }} {{ $labels.job }}
+        labels:
+          # if high => alert on #team-canton-network-high-prio-prod-alerts
+          priority: $SEQUENCER_RATE_LIMIT_REJECTION_RATE_PRIORITY
+        isPaused: false
+      - uid: a3f7c8e1d494
+        title: Sequencer Throughput Cap Topology Transaction Rejections
+        condition: rejection_rate_threshold
+        data:
+          - refId: rejection_rate
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum by (namespace, job)(rate(daml_sequencer_throughput_cap_topology_transaction_rejections_total[5m]))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: rejection_rate
+          - refId: rejection_rate_threshold
+            datasourceUid: __expr__
+            model:
+              conditions:
+                  - evaluator:
+                      params:
+                          - $SEQUENCER_RATE_LIMIT_REJECTION_RATE_THRESHOLD
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params: []
+                    reducer:
+                      params: []
+                      type: avg
+                    type: query
+              datasource:
+                  name: Expression
+                  type: __expr__
+                  uid: __expr__
+              expression: rejection_rate
+              hide: false
+              refId: rejection_rate_threshold
+              type: threshold
+        dashboardUid: eb26bc60-6c26-408a-b0de-befc19f6915c
+        panelId: 3
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          __dashboardUid__: eb26bc60-6c26-408a-b0de-befc19f6915c
+          __panelId__: "3"
+          description: Sequencer throughput cap is rejecting topology transactions on namespace {{ $labels.namespace }} job {{ $labels.job }}. This means members are exceeding their rate limits.
+          severity: warning
+          summary: Sequencer throughput cap topology transaction rejections detected on {{ $labels.namespace }} {{ $labels.job }}
         labels:
           # if high => alert on #team-canton-network-high-prio-prod-alerts
           priority: $SEQUENCER_RATE_LIMIT_REJECTION_RATE_PRIORITY

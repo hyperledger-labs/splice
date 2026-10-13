@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 {{ if .Values.ansWebUi.enabled }}
-{{- $ansWebUiLabel := "ans-web-ui" }}
+{{- $ansWebUiLabel := .Values.appLabels.ansWebUi | default "ans-web-ui" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -78,7 +78,7 @@ spec:
           valueFrom:
             secretKeyRef:
               key: client-id
-              name: splice-app-cns-ui-auth
+              name: {{ .Values.ansWebUi.secretName | default "splice-app-cns-ui-auth" }}
               optional: false
           {{- end }}
         - name: SPLICE_APP_UI_AUTH_URL
@@ -88,7 +88,7 @@ spec:
           valueFrom:
             secretKeyRef:
               key: url
-              name: splice-app-cns-ui-auth
+              name: {{ .Values.ansWebUi.secretName | default "splice-app-cns-ui-auth" }}
               optional: false
           {{- end }}
         - name: SPLICE_APP_UI_AUTH_AUDIENCE

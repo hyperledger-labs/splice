@@ -35,7 +35,10 @@ test_ensureReceiptAllocation = do
   let dummyCid = coerceContractId aggreementCid
   now <- getTime
 
-  let aliceAccount = TSU.basicAccount alice
+  let aliceAccount = V2.Account with
+        owner = Some alice
+        provider = None
+        id = "test-account-id"
   let bobAccount = TSU.basicAccount bob
   let settlementV2 = V2.SettlementInfo with
         executors = [provider]
@@ -96,15 +99,9 @@ test_ensureReceiptAllocation = do
     choiceArgV2 with
       actors = [bob]
 
-  test'
-    ( expectMessageContains "choiceArg.allocation.authorizer' is not equal to 'receiptAccount'" <>
-      expectMessageContains ("receiptAccount: " <> show aliceAccount)
-    )
+  test' (expectMessageContains "receipt allocation authorizer owner")
     allocationV2 with
-      authorizer = V2.Account with
-        owner = Some alice
-        id = "non-default-id"
-        provider = None
+      authorizer = bobAccount
 
   test' (expectUnmetRequirement "transferLeg[leg1] is a receipt leg")
     allocationV2 with

@@ -30,9 +30,12 @@ import java.util.UUID
   */
 object CantonRequireTypes {
 
-  final case class NonEmptyString private (private val str: String) {
+  final case class NonEmptyString private (private val str: String)
+      extends Ordered[NonEmptyString] {
     def unwrap: String = str
     require(str.nonEmpty, s"Unable to create a NonEmptyString as the empty string $str was given.")
+
+    override def compare(that: NonEmptyString): Int = this.str.compare(that.str)
   }
 
   object NonEmptyString {
@@ -56,6 +59,14 @@ object CantonRequireTypes {
       override def description: String =
         s"The value you gave for this configuration setting ('$str') was the empty string, but we require a non-empty string for this configuration setting"
     }
+
+    def fromProtoPrimitive(
+        str: String,
+        name: String,
+    ): Either[ProtoInvariantViolation, NonEmptyString] =
+      NonEmptyString
+        .create(str)
+        .leftMap(e => ProtoInvariantViolation(field = Some(name), error = e.toString))
   }
 
   /** This trait wraps a String that is limited to a certain maximum length. The canonical use case
@@ -414,8 +425,14 @@ object CantonRequireTypes {
       tryCreate(truncated, name)
     }
 
+    def fromProtoPrimitive(str: String): ParsingResult[A] =
+      fromProtoPrimitive(str, field = None)
+
     def fromProtoPrimitive(str: String, name: String): ParsingResult[A] =
-      create(str, Some(name)).leftMap(e => ProtoInvariantViolation(field = Some(name), error = e))
+      fromProtoPrimitive(str, Some(name))
+
+    def fromProtoPrimitive(str: String, field: Option[String]): ParsingResult[A] =
+      create(str, field).leftMap(e => ProtoInvariantViolation(field = field, error = e))
 
     implicit val lengthLimitedStringOrder: Order[A] =
       Order.by[A, String](_.unwrap)
@@ -496,7 +513,13 @@ object CantonRequireTypes {
       tryCreate(str.take(companion.maxLength.unwrap))
 
     def fromProtoPrimitive(str: String): ParsingResult[Wrapper] =
-      companion.fromProtoPrimitive(str, instanceName).map(factoryMethodWrapper)
+      fromProtoPrimitive(str, field = None)
+
+    def fromProtoPrimitive(str: String, field: String): ParsingResult[Wrapper] =
+      fromProtoPrimitive(str, Some(field))
+
+    private def fromProtoPrimitive(str: String, field: Option[String]): ParsingResult[Wrapper] =
+      companion.fromProtoPrimitive(str, field.getOrElse(instanceName)).map(factoryMethodWrapper)
 
     implicit val wrapperOrder: Order[Wrapper] =
       Order.by[Wrapper, String](_.unwrap)

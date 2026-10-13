@@ -17,6 +17,6 @@ jobs:
       with:
         cache_version: 10
     - name: Check github scripts
-      uses: ./.github/actions/nix/run_bash_command_in_nix
+      uses: ./.github/actions/nix/run
       with:
         cmd: bash gha-scripts/scripts/check-build.sh

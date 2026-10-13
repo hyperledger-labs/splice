@@ -13,6 +13,7 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggingContext}
 import com.digitalasset.canton.sequencing.protocol.{AggregationBySender, AggregationRule}
@@ -99,7 +100,7 @@ final case class InFlightAggregation(
               maxSequencingTime <= sequencingTimestamp,
               s"Cannot prepare in-flight aggregation for new aggregation at sequencing timestamp $sequencingTimestamp because it contains signatures with sequencing timestamp up to $maxSequencingTime",
             )
-            // We need to be careful with the snapshot we are using for computing the delivered at and use the
+            // We need to e careful with the snapshot we are using for computing the delivered at and use the
             // standard method for finding the right snapshot in the sequencer, respecting the events that
             // this client has seen.
             SyncCryptoClient

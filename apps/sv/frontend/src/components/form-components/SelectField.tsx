@@ -14,7 +14,7 @@ import {
 import { CREATE_PROPOSAL_FIELD_LABEL_SX } from '../../constants/createProposalLayout';
 import type { FormEvent } from 'react';
 import { useFieldContext } from '../../hooks/formContext';
-import { scrollableSelectFieldSx } from '../beta/identifierStyles';
+import { scrollableSelectFieldSx } from '../ui/identifierStyles';
 import { selectFieldSx } from '../../themes/fieldStyles';
 
 export type Option = { key: string; value: string };

@@ -12,8 +12,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.cometbft.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
   DsoDecentralizedSynchronizerConfig,
   MediatorConfig,
+  PhysicalSynchronizerNodeConfig,
   ScanConfig,
-  SequencerConfig,
+  SequencerConnectionConfig,
+  SequencerIdentityConfig,
   SynchronizerConfig,
   SynchronizerNodeConfig,
   SynchronizerNodeConfigLimits,
@@ -35,7 +37,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.protocol.AcsCommitmentsCatchUpParameters
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 
@@ -148,10 +150,9 @@ object SvUtil {
   case class LocalSequencerConfig(
       sequencerId: String,
       url: String,
-      migrationId: Long,
   )
 
-  def getSequencerConfig(synchronizerNode: Option[SvSynchronizerNode], migrationId: Long)(implicit
+  def getSequencerConfig(synchronizerNode: Option[SvSynchronizerNode])(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Option[LocalSequencerConfig]] = synchronizerNode.map { node =>
@@ -159,7 +160,6 @@ object SvUtil {
       LocalSequencerConfig(
         sequencerId.toProtoPrimitive,
         node.sequencerExternalPublicUrl,
-        migrationId,
       )
     }
   }.sequence
@@ -181,9 +181,8 @@ object SvUtil {
       cometBftNode: Option[CometBftNode],
       localSynchronizerNode: LocalSynchronizerNode,
       scanConfig: SvScanConfig,
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       clock: Clock,
-      migrationId: Long,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -213,12 +212,10 @@ object SvUtil {
           )
         }
         .getOrElse(SvUtil.emptyCometBftConfig)
-      localSequencerConfig <- getSequencerConfig(Some(localSynchronizerNode), migrationId)
+      localSequencerConfig <- getSequencerConfig(Some(localSynchronizerNode))
       sequencerConfig = localSequencerConfig.map(c =>
-        new SequencerConfig(
-          migrationId,
+        new SequencerIdentityConfig(
           c.sequencerId,
-          c.url,
           Some(clock.now.toInstant).toJava,
         )
       )
@@ -230,14 +227,21 @@ object SvUtil {
       )
     } yield {
       Map(
-        synchronizerId.toProtoPrimitive -> new SynchronizerNodeConfig(
+        synchronizerId.logical.toProtoPrimitive -> new SynchronizerNodeConfig(
           cometBftConfig,
-          sequencerConfig.toJava,
+          Optional.empty(),
           mediatorConfig.toJava,
           Optional.of(new ScanConfig(scanConfig.publicUrl.toString())),
           Optional.empty(),
-          Optional.empty(),
-          Optional.empty(),
+          sequencerConfig.toJava,
+          Optional.of(
+            Map(
+              java.lang.Long.valueOf(synchronizerId.serial.value.toLong) ->
+                new PhysicalSynchronizerNodeConfig(
+                  localSequencerConfig.map(c => new SequencerConnectionConfig(c.url)).toJava
+                )
+            ).asJava
+          ),
         )
       ).asJava
     }

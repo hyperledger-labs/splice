@@ -1,0 +1,428 @@
+{
+  "title": "GCP - Cloud Armor",
+  "uid": "gcp-cloud-armor",
+  "tags": [
+    "gcp",
+    "cloud-armor"
+  ],
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 41,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "5m",
+  "timezone": "",
+  "annotations": {
+    "list": []
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "label": "Project",
+        "description": "GCP project of the cluster, set by Pulumi",
+        "type": "constant",
+        "hide": 2,
+        "query": "da-cn-devnet",
+        "current": {
+          "text": "da-cn-devnet",
+          "value": "da-cn-devnet"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "da-cn-devnet",
+            "value": "da-cn-devnet"
+          }
+        ]
+      },
+      {
+        "name": "cluster",
+        "label": "Cluster",
+        "description": "Cluster basename, set by Pulumi",
+        "type": "constant",
+        "hide": 2,
+        "query": "devnet",
+        "current": {
+          "text": "devnet",
+          "value": "devnet"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "devnet",
+            "value": "devnet"
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Cloud Armor metrics (GCP)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "interval": "5m",
+      "title": "Requests evaluated by Cloud Armor",
+      "description": "Requests evaluated by the Cloud Armor policy of the selected cluster, by whether they were blocked.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcp-monitoring"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "blocked=${__field.labels.blocked}"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "max",
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcp-monitoring"
+          },
+          "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "$project",
+            "crossSeriesReducer": "REDUCE_NONE"
+          },
+          "promQLQuery": {
+            "projectName": "$project",
+            "expr": "sum by (blocked) (rate(networksecurity_googleapis_com:https_request_count{monitored_resource=\"network_security_policy\", policy_name=\"waf-whitelist-throttle-ban-${cluster}\"}[$__interval]))",
+            "step": "$__interval"
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "interval": "5m",
+      "title": "Denied requests by backend",
+      "description": "Requests denied by the Cloud Armor policy (enforced rules), and requests that rules in preview mode would have denied.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcp-monitoring"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "denied ${__field.labels.backend_target_name}"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "would deny (preview) ${__field.labels.backend_target_name}"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "max",
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcp-monitoring"
+          },
+          "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "$project",
+            "crossSeriesReducer": "REDUCE_NONE"
+          },
+          "promQLQuery": {
+            "projectName": "$project",
+            "expr": "sum by (backend_target_name) (increase(networksecurity_googleapis_com:https_request_count{monitored_resource=\"network_security_policy\", policy_name=\"waf-whitelist-throttle-ban-${cluster}\", blocked=\"true\"}[$__interval]))",
+            "step": "$__interval"
+          }
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcp-monitoring"
+          },
+          "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "$project",
+            "crossSeriesReducer": "REDUCE_NONE"
+          },
+          "promQLQuery": {
+            "projectName": "$project",
+            "expr": "sum by (backend_target_name) (increase(networksecurity_googleapis_com:https_previewed_request_count{monitored_resource=\"network_security_policy\", policy_name=\"waf-whitelist-throttle-ban-${cluster}\", blocked=\"true\"}[$__interval]))",
+            "step": "$__interval"
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "row",
+      "title": "Cloud Armor log based metrics",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "panels": []
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "interval": "5m",
+      "title": "Rejections by rule priority",
+      "description": "Requests rejected (or that would be rejected, in preview) by the Cloud Armor policy, by mode (enforced / previewed) and priority of the rule that denied them, from the load balancer request logs. Each rule group has its own 9 digit priority prefix: 1xxxxxxxx WAF rules, 2xxxxxxxx IP whitelist rules, 3xxxxxxxx public endpoint (throttle) rules; 2147483646 / 2147483647 are the (preview) default deny rules. Requires Cloud Armor logging to be enabled.",
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcp-monitoring"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "${__field.labels.mode} priority=${__field.labels.rule_priority}"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "max",
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "gcp-monitoring"
+          },
+          "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "$project",
+            "crossSeriesReducer": "REDUCE_NONE"
+          },
+          "promQLQuery": {
+            "projectName": "$project",
+            "expr": "label_replace(sum by (rule_priority) (increase({\"__name__\"=\"logging.googleapis.com/user/cloud_armor_enforced_rejections_${cluster}\", \"monitored_resource\"=\"http_external_regional_lb_rule\"}[$__interval])), \"mode\", \"enforced\", \"\", \"\") or label_replace(sum by (rule_priority) (increase({\"__name__\"=\"logging.googleapis.com/user/cloud_armor_previewed_rejections_${cluster}\", \"monitored_resource\"=\"http_external_regional_lb_rule\"}[$__interval])), \"mode\", \"previewed\", \"\", \"\")",
+            "step": "$__interval"
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "Cloud Armor logs",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "logs",
+      "title": "Denied requests",
+      "description": "Load balancer request logs of requests denied (or that would be denied in preview mode) by the Cloud Armor policy.",
+      "datasource": {
+        "type": "googlecloud-logging-datasource",
+        "uid": "gcp-logging"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "googlecloud-logging-datasource",
+            "uid": "gcp-logging"
+          },
+          "projectId": "$project",
+          "queryText": "resource.type=(\"http_external_regional_lb_rule\" OR \"http_load_balancer\")\n((jsonPayload.enforcedSecurityPolicy.name=\"waf-whitelist-throttle-ban-${cluster}\" AND jsonPayload.enforcedSecurityPolicy.outcome=\"DENY\") OR (jsonPayload.previewSecurityPolicy.name=\"waf-whitelist-throttle-ban-${cluster}\" AND jsonPayload.previewSecurityPolicy.outcome=\"DENY\"))"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "logs",
+      "title": "WAF rule matches",
+      "description": "Load balancer request logs of requests matching a WAF rule; `preconfiguredExprIds` tells which signature matched.",
+      "datasource": {
+        "type": "googlecloud-logging-datasource",
+        "uid": "gcp-logging"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "googlecloud-logging-datasource",
+            "uid": "gcp-logging"
+          },
+          "projectId": "$project",
+          "queryText": "resource.type=(\"http_external_regional_lb_rule\" OR \"http_load_balancer\")\n((jsonPayload.enforcedSecurityPolicy.name=\"waf-whitelist-throttle-ban-${cluster}\" AND jsonPayload.enforcedSecurityPolicy.outcome=\"DENY\" AND jsonPayload.enforcedSecurityPolicy.priority>=100000000 AND jsonPayload.enforcedSecurityPolicy.priority<200000000) OR (jsonPayload.previewSecurityPolicy.name=\"waf-whitelist-throttle-ban-${cluster}\" AND jsonPayload.previewSecurityPolicy.outcome=\"DENY\" AND jsonPayload.previewSecurityPolicy.priority>=100000000 AND jsonPayload.previewSecurityPolicy.priority<200000000))"
+        }
+      ]
+    }
+  ]
+}

@@ -5,6 +5,7 @@ package com.digitalasset.canton.store
 
 import com.digitalasset.canton.config.RequireTypes.{PositiveDouble, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging}
 import com.digitalasset.canton.pruning.{PruningPhase, PruningStatus}
@@ -84,6 +85,8 @@ trait PrunableByTime {
   self: NamedLogging =>
 
   protected implicit val ec: ExecutionContext
+  @VisibleForTesting @inline private[canton] final def ecInternal: ExecutionContext = ec
+
   protected def kind: String
 
   /** Parameters to control prune batching
@@ -107,7 +110,8 @@ trait PrunableByTime {
   )(implicit
       traceContext: TraceContext,
       closeContext: CloseContext,
-  ): FutureUnlessShutdown[Unit] =
+  ): FutureUnlessShutdown[Unit] = {
+    logger.debug(s"Pruning $kind up to $limit")
     for {
       lastTs <- getLastPruningTs
       _ <- advancePruningTimestamp(PruningPhase.Started, limit)
@@ -124,6 +128,7 @@ trait PrunableByTime {
         logger.debug(s"Pruned $num $kind using ${res.length} intervals")
       lastTs.foreach(ts => updateBucketSize(res, limit - ts))
     }
+  }
 
   private val stepSizeMillis = new AtomicReference[Long](
     batchingParameters
@@ -216,10 +221,17 @@ trait PrunableByTime {
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[PruningStatus]]
 
-  @VisibleForTesting
-  protected[canton] def advancePruningTimestamp(phase: PruningPhase, timestamp: CantonTimestamp)(
-      implicit traceContext: TraceContext
+  protected def advancePruningTimestamp(phase: PruningPhase, timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
   ): FutureUnlessShutdown[Unit]
+
+  @VisibleForTesting
+  @inline private[canton] final def advancePruningTimestampInternal(
+      phase: PruningPhase,
+      timestamp: CantonTimestamp,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Unit] = advancePruningTimestamp(phase, timestamp)
 
   /** Actual invocation of doPrune
     *
@@ -227,8 +239,16 @@ trait PrunableByTime {
     *   the approximate number of pruned rows, used to adjust the pruning windows to reach optimal
     *   batch sizes
     */
-  @VisibleForTesting
-  protected[canton] def doPrune(limit: CantonTimestamp, lastPruning: Option[CantonTimestamp])(
-      implicit traceContext: TraceContext
+  protected def doPrune(limit: CantonTimestamp, lastPruning: Option[CantonTimestamp])(implicit
+      traceContext: TraceContext
   ): FutureUnlessShutdown[Int]
+
+  @VisibleForTesting
+  @inline
+  private[canton] final def doPruneInternal(
+      limit: CantonTimestamp,
+      lastPruning: Option[CantonTimestamp],
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Int] = doPrune(limit, lastPruning)
 }

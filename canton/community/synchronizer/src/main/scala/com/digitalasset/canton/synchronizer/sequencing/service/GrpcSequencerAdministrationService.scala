@@ -7,7 +7,6 @@ import cats.data.EitherT
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
-import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.ProtoDeserializationError
@@ -15,6 +14,7 @@ import com.digitalasset.canton.ProtoDeserializationError.FieldNotSet
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.*
@@ -67,6 +67,7 @@ import com.digitalasset.canton.topology.{
   UniqueIdentifier,
 }
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{EitherTUtil, GrpcStreamingUtils}
 import com.digitalasset.canton.version.ProtoVersion
 import com.google.protobuf.timestamp.Timestamp
@@ -246,6 +247,7 @@ class GrpcSequencerAdministrationService(
       },
       responseObserver,
       byteString => OnboardingStateResponse(byteString),
+      parameters.processingTimeouts.adminStreamOpenBound.duration,
     )
   }
 
@@ -298,6 +300,7 @@ class GrpcSequencerAdministrationService(
       },
       responseObserver,
       byteString => OnboardingStateV2Response(byteString),
+      parameters.processingTimeouts.adminStreamOpenBound.duration,
     )
   }
 
@@ -426,7 +429,7 @@ class GrpcSequencerAdministrationService(
             new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription(err.toString))
           )
       )
-      _ <- sequencer.disableMember(member).leftMap(_.asGrpcError)
+      _ <- sequencer.disableMember(member).leftMap(_.toGrpcError)
     } yield v30.DisableMemberResponse()
 
     result.asGrpcResponse

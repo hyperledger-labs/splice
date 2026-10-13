@@ -16,10 +16,11 @@ runs:
   steps:
     - name: Archive Daml artifacts
       if: ${{ ! fromJson(inputs.load_cache_hit) }}
-      shell: bash
-      run: |
-        mkdir -p /tmp/daml
-        find ${{ inputs.splice_root }} -type d -name ".daml" | tar --use-compress-program=pigz -cf /tmp/daml/daml.tar.gz -T -
+      uses: ./.github/actions/nix/run
+      with:
+        cmd: |
+          mkdir -p /tmp/daml
+          find ${{ inputs.splice_root }} -type d -name ".daml" | tar --use-compress-program=pigz -cf /tmp/daml/daml.tar.gz -T -
     - name: Not archiving Daml artifacts
       if: ${{ fromJson(inputs.load_cache_hit) }}
       shell: bash

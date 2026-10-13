@@ -25,13 +25,14 @@ import com.digitalasset.canton.ledger.participant.state.{
   SynchronizerUpdate,
 }
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
 import com.digitalasset.canton.participant.sync.SynchronizerConnectionsManager.PerformLsuHandler
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PhysicalSynchronizerId
+import com.digitalasset.canton.topology.{OpaquePhysicalSynchronizerId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil, MonadUtil}
 import com.digitalasset.canton.{RequestCounter, SequencerCounter}
@@ -168,6 +169,7 @@ class RecordOrderPublisher private (
     FutureUnlessShutdown.outcomeF(taskScheduler.flush())
 
   /** Schedule a floating event, if the current synchronizer time is earlier than timestamp.
+    *
     * @param timestamp
     *   The desired timestamp of the publication: if cannot be met, the function will return a Left.
     * @param eventFactory
@@ -178,6 +180,8 @@ class RecordOrderPublisher private (
     *   A function creating a FutureUnlessShutdown[T]. This function will be only executed, if the
     *   scheduling is possible. If scheduling is possible, execution of the floating event
     *   publication will wait for the onScheduled operation to finish.
+    * @param publishBefore
+    *   additional events to publish before the floating update and at the same record time
     * @param traceContext
     *   Should be the TraceContext of the event
     * @return
@@ -188,6 +192,9 @@ class RecordOrderPublisher private (
       timestamp: CantonTimestamp,
       eventFactory: CantonTimestamp => Option[FloatingUpdate],
       onScheduled: () => FutureUnlessShutdown[T], // perform will wait for this to complete
+      publishBefore: (
+          SynchronizerUpdate => FutureUnlessShutdown[Unit]
+      ) => FutureUnlessShutdown[Unit],
   )(implicit
       traceContext: TraceContext
   ): UnlessShutdown[Either[CantonTimestamp, FutureUnlessShutdown[T]]] =
@@ -195,7 +202,10 @@ class RecordOrderPublisher private (
       // Unsupervised because it is to be expected that this promise never completes if scheduling is not possible.
       val promise = PromiseUnlessShutdown.unsupervised[Unit]()
       val waitFor = promise.futureUS.flatMap(_ => onScheduled())
-      val task = FloatingEventPublicationTask(waitFor, timestamp)(() => eventFactory(timestamp))
+      val task = FloatingEventPublicationTask(waitFor, timestamp)(
+        () => eventFactory(timestamp),
+        publishBefore,
+      )
       taskScheduler.scheduleTaskIfLater(desiredTimestamp = timestamp, task).toLeft(()).map {
         (_: Unit) =>
           promise.outcome_(())
@@ -224,6 +234,7 @@ class RecordOrderPublisher private (
       timestamp = timestamp,
       eventFactory = eventFactory,
       onScheduled = () => FutureUnlessShutdown.unit,
+      publishBefore = _ => FutureUnlessShutdown.unit,
     ).map(_.map(_ => ()))
 
   /** Schedule a floating event immediately: with the synchronizer time of the last published event.
@@ -269,7 +280,7 @@ class RecordOrderPublisher private (
       if (sequencerCounter >= initSc) {
         scheduleFloatingEventPublication(
           timestamp = timestamp,
-          eventFactory = EmptyAcsPublicationRequired(psid.logical, _).some,
+          eventFactory = EmptyAcsPublicationRequired(psid.logical, _, traceContext).some,
         ).foreach(
           _.toOption.getOrElse(
             ErrorUtil.invalidState(
@@ -345,6 +356,14 @@ class RecordOrderPublisher private (
   def setSuccessor(successor: Option[SynchronizerSuccessor]): Unit = {
     synchronizerSuccessor.set(successor)
     successor.foreach { successor =>
+      successor.psid.parseAsPhysical match {
+        case Left(err) =>
+          logger.warn(OpaquePhysicalSynchronizerId.unparseablePSIdMessage(successor, err))(
+            TraceContext.empty
+          )
+        case Right(_) =>
+      }
+
       if (successor.upgradeTime <= initTimestamp) {
         lsuAutomaticAttemptAlreadyDone.set(true)
         // Upon node restart past the upgrade time, we attempt an automatic LSU
@@ -409,7 +428,10 @@ class RecordOrderPublisher private (
       waitFor: FutureUnlessShutdown[T], // ability to hold back publication execution
       override val timestamp: CantonTimestamp,
   )(
-      eventO: () => Option[FloatingUpdate]
+      eventO: () => Option[FloatingUpdate],
+      publishBefore: (
+          SynchronizerUpdate => FutureUnlessShutdown[Unit]
+      ) => FutureUnlessShutdown[Unit],
   )(implicit val traceContext: TraceContext)
       extends PublicationTask {
 
@@ -418,7 +440,10 @@ class RecordOrderPublisher private (
         case Success(Outcome(_)) =>
           eventO() match {
             case Some(event) =>
-              publishOrBuffer(event, s"floating event with timestamp $timestamp")
+              for {
+                _ <- publishBefore(publishLedgerApiIndexerEvent(_))
+                _ <- publishOrBuffer(event, s"floating event with timestamp $timestamp")
+              } yield ()
             case None =>
               logger.debug(
                 s"Skip publishing floating event with timestamp $timestamp: nothing to publish"
@@ -509,8 +534,9 @@ class RecordOrderPublisher private (
             }
 
             val upgradeTimeReached = LsuTimeReached(
-              synchronizerUpdate.synchronizerId,
-              successor.upgradeTime,
+              synchronizerId = synchronizerUpdate.synchronizerId,
+              recordTime = successor.upgradeTime,
+              traceContext = traceContext,
             )
             logger.debug(
               s"Not publishing event whose record time ${event.recordTime} is greater than upgrade time ${successor.upgradeTime} $event but publishing $upgradeTimeReached instead"

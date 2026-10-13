@@ -5,7 +5,7 @@ on:
     paths:
       - cluster/deployment/**
       - cluster/configs/**
-      - '**/expected.json'
+      - cluster/expected/**
 
 jobs:
   add-backport-reminder:

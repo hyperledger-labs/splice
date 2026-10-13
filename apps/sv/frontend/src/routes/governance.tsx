@@ -10,12 +10,10 @@ import {
 import { ProposalListingSection } from '../components/governance/ProposalListingSection';
 import ProposalSearch from '../components/governance/ProposalSearch';
 import { Loading, useVotesHooks } from '@canton-network/splice-common-frontend';
-import { dateTimeFormatISO } from '@canton-network/splice-common-frontend-utils';
-import dayjs from 'dayjs';
 import { ContractId } from '@daml/types';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { useSvConfig } from '../utils';
-import { PageHeader } from '../components/beta';
+import { PageHeader } from '../components/ui';
 import {
   actionTagToTitle,
   buildVoteHistoryData,
@@ -84,8 +82,8 @@ export const Governance: React.FC = () => {
             getGovernanceActionTag(vr.payload.action) as SupportedActionTag
           ],
         description: vr.payload.reason.body,
-        votingCloses: dayjs(vr.payload.voteBefore).format(dateTimeFormatISO),
-        createdAt: dayjs(vr.createdAt).format(dateTimeFormatISO),
+        votingCloses: vr.payload.voteBefore,
+        createdAt: vr.createdAt,
         requester: getRequesterPartyId(vr.payload.requester, svs),
       })) as ActionRequiredData[];
   }, [voteRequests, alreadyVotedRequestIds, amuletName, svs]);
@@ -98,9 +96,7 @@ export const Governance: React.FC = () => {
     return voteRequests
       .filter(v => alreadyVotedRequestIds.has(v.payload.trackingCid || v.contractId))
       .map(v => {
-        const effectiveAt = v.payload.targetEffectiveAt
-          ? dayjs(v.payload.targetEffectiveAt).format(dateTimeFormatISO)
-          : 'Threshold';
+        const effectiveAt = v.payload.targetEffectiveAt ? v.payload.targetEffectiveAt : 'Threshold';
         const votes = v.payload.votes.entriesArray().map(e => e[1]);
 
         return {
@@ -110,7 +106,7 @@ export const Governance: React.FC = () => {
               getGovernanceActionTag(v.payload.action) as SupportedActionTag
             ],
           description: v.payload.reason.body,
-          votingThresholdDeadline: dayjs(v.payload.voteBefore).format(dateTimeFormatISO),
+          votingThresholdDeadline: v.payload.voteBefore,
           voteTakesEffect: effectiveAt,
           yourVote: computeYourVote(votes, svPartyId),
           status: 'In Progress',

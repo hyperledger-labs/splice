@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.error
 
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.{
   ErrorCategory,
   ErrorCode,
@@ -16,6 +15,7 @@ import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.RoutingErrorGroup
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
+import com.digitalasset.nonempty.NonEmpty
 
 sealed trait TransactionRoutingError extends TransactionError with Product with Serializable
 sealed trait TransactionRoutingErrorWithSynchronizer extends TransactionRoutingError {
@@ -214,6 +214,31 @@ object TransactionRoutingError extends RoutingErrorGroup {
           )
           with TransactionRoutingError
 
+    }
+
+    @Explanation(
+      """This error indicates that one or more submitters are hosted with Submission permission on a
+    participant and at the same time have a confirmation threshold greater than 1 in their
+    PartyToParticipant mapping."""
+    )
+    @Resolution(
+      """Use an external submission instead: give the party its own signing key so
+    that the submission authorization is independent of any hosting participant, and the threshold is
+    satisfied by confirmations from independent participants."""
+    )
+    object DecentralizedPartyCannotSubmit
+        extends ErrorCode(
+          id = "DECENTRALIZED_PARTY_CANNOT_SUBMIT",
+          ErrorCategory.InvalidGivenCurrentSystemStateOther,
+        ) {
+
+      final case class Error(partyIds: Seq[LfPartyId])
+          extends TransactionErrorImpl(
+            cause =
+              s"Submission is not supported for parties that are hosted with Submission permission and have a confirmation threshold greater than 1: ${partyIds
+                  .mkString(", ")}."
+          )
+          with TransactionRoutingError
     }
 
     @Explanation(

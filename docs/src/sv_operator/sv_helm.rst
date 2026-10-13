@@ -854,7 +854,7 @@ In order to install the reference charts, the following must be satisfied in you
 
 .. code-block:: bash
 
-    helm repo add istio https://istio-release.storage.googleapis.com/charts
+    helm repo add istio https://blob.istio.io/istio-release/charts
     helm repo update
     helm install istio-base istio/base -n istio-system --set defaults.global.istioNamespace=cluster-ingress --wait
     helm install istiod istio/istiod -n cluster-ingress --set global.istioNamespace="cluster-ingress" --set meshConfig.accessLogFile="/dev/stdout"  --wait

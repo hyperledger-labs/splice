@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "name": "cantonnet"
+  },
+  "name": "splitwell-db-sw-pg-cantonnet",
+  "provider": "",
+  "type": "gcp:sql/database:Database"
+}

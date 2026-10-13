@@ -13,6 +13,8 @@ export type ExposedAudience = (typeof exposedAudiences)[number];
 
 const httpMethods = ['get', 'put', 'post', 'delete', 'patch', 'head', 'options'];
 
+const publicJvmPackages = ['sv_public', 'sv_public_stream'];
+
 export type SvPublicEndpoint = {
   path: string;
   // HTTP method or `*` for a `$ref`'d path item
@@ -30,7 +32,7 @@ function isPublicAudience(value: unknown): value is PublicAudience {
  * authentication together with the external audience they must be exposed to.
  *
  * `x-external-audience` can be declared in two places:
- * - on an operation with `x-jvm-package: sv_public`, where it is mandatory;
+ * - on an operation with a public `x-jvm-package` (see `publicJvmPackages`), where it is mandatory;
  * - on a path item, where it applies to all operations of that path. This is the form to use
  *   for path items that `$ref` a shared, unauthenticated endpoint such as `/version`
  *   (`x-jvm-package: external.common_admin`), which clients call before any other endpoint.
@@ -70,7 +72,7 @@ export function parseSvPublicEndpoints(openApiContent: string): SvPublicEndpoint
     for (const method of operationMethods) {
       const operation = pathItem[method];
       const operationAudience = operation['x-external-audience'];
-      const isPublic = operation['x-jvm-package'] === 'sv_public';
+      const isPublic = publicJvmPackages.includes(operation['x-jvm-package']);
       if (pathAudience !== undefined && operationAudience !== undefined) {
         errors.push(
           `${method.toUpperCase()} ${path}: x-external-audience is declared both on the path item and on the operation`
@@ -79,7 +81,9 @@ export function parseSvPublicEndpoints(openApiContent: string): SvPublicEndpoint
       }
       if (!isPublic && operationAudience !== undefined) {
         errors.push(
-          `${method.toUpperCase()} ${path}: x-external-audience is only allowed on endpoints with x-jvm-package: sv_public`
+          `${method.toUpperCase()} ${path}: x-external-audience is only allowed on endpoints with x-jvm-package in ${publicJvmPackages.join(
+            ', '
+          )}`
         );
         continue;
       }
@@ -89,7 +93,7 @@ export function parseSvPublicEndpoints(openApiContent: string): SvPublicEndpoint
       }
       if (!isPublicAudience(audience)) {
         errors.push(
-          `${method.toUpperCase()} ${path}: sv_public endpoints must declare x-external-audience as one of ${publicAudiences.join(
+          `${method.toUpperCase()} ${path}: public endpoints must declare x-external-audience as one of ${publicAudiences.join(
             ', '
           )} but got ${JSON.stringify(audience)}`
         );
@@ -110,9 +114,9 @@ export function toIngressPath(openApiPath: string): string {
 }
 
 export function svPublicIngressPathsByAudience(
-  openApiContent: string
+  ...openApiContents: string[]
 ): Record<ExposedAudience, string[]> {
-  const endpoints = parseSvPublicEndpoints(openApiContent);
+  const endpoints = openApiContents.flatMap(content => parseSvPublicEndpoints(content));
   return Object.fromEntries(
     exposedAudiences.map(audience => [
       audience,
@@ -124,7 +128,9 @@ export function svPublicIngressPathsByAudience(
 }
 
 export function readSvPublicIngressPathsByAudience(
-  openApiFile: string
+  ...openApiFiles: string[]
 ): Record<ExposedAudience, string[]> {
-  return svPublicIngressPathsByAudience(fs.readFileSync(openApiFile, 'utf-8'));
+  return svPublicIngressPathsByAudience(
+    ...openApiFiles.map(openApiFile => fs.readFileSync(openApiFile, 'utf-8'))
+  );
 }

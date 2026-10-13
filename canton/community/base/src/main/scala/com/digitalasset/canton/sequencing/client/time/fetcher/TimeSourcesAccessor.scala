@@ -6,6 +6,7 @@ package com.digitalasset.canton.sequencing.client.time.fetcher
 import cats.syntax.parallel.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.client.time.fetcher.OneCallAtATimeSourcesAccessor.QueryTimeSourcesRunningTask
@@ -97,7 +98,11 @@ private[client] class OneCallAtATimeSourcesAccessor(
           //  because we won't retry in that case
           FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
             localClock
-              .scheduleAfter(_ => setFirst(Map.empty), timeout.duration),
+              .scheduleAfter(
+                action = _ => setFirst(Map.empty),
+                taskName = s"${getClass.getName}: clear sequencer timestamp map",
+                delta = timeout.duration,
+              ),
             "waiting for timeout to elapse failed",
           )
           val timeSourcesToBeStarted =

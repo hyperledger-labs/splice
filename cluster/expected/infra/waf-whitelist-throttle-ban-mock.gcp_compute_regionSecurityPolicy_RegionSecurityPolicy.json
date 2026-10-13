@@ -1,0 +1,12 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "description": "Cloud Armor security policy for mock",
+    "name": "waf-whitelist-throttle-ban-mock",
+    "type": "CLOUD_ARMOR"
+  },
+  "name": "waf-whitelist-throttle-ban-mock",
+  "provider": "",
+  "type": "gcp:compute/regionSecurityPolicy:RegionSecurityPolicy"
+}

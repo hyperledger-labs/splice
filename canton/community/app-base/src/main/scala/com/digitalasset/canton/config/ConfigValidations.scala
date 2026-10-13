@@ -8,11 +8,11 @@ import cats.instances.list.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
-import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.config.ParticipantNodeConfig
+import com.digitalasset.canton.networking.grpc.ClientChannelParams
+import com.digitalasset.canton.participant.config.{ExtensionServiceConfig, ParticipantNodeConfig}
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.synchronizer.mediator.MediatorNodeConfig
 import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig
@@ -20,6 +20,7 @@ import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.HandshakeErrors.DeprecatedProtocolVersion
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 
 import java.net.URI
@@ -27,6 +28,7 @@ import scala.concurrent.duration.Duration
 import scala.util.chaining.scalaUtilChainingOps
 
 object ConfigValidations extends NamedLogging {
+
   import TraceContext.Implicits.Empty.*
 
   override protected def loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
@@ -67,20 +69,26 @@ object ConfigValidations extends NamedLogging {
   }
 
   /** Return the list of validations
+    *
     * @param ensurePortsSet
     *   If set to true, will validate that ports are set. Should be true in `main`.
     * @return
     */
   protected def validations(ensurePortsSet: Boolean): List[Validation] =
     List[Validation](
+      devProtocolVersionRequiresNonStandard,
       alphaProtocolVersionRequiresNonStandard,
       dbSequencerRequiresNonStandard,
+      bftBlockOrderingStandaloneModeRequiresNonStandard,
       snapshotDirRequiresNonStandard,
       warnIfUnsafeMinProtocolVersion,
       adminTokenSafetyCheckParticipants,
       adminTokenConfigsMatchOnParticipants,
       topologyAwarePackageSelectionCheckParticipants,
       eitherUserListsOrPrivilegedTokensOnParticipants,
+      engineExtensionApiVersionPathSegmentsParticipants,
+      engineExtensionTargetPortsParticipants,
+      engineExtensionRetryDelaysParticipants,
       validateSelectedSchemes,
       sessionSigningKeysOnlyWithKmsAndSchemesAreSupported,
       sessionSigningKeysParamsValidation,
@@ -95,6 +103,8 @@ object ConfigValidations extends NamedLogging {
       defaultUpdatesPageSizeMustBeLeqMaximalPageSize,
       defaultAcsPageSizeMustBeLeqMaxPageSize,
       validateLegacyContractsV11Enabled,
+      serverConfigOnlyOneGrpcControlFlowMode,
+      clientChannelParamsOnlyOneGrpcControlFlowMode,
     ) ++ (if (ensurePortsSet) List(portsArtSet) else Nil)
 
   /** Group node configs by db access to find matching db storage configs. Overcomplicated types
@@ -255,15 +265,17 @@ object ConfigValidations extends NamedLogging {
     else base
   }
 
-  private def alphaProtocolVersionRequiresNonStandard(
-      config: CantonConfig
+  private def devOrAlphaProtocolVersionRequiresNonStandard(
+      config: CantonConfig,
+      configValueFn: LocalNodeParametersConfig => Boolean,
+      configName: String,
   ): Validated[NonEmpty[Seq[String]], Unit] = {
 
     val errors = config.allLocalNodes.toSeq.mapFilter { case (name, nodeConfig) =>
       val nonStandardConfig = config.parameters.nonStandardConfig
-      val alphaVersionSupport = nodeConfig.parameters.alphaVersionSupport
-      Option.when(!nonStandardConfig && alphaVersionSupport)(
-        alphaProtocolVersionRequiresNonStandardError(
+      Option.when(!nonStandardConfig && configValueFn(nodeConfig.parameters))(
+        devOrAlphaProtocolVersionRequiresNonStandardError(
+          configName = configName,
           nodeType = nodeConfig.nodeTypeName,
           nodeName = name.unwrap,
         )
@@ -273,8 +285,28 @@ object ConfigValidations extends NamedLogging {
     toValidated(errors)
   }
 
-  def alphaProtocolVersionRequiresNonStandardError(nodeType: String, nodeName: String) =
-    s"Enabling alpha-version-support for $nodeType $nodeName requires you to explicitly set canton.parameters.non-standard-config = yes"
+  private def devProtocolVersionRequiresNonStandard(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = devOrAlphaProtocolVersionRequiresNonStandard(
+    config,
+    _.devVersionSupport,
+    "dev-version-support",
+  )
+
+  private def alphaProtocolVersionRequiresNonStandard(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = devOrAlphaProtocolVersionRequiresNonStandard(
+    config,
+    _.alphaVersionSupport,
+    "alpha-version-support",
+  )
+
+  def devOrAlphaProtocolVersionRequiresNonStandardError(
+      configName: String,
+      nodeType: String,
+      nodeName: String,
+  ) =
+    s"Enabling $configName for $nodeType $nodeName requires you to explicitly set canton.parameters.non-standard-config = yes"
 
   private def snapshotDirRequiresNonStandard(
       config: CantonConfig
@@ -312,6 +344,27 @@ object ConfigValidations extends NamedLogging {
 
   def dbSequencerRequiresNonStandardError(nodeName: String): String =
     s"Using DB sequencer config for sequencer $nodeName requires you to explicitly set canton.parameters.non-standard-config = yes"
+
+  private def bftBlockOrderingStandaloneModeRequiresNonStandard(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    val errors = if (!config.parameters.nonStandardConfig) {
+      config.sequencers.toSeq.mapFilter { case (name, config) =>
+        config.sequencer match {
+          case x: SequencerConfig.BftSequencer =>
+            if (x.config.standalone.isDefined)
+              Some(bftBlockOrderingStandaloneModeRequiresNonStandardError(name.unwrap))
+            else None
+          case _ => None
+        }
+      }
+    } else Nil
+
+    toValidated(errors)
+  }
+
+  def bftBlockOrderingStandaloneModeRequiresNonStandardError(nodeName: String): String =
+    s"Using BftBlockOrdering standalone mode for sequencer $nodeName requires you to explicitly set canton.parameters.non-standard-config = yes"
 
   private def warnIfUnsafeMinProtocolVersion(
       config: CantonConfig
@@ -377,6 +430,60 @@ object ConfigValidations extends NamedLogging {
         participantConfig.parameters.engine.enableAdditionalConsistencyChecks && !config.parameters.nonStandardConfig
       )(
         s"Enabling additional consistency checks on the Daml Engine for participant ${name.unwrap} requires to explicitly set canton.parameters.non-standard-config = true"
+      )
+    }
+    toValidated(errors)
+  }
+
+  private def engineExtensionErrors(
+      config: CantonConfig
+  )(
+      validate: (InstanceName, String, ExtensionServiceConfig) => Option[String]
+  ): Seq[String] =
+    config.participants.toSeq.flatMap { case (name, participantConfig) =>
+      participantConfig.parameters.engine.extensions.toSeq.mapFilter {
+        case (extensionId, extensionConfig) => validate(name, extensionId, extensionConfig)
+      }
+    }
+
+  private def engineExtensionApiVersionPathSegmentsParticipants(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    val errors = engineExtensionErrors(config) { case (name, extensionId, extensionConfig) =>
+      Option.when(
+        extensionConfig.version == "." ||
+          extensionConfig.version == ".." ||
+          !extensionConfig.version.matches("[A-Za-z0-9._~-]+")
+      )(
+        s"For participant ${name.unwrap}, engine.extensions.$extensionId.version must be " +
+          "a non-empty URI path segment containing only unreserved characters [A-Za-z0-9._~-], " +
+          s"excluding '.' and '..', but found '${extensionConfig.version}'"
+      )
+    }
+    toValidated(errors)
+  }
+
+  private def engineExtensionTargetPortsParticipants(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    val errors = engineExtensionErrors(config) { case (name, extensionId, extensionConfig) =>
+      Option.when(extensionConfig.port == Port.Dynamic)(
+        s"For participant ${name.unwrap}, engine.extensions.$extensionId.port must not be the " +
+          s"dynamic port ${Port.Dynamic}"
+      )
+    }
+    toValidated(errors)
+  }
+
+  private def engineExtensionRetryDelaysParticipants(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+    val errors = engineExtensionErrors(config) { case (name, extensionId, extensionConfig) =>
+      Option.when(
+        extensionConfig.retryInitialDelay.underlying > extensionConfig.retryMaxDelay.underlying
+      )(
+        s"For participant ${name.unwrap}, engine.extensions.$extensionId retry delays must satisfy retry-initial-delay <= retry-max-delay; " +
+          s"respective values are ${extensionConfig.retryInitialDelay.underlying} and ${extensionConfig.retryMaxDelay.underlying}"
       )
     }
     toValidated(errors)
@@ -677,6 +784,7 @@ object ConfigValidations extends NamedLogging {
         )
         .toList
     }
+
     val errors = config.participants.toSeq
       .flatMap { case (name, participantConfig) =>
         List(
@@ -908,6 +1016,152 @@ object ConfigValidations extends NamedLogging {
           errors += s"Participant $name has 'parameters.validate-legacy-contracts-v-11' disabled. " +
             s"This should only be disabled if advised by the Digital Asset support. " +
             s"Set 'canton.parameters.non-standard-config = true' to override."
+      }
+
+      errors.result()
+    }
+
+  private def serverConfigOnlyOneGrpcControlFlowMode(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] =
+    toValidated {
+      val errors = Seq.newBuilder[String]
+
+      def validateServerConfig(serverConfig: ServerConfig, nodeName: InstanceName): Unit =
+        if (
+          serverConfig.flowControlWindow.isDefined && serverConfig.initialFlowControlWindow.isDefined
+        )
+          errors.addOne(
+            s"gRPC server config ('$nodeName', ${serverConfig.name}) has both " +
+              "flow-control-window and initial-flow-control-window set, " +
+              "but at most one of them should be set."
+          )
+
+      config.allLocalNodes.foreach { case (nodeName, nodeConfig) =>
+        validateServerConfig(nodeConfig.adminApi, nodeName)
+
+        nodeConfig match {
+          case sequencer: SequencerNodeConfig =>
+            validateServerConfig(sequencer.publicApi, nodeName)
+            sequencer.sequencer match {
+              case sequencerConfig: SequencerConfig.BftSequencer =>
+                sequencerConfig.config.initialNetwork.foreach(initialNetwork =>
+                  validateServerConfig(initialNetwork.serverEndpoint, nodeName)
+                )
+              case _ => ()
+            }
+          case participant: ParticipantNodeConfig =>
+            validateServerConfig(participant.ledgerApi, nodeName)
+          case _: MediatorNodeConfig => () // No public API
+          case _ => () // Tests
+        }
+      }
+
+      errors.result()
+    }
+
+  def clientChannelParamsOnlyOneGrpcControlFlowMode(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] =
+    toValidated {
+      val errors = Seq.newBuilder[String]
+
+      def validateFlowControlWindows(
+          flowControlWindow: Option[PositiveInt],
+          initialFlowControlWindow: Option[PositiveInt],
+          name: String,
+      ): Unit =
+        if (flowControlWindow.isDefined && initialFlowControlWindow.isDefined)
+          errors.addOne(
+            s"gRPC client channel config ($name) has both flow-control-window and initial-flow-control-window set, " +
+              "but at most one of them should be set."
+          )
+
+      def validateClientChannelParams(
+          clientChannelParams: ClientChannelParams,
+          name: String,
+      ): Unit =
+        validateFlowControlWindows(
+          clientChannelParams.flowControlWindow,
+          clientChannelParams.initialFlowControlWindow,
+          name,
+        )
+
+      config.parameters.clock match {
+        case ClockConfig.RemoteClock(remoteApi) =>
+          validateClientChannelParams(remoteApi.channel, "remote clock")
+        case _ => ()
+      }
+
+      config.allLocalNodes.foreach { case (nodeName, nodeConfig) =>
+        nodeConfig match {
+          case sequencer: SequencerNodeConfig =>
+            validateFlowControlWindows(
+              sequencer.sequencerClient.channelFlowControlWindow,
+              sequencer.sequencerClient.channelInitialFlowControlWindow,
+              s"local sequencer '$nodeName', sequencer client",
+            )
+            sequencer.sequencer match {
+              case sequencerConfig: SequencerConfig.BftSequencer =>
+                sequencerConfig.config.initialNetwork.foreach(initialNetwork =>
+                  initialNetwork.peerEndpoints.foreach { peerEndpoint =>
+                    validateClientChannelParams(
+                      peerEndpoint.channel,
+                      s"CantonBFT sequencer '$nodeName', P2P endpoint: ${peerEndpoint.endpointAsString}",
+                    )
+                  }
+                )
+              case _ => ()
+            }
+          case mediator: MediatorNodeConfig =>
+            validateFlowControlWindows(
+              mediator.sequencerClient.channelFlowControlWindow,
+              mediator.sequencerClient.channelInitialFlowControlWindow,
+              s"local mediator '$nodeName', sequencer client",
+            )
+          case participant: ParticipantNodeConfig =>
+            validateFlowControlWindows(
+              participant.sequencerClient.channelFlowControlWindow,
+              participant.sequencerClient.channelInitialFlowControlWindow,
+              s"local participant '$nodeName', sequencer client",
+            )
+          case _ => () // Tests
+        }
+      }
+
+      config.remoteSequencers.foreach { case (nodeName, nodeConfig) =>
+        validateClientChannelParams(
+          nodeConfig.clientAdminApi.channel,
+          s"remote sequencer '$nodeName', client admin API",
+        )
+        validateClientChannelParams(
+          nodeConfig.publicApi.channel,
+          s"remote sequencer '$nodeName', public API",
+        )
+        nodeConfig.grpcHealth.foreach(grpcHealth =>
+          validateClientChannelParams(
+            grpcHealth.channel,
+            s"remote sequencer '$nodeName', gRPC health",
+          )
+        )
+      }
+
+      config.remoteMediators.foreach { case (nodeName, nodeConfig) =>
+        validateClientChannelParams(
+          nodeConfig.clientAdminApi.channel,
+          s"remote mediator '$nodeName', client admin API",
+        )
+      }
+
+      config.remoteParticipants.foreach { case (nodeName, nodeConfig) =>
+        validateClientChannelParams(
+          nodeConfig.clientAdminApi.channel,
+          s"remote participant '$nodeName', client admin API",
+        )
+        validateClientChannelParams(
+          nodeConfig.clientLedgerApi.channel,
+          s"remote participant '$nodeName', ledger API",
+        )
       }
 
       errors.result()

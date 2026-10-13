@@ -1704,21 +1704,23 @@
       {
         "allValue": ".*",
         "current": {
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
         },
-        "definition": "label_values(daml_participant_sync_commitments_compute_duration_seconds,namespace)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(daml_participant_sync_commitments_digest_processor_health,namespace)",
         "includeAll": true,
         "multi": true,
         "name": "namespace",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_participant_sync_commitments_compute_duration_seconds,namespace)",
+          "query": "label_values(daml_participant_sync_commitments_digest_processor_health,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1730,18 +1732,20 @@
         "allValue": ".*",
         "current": {
           "text": "All",
-          "value": [
-            "$__all"
-          ]
+          "value": "$__all"
         },
-        "definition": "label_values(daml_participant_sync_commitments_compute_duration_seconds,job)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(daml_participant_sync_commitments_digest_processor_health,job)",
         "includeAll": true,
         "multi": true,
         "name": "job",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(daml_participant_sync_commitments_compute_duration_seconds,job)",
+          "query": "label_values(daml_participant_sync_commitments_digest_processor_health,job)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1759,6 +1763,6 @@
   "timezone": "",
   "title": "ACS Commitment Performance PV >= 36",
   "uid": "cnpqrxx",
-  "version": 9,
+  "version": 1,
   "weekStart": ""
 }

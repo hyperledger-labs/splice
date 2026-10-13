@@ -605,7 +605,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(rate_limiting_unknown_attribute_not_limited{namespace=~\"$namespace\", http_service=~\"$http_service\", limiter=~\"$limiter\", node_name=~\"$node_name\"}[$__rate_interval])) by (limiter, limiter_type, limiter_attribute)",
+          "expr": "sum(rate(splice_rate_limiting_unknown_attribute_not_limited_total{namespace=~\"$namespace\", http_service=~\"$http_service\", limiter=~\"$limiter\", node_name=~\"$node_name\"}[$__rate_interval])) by (limiter, limiter_type, limiter_attribute)",
           "instant": false,
           "legendFormat": "{{ limiter }} {{limiter_type}} {{limiter_attribute}}",
           "range": true,

@@ -3,9 +3,10 @@
 
 package com.digitalasset.canton.util
 
-import cats.Id
+import cats.{Functor, Id}
 import com.daml.grpc.adapter.{ExecutionSequencerFactory, PekkoExecutionSequencerPool}
-import com.daml.metrics.api.noop.NoOpMeter
+import com.daml.metrics.api.MetricHandle.Counter
+import com.daml.metrics.api.noop.NoOpGauge
 import com.daml.metrics.api.{
   MetricHandle,
   MetricInfo,
@@ -13,11 +14,12 @@ import com.daml.metrics.api.{
   MetricQualification,
   MetricsContext,
 }
-import com.daml.nonempty.NonEmpty
 import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, Threading}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.health.{ComponentHealthState, HealthStatus, Healthy, Unhealthy}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.pretty.Pretty
@@ -33,13 +35,16 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.SingletonTraverse.syntax.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.TryUtil.*
+import com.digitalasset.nonempty.NonEmpty
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.Logger
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.GraphDSL.Implicits.SourceShapeArrow
 import org.apache.pekko.stream.scaladsl.{
   Flow,
   FlowOps,
   FlowOpsMat,
+  GraphDSL,
   Keep,
   RunnableGraph,
   Sink,
@@ -47,6 +52,7 @@ import org.apache.pekko.stream.scaladsl.{
   SourceQueueWithComplete,
 }
 import org.apache.pekko.stream.stage.{
+  GraphStage,
   GraphStageLogic,
   GraphStageWithMaterializedValue,
   InHandler,
@@ -55,14 +61,19 @@ import org.apache.pekko.stream.stage.{
 import org.apache.pekko.stream.{
   ActorAttributes,
   Attributes,
+  FanInShape2,
   FlowShape,
+  Graph,
   Inlet,
   KillSwitch,
   KillSwitches,
   Materializer,
   Outlet,
+  OverflowStrategy,
   QueueCompletionResult,
   QueueOfferResult,
+  SourceShape,
+  StreamDetachedException,
   Supervision,
   UniqueKillSwitch,
 }
@@ -70,26 +81,43 @@ import org.apache.pekko.{Done, NotUsed}
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import java.util.{Timer, TimerTask}
+import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.implicitConversions
+import scala.util.chaining.*
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
+
+trait StateChangedCallback {
+  def apply(): Unit
+}
 
 object PekkoUtil extends HasLoggerName {
 
   /** Utility function to run the graph supervised and stop on an unhandled exception.
     *
-    * By default, an Pekko flow will discard exceptions. Use this method to avoid discarding
+    * By default, a Pekko flow will discard exceptions. Use this method to avoid discarding
     * exceptions.
+    *
+    * @param isDone
+    *   Evaluated on the materialized value when an unhandled exception reaches the supervisor. If
+    *   it returns true (e.g., indicating the stream has already completed naturally), the exception
+    *   is logged at INFO level with the suffix "(encountered after the graph is completed)" to
+    *   prevent false-positive alerts from late straggler exceptions.
+    * @param reportExceptionAtInfo
+    *   Evaluated on the exception itself. If it returns true (e.g., for expected control-flow
+    *   exceptions like aborts due to shutdown or non-failure cancellations), the exception is
+    *   logged at INFO level with the suffix "(explicitly suppressed)" instead of ERROR.
     */
   def runSupervised[MaterializedValueT](
       graph: RunnableGraph[MaterializedValueT],
       errorLogMessagePrefix: String,
       isDone: MaterializedValueT => Boolean = (_: MaterializedValueT) => false,
       debugLogging: Boolean = false,
+      reportExceptionAtInfo: Throwable => Boolean = _ => false,
   )(implicit mat: Materializer, loggingContext: ErrorLoggingContext): MaterializedValueT = {
     val materializedValueCell = new SingleUseCell[MaterializedValueT]
 
@@ -101,10 +129,12 @@ object PekkoUtil extends HasLoggerName {
             ex, // Pass the original error as well so that we don't lose it
           )
         )
-        // Avoid errors on shutdown
+        // Avoid errors on shutdown or if explicitly suppress
         if (isDone(materializedValue)) {
           loggingContext
             .info(s"$errorLogMessagePrefix (encountered after the graph is completed)", ex)
+        } else if (reportExceptionAtInfo(ex)) {
+          loggingContext.info(s"$errorLogMessagePrefix (explicitly suppressed)", ex)
         } else {
           loggingContext.error(errorLogMessagePrefix, ex)
         }
@@ -143,9 +173,55 @@ object PekkoUtil extends HasLoggerName {
       actorCount = Threading.detectNumberOfThreads(logger).value,
     )
 
+  def pekkoSourceFunctor[Mat]: Functor[Source[*, Mat]] = new Functor[Source[*, Mat]] {
+    override def map[A, B](source: Source[A, Mat])(f: A => B): Source[B, Mat] = source.map(f)
+  }
+
+  def pekkoFlowFunctor[In, Mat]: Functor[Flow[In, *, Mat]] = new Functor[Flow[In, *, Mat]] {
+    override def map[A, B](flow: Flow[In, A, Mat])(f: A => B): Flow[In, B, Mat] = flow.map(f)
+  }
+
+  /** This method should actually belong to `FlowOps` as an evidence that every `FlowOps`` can be
+    * transformed into its `Repr` type without having to modify the blueprint itself. The
+    * `asInstanceOf` is justified by inspection of all implementations of `FlowOps` (as of Pekko
+    * 1.2.1).
+    */
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def asRepr[Out, Mat](flowOps: FlowOps[Out, Mat]): flowOps.Repr[Out] =
+    flowOps.asInstanceOf[flowOps.Repr[Out]]
+
+  /** Adds a buffer to the output of the `graph`, and adds a Counter metric for buffer size.
+    *
+    * Good for detecting bottlenecks and speed difference between consumer and producer. In case
+    * producer is faster, this buffer should be mostly full. In case producer is slower, this buffer
+    * should be mostly empty.
+    *
+    * If `size` is <= 0, no buffer is added.
+    *
+    * @param counter
+    *   the counter to track the actual size of the buffer
+    * @param size
+    *   the maximum size of the buffer. In case of a bottleneck in producer this will be mostly
+    *   full, so careful estimation is needed to prevent excessive memory pressure.
+    * @param metricsContext
+    *   metrics context for the counter. Can be used to re-use one counter with different contexts
+    * @return
+    *   the instrumented flow
+    */
+  def buffered[Out, Mat](graph: FlowOps[Out, Mat], counter: Counter, size: Int)(implicit
+      metricsContext: MetricsContext = MetricsContext.Empty
+  ): graph.Repr[Out] =
+    if (size <= 0) asRepr(graph)
+    else
+      graph
+        // since wireTap is not guaranteed to be executed always, we need map to prevent counter skew over time.
+        .map(_.tap(_ => counter.inc()))
+        .buffer(size, OverflowStrategy.backpressure)
+        .map(_.tap(_ => counter.dec()))
+
   /** Remembers the last `memory` many elements that have already been emitted previously. Passes
     * those remembered elements downstream with each new element. The current element is the
-    * [[com.daml.nonempty.NonEmptyCollInstances.NEPreservingOps.last1]] of the sequence.
+    * [[com.digitalasset.nonempty.NonEmptyCollInstances.NEPreservingOps.last1]] of the sequence.
     *
     * [[remember]] differs from [[org.apache.pekko.stream.scaladsl.FlowOps.sliding]] in that
     * [[remember]] emits elements immediately when the given source emits, whereas
@@ -322,7 +398,7 @@ object PekkoUtil extends HasLoggerName {
   )(implicit loggingContext: NamedLoggingContext): graph.Repr[B] =
     mapAsyncUS(graph, parallelism)(f)
       // Important to use `collect` instead of `takeWhile` here
-      // so that the return source completes only after all `source`'s elements have been consumed.
+      // so that the returned source/flow completes only after all `source`'s elements have been consumed.
       // TODO(#13789) Should we cancel/pull a kill switch to signal upstream that no more elements are needed?
       .collect { case Outcome(x) => x }
 
@@ -382,6 +458,41 @@ object PekkoUtil extends HasLoggerName {
       // so that the return source completes only after all `source`'s elements have been consumed.
       // TODO(#13789) Should we cancel/pull a kill switch to signal upstream that no more elements are needed?
       .collect { case Outcome(x) => x }
+
+  /** Accumulates a value in state and concatenates a continuation Source when the state is ready.
+    *
+    * This construction must not be materialized multiple times.
+    */
+  def foldConcatF[Mat, Mat2, T, U >: T, Point](graph: FlowOps[T, Mat])(
+      init: => Point,
+      update: (Point, T) => Point,
+      continue: (Option[Throwable], Point) => Future[Source[U, Mat2]],
+  )(implicit ec: ExecutionContext): graph.Repr[U] = {
+    val errorPromise = Promise[Option[Throwable]]()
+    val pointPromise = Promise[Point]()
+    graph
+      .onErrorComplete { case throwable =>
+        errorPromise.trySuccess(Some(throwable)).discard
+        true
+      }
+      .statefulMap(() => init)(
+        f = (state: Point, e: T) => update(state, e) -> e,
+        onComplete = point => {
+          pointPromise.trySuccess(point).discard
+          errorPromise.trySuccess(None).discard
+          None
+        },
+      )
+      .concat(
+        Source.futureSource(
+          for {
+            error <- errorPromise.future
+            point <- pointPromise.future
+            continuationSource <- continue(error, point)
+          } yield continuationSource
+        )
+      )
+  }
 
   /** Combines two kill switches into one */
   class CombinedKillSwitch(private val killSwitch1: KillSwitch, private val killSwitch2: KillSwitch)
@@ -848,6 +959,127 @@ object PekkoUtil extends HasLoggerName {
     override def abort(ex: Throwable): Unit = delegate.onComplete(_.foreach(_.abort(ex)))
   }
 
+  /** Aggregates stream elements until the aggregation state is full or upstream completes. Ensures
+    * that all aggregation functions (`initial`, `aggregate`, `emit`) execute sequentially in the
+    * order of received elements. For example, if `e1`, ..., `eN` are the elements of the streams
+    * received, the methods execute in the following order:
+    *
+    *   - `initial(e1)`,
+    *   - `aggregate(_, e2)`, ..., `aggregate(_, eI)`,
+    *   - `emit(_)`,
+    *   - `initial(eI+1)`,
+    *   - `aggregate(_, eI_2)`, ..., `aggregate(_, eJ)`,
+    *   - `emit(_)`
+    *   - ...
+    *
+    * In particular, `emit` executes before `initial` of the next aggregation.
+    *
+    * @param initial
+    *   Turns an element into an aggregation state for only this element.
+    * @param aggregate
+    *   Adds an element into the aggregation state.
+    * @param full
+    *   Determines whether the aggregation state is full and no further elements shall be pulled
+    *   from upstream until the aggregated state has been emitted.
+    * @param emit
+    *   Converts an aggregation state into an element to be emitted downstream.
+    */
+  def aggregate[A, Acc, B, Mat](graph: FlowOps[A, Mat])(
+      initial: A => Acc
+  )(full: Acc => Boolean, aggregate: (Acc, A) => Acc, emit: Acc => B): graph.Repr[B] =
+    graph.via(new Aggregator[A, Acc, B](initial, aggregate, emit, full))
+
+  private class Aggregator[A, Acc, B](
+      initial: A => Acc,
+      aggregate: (Acc, A) => Acc,
+      emit: Acc => B,
+      full: Acc => Boolean,
+  ) extends GraphStage[FlowShape[A, B]] {
+    private val in: Inlet[A] = Inlet[A]("Aggregator.in")
+    private val out: Outlet[B] = Outlet[B]("Aggregator.out")
+    override val shape: FlowShape[A, B] = FlowShape(in, out)
+
+    override def initialAttributes: Attributes = Attributes.name("Aggregator")
+
+    @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.Null"))
+    override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
+      new GraphStageLogic(shape) with InHandler with OutHandler {
+        private var accumulator: Acc = _
+
+        override def onPush(): Unit = {
+          val elem = grab(in)
+          val oldAcc = accumulator
+          attempt {
+            accumulator = if (oldAcc == null) initial(elem) else aggregate(oldAcc, elem)
+            if (!full(accumulator)) pull(in) else flush()
+          }
+        }
+
+        override def onPull(): Unit =
+          pull(in)
+
+        override def onUpstreamFinish(): Unit = {
+          if (accumulator != null) flush()
+          completeStage()
+        }
+
+        @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+        private def flush(): Unit =
+          attempt {
+            val b = Aggregator.this.emit(accumulator)
+            push(out, b)
+            accumulator = null.asInstanceOf[Acc]
+          }
+
+        private def attempt(x: => Unit): Unit =
+          try {
+            x
+          } catch {
+            case NonFatal(ex) => failStage(ex)
+          }
+
+        setHandlers(in, out, this)
+      }
+  }
+
+  /** Emits the elements from `flowOps` in order. An element `e` is emitted only when the `gate` has
+    * previously produced a value that is at least as large as `by(e)`. Otherwise, `e` is buffered
+    * until such a value is produced by the `gate`. In the latter case, `onStuck` is called with the
+    * stuck element and the current gate size; if `onStuck` returns an `e'`, `e'` is inserted into
+    * the stream. `e'` does not replace `e` in the sense that `e` is still emitted once the gate has
+    * produced a value that is at least as large as `by(e)`.
+    *
+    * Backpressures when either `flowOps` or `gate` are slow.
+    *
+    * Completes when either input stream completes and all inputs have been emitted. May not
+    * complete when `flowOps` completes after some elements that are still queued in front of the
+    * `gate` and the `gate` has not yet completed.
+    */
+  def gateKeeper[A, B: Ordering, Mat](flowOps: FlowOps[A, Mat], gate: Graph[SourceShape[B], ?])(
+      by: A => B
+  )(onStuck: (A, B) => Option[A]): flowOps.Repr[A] =
+    flowOps.via(gateKeeperGraph(gate, by, onStuck))
+
+  /** @see com.digitalasset.canton.util.PekkoUtil.gateKeeper */
+  def gateKeeperMat[A, B: Ordering, Mat1, Mat2, Mat3](
+      flowOps: FlowOpsMat[A, Mat1],
+      gate: Graph[SourceShape[B], Mat2],
+  )(by: A => B)(onStuck: (A, B) => Option[A])(
+      combine: (Mat1, Mat2) => Mat3
+  ): flowOps.ReprMat[A, Mat3] =
+    flowOps.viaMat(gateKeeperGraph(gate, by, onStuck))(combine)
+
+  private def gateKeeperGraph[A, B: Ordering, M](
+      gate: Graph[SourceShape[B], M],
+      by: A => B,
+      onStuck: (A, B) => Option[A],
+  ): Graph[FlowShape[A, A], M] =
+    GraphDSL.createGraph(gate) { implicit b => r =>
+      val gated = b.add(new GateKeeper[A, B](by, onStuck))
+      r ~> gated.in1
+      FlowShape(gated.in0, gated.out)
+    }
+
   object syntax {
 
     /** Defines extension methods for [[org.apache.pekko.stream.scaladsl.FlowOpsMat]] that map to
@@ -865,6 +1097,11 @@ object PekkoUtil extends HasLoggerName {
     private[util] class PekkoUtilSyntaxForFlowOps[A, Mat, U <: FlowOps[A, Mat]](
         private val graph: U
     ) extends AnyVal {
+      def buffered(counter: Counter, size: Int)(implicit
+          metricsContext: MetricsContext = MetricsContext.Empty
+      ): U#Repr[A] =
+        PekkoUtil.buffered(graph, counter, size)
+
       def remember(window: NonNegativeInt): U#Repr[NonEmpty[Seq[A]]] =
         PekkoUtil.remember(graph, window)
 
@@ -920,7 +1157,39 @@ object PekkoUtil extends HasLoggerName {
 
       def dropIf(count: Int)(condition: A => Boolean): U#Repr[A] =
         PekkoUtil.dropIf(graph, count, condition)
+
+      def foldConcat[Mat2, R, B >: A](init: => R)(update: (R, A) => R)(
+          continue: R => Source[B, Mat2]
+      )(implicit ec: ExecutionContext): U#Repr[B] =
+        PekkoUtil.foldConcatF[Mat, Mat2, A, B, R](graph)(
+          init = init,
+          update = update,
+          continue = {
+            case (None, point) => Future.successful(continue(point))
+            case (Some(t), _) => Future.failed(t) // continue only successful Sources
+          },
+        )
+
+      def foldConcatF[Mat2, R, B >: A](init: => R)(update: (R, A) => R)(
+          continue: (Option[Throwable], R) => Future[Source[B, Mat2]]
+      )(implicit ec: ExecutionContext): U#Repr[B] =
+        PekkoUtil.foldConcatF[Mat, Mat2, A, B, R](graph)(
+          init = init,
+          update = update,
+          continue = continue,
+        )
+
+      def aggregate[Agg, B](
+          initial: A => Agg
+      )(full: Agg => Boolean, aggregate: (Agg, A) => Agg, emit: Agg => B): U#Repr[B] =
+        PekkoUtil.aggregate(graph)(initial)(full, aggregate, emit)
+
+      def gateKeeper[B: Ordering](gate: Graph[SourceShape[B], ?])(by: A => B)(
+          onStuck: (A, B) => Option[A]
+      ): U#Repr[A] =
+        PekkoUtil.gateKeeper(graph, gate)(by)(onStuck)
     }
+
     // Use separate implicit conversions for Sources and Flows to help IntelliJ
     // Otherwise IntelliJ gets very resource hungry.
     implicit def pekkoUtilSyntaxForFlowOpsSource[A, Mat](
@@ -977,6 +1246,11 @@ object PekkoUtil extends HasLoggerName {
 
       def injectKillSwitch(killSwitch: Mat => KillSwitch): U#ReprMat[WithKillSwitch[A], Mat] =
         PekkoUtil.injectKillSwitch(graph)(killSwitch)
+
+      def gateKeeperMat[B: Ordering, Mat2, Mat3](gate: Graph[SourceShape[B], Mat2])(by: A => B)(
+          onStuck: (A, B) => Option[A]
+      )(combine: (Mat, Mat2) => Mat3): U#ReprMat[A, Mat3] =
+        PekkoUtil.gateKeeperMat(graph, gate)(by)(onStuck)(combine)
     }
     // Use separate implicit conversions for Sources and Flows to help IntelliJ
     // Otherwise IntelliJ gets very resource hungry.
@@ -1044,6 +1318,11 @@ object PekkoUtil extends HasLoggerName {
       ContextualizedFlow[Context, A, B, Mat],
       C,
     ] = new PekkoUtilSyntaxForContextualizedFlowOps(graph)
+
+    implicit def pekkoUtilSourceFunctor[Mat]: Functor[Source[*, Mat]] =
+      PekkoUtil.pekkoSourceFunctor[Mat]
+    implicit def pekkoUtilSourceFlow[In, Mat]: Functor[Flow[In, *, Mat]] =
+      PekkoUtil.pekkoFlowFunctor[In, Mat]
   }
 
   type ContextualizedFlowOps[+Context[+_], +A, +Mat] =
@@ -1169,6 +1448,7 @@ object PekkoUtil extends HasLoggerName {
     def firstSuccessfulConsumerInitialization: Future[Unit]
 
     def uncommittedQueueSnapshot: Vector[(Long, T)]
+    def componentHealthState: ComponentHealthState
   }
 
   def exponentialRetryWithCap(
@@ -1201,7 +1481,10 @@ object PekkoUtil extends HasLoggerName {
       uncommittedWarnTreshold: Int,
       recoveringQueueMetrics: RecoveringQueueMetrics,
       consumerFactory: Commit => ShutdownInProgress => Future[Future[FutureQueueConsumer[T]]],
+      consumerName: String,
+      healthStateChanged: StateChangedCallback,
   ) extends RecoveringFutureQueue[T] {
+
     assert(maxBlockedOffer > 0)
     assert(retryAttemptWarnThreshold > 0)
     assert(retryAttemptErrorThreshold > 0)
@@ -1210,6 +1493,7 @@ object PekkoUtil extends HasLoggerName {
     private val logger = loggerFactory.getLogger(this.getClass)
     private implicit val directEC: ExecutionContext = DirectExecutionContext(logger)
 
+    @volatile
     private var consumer: Consumer[T] = Consumer.InitializationInProgress
 
     private val recoveringQueue: RecoveringQueue[T] = new RecoveringQueue(
@@ -1271,12 +1555,31 @@ object PekkoUtil extends HasLoggerName {
 
     override def done: Future[Done] = donePromise.future
 
+    override def componentHealthState: ComponentHealthState =
+      if (shuttingDown.get()) ComponentHealthState.ShutdownState
+      else
+        consumer match {
+          case Consumer.InitializationInProgress =>
+            ComponentHealthState.failed(s"Initializing $consumerName")
+          case Consumer.WaitingForRetry =>
+            ComponentHealthState.failed(
+              s"Pausing before $consumerName restart"
+            )
+          case Consumer.Initialized(consumer, consumerHealthStatus) =>
+            consumerHealthStatus.get() match {
+              case Healthy => ComponentHealthState.Ok()
+              case Unhealthy =>
+                ComponentHealthState.failed(s"Initializing $consumerName")
+            }
+        }
+
     private def shutdownStepTwo(): Unit = blockingSynchronized {
       logger.info("Shutdown initiated")
       shuttingDown.set(true)
+      healthStateChanged()
       recoveringQueue.shutdown()
       consumer match {
-        case Consumer.Initialized(c) =>
+        case Consumer.Initialized(c, _) =>
           logger.info("Consumer shutdown initiated")
           c.shutdown()
 
@@ -1291,30 +1594,50 @@ object PekkoUtil extends HasLoggerName {
       }
     }
 
+    private def commitProxy(consumerHealthStatus: AtomicReference[HealthStatus]): Commit = commit =>
+      {
+        val oldStatus = consumerHealthStatus.getAndSet(HealthStatus.healthy)
+        if (oldStatus != HealthStatus.healthy) {
+          healthStateChanged()
+        }
+        recoveringQueue.commit(commit)
+      }
+
     private def initializeConsumer(attempt: Int = 1): Unit = blockingSynchronized {
       logger.info("Initializing consumer...")
+      val atomicHealthStatus =
+        new AtomicReference(
+          HealthStatus.unhealthy // At this point we don't know it there will be uncomitted updates when consumer is up. Some late ayncrhonous commit may still arrive from previous consumer that died. We assume unhealthy, it will be updated in consumerInitialized
+        )
       consumer = Consumer.InitializationInProgress
-      consumerFactory(recoveringQueue.commit)(() => shuttingDown.get())
+      healthStateChanged()
+      consumerFactory(commitProxy(atomicHealthStatus))(() => shuttingDown.get())
         .flatMap { innerFuture =>
           firstSuccessfulConsumerInitializationPromise.trySuccess(()).discard
           innerFuture
         }(directEC)
-        .onComplete(consumerInitialized(_, attempt))(directEC)
+        .onComplete(consumerInitialized(_, attempt, atomicHealthStatus))(directEC)
     }
 
     private def consumerInitialized(
         result: Try[FutureQueueConsumer[T]],
         attempt: Int,
+        consumerHealthStatus: AtomicReference[HealthStatus],
     ): Unit = blockingSynchronized {
       result match {
         case Success(queueConsumer) =>
-          try {
-            recoveringQueue.recover(queueConsumer.fromExclusive)
-          } catch {
-            case t: Throwable =>
-              logger.error(s"Exception caught while recovering: ${t.getMessage}. Shutting down.", t)
-              shutdown()
-          }
+          val haveUncommittedElements =
+            try {
+              recoveringQueue.recover(queueConsumer.fromExclusive)
+            } catch {
+              case t: Throwable =>
+                logger.error(
+                  s"Exception caught while recovering: ${t.getMessage}. Shutting down.",
+                  t,
+                )
+                shutdown()
+                false // We don't care about uncommitted elements when we are going down
+            }
           if (shuttingDown.get()) {
             logger.info(
               "Consumer initialized, but since shutdown already in progress, consumer shutdown initiated"
@@ -1323,14 +1646,19 @@ object PekkoUtil extends HasLoggerName {
             queueConsumer.futureQueue.done.onComplete(consumerTerminated)(directEC)
           } else {
             logger.info("Consumer initialized")
+            if (!haveUncommittedElements) { // If there are no outstanding uncommitted elements, we assume healthy, so idle indexer is healthy
+              consumerHealthStatus.set(HealthStatus.healthy)
+            }
             consumer = Consumer.Initialized(
               new FutureQueuePullProxy(
                 initialEndIndex = queueConsumer.fromExclusive,
                 pull = recoveringQueue.dequeue,
                 delegate = queueConsumer.futureQueue,
                 loggerFactory = loggerFactory,
-              )
+              ),
+              consumerHealthStatus,
             )
+            healthStateChanged()
             consumer.ifInitialized(
               _.done.onComplete(consumerTerminated)(directEC)
             )
@@ -1352,6 +1680,7 @@ object PekkoUtil extends HasLoggerName {
             else if (attempt > retryAttemptWarnThreshold) logger.warn(logMessage, failure)
             else logger.info(logMessage, failure)
             consumer = Consumer.WaitingForRetry
+            healthStateChanged()
             if (!shuttingDownTimerCancelled) {
               timer.schedule(
                 new TimerTask {
@@ -1392,7 +1721,7 @@ object PekkoUtil extends HasLoggerName {
   sealed trait Consumer[+T] {
     def ifInitialized(f: FutureQueuePullProxy[T] => Unit): Unit =
       this match {
-        case Consumer.Initialized(consumer) => f(consumer)
+        case Consumer.Initialized(consumer, _) => f(consumer)
         case _ => ()
       }
   }
@@ -1402,7 +1731,10 @@ object PekkoUtil extends HasLoggerName {
 
     case object WaitingForRetry extends Consumer[Nothing]
 
-    final case class Initialized[+T](consumer: FutureQueuePullProxy[T]) extends Consumer[T]
+    final case class Initialized[+T](
+        consumer: FutureQueuePullProxy[T],
+        consumerHealthStatus: AtomicReference[HealthStatus],
+    ) extends Consumer[T]
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -1475,27 +1807,28 @@ object PekkoUtil extends HasLoggerName {
   }
 
   trait RecoveringQueueMetrics {
-    def blocked: MetricHandle.Meter
-    def buffered: MetricHandle.Meter
-    def uncommitted: MetricHandle.Meter
+    def blocked: MetricHandle.Gauge[Int]
+    def buffered: MetricHandle.Gauge[Int]
+    def uncommitted: MetricHandle.Gauge[Int]
   }
 
   object RecoveringQueueMetrics {
     def apply(
-        blockedMeter: MetricHandle.Meter,
-        bufferedMeter: MetricHandle.Meter,
-        uncommittedMeter: MetricHandle.Meter,
+        blockedGauge: MetricHandle.Gauge[Int],
+        bufferedGauge: MetricHandle.Gauge[Int],
+        uncommittedGauge: MetricHandle.Gauge[Int],
     ): RecoveringQueueMetrics = new RecoveringQueueMetrics {
-      override val blocked: MetricHandle.Meter = blockedMeter
-      override val buffered: MetricHandle.Meter = bufferedMeter
-      override val uncommitted: MetricHandle.Meter = uncommittedMeter
+      override val blocked: MetricHandle.Gauge[Int] = blockedGauge
+      override val buffered: MetricHandle.Gauge[Int] = bufferedGauge
+      override val uncommitted: MetricHandle.Gauge[Int] = uncommittedGauge
     }
 
     val NoOp: RecoveringQueueMetrics = {
-      val noOpMeter = NoOpMeter(
-        MetricInfo(MetricName.Daml, "", MetricQualification.Debug)
+      val noOpGauge = NoOpGauge(
+        MetricInfo(MetricName.Daml, "", MetricQualification.Debug),
+        0,
       )
-      apply(noOpMeter, noOpMeter, noOpMeter)
+      apply(noOpGauge, noOpGauge, noOpGauge)
     }
   }
 
@@ -1574,8 +1907,12 @@ object PekkoUtil extends HasLoggerName {
           updateMetrics()
         }
 
-    def recover(fromExclusive: Long): Unit = blockingSynchronized {
+    /** @return
+      *   If there were any uncomitted elements
+      */
+    def recover(fromExclusive: Long): Boolean = blockingSynchronized {
       commit(fromExclusive)
+      val ret = uncommitted.nonEmpty
       uncommitted.headOption.foreach { case (uncommittedHeadIndex, _) =>
         assert(
           uncommittedHeadIndex == fromExclusive + 1,
@@ -1588,6 +1925,7 @@ object PekkoUtil extends HasLoggerName {
         .map(_._2)
         .foreach(buffered.prepend)
       updateMetrics()
+      ret
     }
 
     // complete all blocked futures with success (anyway no guarantees that an offered elem makes it through),
@@ -1610,9 +1948,9 @@ object PekkoUtil extends HasLoggerName {
       (lock.exclusive(u))
 
     private def updateMetrics(): Unit = {
-      metrics.buffered.mark(buffered.size.toLong)(MetricsContext.Empty)
-      metrics.blocked.mark(blocked.size.toLong)(MetricsContext.Empty)
-      metrics.uncommitted.mark(uncommitted.size.toLong)(MetricsContext.Empty)
+      metrics.buffered.updateValue(buffered.size)(MetricsContext.Empty)
+      metrics.blocked.updateValue(blocked.size)(MetricsContext.Empty)
+      metrics.uncommitted.updateValue(uncommitted.size)(MetricsContext.Empty)
     }
   }
 
@@ -1685,4 +2023,379 @@ object PekkoUtil extends HasLoggerName {
     override def shutdown(): Unit = flagClosable.close()
     override def abort(ex: Throwable): Unit = flagClosable.close()
   }
+
+  def stashSource[T]: Source[T, StashSource[T]] = Source.fromGraph(new StashSourceStage[T]())
+
+  /** Similar to `Source.queue(1)`, but with drop-head (keep latest) semantics.
+    *
+    * The implementation follows the same logic as
+    * `org.apache.pekko.stream.impl.BoundedSourceQueueStage`, except that the `stash` plays the role
+    * of the `queue`. In fact, we could implement a `Queue`-like interface for the stash and keep
+    * the exact same implementation as `org.apache.pekko.stream.impl.BoundedSourceQueueStage`. Alas,
+    * the Pekko implementation is not parametric in the queue and so we copy everything over here.
+    */
+  private final class StashSourceStage[T]
+      extends GraphStageWithMaterializedValue[SourceShape[T], StashSource[T]] {
+    import StashSourceStage.*
+
+    private val out: Outlet[T] = Outlet[T]("StashSource.out")
+    override val shape: SourceShape[T] = SourceShape(out)
+
+    override def createLogicAndMaterializedValue(
+        inheritedAttributes: Attributes
+    ): (GraphStageLogic, StashSource[T]) = {
+
+      val state = new AtomicReference[State](Running)
+      val stash = new AtomicReference[Option[T]](None)
+
+      object Logic extends GraphStageLogic(shape) with OutHandler {
+
+        setHandler(out, this)
+        val callback = getAsyncCallback[Unit] { _ =>
+          clearNeedsActivation().discard
+          run()
+        }
+
+        override def onPull(): Unit = run()
+
+        override def onDownstreamFinish(cause: Throwable): Unit = {
+          setCompleted(Completed(StashOfferResult.Failure(cause))).discard
+          super.onDownstreamFinish(cause)
+        }
+
+        override def postStop(): Unit = {
+          // If the ActorSystem or Materializer is terminated abruptly, `postStop` may execute
+          // without previously closing the ports (fail, complete, onDownstreamFinish).
+          // So let's clean up.
+          stash.set(None)
+          val exception = new StreamDetachedException()
+          setCompleted(Completed(StashOfferResult.Failure(exception))).discard
+        }
+
+        /** Main loop of the stash. We do two volatile reads for the fast path of pushing elements
+          * from the queue to the stream: one for the state and one to poll the stash. This leads to
+          * a somewhat simple design that will quickly pick up failures from the stash interface.
+          *
+          * An even more optimized version could use a fast path in onPull to avoid reading the
+          * state for every element.
+          */
+        @tailrec
+        def run(): Unit =
+          state.get() match {
+            case Running =>
+              if (isAvailable(out)) {
+                val next = stash.getAndSet(None)
+                next match {
+                  case None =>
+                    // stash empty
+                    if (!setNeedsActivation())
+                      run() // didn't manage to set because stream has been completed in the meantime
+                    else if (stash.get.isDefined) /* && setNeedsActivation was true */ {
+                      // tricky case: new element might have been added in the meantime without callback being sent because
+                      // NeedsActivation had not yet been set
+
+                      clearNeedsActivation().discard
+                      run()
+                    } // else stash is empty && setNeedsActivation was true: waiting for next offer
+                  case Some(t) =>
+                    push(out, t) // and then: wait for pull
+                }
+              } // else: wait for pull
+
+            case Completed(StashOfferResult.StashClosed) =>
+              stash.get match {
+                case None => completeStage()
+                case Some(stashed) =>
+                  if (isAvailable(out)) {
+                    push(out, stashed)
+                    completeStage()
+                  }
+                // else: wait for pull to drain remaining elements
+              }
+            case Completed(StashOfferResult.Failure(ex)) => failStage(ex)
+            case NeedsActivation => throw new IllegalStateException // needs to be cleared before
+          }
+      }
+
+      object Mat extends StashSource[T] {
+        final override def offer(elem: T): StashOfferResult[T] = state.get() match {
+          case Running | NeedsActivation =>
+            val previous = stash.getAndSet(Some(elem))
+            // need to query state again because stage might have switched from Running -> NeedsActivation only after
+            // the last state.get but before stash.set.
+            if (state.get() == NeedsActivation)
+              // if this thread wins the race to toggle the flag, schedule async callback here
+              if (clearNeedsActivation())
+                Logic.callback.invoke(())
+
+            previous match {
+              case None => StashOfferResult.Stashed
+              case Some(prev) => StashOfferResult.Replaced(prev)
+            }
+
+          case Completed(result) => result
+        }
+
+        final override def complete(): Unit = {
+          assertNotCompleted()
+          if (setCompleted(Completed(StashOfferResult.StashClosed)))
+            Logic.callback.invoke(
+              ()
+            ) // if this thread won the completion race also schedule an async callback
+        }
+
+        final override def isCompleted: Boolean = state.get() match {
+          case _: Completed => true
+          case _ => false
+        }
+
+        final override def fail(ex: Throwable): Unit = {
+          assertNotCompleted()
+          if (setCompleted(Completed(StashOfferResult.Failure(ex))))
+            Logic.callback.invoke(
+              ()
+            ) // if this thread won the completion race also schedule an async callback
+        }
+
+        final def assertNotCompleted(): Unit =
+          if (isCompleted)
+            throw new IllegalStateException("The stash has already been completed.")
+
+        final override def isEmpty: Boolean = stash.get().isEmpty
+      }
+
+      // some state transition helpers
+      @tailrec
+      def setCompleted(completed: Completed): Boolean =
+        state.get() match {
+          case _: Completed => false
+          case x =>
+            if (!state.compareAndSet(x, completed)) setCompleted(completed)
+            else true
+        }
+
+      @tailrec
+      def clearNeedsActivation(): Boolean =
+        state.get() match {
+          case NeedsActivation =>
+            if (!state.compareAndSet(NeedsActivation, Running)) clearNeedsActivation()
+            else true
+
+          case _ => false
+        }
+      @tailrec
+      def setNeedsActivation(): Boolean =
+        state.get() match {
+          case Running =>
+            if (!state.compareAndSet(Running, NeedsActivation)) setNeedsActivation()
+            else true
+
+          case _ => false
+        }
+
+      (Logic, Mat)
+    }
+  }
+
+  private object StashSourceStage {
+    sealed trait State extends Product with Serializable
+    case object NeedsActivation extends State
+    case object Running extends State
+    final case class Completed(result: StashCompletionResult) extends State
+  }
+
+  trait StashSource[T] {
+
+    /** Returns a [[StashOfferResult]] that notifies the caller if the element could be stashed or
+      * not, or the completion status of the stash.
+      *
+      * A result of [[StashOfferResult.Stashed]] does not guarantee that an element also has been or
+      * will be processed by downstream.
+      */
+    def offer(elem: T): StashOfferResult[T]
+
+    /** Completes the stream normally.
+      */
+    def complete(): Unit
+
+    /** Returns true if the stream has been completed, either normally or with failure.
+      */
+    def isCompleted: Boolean
+
+    /** Completes the stream with a failure.
+      */
+    def fail(ex: Throwable): Unit
+
+    /** Returns whether the stash is empty.
+      */
+    def isEmpty: Boolean
+  }
+
+  /** Describes the result of offering an element to a [[StashSource]].
+    */
+  sealed trait StashOfferResult[+T] extends Product with Serializable
+
+  /** The completion result of a [[StashSource]]. */
+  sealed trait StashCompletionResult extends StashOfferResult[Nothing]
+
+  object StashOfferResult {
+
+    /** The element has been added to the empty stash. The element has been or will be passed
+      * downstream unless another offer replaces it or the stash is completed before that.
+      */
+    case object Stashed extends StashOfferResult[Nothing]
+
+    /** The element has been added to the stash that previously contained the given value. The
+      * `previous` value will not be passed downstream any more.
+      */
+    final case class Replaced[+T](previous: T) extends StashOfferResult[T]
+
+    /** The stash is failed. */
+    final case class Failure(cause: Throwable) extends StashCompletionResult
+
+    /** The stash has been completed normally. */
+    case object StashClosed extends StashCompletionResult
+  }
+
+  private final class GateKeeper[A, B: Ordering](by: A => B, onStuck: (A, B) => Option[A])
+      extends GraphStage[FanInShape2[A, B, A]] {
+    private val in = Inlet[A]("in")
+    private val gate = Inlet[B]("gate")
+    private val out = Outlet[A]("out")
+
+    override val shape = new FanInShape2(in, gate, out)
+
+    @SuppressWarnings(Array("org.wartremover.warts.Null", "org.wartremover.warts.Var"))
+    override def createLogic(attr: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
+      import Ordering.Implicits.*
+      setHandler(in, eagerTerminateInput)
+      setHandler(gate, ignoreTerminateInput)
+      setHandler(out, eagerTerminateOutput)
+
+      var watermark: B = _
+      var buffered: A = _
+
+      override def preStart(): Unit = {
+        // all fan-in stages need to eagerly pull all inputs to get cycles started
+        pull(in)
+        read(gate)(
+          g => {
+            watermark = g
+            readIn()
+          },
+          () => completeStage(),
+        )
+      }
+
+      val readIn: () => Unit = () =>
+        read(in)(
+          a => {
+            val wm = watermark
+            if (by(a) <= wm) {
+              emit(out, a, readIn)
+            } else {
+              buffered = a
+              onStuck(a, wm) match {
+                case None => readGate()
+                case Some(stuck) => emit(out, stuck, readGate)
+              }
+            }
+          },
+          () => completeStage(),
+        )
+
+      @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+      val readGate: () => Unit = () =>
+        read(gate)(
+          g => {
+            val wm = g max watermark
+            watermark = wm
+            if (by(buffered) <= wm) {
+              val next = buffered
+              buffered = null.asInstanceOf[A]
+              emit(out, next, readIn)
+            } else {
+              readGate()
+            }
+          },
+          () => completeStage(),
+        )
+    }
+  }
+
+  final case class RecoverAttempt(attempt: Int, delay: FiniteDuration)
+
+  trait RecoveryStrategy {
+    def recoverable(
+        lastAttempt: Option[RecoverAttempt],
+        throwable: Throwable,
+        elc: ErrorLoggingContext,
+    ): Option[RecoverAttempt]
+  }
+  object RecoveryStrategy {
+    def exponentialBackoff(
+        initialDelay: FiniteDuration,
+        maxDelay: FiniteDuration,
+        streamName: String,
+        warnLoggingAttemptThreshold: Int = Int.MaxValue, // by default always log on INFO
+        errorLoggingAttemptThreshold: Int = Int.MaxValue, // by default always log on INFO
+        failingAttemptThreshold: Int = Int.MaxValue, // by default always retry
+    )(recoverable: Throwable => Boolean): RecoveryStrategy = { (lastAttempt, throwable, elc) =>
+      val attemptsSoFar = lastAttempt.map(_.attempt).getOrElse(0)
+      val attempt = lastAttempt match {
+        case Some(last) =>
+          RecoverAttempt(
+            attempt = last.attempt + 1,
+            delay = last.delay.*(2).min(maxDelay),
+          )
+        case None =>
+          RecoverAttempt(
+            attempt = 1,
+            delay = initialDelay,
+          )
+      }
+      val (result, logMessage) =
+        if (!recoverable(throwable))
+          None -> s"$streamName failed with error. Failure is not recoverable (attempt: $attemptsSoFar). Propagating failure."
+        else if (attempt.attempt > failingAttemptThreshold)
+          None -> s"$streamName failed with error. Failed to recover as maximum attempts reached ($attemptsSoFar). Propagating failure."
+        else
+          Some(
+            attempt
+          ) -> s"$streamName failed with error. Recovering (attempt: ${attempt.attempt}) after ${attempt.delay}."
+      if (attempt.attempt > errorLoggingAttemptThreshold) elc.error(logMessage, throwable)
+      else if (attempt.attempt > warnLoggingAttemptThreshold) elc.warn(logMessage, throwable)
+      else elc.info(logMessage, throwable)
+      result
+    }
+  }
+
+  def recoveringSource[A, Mat, Point](
+      init: Point,
+      recoveryStrategy: RecoveryStrategy,
+  )(sourceFactory: Point => Source[A, Mat])(pointOf: A => Point)(implicit
+      executionContext: ExecutionContext,
+      elc: ErrorLoggingContext,
+  ): Source[A, Mat] = {
+    import syntax.*
+    def recursiveRecovery(point: Point, lastAttempt: Option[RecoverAttempt]): Source[A, Mat] =
+      sourceFactory(point)
+        .foldConcatF(point)((_, next) => pointOf(next)) {
+          case (None, _) => Future.successful(Source.empty)
+          case (Some(throwable), lastPoint) =>
+            recoveryStrategy.recoverable(
+              // only do exponential backoff, if the stream cannot progress
+              lastAttempt = lastAttempt.filter(_ => lastPoint == point),
+              throwable = throwable,
+              elc = elc,
+            ) match {
+              case Some(attempt) =>
+                DelayUtil.delay(attempt.delay).map(_ => recursiveRecovery(lastPoint, Some(attempt)))
+              case None => Future.failed(throwable)
+            }
+        }
+
+    recursiveRecovery(init, None)
+  }
+
 }

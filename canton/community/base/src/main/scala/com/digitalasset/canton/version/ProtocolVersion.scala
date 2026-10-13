@@ -4,7 +4,6 @@
 package com.digitalasset.canton.version
 
 import cats.syntax.either.*
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.ProtoDeserializationError.OtherError
 import com.digitalasset.canton.buildinfo.BuildInfo
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -18,6 +17,7 @@ import com.digitalasset.canton.version.ProtocolVersion.{
   supported,
 }
 import com.digitalasset.daml.lf.language.LanguageVersion
+import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
 import io.circe.Encoder
 import pureconfig.error.FailureReason
 import pureconfig.{ConfigReader, ConfigWriter}
@@ -105,6 +105,10 @@ sealed case class ProtocolVersion private[version] (v: Int)
   def toProtoPrimitiveS: String = v.toString
 
   override def compare(that: ProtocolVersion): Int = v.compare(that.v)
+
+  def nextSupported: Option[ProtocolVersion] = supported.filter(_.v > v).minOption
+
+  def previousSupported: Option[ProtocolVersion] = supported.filter(_.v < v).maxOption
 }
 
 object ProtocolVersion {
@@ -305,6 +309,9 @@ object ProtocolVersion {
       .map(ProtocolVersion.tryCreate)
       .getOrElse(ProtocolVersion.latest)
 
+  // TODO(#32229) Remove this once we have a stable protocol version that supports transparency
+  lazy val transparency: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] = dev
+
   lazy val almostDev: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
     ProtocolVersion.createAlpha(Int.MaxValue - 1)
 
@@ -319,6 +326,11 @@ object ProtocolVersion {
 
   lazy val v36: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
     ProtocolVersion.createStable(36)
+
+  // local storage doesn't depend on a synchronizer with a specific protocol version
+  lazy val acsCommitmentRedesignStorage
+      : ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] = v35
+  lazy val acsCommitmentRedesign: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] = v36
 
   // Minimum stable protocol version introduced
   lazy val minimum: ProtocolVersion = v34

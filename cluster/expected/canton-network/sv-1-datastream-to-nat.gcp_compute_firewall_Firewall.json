@@ -1,0 +1,27 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "allows": [
+      {
+        "ports": [
+          "5432"
+        ],
+        "protocol": "tcp"
+      }
+    ],
+    "destinationRanges": [
+      null
+    ],
+    "direction": "INGRESS",
+    "name": "sv-1-datastream-to-nat",
+    "network": "default",
+    "priority": 42,
+    "sourceRanges": [
+      "1.2.3.16/29"
+    ]
+  },
+  "name": "sv-1-datastream-to-nat",
+  "provider": "",
+  "type": "gcp:compute/firewall:Firewall"
+}

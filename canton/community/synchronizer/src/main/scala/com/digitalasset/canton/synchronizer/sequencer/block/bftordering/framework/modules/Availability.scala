@@ -18,6 +18,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability.{
   BatchId,
+  OrderingBlock,
   ProofOfAvailability,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.{
@@ -37,6 +38,9 @@ import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30
 import com.digitalasset.canton.tracing.Traced
 import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
+
+import java.time.Instant
+import scala.concurrent.duration.FiniteDuration
 
 object Availability {
 
@@ -279,6 +283,12 @@ object Availability {
 
     final case class FetchBlockData(block: OrderedBlockForOutput) extends LocalOutputFetch
 
+    final case class EarlyFetchBlockData(
+        blockNumber: BlockNumber,
+        originalLeader: BftNodeId,
+        block: OrderingBlock,
+    ) extends LocalOutputFetch
+
     final case class FetchedBlockDataFromStorage(
         request: BatchesRequest,
         result: AvailabilityStore.FetchBatchesResult,
@@ -289,15 +299,38 @@ object Availability {
         orderingMode: OrderingMode,
     ) extends LocalOutputFetch
 
-    final case class FetchRemoteBatchDataTimeout(batchId: BatchId, epochNumber: EpochNumber)
-        extends LocalOutputFetch
+    final case class FetchRemoteBatchDataTimeout(
+        nodesThatTimedOut: Seq[BftNodeId],
+        batchId: BatchId,
+        epochNumber: EpochNumber,
+        timeout: FiniteDuration,
+    ) extends LocalOutputFetch
 
     final case class AttemptedBatchDataLoadForNode(
         batchId: BatchId,
         batch: Option[OrderingRequestBatch],
     ) extends LocalOutputFetch
 
+    /** Result of asynchronously validating a batch fetched from a remote node (i.e. checking that
+      * its payload matches the requested `BatchId`). The (potentially expensive) hash computation
+      * is performed off the actor thread, and this message carries the outcome back so that the
+      * remaining, state-mutating handling runs on the actor thread.
+      */
+    final case class LocalFetchedBatchValidated(
+        batchId: BatchId,
+        batch: OrderingRequestBatch,
+        from: BftNodeId,
+        isValid: Boolean,
+        timeWeReceivedResponse: Instant,
+    ) extends LocalOutputFetch
+
     final case class FetchedBatchStored(batchId: BatchId) extends LocalOutputFetch
+
+    final case class PickedRecipientsForFetch(
+        chosenRecipients: Seq[BftNodeId],
+        batchId: BatchId,
+        instantWhenDidRequest: Instant,
+    ) extends LocalOutputFetch
   }
 
   object RemoteOutputFetch {

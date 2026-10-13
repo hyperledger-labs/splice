@@ -7,6 +7,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.digitalasset.canton.crypto.{AsymmetricEncrypted, Encrypted}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.ProtocolSymmetricKey
 import com.digitalasset.canton.sequencer.api.v30
@@ -77,6 +78,7 @@ private[endpoint] object ChannelStage {
       security: SequencerChannelSecurity,
       protocolVersion: ProtocolVersion,
       processor: SequencerChannelProtocolProcessor,
+      maxBytesToDecompress: MaxBytesToDecompress,
       loggerFactory: NamedLoggerFactory,
   )
 }
@@ -202,12 +204,9 @@ private[endpoint] class ChannelStageSecurelyConnected(data: InternalData)(implic
     val encryptedPayload = Encrypted.fromByteString(payload.value)
     for {
       decrypted <- decrypt(encryptedPayload)(Right(_))
-      // TODO(#29003): Use static or dynamic synchronizer maxRequestSize parameter value
-      //  to be passed in via ChannelStage.InternalData. If the parameter is decided to be dynamic,
-      //  use SequencerChannelClientEndpoint.timestamp for lookup.
       decompressed <- EitherT.fromEither[FutureUnlessShutdown](
         ByteStringUtil
-          .decompressGzip(decrypted, MaxBytesToDecompress.HardcodedDefault)
+          .decompressZstd(decrypted, data.maxBytesToDecompress)
           .leftMap(err => s"Failed to decompress payload: ${err.message}")
       )
       _ <- data.processor.handlePayload(decompressed)(traceContext)

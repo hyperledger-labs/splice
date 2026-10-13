@@ -5,12 +5,12 @@ package com.digitalasset.canton.participant.topology
 
 import cats.data.EitherT
 import cats.syntax.bifunctor.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.participant.topology.ParticipantTopologyManagerError.{
   ExternalPartyAlreadyExists,
@@ -29,6 +29,7 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.concurrent.ExecutionContext
 
@@ -100,12 +101,20 @@ object PartyOps {
                 partySigningKeysWithThreshold = None,
               )
             )
-            .bimap(
+            .biflatMap(
               err =>
-                ParticipantTopologyManagerError.IdentityManagerParentError(
-                  InvalidTopologyMapping.Reject(err)
+                EitherT.leftT[FutureUnlessShutdown, (Option[PositiveInt], PartyToParticipant)](
+                  ParticipantTopologyManagerError.IdentityManagerParentError(
+                    InvalidTopologyMapping.Reject(err)
+                  )
                 ),
-              ptp => (Some(existingPtpTx.serial.increment), ptp),
+              ptp =>
+                EitherT.fromEither[FutureUnlessShutdown](
+                  existingPtpTx.transaction
+                    .nextSerial(errorLoggingContext)
+                    .map[(Option[PositiveInt], PartyToParticipant)](next => (Some(next), ptp))
+                    .leftMap(ParticipantTopologyManagerError.IdentityManagerParentError(_))
+                ),
             )
 
         case multiple =>

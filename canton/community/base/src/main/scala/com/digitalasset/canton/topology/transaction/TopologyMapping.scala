@@ -9,7 +9,6 @@ import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError.{
   FieldNotSet,
   InvariantViolation,
@@ -23,10 +22,6 @@ import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.networking.{Endpoint, UrlValidator}
-import com.digitalasset.canton.protocol.v30.Enums
-import com.digitalasset.canton.protocol.v30.Enums.ParticipantFeatureFlag
-import com.digitalasset.canton.protocol.v30.NamespaceDelegation.Restriction
-import com.digitalasset.canton.protocol.v30.TopologyMapping.Mapping
 import com.digitalasset.canton.protocol.{DynamicSynchronizerParameters, SequencingParameters, v30}
 import com.digitalasset.canton.resource.ToDbPrimitive
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
@@ -48,8 +43,11 @@ import com.digitalasset.canton.topology.transaction.TopologyMapping.{
   newSigningKeys,
 }
 import com.digitalasset.canton.util.LoggerUtil
-import com.digitalasset.canton.version.ProtoVersion
+import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
+import com.digitalasset.canton.validation.{ProtoUnvalidatedString, ProtoValidation}
+import com.digitalasset.canton.version.*
 import com.digitalasset.canton.{LfPackageId, ProtoDeserializationError, SequencerAlias}
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import monocle.Lens
@@ -97,7 +95,7 @@ sealed trait TopologyMapping extends Product with Serializable with PrettyPrinti
 
   def restrictedToSynchronizer: Option[SynchronizerId]
 
-  def toProtoV30: v30.TopologyMapping
+  def toProtoV30: Either[String, v30.TopologyMapping]
 
   def uniqueKey: MappingHash
 
@@ -134,7 +132,7 @@ object TopologyMapping {
 
     val participantIdOld = ParticipantId.fromProtoPrimitive(proto = proto, fieldName = fieldName)
     participantIdOld.orElse(
-      UniqueIdentifier.fromProtoPrimitive(uid = proto, fieldName = fieldName).map(ParticipantId(_))
+      ParticipantId.fromProtoPrimitiveUid(uid = proto, fieldName = fieldName)
     )
   }
 
@@ -370,33 +368,43 @@ object TopologyMapping {
   }
 
   @nowarn("cat=deprecation")
-  def fromProtoV30(proto: v30.TopologyMapping): ParsingResult[TopologyMapping] =
+  def fromProtoV30(
+      pvv: ProtocolVersionValidation,
+      proto: v30.TopologyMapping,
+  ): ParsingResult[TopologyMapping] =
     proto.mapping match {
-      case Mapping.Empty =>
+      case v30.TopologyMapping.Mapping.Empty =>
         FieldNotSet("mapping").asLeft
-      case Mapping.NamespaceDelegation(value) => NamespaceDelegation.fromProtoV30(value)
-      case Mapping.DecentralizedNamespaceDefinition(value) =>
-        DecentralizedNamespaceDefinition.fromProtoV30(value)
-      case Mapping.OwnerToKeyMapping(value) => OwnerToKeyMapping.fromProtoV30(value)
-      case Mapping.PartyToKeyMapping(value) => PartyToKeyMapping.fromProtoV30(value)
-      case Mapping.SynchronizerTrustCertificate(value) =>
-        SynchronizerTrustCertificate.fromProtoV30(value)
-      case Mapping.PartyHostingLimits(value) => PartyHostingLimits.fromProtoV30(value)
-      case Mapping.ParticipantPermission(value) =>
-        ParticipantSynchronizerPermission.fromProtoV30(value)
-      case Mapping.VettedPackages(value) => VettedPackages.fromProtoV30(value)
-      case Mapping.PartyToParticipant(value) => PartyToParticipant.fromProtoV30(value)
-      case Mapping.SynchronizerParametersState(value) =>
-        SynchronizerParametersState.fromProtoV30(value)
-      case Mapping.SequencingDynamicParametersState(value) =>
-        SequencingParametersState.fromProtoV30(value)
-      case Mapping.MediatorSynchronizerState(value) => MediatorSynchronizerState.fromProtoV30(value)
-      case Mapping.SequencerSynchronizerState(value) =>
-        SequencerSynchronizerState.fromProtoV30(value)
-      case Mapping.SynchronizerUpgradeAnnouncement(value) =>
-        LsuAnnouncement.fromProtoV30(value)
-      case Mapping.SequencerConnectionSuccessor(value) =>
-        LsuSequencerConnectionSuccessor.fromProtoV30(value)
+      case v30.TopologyMapping.Mapping.NamespaceDelegation(value) =>
+        NamespaceDelegation.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.DecentralizedNamespaceDefinition(value) =>
+        DecentralizedNamespaceDefinition.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.OwnerToKeyMapping(value) =>
+        OwnerToKeyMapping.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.PartyToKeyMapping(value) =>
+        PartyToKeyMapping.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.SynchronizerTrustCertificate(value) =>
+        SynchronizerTrustCertificate.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.PartyHostingLimits(value) =>
+        PartyHostingLimits.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.ParticipantPermission(value) =>
+        ParticipantSynchronizerPermission.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.VettedPackages(value) =>
+        VettedPackages.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.PartyToParticipant(value) =>
+        PartyToParticipant.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.SynchronizerParametersState(value) =>
+        SynchronizerParametersState.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.SequencingDynamicParametersState(value) =>
+        SequencingParametersState.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.MediatorSynchronizerState(value) =>
+        MediatorSynchronizerState.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.SequencerSynchronizerState(value) =>
+        SequencerSynchronizerState.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.SynchronizerUpgradeAnnouncement(value) =>
+        LsuAnnouncement.fromProtoV30(pvv, value)
+      case v30.TopologyMapping.Mapping.SequencerConnectionSuccessor(value) =>
+        LsuSequencerConnectionSuccessor.fromProtoV30(pvv, value)
     }
 
   /** Determines the appropriate level for the given topology mappings.
@@ -434,24 +442,31 @@ sealed trait DelegationRestriction extends Product with Serializable {
 }
 object DelegationRestriction {
 
-  /** If no mapping restrictions are specified, returns CanSignAllMappings.
-    */
+  /** If no mapping restrictions are specified, returns None. */
   def fromProtoV30(
-      restriction: v30.NamespaceDelegation.Restriction
+      pvv: ProtocolVersionValidation,
+      restriction: v30.NamespaceDelegation.Restriction,
   ): ParsingResult[Option[DelegationRestriction]] =
     restriction match {
-      case Restriction.Empty => ParsingResult.pure(None)
-      case Restriction.CanSignAllMappings(v30.NamespaceDelegation.CanSignAllMappings()) =>
+      case v30.NamespaceDelegation.Restriction.Empty => ParsingResult.pure(None)
+      case v30.NamespaceDelegation.Restriction
+            .CanSignAllMappings(v30.NamespaceDelegation.CanSignAllMappings()) =>
         ParsingResult.pure(Some(CanSignAllMappings))
-      case Restriction.CanSignAllButNamespaceDelegations(
+      case v30.NamespaceDelegation.Restriction.CanSignAllButNamespaceDelegations(
             v30.NamespaceDelegation.CanSignAllButNamespaceDelegations()
           ) =>
         ParsingResult.pure(Some(CanSignAllButNamespaceDelegations))
-      case Restriction.CanSignSpecificMapings(
+      case v30.NamespaceDelegation.Restriction.CanSignSpecificMapings(
             v30.NamespaceDelegation.CanSignSpecificMappings(mappings)
           ) =>
-        ProtoConverter
-          .parseRequiredNonEmpty(Code.fromProtoV30, "mappings", mappings)
+        ProtoValidation
+          .validateLength(
+            mappings,
+            "mappings",
+            pvv,
+            ProtoValidation.MaxCollectionSize,
+          )
+          .flatMap(ProtoConverter.parseRequiredNonEmpty(Code.fromProtoV30, "mappings", _))
           .map(restrictions => Some(CanSignSpecificMappings(restrictions.toSet)))
     }
 
@@ -542,24 +557,26 @@ final case class NamespaceDelegation private (
       ),
     )
 
-  def toProto: v30.NamespaceDelegation =
-    v30.NamespaceDelegation(
-      namespace = namespace.fingerprint.unwrap,
-      targetKey = Some(target.toProtoV30),
-      // never set the isRootDelegation flag to true
-      isRootDelegation = false,
-      restriction = restriction.toProtoV30,
-    )
+  def toProtoNamespaceDelegationV30: Either[String, v30.NamespaceDelegation] =
+    target.toProtoV30.map { targetP =>
+      v30.NamespaceDelegation(
+        namespace = namespace.fingerprint.unwrap,
+        targetKey = Some(targetP),
+        // never set the isRootDelegation flag to true
+        isRootDelegation = false,
+        restriction = restriction.toProtoV30,
+      )
+    }
 
   override def referencedUids: Set[UniqueIdentifier] = Set.empty
 
-  def canSign(mappingsToSign: Code): Boolean =
-    restriction.canSign(mappingsToSign)
+  def canSign(mappingCodeToSign: Code): Boolean =
+    restriction.canSign(mappingCodeToSign)
 
-  override def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.NamespaceDelegation(
-        toProto
+  override def toProtoV30: Either[String, v30.TopologyMapping] =
+    toProtoNamespaceDelegationV30.map(mappingP =>
+      v30.TopologyMapping(
+        v30.TopologyMapping.Mapping.NamespaceDelegation(mappingP)
       )
     )
 
@@ -640,21 +657,24 @@ object NamespaceDelegation extends TopologyMappingCompanion {
           // explicitly checking for nonEmpty to guard against refactorings away from NonEmpty[Set[...]].
           sit.signatures.nonEmpty &&
           ns.canSign(Code.NamespaceDelegation) &&
-          ns.target.fingerprint == ns.namespace.fingerprint
+          ns.target.fingerprint == ns.namespace.fingerprint // root check
       )
 
   @nowarn("cat=deprecation")
   def fromProtoV30(
-      value: v30.NamespaceDelegation
+      pvv: ProtocolVersionValidation,
+      value: v30.NamespaceDelegation,
   ): ParsingResult[NamespaceDelegation] =
     for {
-      namespace <- Fingerprint.fromProtoPrimitive(value.namespace).map(Namespace(_))
+      namespace <- ProtoValidation
+        .validateThen(value.namespace, "namespace", pvv)(Fingerprint.fromProtoPrimitive)
+        .map(Namespace(_))
       target <- ProtoConverter.parseRequired(
         SigningPublicKey.fromProtoV30,
         "target_key",
         value.targetKey,
       )
-      explicitRestriction <- DelegationRestriction.fromProtoV30(value.restriction)
+      explicitRestriction <- DelegationRestriction.fromProtoV30(pvv, value.restriction)
       finalRestriction <- explicitRestriction match {
         case None =>
           // this branch is for maintaining backwards compatibility
@@ -709,13 +729,15 @@ final case class DecentralizedNamespaceDefinition private (
     v30.DecentralizedNamespaceDefinition(
       decentralizedNamespace = namespace.fingerprint.unwrap,
       threshold = threshold.unwrap,
-      owners = owners.toSeq.map(_.toProtoPrimitive),
+      owners = owners.toSeq.map(_.toProtoPrimitive.toProtoUnvalidated),
     )
 
-  override def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.DecentralizedNamespaceDefinition(toProto)
-    )
+  override def toProtoV30: Either[String, v30.TopologyMapping] =
+    v30
+      .TopologyMapping(
+        v30.TopologyMapping.Mapping.DecentralizedNamespaceDefinition(toProto)
+      )
+      .asRight
 
   override def maybeUid: Option[UniqueIdentifier] = None
   override def referencedUids: Set[UniqueIdentifier] = Set.empty
@@ -771,15 +793,25 @@ object DecentralizedNamespaceDefinition extends TopologyMappingCompanion {
     } yield DecentralizedNamespaceDefinition(decentralizedNamespace, threshold, owners)
 
   def fromProtoV30(
-      value: v30.DecentralizedNamespaceDefinition
+      pvv: ProtocolVersionValidation,
+      value: v30.DecentralizedNamespaceDefinition,
   ): ParsingResult[DecentralizedNamespaceDefinition] = {
     val v30.DecentralizedNamespaceDefinition(decentralizedNamespaceP, thresholdP, ownersP) = value
     for {
-      decentralizedNamespace <- Fingerprint
-        .fromProtoPrimitive(decentralizedNamespaceP)
+      decentralizedNamespace <- ProtoValidation
+        .validateThen(decentralizedNamespaceP, "decentralized_namespace", pvv)(
+          Fingerprint.fromProtoPrimitive
+        )
         .map(Namespace(_))
       threshold <- ProtoConverter.parsePositiveInt("threshold", thresholdP)
-      owners <- ownersP.traverse(Fingerprint.fromProtoPrimitive)
+      owners <- ProtoValidation.validateThen(
+        ownersP,
+        "owners",
+        pvv,
+        ProtoValidation.MaxCollectionSize,
+      )(
+        Fingerprint.fromProtoPrimitive
+      )
       ownersNE <- NonEmpty
         .from(owners.toSet)
         .toRight(
@@ -870,15 +902,20 @@ final case class OwnerToKeyMapping private (
     ),
   )
 
-  def toProto: v30.OwnerToKeyMapping = v30.OwnerToKeyMapping(
-    member = member.toProtoPrimitive,
-    publicKeys = keys.map(_.toProtoPublicKeyV30),
-  )
+  def toProtoOwnerToKeyMappingV30: Either[String, v30.OwnerToKeyMapping] =
+    keys.forgetNE.traverse(_.toProtoPublicKeyV30).map { keysP =>
+      v30.OwnerToKeyMapping(
+        member = member.toProtoPrimitive,
+        publicKeys = keysP,
+      )
+    }
 
-  def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.OwnerToKeyMapping(
-        toProto
+  def toProtoV30: Either[String, v30.TopologyMapping] =
+    toProtoOwnerToKeyMappingV30.map(mappingP =>
+      v30.TopologyMapping(
+        v30.TopologyMapping.Mapping.OwnerToKeyMapping(
+          mappingP
+        )
       )
     )
 
@@ -939,13 +976,18 @@ object OwnerToKeyMapping extends TopologyMappingCompanion {
     create(member, keys).valueOr(err => throw new IllegalArgumentException(err))
 
   def fromProtoV30(
-      value: v30.OwnerToKeyMapping
+      pvv: ProtocolVersionValidation,
+      value: v30.OwnerToKeyMapping,
   ): ParsingResult[OwnerToKeyMapping] = {
     val v30.OwnerToKeyMapping(memberP, keysP) = value
     for {
-      member <- Member.fromProtoPrimitive(memberP, "member")
+      member <- ProtoValidation.validateThen(memberP, "member", pvv)(
+        Member.fromProtoPrimitive
+      )
+      keysSeqP <- ProtoValidation
+        .validateLength(keysP, "public_keys", pvv, ProtoValidation.MaxCollectionSize)
       keys <- ProtoConverter
-        .parseRequiredNonEmpty(PublicKey.fromProtoPublicKeyV30, "public_keys", keysP)
+        .parseRequiredNonEmpty(PublicKey.fromProtoPublicKeyV30, "public_keys", keysSeqP)
       otk <- create(member, keys).leftMap(ProtoDeserializationError.InvariantViolation(None, _))
     } yield otk
   }
@@ -975,16 +1017,22 @@ final case class PartyToKeyMapping private (
     )
   override def companion: PartyToKeyMapping.type = PartyToKeyMapping
 
-  def toProto: v30.PartyToKeyMapping = v30.PartyToKeyMapping(
-    party = party.toProtoPrimitive,
-    threshold = signingKeysWithThreshold.threshold.unwrap,
-    signingKeys = signingKeysWithThreshold.keys.toSeq.sortBy(_.fingerprint).map(_.toProtoV30),
-  )
+  def toProtoPartyToKeyMappingV30: Either[String, v30.PartyToKeyMapping] =
+    signingKeysWithThreshold.keys.toSeq.sortBy(_.fingerprint).forgetNE.traverse(_.toProtoV30).map {
+      signingKeysP =>
+        v30.PartyToKeyMapping(
+          party = party.toProtoPrimitive,
+          threshold = signingKeysWithThreshold.threshold.unwrap,
+          signingKeys = signingKeysP,
+        )
+    }
 
-  def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.PartyToKeyMapping(
-        toProto
+  def toProtoV30: Either[String, v30.TopologyMapping] =
+    toProtoPartyToKeyMappingV30.map(mappingP =>
+      v30.TopologyMapping(
+        v30.TopologyMapping.Mapping.PartyToKeyMapping(
+          mappingP
+        )
       )
     )
 
@@ -1072,16 +1120,21 @@ object PartyToKeyMapping extends TopologyMappingCompanion {
   override def code: TopologyMapping.Code = Code.PartyToKeyMapping
 
   def fromProtoV30(
-      value: v30.PartyToKeyMapping
+      pvv: ProtocolVersionValidation,
+      value: v30.PartyToKeyMapping,
   ): ParsingResult[PartyToKeyMapping] = {
     val v30.PartyToKeyMapping(partyP, thresholdP, signingKeysP) = value
     for {
-      party <- PartyId.fromProtoPrimitive(partyP, "party")
+      party <- ProtoValidation.validateThen(partyP, "party", pvv)(
+        PartyId.fromProtoPrimitive
+      )
+      signingKeysSeqP <- ProtoValidation
+        .validateLength(signingKeysP, "signing_keys", pvv, ProtoValidation.MaxCollectionSize)
       signingKeysNE <-
         ProtoConverter.parseRequiredNonEmpty(
           SigningPublicKey.fromProtoV30,
           "signing_keys",
-          signingKeysP,
+          signingKeysSeqP,
         )
       threshold <- PositiveInt
         .create(thresholdP)
@@ -1124,12 +1177,14 @@ final case class SynchronizerTrustCertificate(
       featureFlags = featureFlags.map(_.toProtoV30),
     )
 
-  override def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.SynchronizerTrustCertificate(
-        toProto
+  override def toProtoV30: Either[String, v30.TopologyMapping] =
+    v30
+      .TopologyMapping(
+        v30.TopologyMapping.Mapping.SynchronizerTrustCertificate(
+          toProto
+        )
       )
-    )
+      .asRight
 
   override def namespace: Namespace = participantId.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(participantId.uid)
@@ -1185,9 +1240,10 @@ object SynchronizerTrustCertificate extends TopologyMappingCompanion {
       knownTopologyFeatureFlags
         .find(_.value == valueP.value)
         .orElse(
-          Option.when(valueP != ParticipantFeatureFlag.PARTICIPANT_FEATURE_FLAG_UNSPECIFIED)(
-            ParticipantTopologyFeatureFlag(valueP.value)()
-          )
+          Option
+            .when(valueP != v30.Enums.ParticipantFeatureFlag.PARTICIPANT_FEATURE_FLAG_UNSPECIFIED)(
+              ParticipantTopologyFeatureFlag(valueP.value)()
+            )
         )
   }
 
@@ -1199,15 +1255,28 @@ object SynchronizerTrustCertificate extends TopologyMappingCompanion {
   override def code: Code = Code.SynchronizerTrustCertificate
 
   def fromProtoV30(
-      valueP: v30.SynchronizerTrustCertificate
+      pvv: ProtocolVersionValidation,
+      valueP: v30.SynchronizerTrustCertificate,
   ): ParsingResult[SynchronizerTrustCertificate] =
     for {
-      participantId <- TopologyMapping.participantIdFromProtoPrimitive(
+      participantId <- ProtoValidation.validateThen(
         valueP.participantUid,
         "participant_uid",
-      )
-      synchronizerId <- SynchronizerId.fromProtoPrimitive(valueP.synchronizerId, "synchronizer_id")
-      featureFlags = valueP.featureFlags.flatMap(ParticipantTopologyFeatureFlag.fromProtoV30)
+        pvv,
+      )(TopologyMapping.participantIdFromProtoPrimitive)
+      synchronizerId <- ProtoValidation.validateThen(
+        valueP.synchronizerId,
+        "synchronizer_id",
+        pvv,
+      )(SynchronizerId.fromProtoPrimitive)
+      featureFlagsP <- ProtoValidation
+        .validateLength(
+          valueP.featureFlags,
+          "feature_flags",
+          pvv,
+          ProtoValidation.MaxCollectionSize,
+        )
+      featureFlags = featureFlagsP.flatMap(ParticipantTopologyFeatureFlag.fromProtoV30)
     } yield SynchronizerTrustCertificate(
       participantId,
       synchronizerId,
@@ -1230,17 +1299,17 @@ sealed trait ParticipantPermission extends Product with Serializable {
 }
 object ParticipantPermission {
   case object Submission extends ParticipantPermission {
-    lazy val toProtoV30: Enums.ParticipantPermission =
+    lazy val toProtoV30: v30.Enums.ParticipantPermission =
       v30.Enums.ParticipantPermission.PARTICIPANT_PERMISSION_SUBMISSION
     private[transaction] def canConfirm: Boolean = true
   }
   case object Confirmation extends ParticipantPermission {
-    lazy val toProtoV30: Enums.ParticipantPermission =
+    lazy val toProtoV30: v30.Enums.ParticipantPermission =
       v30.Enums.ParticipantPermission.PARTICIPANT_PERMISSION_CONFIRMATION
     private[transaction] def canConfirm: Boolean = true
   }
   case object Observation extends ParticipantPermission {
-    lazy val toProtoV30: Enums.ParticipantPermission =
+    lazy val toProtoV30: v30.Enums.ParticipantPermission =
       v30.Enums.ParticipantPermission.PARTICIPANT_PERMISSION_OBSERVATION
     private[transaction] def canConfirm: Boolean = false
   }
@@ -1328,12 +1397,14 @@ final case class ParticipantSynchronizerPermission(
       loginAfter = loginAfter.map(_.toProtoPrimitive),
     )
 
-  override def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.ParticipantPermission(
-        toProto
+  override def toProtoV30: Either[String, v30.TopologyMapping] =
+    v30
+      .TopologyMapping(
+        v30.TopologyMapping.Mapping.ParticipantPermission(
+          toProto
+        )
       )
-    )
+      .asRight
 
   override def namespace: Namespace = participantId.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(participantId.uid)
@@ -1386,14 +1457,20 @@ object ParticipantSynchronizerPermission extends TopologyMappingCompanion {
     )
 
   def fromProtoV30(
-      valueP: v30.ParticipantSynchronizerPermission
+      pvv: ProtocolVersionValidation,
+      valueP: v30.ParticipantSynchronizerPermission,
   ): ParsingResult[ParticipantSynchronizerPermission] =
     for {
-      synchronizerId <- SynchronizerId.fromProtoPrimitive(valueP.synchronizerId, "synchronizer_id")
-      participantId <- TopologyMapping.participantIdFromProtoPrimitive(
+      synchronizerId <- ProtoValidation.validateThen(
+        valueP.synchronizerId,
+        "synchronizer_id",
+        pvv,
+      )(SynchronizerId.fromProtoPrimitive)
+      participantId <- ProtoValidation.validateThen(
         valueP.participantUid,
         "participant_uid",
-      )
+        pvv,
+      )(TopologyMapping.participantIdFromProtoPrimitive)
       permission <- ParticipantPermission.fromProtoV30(valueP.permission)
       limits <- valueP.limits.traverse(ParticipantSynchronizerLimits.fromProtoV30)
       loginAfter <- valueP.loginAfter.traverse(CantonTimestamp.fromProtoPrimitive)
@@ -1423,12 +1500,14 @@ final case class PartyHostingLimits(
       party = partyId.toProtoPrimitive,
     )
 
-  override def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.PartyHostingLimits(
-        toProto
+  override def toProtoV30: Either[String, v30.TopologyMapping] =
+    v30
+      .TopologyMapping(
+        v30.TopologyMapping.Mapping.PartyHostingLimits(
+          toProto
+        )
       )
-    )
+      .asRight
 
   override def namespace: Namespace = partyId.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(partyId.uid)
@@ -1454,11 +1533,18 @@ object PartyHostingLimits extends TopologyMappingCompanion {
   override def code: Code = Code.PartyHostingLimits
 
   def fromProtoV30(
-      valueP: v30.PartyHostingLimits
+      pvv: ProtocolVersionValidation,
+      valueP: v30.PartyHostingLimits,
   ): ParsingResult[PartyHostingLimits] =
     for {
-      synchronizerId <- SynchronizerId.fromProtoPrimitive(valueP.synchronizerId, "synchronizer_id")
-      partyId <- PartyId.fromProtoPrimitive(valueP.party, "party")
+      synchronizerId <- ProtoValidation.validateThen(
+        valueP.synchronizerId,
+        "synchronizer_id",
+        pvv,
+      )(SynchronizerId.fromProtoPrimitive)
+      partyId <- ProtoValidation.validateThen(valueP.party, "party", pvv)(
+        PartyId.fromProtoPrimitive
+      )
     } yield PartyHostingLimits(synchronizerId, partyId)
 }
 
@@ -1506,18 +1592,19 @@ object VettedPackage {
     packageIds.map(VettedPackage(_, None, None))
 
   def fromProtoV30(
-      value: v30.VettedPackages.VettedPackage
+      pvv: ProtocolVersionValidation,
+      value: v30.VettedPackages.VettedPackage,
   ): ParsingResult[VettedPackage] = for {
-    pkgId <- LfPackageId
-      .fromString(value.packageId)
-      .leftMap(ProtoDeserializationError.ValueConversionError("package_id", _))
+    pkgId <- ProtoValidation.validateThen(value.packageId, "package_id", pvv)(
+      ProtoConverter.parsePackageId
+    )
     validFromInclusive <- value.validFromInclusive.traverse(CantonTimestamp.fromProtoTimestamp)
     validUntilExclusive <- value.validUntilExclusive.traverse(CantonTimestamp.fromProtoTimestamp)
   } yield VettedPackage(pkgId, validFromInclusive, validUntilExclusive)
 }
 
 // Package vetting
-final case class VettedPackages private (
+final case class VettedPackages(
     participantId: ParticipantId,
     packages: Seq[VettedPackage],
 ) extends TopologyMapping {
@@ -1531,16 +1618,18 @@ final case class VettedPackages private (
   def toProto: v30.VettedPackages =
     v30.VettedPackages(
       participantUid = participantId.uid.toProtoPrimitive,
-      packageIds = Seq.empty,
+      packageIds = Seq.empty[ProtoUnvalidatedString],
       packages = packages.map(_.toProtoV30),
     )
 
-  override def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.VettedPackages(
-        toProto
+  override def toProtoV30: Either[String, v30.TopologyMapping] =
+    v30
+      .TopologyMapping(
+        v30.TopologyMapping.Mapping.VettedPackages(
+          toProto
+        )
       )
-    )
+      .asRight
 
   override def namespace: Namespace = participantId.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(participantId.uid)
@@ -1604,21 +1693,27 @@ object VettedPackages extends TopologyMappingCompanion {
 
   @nowarn("cat=deprecation")
   def fromProtoV30(
-      value: v30.VettedPackages
+      pvv: ProtocolVersionValidation,
+      value: v30.VettedPackages,
   ): ParsingResult[VettedPackages] =
     for {
-      participantId <- TopologyMapping.participantIdFromProtoPrimitive(
+      participantId <- ProtoValidation.validateThen(
         value.participantUid,
         "participant_uid",
-      )
-      packageIdsUnbounded <- value.packageIds
-        .traverse(
-          LfPackageId
-            .fromString(_)
-            .leftMap(ProtoDeserializationError.ValueConversionError("package_ids", _))
+        pvv,
+      )(TopologyMapping.participantIdFromProtoPrimitive)
+      packageIdsUnbounded <- ProtoValidation
+        .validateThen(value.packageIds, "package_ids", pvv, ProtoValidation.MaxCollectionSize)(
+          ProtoConverter.parsePackageId
         )
         .map(VettedPackage.unbounded)
-      packages <- value.packages.traverse(VettedPackage.fromProtoV30)
+      packages <- ProtoValidation
+        .validateLengthThen(
+          value.packages,
+          "packages",
+          pvv,
+          ProtoValidation.MaxCollectionSize,
+        )((element, _) => VettedPackage.fromProtoV30(pvv, element))
 
       duplicatePackages = packageIdsUnbounded
         .map(_.packageId)
@@ -1657,12 +1752,14 @@ object HostingParticipant {
     HostingParticipant(participantId, permission, onboarding = false)
 
   def fromProtoV30(
-      value: v30.PartyToParticipant.HostingParticipant
+      pvv: ProtocolVersionValidation,
+      value: v30.PartyToParticipant.HostingParticipant,
   ): ParsingResult[HostingParticipant] = for {
-    participantId <- TopologyMapping.participantIdFromProtoPrimitive(
+    participantId <- ProtoValidation.validateThen(
       value.participantUid,
       "participant_uid",
-    )
+      pvv,
+    )(TopologyMapping.participantIdFromProtoPrimitive)
     permission <- ParticipantPermission.fromProtoV30(value.permission)
   } yield HostingParticipant(participantId, permission, value.onboarding.nonEmpty)
 }
@@ -1698,19 +1795,20 @@ final case class PartyToParticipant private (
         .toMap,
     ),
   )
-  def toProto: v30.PartyToParticipant =
-    v30.PartyToParticipant(
-      party = partyId.toProtoPrimitive,
-      threshold = threshold.value,
-      participants = participants.map(_.toProto),
-      partySigningKeys = partySigningKeysWithThreshold.map(_.toProto),
-    )
 
-  override def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.PartyToParticipant(
-        toProto
+  def toProtoPartyToParticipantV30: Either[String, v30.PartyToParticipant] =
+    partySigningKeysWithThreshold.traverse(_.toProtoV30).map { partySigningKeysWithThreshold =>
+      v30.PartyToParticipant(
+        party = partyId.toProtoPrimitive,
+        threshold = threshold.value,
+        participants = participants.map(_.toProto),
+        partySigningKeys = partySigningKeysWithThreshold,
       )
+    }
+
+  override def toProtoV30: Either[String, v30.TopologyMapping] =
+    toProtoPartyToParticipantV30.map(mappingP =>
+      v30.TopologyMapping(v30.TopologyMapping.Mapping.PartyToParticipant(mappingP))
     )
 
   @VisibleForTesting
@@ -1881,6 +1979,7 @@ object PartyToParticipant extends TopologyMappingCompanion {
 
     // If a participant is listed several times with different permissions, take the one with the higher
     // Needed for backwards compatibility with existing topologies
+    // TODO(#33949) this is not a good idea: let's not try to fix user mistakes. Reject bad stuff!
     val deduplicateParticipantsWithDifferentPermissionsMap =
       participants
         .groupMapReduce(_.participantId)(identity) { case (first, second) =>
@@ -1911,6 +2010,19 @@ object PartyToParticipant extends TopologyMappingCompanion {
     )
   }
 
+  @VisibleForTesting
+  def uncheckedCreate(
+      partyId: PartyId,
+      threshold: PositiveInt,
+      participants: Seq[HostingParticipant],
+      partySigningKeysWithThreshold: Option[SigningKeysWithThreshold],
+  ): PartyToParticipant = PartyToParticipant(
+    partyId,
+    threshold,
+    participants,
+    partySigningKeysWithThreshold,
+  )
+
   def tryCreate(
       partyId: PartyId,
       threshold: PositiveInt,
@@ -1927,19 +2039,29 @@ object PartyToParticipant extends TopologyMappingCompanion {
   override def code: Code = Code.PartyToParticipant
 
   def fromProtoV30(
-      value: v30.PartyToParticipant
+      pvv: ProtocolVersionValidation,
+      value: v30.PartyToParticipant,
   ): ParsingResult[PartyToParticipant] =
     for {
-      partyId <- PartyId.fromProtoPrimitive(value.party, "party")
+      partyId <- ProtoValidation.validateThen(value.party, "party", pvv)(
+        PartyId.fromProtoPrimitive
+      )
       threshold <- ProtoConverter.parsePositiveInt("threshold", value.threshold)
-      participants <- value.participants.traverse(HostingParticipant.fromProtoV30)
+      participants <- ProtoValidation
+        .validateLengthThen(
+          value.participants,
+          "participants",
+          pvv,
+          ProtoValidation.MaxCollectionSize,
+        )((element, _) => HostingParticipant.fromProtoV30(pvv, element))
       partySigningKeys <- value.partySigningKeys.traverse(protoValue =>
-        SigningKeysWithThreshold.fromProtoV30(protoValue)
+        SigningKeysWithThreshold.fromProtoV30(pvv, protoValue)
       )
       partyToParticipant <- PartyToParticipant
         .create(partyId, threshold, participants, partySigningKeys)
         .leftMap(ProtoDeserializationError.InvariantViolation(None, _))
     } yield partyToParticipant
+
 }
 
 /** Dynamic synchronizer parameter settings for the synchronizer
@@ -1957,15 +2079,20 @@ final case class SynchronizerParametersState(
     param("synchronizerId", _.synchronizerId),
     param("parameters", _.parameters),
   )
-  def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.SynchronizerParametersState(
-        v30.SynchronizerParametersState(
-          synchronizerId = synchronizerId.toProtoPrimitive,
-          synchronizerParameters = Some(parameters.toProtoV30),
-        )
-      )
+
+  def toProtoSynchronizerParametersStateV30: v30.SynchronizerParametersState =
+    v30.SynchronizerParametersState(
+      synchronizerId = synchronizerId.toProtoPrimitive,
+      synchronizerParameters = Some(parameters.toProtoV30),
     )
+
+  def toProtoV30: Either[String, v30.TopologyMapping] =
+    v30
+      .TopologyMapping(
+        v30.TopologyMapping.Mapping
+          .SynchronizerParametersState(toProtoSynchronizerParametersStateV30)
+      )
+      .asRight
 
   override def namespace: Namespace = synchronizerId.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(synchronizerId.uid)
@@ -1988,14 +2115,16 @@ object SynchronizerParametersState extends TopologyMappingCompanion {
   override def code: TopologyMapping.Code = Code.SynchronizerParametersState
 
   def fromProtoV30(
-      value: v30.SynchronizerParametersState
+      pvv: ProtocolVersionValidation,
+      value: v30.SynchronizerParametersState,
   ): ParsingResult[SynchronizerParametersState] = {
     val v30.SynchronizerParametersState(synchronizerIdP, synchronizerParametersP) = value
     for {
-      synchronizerId <- SynchronizerId.fromProtoPrimitive(
+      synchronizerId <- ProtoValidation.validateThen(
         synchronizerIdP,
         "synchronizer_id",
-      )
+        pvv,
+      )(SynchronizerId.fromProtoPrimitive)
       parameters <- ProtoConverter.parseRequired(
         DynamicSynchronizerParameters.fromProtoV30,
         "synchronizer_parameters",
@@ -2021,15 +2150,17 @@ final case class SequencingParametersState(
     param("synchronizerId", _.synchronizerId),
     param("parameters", _.parameters),
   )
-  def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.SequencingDynamicParametersState(
-        v30.DynamicSequencingParametersState(
-          synchronizerId = synchronizerId.toProtoPrimitive,
-          sequencingParameters = Some(parameters.toProtoV30),
-        )
-      )
+
+  def toProto: v30.DynamicSequencingParametersState =
+    v30.DynamicSequencingParametersState(
+      synchronizerId = synchronizerId.toProtoPrimitive,
+      sequencingParameters = Some(parameters.toProtoV30),
     )
+
+  def toProtoV30: Either[String, v30.TopologyMapping] =
+    v30
+      .TopologyMapping(v30.TopologyMapping.Mapping.SequencingDynamicParametersState(toProto))
+      .asRight
 
   override def namespace: Namespace = synchronizerId.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(synchronizerId.uid)
@@ -2052,11 +2183,16 @@ object SequencingParametersState extends TopologyMappingCompanion {
   override def code: TopologyMapping.Code = Code.SequencingParametersState
 
   def fromProtoV30(
-      value: v30.DynamicSequencingParametersState
+      pvv: ProtocolVersionValidation,
+      value: v30.DynamicSequencingParametersState,
   ): ParsingResult[SequencingParametersState] = {
     val v30.DynamicSequencingParametersState(synchronizerIdP, sequencingParametersP) = value
     for {
-      synchronizerId <- SynchronizerId.fromProtoPrimitive(synchronizerIdP, "synchronizer_id")
+      synchronizerId <- ProtoValidation.validateThen(
+        synchronizerIdP,
+        "synchronizer_id",
+        pvv,
+      )(SynchronizerId.fromProtoPrimitive)
       representativeProtocolVersion <- SequencingParameters.protocolVersionRepresentativeFor(
         ProtoVersion(30)
       )
@@ -2096,16 +2232,18 @@ final case class MediatorSynchronizerState private (
       synchronizerId = synchronizerId.toProtoPrimitive,
       group = group.unwrap,
       threshold = threshold.unwrap,
-      active = active.map(_.uid.toProtoPrimitive),
-      observers = observers.map(_.uid.toProtoPrimitive),
+      active = active.map(_.uid.toProtoPrimitive.toProtoUnvalidated),
+      observers = observers.map(o => o.uid.toProtoPrimitive.toProtoUnvalidated),
     )
 
-  def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.MediatorSynchronizerState(
-        toProto
+  def toProtoV30: Either[String, v30.TopologyMapping] =
+    v30
+      .TopologyMapping(
+        v30.TopologyMapping.Mapping.MediatorSynchronizerState(
+          toProto
+        )
       )
-    )
+      .asRight
 
   override def namespace: Namespace = synchronizerId.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(synchronizerId.uid)
@@ -2137,6 +2275,10 @@ object MediatorSynchronizerState extends TopologyMappingCompanion {
       active: Seq[MediatorId],
       observers: Seq[MediatorId],
   ): Either[String, MediatorSynchronizerState] = for {
+    // TODO(#33949): this is bad as we check the threshold on the non-deduped active length
+    //   Unclear if fixing this without making the parser pv dependent is dangerous or not.
+    //   As of PV36, we check this in the mapping state which means that once pv35 is gone,
+    //   we can fix these things here and align them
     _ <- Either.cond(
       threshold.unwrap <= active.length,
       (),
@@ -2150,27 +2292,55 @@ object MediatorSynchronizerState extends TopologyMappingCompanion {
           .mkString(", ")}",
     )
     activeNE <- NonEmpty
+      // TODO(#33949) reject, instead of fixing user mistakes
       .from(active.distinct)
       .toRight("mediator synchronizer state requires at least one active mediator")
+    // TODO(#33949) reject, instead of fixing user mistakes
   } yield MediatorSynchronizerState(synchronizerId, group, threshold, activeNE, observers.distinct)
 
+  /** Create a potentially invalid mediator sync state
+    *
+    * This is only visible for testing to check that the mapping checks work.
+    */
+  @VisibleForTesting
+  def uncheckedCreate(
+      synchronizerId: SynchronizerId,
+      group: MediatorGroupIndex,
+      threshold: PositiveInt,
+      active: NonEmpty[Seq[MediatorId]],
+      observers: Seq[MediatorId],
+  ): MediatorSynchronizerState = MediatorSynchronizerState(
+    synchronizerId = synchronizerId,
+    group = group,
+    threshold = threshold,
+    active = active,
+    observers = observers,
+  )
+
   def fromProtoV30(
-      value: v30.MediatorSynchronizerState
+      pvv: ProtocolVersionValidation,
+      value: v30.MediatorSynchronizerState,
   ): ParsingResult[MediatorSynchronizerState] = {
     val v30.MediatorSynchronizerState(synchronizerIdP, groupP, thresholdP, activeP, observersP) =
       value
     for {
-      synchronizerId <- SynchronizerId.fromProtoPrimitive(synchronizerIdP, "synchronizer_id")
+      synchronizerId <- ProtoValidation.validateThen(
+        synchronizerIdP,
+        "synchronizer_id",
+        pvv,
+      )(SynchronizerId.fromProtoPrimitive)
       group <- NonNegativeInt
         .create(groupP)
         .leftMap(ProtoDeserializationError.InvariantViolation("group", _))
       threshold <- ProtoConverter.parsePositiveInt("threshold", thresholdP)
-      active <- activeP.traverse(
-        UniqueIdentifier.fromProtoPrimitive(_, "active").map(MediatorId(_))
-      )
-      observers <- observersP.traverse(
-        UniqueIdentifier.fromProtoPrimitive(_, "observers").map(MediatorId(_))
-      )
+      active <- ProtoValidation
+        .validateThen(activeP, "active", pvv, ProtoValidation.MaxCollectionSize)(
+          MediatorId.fromProtoPrimitiveUid
+        )
+      observers <- ProtoValidation
+        .validateThen(observersP, "observers", pvv, ProtoValidation.MaxCollectionSize)(
+          MediatorId.fromProtoPrimitiveUid
+        )
       result <- create(synchronizerId, group, threshold, active, observers).leftMap(
         ProtoDeserializationError.OtherError.apply
       )
@@ -2207,16 +2377,18 @@ final case class SequencerSynchronizerState private (
     v30.SequencerSynchronizerState(
       synchronizerId = synchronizerId.toProtoPrimitive,
       threshold = threshold.unwrap,
-      active = active.map(_.uid.toProtoPrimitive),
-      observers = observers.map(_.uid.toProtoPrimitive),
+      active = active.map(_.uid.toProtoPrimitive.toProtoUnvalidated),
+      observers = observers.map(o => o.uid.toProtoPrimitive.toProtoUnvalidated),
     )
 
-  def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.SequencerSynchronizerState(
-        toProto
+  def toProtoV30: Either[String, v30.TopologyMapping] =
+    v30
+      .TopologyMapping(
+        v30.TopologyMapping.Mapping.SequencerSynchronizerState(
+          toProto
+        )
       )
-    )
+      .asRight
 
   override def namespace: Namespace = synchronizerId.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(synchronizerId.uid)
@@ -2244,6 +2416,10 @@ object SequencerSynchronizerState extends TopologyMappingCompanion {
       active: Seq[SequencerId],
       observers: Seq[SequencerId],
   ): Either[String, SequencerSynchronizerState] = for {
+    // TODO(#33949): this is bad as we check the threshold on the non-deduped active length
+    //   Unclear if fixing this without making the parser pv dependent is dangerous or not.
+    //   As of PV36, we check this in the mapping state which means that once pv35 is gone,
+    //   we can fix these things here and align them
     _ <- Either.cond(
       threshold.unwrap <= active.length,
       (),
@@ -2257,22 +2433,56 @@ object SequencerSynchronizerState extends TopologyMappingCompanion {
           .mkString(", ")}",
     )
     activeNE <- NonEmpty
+      // TODO(#33949) reject, instead of fixing user mistakes
       .from(active.distinct)
       .toRight("sequencer synchronizer state requires at least one active sequencer")
+    // TODO(#33949) reject, instead of fixing user mistakes
   } yield SequencerSynchronizerState(synchronizerId, threshold, activeNE, observers.distinct)
 
+  /** Create a potentially invalid sequencer sync state
+    *
+    * This is only visible for testing to check that the mapping checks work.
+    */
+  @VisibleForTesting
+  def uncheckedCreate(
+      synchronizerId: SynchronizerId,
+      threshold: PositiveInt,
+      active: NonEmpty[Seq[SequencerId]],
+      observers: Seq[SequencerId],
+  ): SequencerSynchronizerState = SequencerSynchronizerState(
+    synchronizerId = synchronizerId,
+    threshold = threshold,
+    active = active,
+    observers = observers,
+  )
+
   def fromProtoV30(
-      value: v30.SequencerSynchronizerState
+      pvv: ProtocolVersionValidation,
+      value: v30.SequencerSynchronizerState,
   ): ParsingResult[SequencerSynchronizerState] = {
     val v30.SequencerSynchronizerState(synchronizerIdP, thresholdP, activeP, observersP) = value
     for {
-      synchronizerId <- SynchronizerId.fromProtoPrimitive(synchronizerIdP, "synchronizer_id")
+      synchronizerId <- ProtoValidation.validateThen(
+        synchronizerIdP,
+        "synchronizer_id",
+        pvv,
+      )(SynchronizerId.fromProtoPrimitive)
       threshold <- ProtoConverter.parsePositiveInt("threshold", thresholdP)
-      active <- activeP.traverse(
-        UniqueIdentifier.fromProtoPrimitive(_, "active").map(SequencerId(_))
+      active <- ProtoValidation.validateThen(
+        activeP,
+        "active",
+        pvv,
+        ProtoValidation.MaxCollectionSize,
+      )(
+        SequencerId.fromProtoPrimitiveUid
       )
-      observers <- observersP.traverse(
-        UniqueIdentifier.fromProtoPrimitive(_, "observers").map(SequencerId(_))
+      observers <- ProtoValidation.validateThen(
+        observersP,
+        "observers",
+        pvv,
+        ProtoValidation.MaxCollectionSize,
+      )(
+        SequencerId.fromProtoPrimitiveUid
       )
       result <- create(synchronizerId, threshold, active, observers).leftMap(
         ProtoDeserializationError.OtherError.apply
@@ -2285,7 +2495,7 @@ object SequencerSynchronizerState extends TopologyMappingCompanion {
 // Indicates the beginning of synchronizer upgrade. Only topology transactions related to synchronizer upgrades are permitted
 // after this transaction has become effective. Removing this mapping effectively unfreezes the topology state again.
 final case class LsuAnnouncement(
-    successorSynchronizerId: PhysicalSynchronizerId,
+    successorSynchronizerId: OpaquePhysicalSynchronizerId,
     upgradeTime: CantonTimestamp,
 ) extends TopologyMapping {
 
@@ -2304,12 +2514,14 @@ final case class LsuAnnouncement(
       upgradeTime = Some(upgradeTime.toProtoTimestamp),
     )
 
-  def toProtoV30: v30.TopologyMapping =
-    v30.TopologyMapping(
-      v30.TopologyMapping.Mapping.SynchronizerUpgradeAnnouncement(toProto)
-    )
+  def toProtoV30: Either[String, v30.TopologyMapping] =
+    v30
+      .TopologyMapping(
+        v30.TopologyMapping.Mapping.SynchronizerUpgradeAnnouncement(toProto)
+      )
+      .asRight
 
-  override def namespace: Namespace = successorSynchronizerId.namespace
+  override def namespace: Namespace = successorSynchronizerId.logical.namespace
   override def maybeUid: Option[UniqueIdentifier] = Some(successorSynchronizerId.uid)
   override def referencedUids: Set[UniqueIdentifier] = Set(successorSynchronizerId.uid)
   override def restrictedToSynchronizer: Option[SynchronizerId] = Some(
@@ -2318,7 +2530,7 @@ final case class LsuAnnouncement(
 
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
-  ): RequiredAuth = RequiredNamespaces(successorSynchronizerId)
+  ): RequiredAuth = RequiredNamespaces(successorSynchronizerId.logical)
 
   override def uniqueKey: MappingHash =
     LsuAnnouncement.uniqueKey(successorSynchronizerId.logical)
@@ -2332,13 +2544,15 @@ object LsuAnnouncement extends TopologyMappingCompanion {
   override def code: TopologyMapping.Code = Code.LsuAnnouncement
 
   def fromProtoV30(
-      value: v30.LsuAnnouncement
+      pvv: ProtocolVersionValidation,
+      value: v30.LsuAnnouncement,
   ): ParsingResult[LsuAnnouncement] =
     for {
-      successorSynchronizerId <- PhysicalSynchronizerId.fromProtoPrimitive(
+      successorSynchronizerId <- ProtoValidation.validateThen(
         value.successorPhysicalSynchronizerId,
         "successor_physical_synchronizer_id",
-      )
+        pvv,
+      )(OpaquePhysicalSynchronizerId.fromProtoPrimitive)
       upgradeTime <- ProtoConverter
         .parseRequired(
           CantonTimestamp.fromProtoTimestamp,
@@ -2355,7 +2569,7 @@ final case class GrpcConnection(
 ) {
   def toProtoV30: v30.LsuSequencerConnectionSuccessor.SequencerConnection =
     v30.LsuSequencerConnectionSuccessor.SequencerConnection(
-      endpoints = endpoints.map(_.toURI(transportSecurity).toString).toSeq,
+      endpoints = endpoints.map(_.toURI(transportSecurity).toString.toProtoUnvalidated).toSeq,
       customTrustCertificates = customTrustCertificates,
     )
 }
@@ -2369,7 +2583,7 @@ object GrpcConnection {
       (s: String) =>
         UrlValidator
           .validate(s)
-          .leftMap(err => ValueDeserializationError("endpoints", err.message)),
+          .leftMap(err => ValueDeserializationError(err.message, "endpoints")),
       "endpoints",
       endpointsP,
     )
@@ -2381,14 +2595,17 @@ object GrpcConnection {
   } yield GrpcConnection(endpoints.toSet, useTls, customTrustCertificates)
 
   def fromProtoV30(
-      value: v30.LsuSequencerConnectionSuccessor.SequencerConnection
+      pvv: ProtocolVersionValidation,
+      value: v30.LsuSequencerConnectionSuccessor.SequencerConnection,
   ): ParsingResult[GrpcConnection] =
-    fromProtoPrimitives(value.endpoints, value.customTrustCertificates)
+    ProtoValidation
+      .validate(value.endpoints, "endpoints", pvv, ProtoValidation.MaxCollectionSize)
+      .flatMap(fromProtoPrimitives(_, value.customTrustCertificates))
 }
 
 final case class LsuSequencerConnectionSuccessor(
     sequencerId: SequencerId,
-    successorPsid: PhysicalSynchronizerId,
+    successorPsid: OpaquePhysicalSynchronizerId,
     connection: GrpcConnection,
 ) extends TopologyMapping {
   override def companion: TopologyMappingCompanion = LsuSequencerConnectionSuccessor
@@ -2423,11 +2640,13 @@ final case class LsuSequencerConnectionSuccessor(
     connection = Some(connection.toProtoV30),
   )
 
-  override def toProtoV30: v30.TopologyMapping = v30.TopologyMapping(
-    v30.TopologyMapping.Mapping.SequencerConnectionSuccessor(
-      toProto
+  override def toProtoV30: Either[String, v30.TopologyMapping] = v30
+    .TopologyMapping(
+      v30.TopologyMapping.Mapping.SequencerConnectionSuccessor(
+        toProto
+      )
     )
-  )
+    .asRight
 
   override def uniqueKey: MappingHash =
     LsuSequencerConnectionSuccessor.uniqueKey(sequencerId, successorPsid.logical)
@@ -2442,16 +2661,22 @@ object LsuSequencerConnectionSuccessor extends TopologyMappingCompanion {
     )
 
   def fromProtoV30(
-      value: v30.LsuSequencerConnectionSuccessor
+      pvv: ProtocolVersionValidation,
+      value: v30.LsuSequencerConnectionSuccessor,
   ): ParsingResult[LsuSequencerConnectionSuccessor] =
     for {
-      sequencerId <- SequencerId.fromProtoPrimitive(value.sequencerId, "sequencer_id")
-      successorPsid <- PhysicalSynchronizerId.fromProtoPrimitive(
+      sequencerId <- ProtoValidation.validateThen(
+        value.sequencerId,
+        "sequencer_id",
+        pvv,
+      )(SequencerId.fromProtoPrimitive)
+      successorPsid <- ProtoValidation.validateThen(
         value.successorPhysicalSynchronizerId,
         "successor_physical_synchronizer_id",
-      )
+        pvv,
+      )(OpaquePhysicalSynchronizerId.fromProtoPrimitive)
       connection <- ProtoConverter.parseRequired(
-        GrpcConnection.fromProtoV30,
+        GrpcConnection.fromProtoV30(pvv, _),
         "connection",
         value.connection,
       )

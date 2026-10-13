@@ -50,6 +50,33 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[0].env[?(@.name=='SPLICE_APP_SCAN_SEQUENCER_ADDRESS')].value
           pattern: 'current-sequencer-address'
+  - it: "sets analyzable time window (atw)"
+    set:
+      # Things we need just to pass the schema
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      sequencerAddress: "current-sequencer-address"
+      mediatorAddress: "current-mediator-address"
+      participantAddress: "mock-address"
+      persistence:
+        host: mock-pg-host
+        schema: scan
+      auth:
+        jwksUrl: "https://mock.com/.well-known/jwks.json"
+        targetAudience: "mock_audience"
+      maxDarVersion: 1.0.0
+      # set for this test
+      analyzableTimeWindowDuration: "30 days"
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='ADDITIONAL_CONFIG_ANALYZABLE_TIME_WINDOW_DURATION')].value
+          pattern: 'analyzable-time-window.duration = "30 days"'
   - it: "sets successor synchronizer"
     set:
       # Things we need just to pass the schema

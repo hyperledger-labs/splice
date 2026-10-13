@@ -8,7 +8,6 @@ import cats.syntax.either.*
 import cats.syntax.functorFilter.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
@@ -46,6 +45,7 @@ import com.digitalasset.canton.util.{
 }
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{SequencerAlias, checked}
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.stream.Materializer
 
@@ -173,7 +173,11 @@ class SequencerConnectionPoolImpl private[sequencing] (
     }
 
     FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-      wallClock.scheduleAfter(_ => signalTimeout(), initializationTimeout.asJavaApproximation),
+      wallClock.scheduleAfterCancelledOnShutdown(
+        _ => signalTimeout(),
+        s"${getClass.getName}: setup timeout",
+        initializationTimeout.asJavaApproximation,
+      ),
       s"connection-pool-initialization-timeout",
     )
   }
@@ -332,7 +336,12 @@ class SequencerConnectionPoolImpl private[sequencing] (
           s"Scheduling restart after ${LoggerUtil.roundDurationForHumans(delay.duration)}"
         )
         FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-          wallClock.scheduleAfter(_ => restart(), delay.duration),
+          wallClock
+            .scheduleAfterCancelledOnShutdown(
+              _ => restart(),
+              s"${getClass.getName}: scheduling restart",
+              delay.duration,
+            ),
           s"restart-connection-${connection.name}",
         )
       }
@@ -562,12 +571,12 @@ class SequencerConnectionPoolImpl private[sequencing] (
     lock.exclusive(NonNegativeInt.tryCreate(pool.values.flatten.size))
 
   override def onClosed(): Unit = {
-    val instances = (lock.exclusive(trackedConnections.keySet.toSeq))
+    val instances = lock.exclusive(trackedConnections.keySet.toSeq)
 
     initializedP.shutdown_()
     // We close the connections outside the critical section to avoid shutdown problems in case
     // it triggers health callbacks
-    LifeCycle.close(instances*)(logger)
+    LifeCycle.close(instances)(logger)
     metrics.removeMetricsForAllConnections(mc.labels.get("psid"))
     super.onClosed()
   }

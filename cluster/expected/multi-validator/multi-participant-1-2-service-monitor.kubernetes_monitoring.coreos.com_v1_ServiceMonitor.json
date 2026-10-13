@@ -1,0 +1,34 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "monitoring.coreos.com/v1",
+    "kind": "ServiceMonitor",
+    "metadata": {
+      "labels": {
+        "release": "prometheus-grafana-monitoring"
+      },
+      "name": "multi-participant-1-2-service-monitor",
+      "namespace": "multi-validator"
+    },
+    "spec": {
+      "endpoints": [
+        {
+          "honorLabels": true,
+          "port": "metrics"
+        }
+      ],
+      "namespaceSelector": {
+        "any": true
+      },
+      "selector": {
+        "matchLabels": {
+          "app": "multi-participant-1-2"
+        }
+      }
+    }
+  },
+  "name": "multi-participant-1-2-service-monitor",
+  "provider": "",
+  "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+}

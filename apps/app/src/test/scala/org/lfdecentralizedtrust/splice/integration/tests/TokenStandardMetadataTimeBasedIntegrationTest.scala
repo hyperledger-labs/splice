@@ -3,9 +3,17 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.integration.{EnvironmentDefinition, InitialPackageVersions}
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.scan.automation.{
+  AcsSnapshotBackfillingTrigger,
+  AcsSnapshotTrigger,
+}
 import org.lfdecentralizedtrust.splice.util.{Codec, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1
 
@@ -23,6 +31,13 @@ class TokenStandardMetadataTimeBasedIntegrationTest
       // The wallet automation periodically merges amulets, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndAmuletMerging
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(
+          ConfigurableApp.Scan
+        )( // we force snapshots half-way through the test
+          _.withPausedTrigger[AcsSnapshotTrigger].withPausedTrigger[AcsSnapshotBackfillingTrigger]
+        )(config)
+      )
       .addConfigTransform((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs_(config =>
           config.copy(
@@ -90,7 +105,7 @@ class TokenStandardMetadataTimeBasedIntegrationTest
     }
 
     clue("Once round totals are defined they are served") {
-      actAndCheck(
+      val (_, forcedSnapshotTime) = actAndCheck(
         "Advance rounds to a point where round totals are defined and the tapped amulet",
         // We sadly need 7 rounds as we need to get to a point where round 0 is closed
         for (i <- 1 to 7) {
@@ -99,18 +114,23 @@ class TokenStandardMetadataTimeBasedIntegrationTest
       )(
         "rounds are defined and include tapped amulet",
         _ => {
-          val totalBalance =
-            sv1ScanBackend
-              .getTotalAmuletBalance("Amulet")
+          val forcedSnapshotTime = sv1ScanBackend.forceAcsSnapshotNow()
+          val totalBalance = sv1ScanBackend
+            .lookupInstrument("Amulet")
+            .flatMap(_.totalSupply.map(s => BigDecimal(s)))
+            .getOrElse(fail("'Amulet' instrument not found or total supply not defined"))
           totalBalance should be >= walletUsdToAmulet(99.0)
+          forcedSnapshotTime
         },
       )
       clue("Compare direct scan reads to instrument metadata") {
-        val forcedSnapshotTime = sv1ScanBackend.forceAcsSnapshotNow()
+        // we record the snapshot time above instead of using
+        // getTotalAmuletBalance because table-per-snapshot collides if we force
+        // twice (same update ms)
         advanceTime(Duration.ofSeconds(1L)) // because the sanity plugin will run another snapshot
         // hope: this test won't have created more than Limit.MaxLimit contracts, so they all fit in a single response
         val totalSupply = sv1ScanBackend
-          .getAcsSnapshotAt(forcedSnapshotTime, migrationId, partyIds = Some(Vector(dsoParty)))
+          .getAcsSnapshotAtV2(forcedSnapshotTime, migrationId, partyIds = Some(Vector(dsoParty)))
           .valueOrFail("Snapshot was just taken, so this has to exist")
           .createdEvents
           .map { createdEvent =>

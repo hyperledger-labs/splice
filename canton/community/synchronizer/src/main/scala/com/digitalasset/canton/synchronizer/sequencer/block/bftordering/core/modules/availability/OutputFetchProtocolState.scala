@@ -4,7 +4,10 @@
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability
 
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
+  BlockNumber,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability.{
   BatchId,
   ProofOfAvailability,
@@ -13,48 +16,42 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   OrderedBlockForOutput,
   OrderingMode,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.JitterGenerator
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry.Jitter
 
+import java.time.Instant
 import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 
-@SuppressWarnings(Array("org.wartremover.warts.Var"))
-final case class JitterStream(
-    jitter: Jitter,
-    initialDelay: FiniteDuration,
-    minimumDelay: FiniteDuration,
-) {
-  private var lastDelay: FiniteDuration = initialDelay
-  private var lastAttempt: Int = 1
+object OutputFetchProtocolState {
 
-  def next(attempt: Int): FiniteDuration = {
-    require(attempt >= lastAttempt)
-    if (attempt >= lastAttempt) {
-      lastDelay = jitter(initialDelay, lastDelay, attempt)
-      lastAttempt = attempt
-    }
-    lastDelay.plus(minimumDelay)
-  }
-}
-
-object JitterStream {
-  def create(config: BftBlockOrdererConfig, random: Random): JitterStream =
-    JitterStream(
-      Jitter.full(config.outputFetchTimeoutCap, Jitter.randomSource(random.self)),
-      config.outputFetchTimeout,
-      config.outputFetchMinimumDelay,
+  /** Creates a jitter generator from the given configuration and random source. It uses the
+    * `Jitter.full` implementation to calculate the delays, with the provided
+    * `outputFetchTimeoutCap`, `outputFetchTimeout`, and `outputFetchMinimumDelay` values.
+    *
+    * Note that `Jitter.full.apply` produces a timeout value between 0 and the exponential (we use
+    * base 2) as `initialValue*math.pow(base.toDouble, attempt.toDouble)`, the unit of the initial
+    * delay is important because the exp is on the non-converted value, the cap is converted to the
+    * same unit of the initial delay with ceiling, and what guarantees that the jitter does not
+    * yield 0 is the minimum delay.
+    */
+  def createJitterGenerator(config: BftBlockOrdererConfig, random: Random): JitterGenerator =
+    JitterGenerator(
+      Jitter.full(cap = config.outputFetchTimeoutCap, Jitter.randomSource(random.self)),
+      initialDelay = config.outputFetchTimeout,
+      minimumDelay = config.outputFetchMinimumDelay,
     )
 }
 
 final case class MissingBatchStatus(
     batchId: BatchId,
     originalProof: ProofOfAvailability,
-    remainingNodesToTry: Seq[BftNodeId],
     numberOfAttempts: Int,
-    jitterStream: JitterStream,
+    jitterStream: JitterGenerator,
     orderingMode: OrderingMode,
+    firstTimeWeMadeRequest: Map[BftNodeId, Instant],
 ) {
   def calculateTimeout(): FiniteDuration = jitterStream.next(numberOfAttempts)
 }
@@ -70,12 +67,16 @@ final class MainOutputFetchProtocolState {
   // in order to avoid re-requesting it when batch is needed
   val pendingRemoteBatchIdsToStore: mutable.SortedSet[BatchId] =
     mutable.SortedSet[BatchId]()
+  // tracks remote batches whose payload is being (re)hashed and validated off the actor thread,
+  // in order to avoid re-requesting or re-validating them while validation is still in flight
+  val pendingRemoteBatchIdsToValidate: mutable.SortedSet[BatchId] =
+    mutable.SortedSet[BatchId]()
 
   def findProofOfAvailabilityForMissingBatchId(
       missingBatchId: BatchId
   ): Option[ProofOfAvailability] = for {
     batchesRequest <- pendingBatchesRequests.find(_.missingBatches.contains(missingBatchId))
-    proof <- batchesRequest.blockForOutput.orderedBlock.batchRefs.find(_.batchId == missingBatchId)
+    proof <- batchesRequest.proofs.find(_.batchId == missingBatchId)
   } yield proof
 
   def removeRequestsWithNoMissingBatches(): Unit = {
@@ -83,8 +84,30 @@ final class MainOutputFetchProtocolState {
   }
 }
 
-final class BatchesRequest(
+sealed trait BatchesRequest {
+  def traceContext: TraceContext
+  def proofs: Seq[ProofOfAvailability]
+  def orderingMode: OrderingMode
+  def originalLeader: BftNodeId
+
+  lazy val missingBatches: mutable.SortedSet[BatchId] =
+    mutable.SortedSet.from(proofs.map(_.batchId))
+}
+
+final class OrderedBlockBatchesRequest(
     val blockForOutput: OrderedBlockForOutput,
-    val missingBatches: mutable.SortedSet[BatchId],
     val traceContext: TraceContext,
-)
+) extends BatchesRequest {
+  override val proofs: Seq[ProofOfAvailability] = blockForOutput.orderedBlock.batchRefs
+  override val orderingMode: OrderingMode = blockForOutput.orderingMode
+  override val originalLeader: BftNodeId = blockForOutput.originalLeader
+}
+
+final class UnorderedBlockBatchesRequest(
+    val blockNumber: BlockNumber,
+    val originalLeader: BftNodeId,
+    val proofs: Seq[ProofOfAvailability],
+    val traceContext: TraceContext,
+) extends BatchesRequest {
+  override val orderingMode: OrderingMode = OrderingMode.Consensus
+}

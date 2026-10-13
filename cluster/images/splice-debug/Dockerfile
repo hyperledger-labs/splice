@@ -3,8 +3,9 @@
 
 # We don't currently have a need for multi-architecture support in this image,
 # so we're hard-coding amd64, and accepting that this will break on arm64.
-FROM --platform=linux/amd64 ubuntu:24.04@sha256:440dcf6a5640b2ae5c77724e68787a906afb8ddee98bf86db94eea8528c2c076
-LABEL org.opencontainers.image.base.name="ubuntu:24.04"
+# check=skip=FromPlatformFlagConstDisallowed
+FROM --platform=linux/amd64 ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
+LABEL org.opencontainers.image.base.name="ubuntu:26.04"
 
 ARG KUBECTL_VERSION
 

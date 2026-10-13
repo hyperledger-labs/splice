@@ -1,0 +1,12 @@
+{
+  "custom": true,
+  "id": "projects/da-cn-devnet/locations/us-central1/keyRings/sv-da-1_participant_mock",
+  "inputs": {
+    "location": "us-central1",
+    "name": "sv-da-1_participant_mock",
+    "project": "da-cn-devnet"
+  },
+  "name": "sv-da-1_participant_mock_keyring",
+  "provider": "",
+  "type": "gcp:kms/keyRing:KeyRing"
+}

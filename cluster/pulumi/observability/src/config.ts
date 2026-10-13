@@ -1,10 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import {
-  clusterSubConfig,
-  SplicePostgresConfig,
-  SplicePostgresSchema,
-} from '@canton-network/splice-pulumi-common';
+import { clusterSubConfig, SplicePostgresSchema } from '@canton-network/splice-pulumi-common';
+import { CloudArmorConfigSchema } from '@canton-network/splice-pulumi-common/src/config/cloudArmorConfig';
 import { z } from 'zod';
 
 const quotaMetricNameSchema = z
@@ -37,36 +34,42 @@ const NatPortUsageConfigSchema = z.object({
 
 export type NatPortUsageConfig = z.infer<typeof NatPortUsageConfigSchema>;
 
+// Threshold based alert on a request count: the requests are summed over windows of
+// `alignmentPeriodSeconds` and the alert fires once such a window exceeds `threshold`
+// for `durationSeconds` in a row.
+const CloudArmorAlertConfigSchema = z
+  .object({
+    // Number of requests within one alignment period above which the alert fires;
+    // 0 means a single request already alerts.
+    threshold: z.number().min(0),
+    // Length of the window the requests are summed over (GCP `alignmentPeriod`).
+    alignmentPeriodSeconds: z
+      .number()
+      .int()
+      .min(60)
+      .refine(v => v % 60 === 0, { message: 'must be a multiple of 60s' })
+      .default(300),
+    // Retest window (GCP `duration`): how long the threshold has to be exceeded before
+    // the alert fires. 0 fires on the first violating alignment period.
+    durationSeconds: z.number().int().min(0).default(0),
+  })
+  .refine(c => c.durationSeconds % c.alignmentPeriodSeconds === 0, {
+    // GCP requires the retest window to be a multiple of the alignment period
+    message: 'durationSeconds must be 0 or a multiple of alignmentPeriodSeconds',
+    path: ['durationSeconds'],
+  });
+
+export type CloudArmorAlertConfig = z.infer<typeof CloudArmorAlertConfigSchema>;
+
+// Grafana alerts on the requests rejected by the Cloud Armor policy.
 const CloudArmorAlertsConfigSchema = z.object({
-  // Number of requests denied by Cloud Armor within the rolling window above which the
-  // alert fires.
-  deniedRequestsThreshold: z.number().min(0),
+  // Requests denied by any rule of the Cloud Armor policy (metric based).
+  deniedRequests: CloudArmorAlertConfigSchema,
+  // Requests matching a WAF (OWASP CRS) rule (log based).
+  wafRejections: CloudArmorAlertConfigSchema.prefault({ threshold: 0 }),
+  // Requests rejected by a per endpoint throttle rule (log based).
+  throttleRejections: CloudArmorAlertConfigSchema.prefault({ threshold: 0 }),
 });
-
-export type CloudArmorAlertsConfig = z.infer<typeof CloudArmorAlertsConfigSchema>;
-
-// Subset of the Cloud Armor config (owned by the infra stack, see
-// cluster/pulumi/infra/src/config.ts) that the alerts need. Parsed leniently, as the
-// infra stack is the one validating the full config.
-const CloudArmorConfigSchema = z.object({
-  enabled: z.boolean().default(false),
-  allRulesPreviewOnly: z.boolean().default(false),
-  // Cloud Armor rule decisions are only logged if the load balancer backend request
-  // logging is enabled, which the WAF log based alert depends on.
-  logging: z
-    .object({
-      enabled: z.boolean().default(false),
-    })
-    .prefault({}),
-  wafRules: z
-    .object({
-      enabled: z.boolean().default(true),
-      previewOnly: z.boolean().default(true),
-    })
-    .prefault({}),
-});
-
-export type CloudArmorConfig = z.infer<typeof CloudArmorConfigSchema>;
 
 export const cloudArmorConfig = CloudArmorConfigSchema.parse(clusterSubConfig('cloudArmor'));
 
@@ -79,7 +82,6 @@ const MuteTimeWindowSchema = z.object({
   ),
   weekdays: z.array(z.string()).optional(), // e.g. ['monday', 'tuesday:friday']
 });
-export type MuteTimeWindow = z.infer<typeof MuteTimeWindowSchema>;
 
 const MuteTimeIntervalSchema = z.array(
   z.object({
@@ -88,12 +90,7 @@ const MuteTimeIntervalSchema = z.array(
     timeWindows: z.array(MuteTimeWindowSchema),
   })
 );
-export type MuteTimeInterval = z.infer<typeof MuteTimeIntervalSchema>[number];
 
-// Observability needs to be migrated
-const defaultObservabilityPostgresConfig: SplicePostgresConfig = {
-  deployment: 'legacy-helm-chart',
-};
 const MonitoringConfigSchema = z
   .object({
     enableGrafanaServiceAccountToken: z.boolean(),
@@ -164,6 +161,7 @@ const MonitoringConfigSchema = z
           seconds: z.number(),
         }),
         acsCommitments: z.object({
+          usePv36Metrics: z.boolean().default(false),
           checkpointDelay: z.object({
             seconds: z.number(),
           }),
@@ -207,7 +205,7 @@ const MonitoringConfigSchema = z
           tolerance: z.number(),
         }),
         gcpQuotas: GcpQuotasConfigSchema,
-        cloudArmor: CloudArmorAlertsConfigSchema.prefault({ deniedRequestsThreshold: 0 }),
+        cloudArmor: CloudArmorAlertsConfigSchema.prefault({ deniedRequests: { threshold: 0 } }),
         natPortUsage: NatPortUsageConfigSchema.default({
           thresholdPercent: 80,
           // `default 30` because every once in a while (likely due to dynamic port allocation),

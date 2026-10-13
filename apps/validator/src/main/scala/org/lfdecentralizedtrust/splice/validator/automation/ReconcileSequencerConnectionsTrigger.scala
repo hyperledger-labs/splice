@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.automation
 
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
@@ -13,6 +13,7 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnectionPoolDelays,
   SequencerConnections,
   SubmissionRequestAmplification,
+  SubscriptionLivenessLimits,
 }
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TraceContext
@@ -38,6 +39,7 @@ class ReconcileSequencerConnectionsTrigger(
     synchronizerConnector: SynchronizerConnector,
     patience: NonNegativeFiniteDuration,
     sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
+    subscriptionLivenessLimits: SubscriptionLivenessLimits,
     initialSynchronizerTimeO: Option[CantonTimestamp],
     reconnectOnSynchronizerConfigurationChange: Boolean,
 )(implicit
@@ -108,6 +110,7 @@ class ReconcileSequencerConnectionsTrigger(
                       patience,
                     ),
                     sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
+                    subscriptionLivenessLimits = subscriptionLivenessLimits,
                   )
               }
               participantAdminConnection.modifyOrRegisterSynchronizerConnectionConfigAndReconnect(

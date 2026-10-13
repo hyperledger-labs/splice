@@ -3,12 +3,14 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.NoScanWillHaveData
 import org.lfdecentralizedtrust.splice.scan.config.BulkStorageConfig
 import org.lfdecentralizedtrust.splice.scan.util.PeerBftScanConnection
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection
@@ -22,6 +24,7 @@ class BulkStorageCommitFromStaging[T](
     stagingS3Connection: S3BucketConnection,
     committedS3Connection: S3BucketConnection,
     getObjects: T => Future[Seq[ObjectKeyAndChecksum]],
+    getRequiredCatchupTimestamp: T => CantonTimestamp,
     appConfig: BulkStorageConfig,
     scanConnection: PeerBftScanConnection,
     override val loggerFactory: NamedLoggerFactory,
@@ -32,36 +35,40 @@ class BulkStorageCommitFromStaging[T](
 ) extends NamedLogging {
 
   private def checkBftForObjects(
-      objects: Seq[ObjectKeyAndChecksum]
+      requiredCatchupTimestamp: CantonTimestamp,
+      objects: Seq[ObjectKeyAndChecksum],
   ): Future[Boolean] = {
     logger.debug(
-      s"Checking BFT agreement for objects: ${objects.map(_.key).mkString(", ")}"
+      s"Checking BFT agreement for objects: ${objects.map(_.key).mkString(", ")} (requires catchup to $requiredCatchupTimestamp)"
     )
     if (appConfig.bftCheckEnabled) {
-      for {
+      (for {
         connection <- scanConnection.connection
-        bft <- connection.getBulkObjectChecksums(objects.map(_.key)).map(Some(_)).recoverWith {
-          case ex @ HttpErrorWithHttpCode(code, _) =>
-            if (code == StatusCodes.BadGateway) {
-              logger.debug(
-                s"Consensus on checksums for objects ${objects.map(_.key).mkString(", ")} not reached. Assuming that this is because not all peers have processed the objects yet."
+        bft <- connection
+          .getBulkObjectChecksums(requiredCatchupTimestamp, objects.map(_.key))
+          .map(Some(_))
+          .recoverWith {
+            case ex @ HttpErrorWithHttpCode(StatusCodes.ServiceUnavailable, _) =>
+              logger.debug("Not enough scans have the data yet, will retry after delay")
+              Future.successful(None)
+            case ex @ HttpErrorWithHttpCode(StatusCodes.BadGateway, _) =>
+              logger.error(
+                "Could not reach consensus on checksums for objects. This indicates that different peers have different data, and must be investigated."
               )
               Future.successful(None)
-            } else {
-              throw ex
-            }
-        }
+          }
       } yield {
         bft match {
           case Some(bftChecksums) =>
+            // Consensus achieved from peers, comparing the consensus checksums to mine.
             val consensusChecksums = bftChecksums.checksums.filter(_.value.isDefined)
             logger.debug(
               s"Consensus achieved on ${consensusChecksums.length} out of ${objects.length} objects"
             )
 
             if (consensusChecksums.length < objects.length) {
-              logger.debug(
-                s"Not all objects are known to the BFT peers yet. Will retry after delay."
+              logger.error(
+                s"Not all objects are known to the BFT peers, despite them indicating that they have caught up to the required timestamp. This indicates that different peers have different data, and must be investigated."
               )
               false
             } else {
@@ -129,8 +136,14 @@ class BulkStorageCommitFromStaging[T](
               }
             }
           case None =>
+            // No consensus yet
             false
         }
+      }).recover { case _: NoScanWillHaveData =>
+        logger.info(
+          s"No peer will ever hold objects ${objects.map(_.key).mkString(", ")}, committing them on this Scan's own checksums"
+        )
+        true
       }
     } else {
       logger.trace("BFT check is disabled, skipping BFT agreement check")
@@ -146,7 +159,9 @@ class BulkStorageCommitFromStaging[T](
     Flow[(T, Seq[ObjectKeyAndChecksum])].flatMapConcat { case (t, obj) =>
       Source
         .repeat(obj)
-        .mapAsync(parallelism = 1)(obj => checkBftForObjects(obj).map(result => (obj, result)))
+        .mapAsync(parallelism = 1)(obj =>
+          checkBftForObjects(getRequiredCatchupTimestamp(t), obj).map(result => (obj, result))
+        )
         .flatMapConcat {
           case (obj, true) =>
             logger.debug(
@@ -245,6 +260,7 @@ object BulkStorageCommitFromStaging {
       stagingS3Connection: S3BucketConnection,
       committedS3Connection: S3BucketConnection,
       getStagingObjects: T => Future[Seq[ObjectKeyAndChecksum]],
+      getRequiredCatchupTimestamp: T => CantonTimestamp,
       appConfig: BulkStorageConfig,
       scanConnection: PeerBftScanConnection,
       loggerFactory: NamedLoggerFactory,
@@ -257,6 +273,7 @@ object BulkStorageCommitFromStaging {
       stagingS3Connection,
       committedS3Connection,
       getStagingObjects,
+      getRequiredCatchupTimestamp,
       appConfig,
       scanConnection,
       loggerFactory,

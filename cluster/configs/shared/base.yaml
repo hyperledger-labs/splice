@@ -22,18 +22,17 @@ infra:
     proxyForIstioHttp: false
   istio:
     enableIngressAccessLogging: true
-    enablePublicTokenRegistry: true
     flowControl:
       # See https://github.com/DACH-NY/canton-network-internal/issues/4901
       # The values are somewhat arbitrary so more fine tuning may be appropriate.
       public:
         initialStreamWindowSize: 524288        # 512 KiB max per stream
         initialConnectionWindowSize: 52428800  # 50 MiB max per connection
-        ports: [5008, 5010]                    # sequencer public api, canton bft
+        ports: [ 5008, 5010 ]                    # sequencer public api, canton bft
       internal:
         initialStreamWindowSize: 1048576        # 1 MiB max per stream
         initialConnectionWindowSize: 104857600  # 100 MiB max per connection
-        ports: [5001, 5002, 5007, 5009]         #  ledger API, participant admin API, mediator admin API, sequencer admin API
+        ports: [ 5001, 5002, 5007, 5009 ]         #  ledger API, participant admin API, mediator admin API, sequencer admin API
 # configs specific for the pulumi project
 # will be applied to all the stacks in the project
 pulumiProjectConfig:
@@ -60,6 +59,7 @@ pulumiProjectConfig:
         max_wal_size: '20480' # 20GB, but GCP doesn't allow to write it that way and must be a number indicating MB
         maintenance_work_mem: '2000000' # 2Gi, but GCP doesn't allow to write it that way and must be a number indicating KB,
         work_mem: '16384' # 16MB, raised from the default of 4MB to better support large queries, but still low enough to avoid OOMs in case of many concurrent queries, can be increased for instances with high memory
+        autovacuum_freeze_max_age: '500000000' # 500 million, raised from the default of 200 million to avoid large impact of autovacuum freeze and allow more time for regular autovacuum
     skipSynchronizerInitialization: true
     # default not allowing version downgrades in our apps
     allowDowngrade: true
@@ -87,12 +87,12 @@ validator1:
   participant:
     additionalEnvVars:
       - !include(./participant_pruning.yaml)
-  walletGateway: !include(./wallet_gateway.yaml) {}
+  walletGateway: !include(./wallet_gateway.yaml) { }
 splitwell:
   participant:
     additionalEnvVars:
       - !include(./participant_pruning.yaml)
-  walletGateway: !include(./wallet_gateway.yaml) {}
+  walletGateway: !include(./wallet_gateway.yaml) { }
 # initial round used only on fresh initialization or resets
 # first SV bootstraps the network with it, other SVs learn it via their sponsors
 initialRound: 0
@@ -132,7 +132,7 @@ monitoring:
       spliceRateLimits:
         usageThreshold: 0.8
         rejectionCountThreshold: 10
-        excludedLimiters: []
+        excludedLimiters: [ ]
       cloudSql:
         maintenance: false
       cometbft:
@@ -146,6 +146,7 @@ monitoring:
       sequencerClientDelay:
         seconds: 90
       acsCommitments:
+        usePv36Metrics: false
         checkpointDelay:
           # Usually every 30s but while the commitment every 30min gets computed
           # it gets blocked so we allow up to 40min
@@ -173,8 +174,8 @@ monitoring:
         excludedRequests:
           - "getTransferInstructionAcceptContext" # exclude as it's really sensitive to ingestion and ROP delays
           - "getOpenAndIssuingMiningRounds" # exclude as it depends on (fast) mutable state and depends on the ROP delays
-        excludedConnections: []
-        excludedHttpStatusCodes: ["404"]
+        excludedConnections: [ ]
+        excludedHttpStatusCodes: [ "404" ]
       walletSweep:
         # Multiplier applied to a wallet sweep's configured maxBalance to set the alert threshold.
         # 1.5 means the alert fires if the balance is 50% higher than expected.
@@ -191,9 +192,26 @@ monitoring:
         # 30m drops below this fraction of the previous 30m.
         tpsDropThreshold: 0.5
       cloudArmor:
-        # Number of requests denied by Cloud Armor within a 5 minute window above which
-        # the alert fires. Only used if cloudArmor.enabled is true.
-        deniedRequestsThreshold: 0
+        # Grafana alerts, only installed if cloudArmor.enabled is true.
+        # Each alert sums the matching requests over windows of alignmentPeriodSeconds
+        # and fires once a window exceeds threshold for durationSeconds in a row
+        # (durationSeconds must be 0 or a multiple of alignmentPeriodSeconds; 0 fires
+        # on the first violating window).
+        # Requests denied by Cloud Armor.
+        deniedRequests:
+          threshold: 100
+          alignmentPeriodSeconds: 300
+          durationSeconds: 0
+        # Requests matching a WAF (OWASP CRS) rule. Only used if cloudArmor.wafRules.enabled
+        # and cloudArmor.logging.enabled are true.
+        wafRejections:
+          threshold: 10
+          alignmentPeriodSeconds: 300
+          durationSeconds: 0
+        throttleRejections:
+          threshold: 0
+          alignmentPeriodSeconds: 300
+          durationSeconds: 0
       gcpQuotas:
         # Quota metric names to exclude from all GCP quota alerts.
         # Each entry is matched exactly for quota exceeded.
@@ -245,6 +263,13 @@ cloudArmor:
   enabled: false
   allRulesPreviewOnly: true
   publicEndpoints:
+    info:
+      hostPrefixRegex: info
+      pathPrefix: /
+      restrictToRateLimitedPaths: false
+      throttleAcrossAllEndpointsPerIp:
+        withinIntervalSeconds: 60
+        maxRequestsBeforeHttp429: 10000
     publicScan:
       hostPrefixRegex: scan
       pathPrefix: /api/scan
@@ -267,6 +292,17 @@ cloudArmor:
       throttleAcrossAllEndpointsPerIp:
         withinIntervalSeconds: 60
         maxRequestsBeforeHttp429: 20000
+    svApp:
+      # required by validators during onboarding
+      hostPrefixRegex: sv
+      pathPrefix: /api/sv
+      restrictToRateLimitedPaths: false
+      throttleAcrossAllEndpointsPerIp:
+        withinIntervalSeconds: 60
+        maxRequestsBeforeHttp429: 500
+  wafRules:
+    excludedHostPrefixes:
+      - 'grafana'
 multiValidator:
   postgresPvcSize: '100Gi'
   resources:
@@ -308,4 +344,4 @@ validators:
     nodeIdentifier: 'validator-runbook'
     partyHint: 'digitalasset-testValidator-1'
     onboardingSecret: 'validatorsecret'
-    walletGateway: !include(./wallet_gateway.yaml) {}
+    walletGateway: !include(./wallet_gateway.yaml) { }

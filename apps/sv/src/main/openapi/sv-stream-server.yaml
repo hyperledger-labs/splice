@@ -1,0 +1,112 @@
+openapi: 3.0.0
+info:
+  title: SV Streaming API
+  version: 0.0.1
+tags:
+  - name: sv
+servers:
+  - url: https://example.com/api/sv
+paths:
+
+  /v0/onboard/sv/party-migration/authorize:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_public_stream
+      x-external-audience: svs
+      operationId: "onboardSvPartyMigrationAuthorize"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeRequest"
+      responses:
+        "200":
+          description: |
+            The ACS snapshot of the DSO party, in the binary format expected by the
+            participant's `ImportPartyAcs` endpoint. This is returned as a binary stream
+            rather than as JSON as snapshots can exceed the 2GB limit of a JSON string.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+                x-scala-type: org.apache.pekko.http.scaladsl.model.ResponseEntity
+        "400":
+          description: system state not yet valid
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeErrorResponse"
+        "401":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
+
+  /v0/onboard/sv/sequencer:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_public_stream
+      x-external-audience: svs
+      operationId: "onboardSvSequencer"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardSvSequencerRequest"
+      responses:
+        "200":
+          description: |
+            The onboarding state of the sequencer, in the binary format expected by the
+            sequencer's initialization endpoint. This is returned as a binary stream
+            rather than as JSON as the onboarding state can exceed the 2GB limit of a JSON string.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+                x-scala-type: org.apache.pekko.http.scaladsl.model.ResponseEntity
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+
+components:
+  schemas:
+    OnboardSvSequencerRequest:
+      type: object
+      required:
+        - sequencer_id
+      properties:
+        sequencer_id:
+          type: string
+
+    OnboardSvPartyMigrationAuthorizeRequest:
+      type: object
+      required:
+        - candidate_party_id
+      properties:
+        candidate_party_id:
+          type: string
+
+    OnboardSvPartyMigrationAuthorizeErrorResponse:
+      oneOf:
+        - "$ref": "#/components/schemas/AcceptedStateNotFoundErrorResponse"
+        - "$ref": "#/components/schemas/ProposalNotFoundErrorResponse"
+    AcceptedStateNotFoundErrorResponse:
+      type: object
+      required:
+        - accepted_state_not_found
+      properties:
+        accepted_state_not_found:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+    ProposalNotFoundErrorResponse:
+      type: object
+      required:
+        - proposal_not_found
+      properties:
+        proposal_not_found:
+          type: object
+          required:
+            - party_to_participant_base_serial
+          properties:
+            party_to_participant_base_serial:
+              type: integer
+              description: "The serial of the party to participant accepted state as seen by the sponsor"

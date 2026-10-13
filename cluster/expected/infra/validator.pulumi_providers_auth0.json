@@ -1,0 +1,12 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "clientId": "mgmt",
+    "clientSecret": "s3cr3t",
+    "domain": "canton-network-validator-test.us.auth0.com"
+  },
+  "name": "validator",
+  "provider": "",
+  "type": "pulumi:providers:auth0"
+}

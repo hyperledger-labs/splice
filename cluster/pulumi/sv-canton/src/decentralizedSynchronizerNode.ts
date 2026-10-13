@@ -52,6 +52,7 @@ const getSequencerRateLimitConfig = (): string | undefined => {
     ].join('\n');
   return [
     limitsForMessageType('confirmation-request', rateLimits.messages.confirmationRequest),
+    limitsForMessageType('confirmation-response', rateLimits.messages.confirmationResponse),
     limitsForMessageType('topology', rateLimits.messages.topology),
   ].join('\n');
 };

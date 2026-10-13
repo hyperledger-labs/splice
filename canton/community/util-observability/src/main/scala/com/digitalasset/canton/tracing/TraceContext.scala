@@ -4,10 +4,10 @@
 package com.digitalasset.canton.tracing
 
 import cats.Show.Shown
-import com.daml.nonempty.NonEmpty
 import com.daml.scalautil.Statement.discard
 import com.daml.tracing.SpanAttribute
 import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
+import com.digitalasset.nonempty.NonEmpty
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.context.Context as OpenTelemetryContext
 import io.opentelemetry.sdk.trace.ReadableSpan
@@ -19,7 +19,8 @@ import scala.language.implicitConversions
   */
 class TraceContext private[tracing] (val context: OpenTelemetryContext)
     extends Equals
-    with Serializable {
+    with Serializable
+    with HasTraceContext {
 
   lazy val asW3CTraceContext: Option[W3CTraceContext] =
     W3CTraceContext.fromOpenTelemetryContext(context)
@@ -78,6 +79,8 @@ class TraceContext private[tracing] (val context: OpenTelemetryContext)
   }
 
   def showTraceId: Shown = Shown(s"tid:${traceId.getOrElse("")}")
+
+  override def traceContext: TraceContext = this
 }
 
 object TraceContext {

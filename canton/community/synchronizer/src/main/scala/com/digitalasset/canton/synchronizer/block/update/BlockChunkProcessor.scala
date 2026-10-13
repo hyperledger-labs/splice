@@ -6,9 +6,9 @@ package com.digitalasset.canton.synchronizer.block.update
 import cats.data.EitherT
 import cats.syntax.alternative.*
 import cats.syntax.functor.*
+import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.base.error.BaseAlarm
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -20,6 +20,7 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime}
 import com.digitalasset.canton.discard.Implicits.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.GroupAddressResolver
@@ -32,19 +33,23 @@ import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.*
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerMemberValidator
 import com.digitalasset.canton.synchronizer.sequencer.time.LsuSequencingBounds
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.concurrent.atomic.AtomicReference
+import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 import BlockUpdateGeneratorImpl.SequencedPreValidatedSubmissionResult
 import SequencedSubmissionsValidator.SequencedSubmissionsValidationResult
@@ -54,7 +59,23 @@ final case class BlockProcessingParameters(
     lsuSequencingBounds: Option[LsuSequencingBounds],
     parallelism: PositiveInt,
     enablePrevalidation: Boolean,
+    enableAsyncLoggingWithOutcome: Boolean,
 )
+
+object BlockProcessingParameters {
+  def apply(
+      orderingTimeFixMode: OrderingTimeFixMode,
+      lsuSequencingBounds: Option[LsuSequencingBounds],
+      parameters: SequencerNodeParameters,
+  ): BlockProcessingParameters =
+    BlockProcessingParameters(
+      orderingTimeFixMode = orderingTimeFixMode,
+      lsuSequencingBounds = lsuSequencingBounds,
+      parallelism = parameters.batchingConfig.parallelism,
+      enablePrevalidation = parameters.enablePrevalidation,
+      enableAsyncLoggingWithOutcome = parameters.enableAsyncSequencerLogging,
+    )
+}
 
 /** Processes a chunk of events in a block, yielding a [[ChunkUpdate]].
   */
@@ -82,7 +103,7 @@ final class BlockChunkProcessor(
   private val submissionRequestValidator =
     new SubmissionRequestValidator(
       inFlightAggregationHandler,
-      memberValidator = memberValidator,
+      memberValidator,
       protocolVersion,
       parameters.enablePrevalidation,
       parameters.parallelism,
@@ -100,6 +121,9 @@ final class BlockChunkProcessor(
       ),
       loggerFactory,
     )
+  private val chainAsyncLogging = new AtomicReference[Future[Unit]](Future.unit)
+  private type EventWithOutcome =
+    (CantonTimestamp, TracedPossiblyPrevalidated[LedgerBlockEvent], Option[String])
 
   def prevalidateLedgerBlockEvent(
       approxCryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
@@ -123,18 +147,21 @@ final class BlockChunkProcessor(
     val (lastTsBeforeValidation, fixedTsChanges) =
       fixTimestampsAndDropSendsAfterUpgradeTime(state, chunkEvents, announcedLsu)
 
-    logChunkDetails(state, height, index, fixedTsChanges)
+    // Old logging: log before we know the outcome
+    if (!parameters.enableAsyncLoggingWithOutcome) {
+      val eventsWithoutOutcomes = fixedTsChanges.map { case (ts, ev) => (ts, ev, None) }
+      logChunkDetails(state, height, index, eventsWithoutOutcomes)
+      FutureUtil.doNotAwait(
+        Future(recordSubmissionMetrics(eventsWithoutOutcomes)),
+        "submission metric updating failed",
+      )
+    }
 
     val orderingRequests =
       fixedTsChanges.collect { case (ts, ev @ TracedPossiblyPrevalidated(sendEvent: Send, _)) =>
         // Discard the timestamp of the `Send` event as we're using the adjusted timestamp
         (ts, ev.map(_ => sendEvent.signedSubmissionRequest), sendEvent.orderingSequencerId)
       }
-
-    FutureUtil.doNotAwait(
-      recordSubmissionMetrics(fixedTsChanges.map(_._2.tracedValue)),
-      "submission metric updating failed",
-    )
 
     // Note: this runs for every submission in parallel using parTraverse
     val validatedSequencedSubmissionsF = addSnapshotsAndValidateSubmissions(
@@ -163,6 +190,30 @@ final class BlockChunkProcessor(
         lastSequencerEventTimestamp,
         reversedOutcomes,
       ) = validationResult
+
+      // wait for previous logging to have finished (should never really throttle)
+      _ = if (parameters.enableAsyncLoggingWithOutcome) {
+        val promise = Promise[Unit]()
+        // store promise to sequentialize logging, but play it safe by recovering from any failure.
+        val current = chainAsyncLogging.getAndSet(promise.future.recover(_ => ()))
+        // trigger the logging in the background, but don't wait for it to finish
+        promise.completeWith(current.map { _ =>
+          val eventsWithOutcomes =
+            mergeResultWithOriginalRequest(fixedTsChanges, reversedOutcomes.reverse)
+          val countBySequencerId = fixedTsChanges
+            .map(_._2.value)
+            .collect { case send: Send =>
+              send.orderingSequencerId
+            }
+            .groupMapReduce(identity)(_ => 1)(_ + _)
+          logChunkDetails(state, height, index, eventsWithOutcomes, countBySequencerId)
+          recordSubmissionMetrics(eventsWithOutcomes)
+        })
+        FutureUtil.doNotAwait(
+          promise.future,
+          "async sequencer logging failed",
+        )
+      }
 
       finalInFlightAggregationsWithAggregationExpiry = finalInFlightAggregations.cleanExpired(
         lastTsBeforeValidation
@@ -203,11 +254,68 @@ final class BlockChunkProcessor(
     } yield (newState, chunkUpdate)
   }
 
+  private def mergeResultWithOriginalRequest(
+      allEvents: Seq[(CantonTimestamp, TracedPossiblyPrevalidated[LedgerBlockEvent])],
+      sendOutcomes: Seq[SubmissionOutcome],
+  )(implicit traceContext: TraceContext): Seq[EventWithOutcome] = {
+
+    val sendOutcomesStr = sendOutcomes.mapFilter {
+      case x: SubmissionOutcome.Deliver => Some((x.submission.messageId, "Deliver"))
+      case x: SubmissionOutcome.Reject => Some((x.submission.messageId, s"Reject(${x.error})"))
+      case x: SubmissionOutcome.DeliverReceipt => Some((x.submission.messageId, "Receipt"))
+      case SubmissionOutcome.Discard =>
+        logger.error(
+          "Found discard outcome but this should be filtered out in SequencedSubmissionsValidator.updateSequencedSubmissionsWithNewResult"
+        )
+        None
+    }
+
+    @tailrec
+    def go(
+        events: List[(CantonTimestamp, TracedPossiblyPrevalidated[LedgerBlockEvent])],
+        outcomes: List[(MessageId, String)],
+        result: List[EventWithOutcome],
+    ): List[EventWithOutcome] =
+      (events, outcomes) match {
+        case (Nil, more) =>
+          // should not happen unless we somehow inserted outcomes without an input event
+          if (more.nonEmpty)
+            logger.error(s"Have more outcomes than events? $events $outcomes")
+          result.reverse
+        case (
+              (ts, ev @ TracedPossiblyPrevalidated(send: LedgerBlockEvent.Send, _)) :: restEvents,
+              (messageId, outcome) :: restOutcomes,
+            ) =>
+          // if message-id lines up, use it
+          if (send.signedSubmissionRequest.content.messageId == messageId)
+            go(restEvents, restOutcomes, (ts, ev, Some(outcome)) :: result)
+          // otherwise the event was discarded
+          else
+            go(restEvents, outcomes, (ts, ev, Some("Discard")) :: result)
+        // if the last one is a discard that got dropped, we won't have an outcome
+        case (
+              (ts, ev @ TracedPossiblyPrevalidated(_: LedgerBlockEvent.Send, _)) :: restEvents,
+              Nil,
+            ) =>
+          go(restEvents, outcomes, (ts, ev, Some("Discard")) :: result)
+        case (
+              (
+                ts,
+                ev @ TracedPossiblyPrevalidated(_: LedgerBlockEvent.Acknowledgment, _),
+              ) :: restEvents,
+              outcomes,
+            ) =>
+          go(restEvents, outcomes, (ts, ev, None) :: result)
+      }
+    go(allEvents.toList, sendOutcomesStr.toList, List.empty)
+  }
+
   private def logChunkDetails(
       state: AccumulatedStateProcessingBlocks,
       height: Long,
       index: Int,
-      assignedTimestamps: Seq[(CantonTimestamp, TracedPossiblyPrevalidated[LedgerBlockEvent])],
+      assignedTimestamps: Seq[EventWithOutcome],
+      eventsBySequencerId: Map[SequencerId, Int] = Map.empty,
   )(implicit traceContext: TraceContext): Unit =
     noTracingLogger.whenInfoEnabled {
       val sb = new mutable.StringBuilder()
@@ -215,19 +323,31 @@ final class BlockChunkProcessor(
         .append(height)
         .append(", data chunk ")
         .append(index)
-        .append(". Last chunk timestamp=")
+        .append(". Last chunk ts=")
         .append(state.lastChunkTs.toString)
-        .append(", last sequencer event timestamp=")
+        .append(", last seq event ts=")
         .append(state.latestSequencerEventTimestamp.toString)
         .append(". ")
-        .append(assignedTimestamps.size)
-        .append(" events:")
         .discard
+      if (eventsBySequencerId.isEmpty)
+        sb.append(assignedTimestamps.size)
+          .append(" events")
+          .discard
+      else {
+        eventsBySequencerId.foreach { case (sequencerId, count) =>
+          sb.append(count)
+            .append(" events from ")
+            .append(sequencerId.uid.toProtoPrimitive)
+            .append("; ")
+            .discard
+        }
+      }
 
       def logLedgerBlockEvent(
           timestamp: CantonTimestamp,
           ledgerBlockEvent: LedgerBlockEvent,
           eventTraceContext: TraceContext,
+          maybeOutcome: Option[String],
       ): Unit = ledgerBlockEvent match {
         case LedgerBlockEvent.Send(_, signedOrderingRequest, _, _) =>
           sb.append("\n  Send of ")
@@ -235,6 +355,9 @@ final class BlockChunkProcessor(
             .append(" at ")
             .append(timestamp.toString)
             .discard
+          maybeOutcome.foreach { outcome =>
+            sb.append(" ").append(outcome).discard
+          }
           eventTraceContext.traceId.foreach { traceId =>
             sb.append(" (tc=").append(traceId).append(")").discard
           }
@@ -245,9 +368,8 @@ final class BlockChunkProcessor(
             .append(signedAck.content.timestamp.toString)
             .discard
       }
-
-      assignedTimestamps.foreach { case (ts, event) =>
-        logLedgerBlockEvent(ts, event.value, event.traceContext)
+      assignedTimestamps.foreach { case (ts, event, outcome) =>
+        logLedgerBlockEvent(ts, event.value, event.traceContext, outcome)
       }
       logger.info(sb.toString())
     }
@@ -536,11 +658,33 @@ final class BlockChunkProcessor(
                     )
                     snapshotAtSequencingTime
                 }
+                // Now that the sequencing timestamp is assigned, we can resolve the topology
+                // snapshot and re-bind the envelope contents' decompression to the dynamic
+                // `maxRequestSize`. Earlier protocol versions keep the hardcoded value.
+                decompressionPolicy <-
+                  if (protocolVersion <= ProtocolVersion.v35)
+                    FutureUnlessShutdown.pure(DecompressionPolicy.HardcodedDefault)
+                  else
+                    snapshotAtSequencingTime.ipsSnapshot
+                      .findDynamicSynchronizerParametersOrDefault(protocolVersion)
+                      .map(parameters =>
+                        DecompressionPolicy.forProtocolVersion(
+                          protocolVersion,
+                          MaxBytesToDecompress(parameters.maxRequestSize.value),
+                        )
+                      )
+                boundedSignedSubmissionRequest = signedSubmissionRequest.copy(
+                  content = submissionRequest.withDecompressionPolicy(decompressionPolicy)
+                )
+                tracedBoundedSubmissionRequest = TracedPossiblyPrevalidated(
+                  boundedSignedSubmissionRequest,
+                  tracedSubmissionRequest.prevalidated,
+                )(traceContext)
                 sequencedValidatedSubmission <- {
                   submissionRequestValidator
                     .performIndependentValidations(
                       sequencingTimestamp,
-                      tracedSubmissionRequest,
+                      tracedBoundedSubmissionRequest,
                       snapshotToValidateSubmissionRequest,
                       topologySnapshotFromRequestO,
                       topologyTimestampFromRequestError,
@@ -551,7 +695,7 @@ final class BlockChunkProcessor(
                     .map { case (trafficConsumption, prevalidationOutcome) =>
                       SequencedPreValidatedSubmissionResult(
                         sequencingTimestamp,
-                        signedSubmissionRequest,
+                        boundedSignedSubmissionRequest,
                         orderingSequencerId,
                         trafficConsumption,
                         prevalidationOutcome,
@@ -682,20 +826,26 @@ final class BlockChunkProcessor(
   }
 
   private def recordSubmissionMetrics(
-      value: Seq[Traced[LedgerBlockEvent]]
-  )(implicit executionContext: ExecutionContext): Future[Unit] =
-    Future {
-      value.foreach(_.withTraceContext { implicit traceContext =>
+      value: Seq[EventWithOutcome]
+  ): Unit =
+    value.map { case (_, ev, outcome) => ev.map(inner => (inner, outcome)) }.foreach { event =>
+      event.withTraceContext { implicit traceContext =>
         {
-          case LedgerBlockEvent.Send(_, signedSubmissionRequest, _, payloadSize) =>
+          case (
+                LedgerBlockEvent.Send(_, signedSubmissionRequest, orderingSequencerId, payloadSize),
+                outcome,
+              ) =>
             val submissionRequest = signedSubmissionRequest.content
             val sender = submissionRequest.sender
             val requestType = submissionRequest.requestType
-            val mc = SequencerMetrics.submissionTypeMetricsContext(sender, requestType, logger)
-            metrics.block.blockEvents.mark()(mc)
-            metrics.block.blockEventBytes.mark(payloadSize.longValue)(mc)
+            val mc = SequencerMetrics
+              .submissionTypeMetricsContext(sender, orderingSequencerId, requestType, logger)
+            val mcWithOutcome =
+              outcome.map(res => mc.withExtraLabels("outcome" -> res)).getOrElse(mc)
+            metrics.block.blockEvents.mark()(mcWithOutcome)
+            metrics.block.blockEventBytes.mark(payloadSize.longValue)(mcWithOutcome)
 
-          case LedgerBlockEvent.Acknowledgment(_, request) =>
+          case (LedgerBlockEvent.Acknowledgment(_, request), _) =>
             // record the event
             val requestContent = request.content
             metrics.block.blockEvents
@@ -713,6 +863,7 @@ final class BlockChunkProcessor(
                 _ max requestContent.timestamp.underlying.micros
               )
         }
-      })
+      }
     }
+
 }

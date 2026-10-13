@@ -1,0 +1,29 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+      "name": "cn-gke-l7-gateway-no-cloud-armor",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "ports": [
+        {
+          "appProtocol": "kubernetes.io/h2c",
+          "name": "http2",
+          "port": 80,
+          "targetPort": 80
+        }
+      ],
+      "selector": {
+        "app": "istio-ingress"
+      },
+      "type": "ClusterIP"
+    }
+  },
+  "name": "cn-gke-l7-gateway-no-cloud-armor",
+  "provider": "",
+  "type": "kubernetes:core/v1:Service"
+}

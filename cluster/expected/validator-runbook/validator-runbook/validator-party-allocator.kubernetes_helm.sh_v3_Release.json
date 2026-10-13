@@ -1,0 +1,78 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-party-allocator",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "party-allocator",
+    "namespace": "validator",
+    "timeout": 600,
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "cluster": {
+        "dnsName": "mock.global.canton.network.digitalasset.com",
+        "fixedTokens": false,
+        "hostname": "mock.global.canton.network.digitalasset.com",
+        "name": "cn-mocknet"
+      },
+      "config": {
+        "auth": {
+          "audience": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE}",
+          "clientId": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID}",
+          "clientSecret": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET}",
+          "scope": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_SCOPE}",
+          "type": "client-credentials",
+          "wellKnownConfigUrl": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_URL}"
+        },
+        "jsonLedgerApiUrl": "http://participant:7575",
+        "keyDirectory": "/keys",
+        "maxParties": 1234,
+        "parallelism": 321,
+        "preapprovalRetries": 9876,
+        "preapprovalRetryDelayMs": 42,
+        "scanApiUrl": "http://scan-app.sv-1:5012",
+        "userId": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME}",
+        "validatorApiUrl": "http://validator-app:5003"
+      },
+      "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+      "pvc": {
+        "name": "party-allocator-keys-hd-pvc",
+        "volumeStorageClass": "hyperdisk-standard-rwo"
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "1.2.3"
+  },
+  "name": "validator-party-allocator",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}
