@@ -1,5 +1,6 @@
 org.lfdecentralizedtrust.splice.admin.api.HttpRequestLoggerTest
 org.lfdecentralizedtrust.splice.admin.api.client.ApiClientRequestLoggerTest
+org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandlerBftCallFailedTest
 org.lfdecentralizedtrust.splice.auth.AuthTokenManagerTest
 org.lfdecentralizedtrust.splice.auth.SignatureVerifierTest
 org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTriggerTest
@@ -11,6 +12,7 @@ org.lfdecentralizedtrust.splice.config.ThresholdsTest
 org.lfdecentralizedtrust.splice.environment.ActiveContractsRestartTest
 org.lfdecentralizedtrust.splice.environment.CommandCircuitBreakerTest
 org.lfdecentralizedtrust.splice.environment.CommandIdDedupTest
+org.lfdecentralizedtrust.splice.environment.RetryProviderBftCallFailedTest
 org.lfdecentralizedtrust.splice.environment.TopologyAwarePackageVersionSupportTest
 org.lfdecentralizedtrust.splice.http.HttpRateLimiterTest
 org.lfdecentralizedtrust.splice.http.InvalidResponseContentTest
