@@ -241,13 +241,36 @@ export const monitoringConfig = MonitoringConfigSchema.parse(clusterSubConfig('m
 
 export type GcpQuotaAlertsConfig = z.infer<typeof GcpQuotasConfigSchema>;
 
-const PrometheusConfigSchema = z.object({
-  prometheus: z.object({
-    storageSize: z.string(),
-    retentionDuration: z.string(),
-    retentionSize: z.string(),
-    installPrometheusPushgateway: z.boolean().default(false),
-  }),
+const PrometheusPushgatewayExternalAccessSchema = z.object({
+  enabled: z.boolean().default(false),
 });
 
-export const prometheusConfig = PrometheusConfigSchema.parse(clusterSubConfig('infra')).prometheus;
+const PrometheusConfigSchema = z.object({
+  prometheus: z
+    .object({
+      storageSize: z.string(),
+      retentionDuration: z.string(),
+      retentionSize: z.string(),
+      installPrometheusPushgateway: z.boolean().default(false),
+      pushgatewayExternalAccess: PrometheusPushgatewayExternalAccessSchema.prefault({}),
+    })
+    .refine(
+      access => !access.pushgatewayExternalAccess.enabled || access.installPrometheusPushgateway,
+      {
+        message: 'pushgatewayExternalAccess.enabled requires installPrometheusPushgateway',
+        path: ['pushgatewayExternalAccess', 'enabled'],
+      }
+    ),
+  // Mirrors infra.ipWhitelisting.excludedIps so excluded IPs stay cut off here too.
+  ipWhitelisting: z
+    .object({
+      excludedIps: z.array(z.string()).default([]),
+    })
+    .optional(),
+});
+
+const infraSubConfig = PrometheusConfigSchema.parse(clusterSubConfig('infra'));
+
+export const prometheusConfig = infraSubConfig.prometheus;
+
+export const excludedIps = infraSubConfig.ipWhitelisting?.excludedIps ?? [];

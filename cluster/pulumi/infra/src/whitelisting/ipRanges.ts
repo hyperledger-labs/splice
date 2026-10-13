@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
 import { externalIpRangesFile, loadJsonFromFile } from '@canton-network/splice-pulumi-common';
-import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
+import { loadInternalWhitelistedIps as loadInternalWhitelistedIpsFromSecret } from '@canton-network/splice-pulumi-common/src/secrets';
 
 import { infraConfig } from '../config';
 
@@ -24,19 +24,7 @@ function extractIpRanges(x: IpRangesDict, svsOnly: boolean = false): string[] {
 export function loadInternalWhitelistedIps(): pulumi.Output<string[]> {
   const excludedIps = infraConfig.ipWhitelisting?.excludedIps || [];
 
-  return getSecretVersionOutput({
-    secret: 'pulumi-internal-whitelists',
-  }).apply(whitelists => {
-    const secretData = whitelists.secretData;
-    const json = JSON.parse(secretData);
-    const ret: string[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    json.forEach((ip: any) => {
-      ret.push(ip);
-    });
-    const ips = ret.filter(ip => excludedIps.indexOf(ip) < 0);
-    return [...new Set(ips)];
-  });
+  return loadInternalWhitelistedIpsFromSecret(excludedIps);
 }
 
 export function loadIPRanges(svsOnly: boolean = false): pulumi.Output<string[]> {
