@@ -39,6 +39,7 @@ import scala.jdk.CollectionConverters.*
   * The successor's sequencer and mediator are started only for this test, uninitialized, so the
   * operator's LSU trigger initializes them from the synchronizer it is upgrading.
   */
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_30
 class SyncOperatorLsuIntegrationTest
     extends IntegrationTest
     with StandaloneCanton
