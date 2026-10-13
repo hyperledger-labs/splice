@@ -44,7 +44,6 @@ import com.digitalasset.canton.topology.transaction.{
 }
 import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -513,19 +512,22 @@ class SV1Initializer(
                 sequencerState,
                 mediatorState,
               ) <- (
-                MonadUtil
-                  .sequentialTraverse(
-                    List(
-                      participantAdminConnection,
-                      synchronizerNode.mediatorAdminConnection,
-                      synchronizerNode.sequencerAdminConnection,
+                for {
+                  participantIdentity <- participantAdminConnection.getIdentityTransactions(
+                    participantId.uid,
+                    TopologyStoreId.Authorized,
+                  )
+                  mediatorIdentity <- synchronizerNode.mediatorAdminConnection
+                    .getOrGenerateIdentityTransactions(
+                      mediatorId,
+                      synchronizerNode.config.protocolVersion,
                     )
-                  ) { con =>
-                    con
-                      .getId()
-                      .flatMap(con.getIdentityTransactions(_, TopologyStoreId.Authorized))
-                  }
-                  .map(_.flatten),
+                  sequencerIdentity <- synchronizerNode.sequencerAdminConnection
+                    .getOrGenerateIdentityTransactions(
+                      sequencerId,
+                      synchronizerNode.config.protocolVersion,
+                    )
+                } yield participantIdentity ++ mediatorIdentity ++ sequencerIdentity,
                 participantAdminConnection.proposeInitialDomainParameters(
                   synchronizerId,
                   values,
