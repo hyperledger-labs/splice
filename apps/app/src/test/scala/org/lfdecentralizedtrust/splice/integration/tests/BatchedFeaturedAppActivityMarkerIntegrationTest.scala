@@ -33,6 +33,12 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
     with SplitwellTestUtil
     with TriggerTestUtil {
 
+  // Bob's participant vets no splice-amulet above 0.1.19 (see the test), so the token-standard
+  // V2 check at teardown fails with:
+  //   NO_VETTED_INTERFACE_IMPLEMENTATION_PACKAGE: No vetted package for rendering the
+  //   interface view for package-name 'splice-amulet'
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
