@@ -211,7 +211,7 @@ trait SigningPrivateStoreOps extends SigningPrivateOps {
   *   through a signature created by a long-term key. This allows the session key to be used for
   *   signing the original message without always relying on the long-term key.
   */
-final case class Signature(
+final case class Signature private (
     format: SignatureFormat,
     private val signature: ByteString,
     private[crypto] val signedBy: Fingerprint,

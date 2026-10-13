@@ -22,7 +22,6 @@ import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.google.protobuf.ByteString
 import io.grpc.Status
-import monocle.Monocle.toAppliedFocusOps
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.HasParticipantId
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologyResult,
@@ -187,9 +186,10 @@ trait ParticipantAdminDarsConnection {
       currentVetting: VettedPackages,
   ): VettedPackages = {
     val packageIdsToRemove: Seq[String] = dars.map(_.packageId)
-    currentVetting
-      .focus(_.packages)
-      .modify(packages => packages.filterNot(pkg => packageIdsToRemove.contains(pkg.packageId)))
+    VettedPackages.tryCreate(
+      currentVetting.participantId,
+      currentVetting.packages.filterNot(pkg => packageIdsToRemove.contains(pkg.packageId)),
+    )
   }
 
   private def addDarsToVettingState(
@@ -207,9 +207,9 @@ trait ParticipantAdminDarsConnection {
       packageValidFrom: Option[CantonTimestamp],
       currentVetting: VettedPackages,
   ) = {
-    currentVetting
-      .focus(_.packages)
-      .modify(packages => {
+    VettedPackages.tryCreate(
+      currentVetting.participantId, {
+        val packages = currentVetting.packages
         def addVettingStateForPackage(packageId: PackageId, packages: Seq[VettedPackage]) = {
           // while the main package is guaranteed to not exist the dependencies might already have been vetted, and they might have been vetted with a later date so we make sure that the dependencies are available as early as we need them
           packages.find(_.packageId == packageId) match {
@@ -239,7 +239,8 @@ trait ParticipantAdminDarsConnection {
           .foldLeft(packages) { case (vettingState, newPackage) =>
             addVettingStateForPackage(newPackage, vettingState)
           }
-      })
+      },
+    )
   }
 
   def listVettedPackages(

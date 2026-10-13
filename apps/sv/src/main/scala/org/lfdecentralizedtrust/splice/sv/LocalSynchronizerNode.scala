@@ -8,6 +8,7 @@ import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.SequencerConnectionPoolDelaysAccess.*
 import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplificationAccess.*
 import com.digitalasset.canton.admin.api.client.data.SubscriptionLivenessLimitsAccess.*
+import com.digitalasset.canton.protocol.StaticSynchronizerParametersAccess.*
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.{ClientConfig, CryptoConfig, CryptoProvider}
