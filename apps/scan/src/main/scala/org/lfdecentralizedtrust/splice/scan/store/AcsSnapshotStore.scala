@@ -817,12 +817,10 @@ class AcsSnapshotStore(
         saveV2IncrementalSnapshot(table, snapshot, nextSnapshotTargetRecordTime)(tc)
     }
     storage.queryAndUpdate(
-      AdvisoryLocks.withDdlLock(
-        withIncrementalSnapshotIdempotencyCheck(
-          table,
-          statement,
-          Some(snapshot),
-        )
+      withIncrementalSnapshotIdempotencyCheck(
+        table,
+        statement,
+        Some(snapshot),
       ),
       "saveIncrementalSnapshot",
     )
@@ -925,22 +923,18 @@ class AcsSnapshotStore(
     // - otherwise, on retry the `create index IF NOT EXISTS` will just move on.
     for {
       _ <- storage.queryAndUpdate(
-        AdvisoryLocks.withDdlLock(
-          AcsSnapshotDDL.stakeholderIndexAction(
-            snapshot.stakeholdersTableName,
-            historyId,
-            snapshot.snapshotRecordTime,
-          )
+        AcsSnapshotDDL.stakeholderIndexAction(
+          snapshot.stakeholdersTableName,
+          historyId,
+          snapshot.snapshotRecordTime,
         ),
         "index_stakeholders",
       )
       _ <- storage.queryAndUpdate(
-        AdvisoryLocks.withDdlLock(
-          AcsSnapshotDDL.stakeholderTemplateIdIndexAction(
-            snapshot.stakeholdersTableName,
-            historyId,
-            snapshot.snapshotRecordTime,
-          )
+        AcsSnapshotDDL.stakeholderTemplateIdIndexAction(
+          snapshot.stakeholdersTableName,
+          historyId,
+          snapshot.snapshotRecordTime,
         ),
         "index_stakeholders_templateid",
       )

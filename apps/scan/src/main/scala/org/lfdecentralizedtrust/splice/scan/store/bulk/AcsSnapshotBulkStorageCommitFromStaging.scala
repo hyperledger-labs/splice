@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
@@ -11,7 +12,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Flow
 import org.lfdecentralizedtrust.splice.scan.config.BulkStorageConfig
 import org.lfdecentralizedtrust.splice.scan.util.PeerBftScanConnection
-import org.lfdecentralizedtrust.splice.store.{S3BucketConnection, TimestampWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -25,40 +26,41 @@ class AcsSnapshotBulkStorageCommitFromStaging(
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor
-) extends AcsSnapshotBulkStorageWriter
+) extends AcsSnapshotBulkStorageWriter[CantonTimestamp]
     with NamedLogging {
 
-  override def getNextSnapshotTimestampAfter(
-      last: TimestampWithMigrationId
-  )(implicit tc: TraceContext): Future[Option[TimestampWithMigrationId]] = {
-    bulkStorageReader
-      .getTimestampOfStagingAcsSnapshotAfter(last.timestamp)
-      .map(
-        _.map(ts => TimestampWithMigrationId(ts, -1L))
-      ) // migration IDs are not used in bulk storage, so we set it to a fake -1
-  }
+  override def positionAt(recordTime: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[CantonTimestamp] = Future.successful(recordTime)
 
-  override def shouldProcessSnapshotAt(ts: TimestampWithMigrationId)(implicit
+  override def recordTimeOf(snapshot: CantonTimestamp): CantonTimestamp = snapshot
+
+  override def getNextSnapshotAfter(
+      last: CantonTimestamp
+  )(implicit tc: TraceContext): Future[Option[CantonTimestamp]] =
+    bulkStorageReader.getTimestampOfStagingAcsSnapshotAfter(last)
+
+  override def shouldProcessSnapshot(snapshot: CantonTimestamp)(implicit
       tc: TraceContext
   ): Boolean = true // all objects in staging should be moved to committed
 
   override def processSnapshotsFlow(implicit
       tc: TraceContext,
       actorSystem: ActorSystem,
-  ): Flow[TimestampWithMigrationId, TimestampWithMigrationId, NotUsed] = {
+  ): Flow[CantonTimestamp, CantonTimestamp, NotUsed] = {
     BulkStorageCommitFromStaging(
       stagingS3Connection,
       committedS3Connection,
       ts =>
         bulkStorageReader
-          .getStagingObjectsForAcsSnapshotAt(ts.timestamp)
+          .getStagingObjectsForAcsSnapshotAt(ts)
           .map(objects => objects.objects)
           .recover {
             // If we restart after all objects have been moved already, the staging objects will not be found.
             case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
               Seq.empty
           },
-      _.timestamp,
+      identity,
       appConfig,
       scanConnection,
       loggerFactory,
