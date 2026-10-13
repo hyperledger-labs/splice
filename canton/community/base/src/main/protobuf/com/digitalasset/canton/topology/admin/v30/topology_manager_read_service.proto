@@ -413,4 +413,3 @@ message GenerateOnboardingTopologyTransactionsRequest {
 message GenerateOnboardingTopologyTransactionsResponse {
   com.digitalasset.canton.protocol.v30.SignedTopologyTransactions result = 1;
 }
-

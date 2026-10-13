@@ -75,3 +75,4 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Changed `DbStorageSetup` to use `DbConfig with PostgresDbConfig` instead of `CommunityDbConfig.Postgres`.
 * Stubbed the `SequencerConfig` due to a missing project dependency in on `communite-reference-sequecer`
 * Added `org.lfdecentralizedtrust.splice` to `logback-test.xml`
+* Backported the `GenerateOnboardingTopologyTransactions` rpc (proto, `TopologyAdminCommands.Read` command, UNIMPLEMENTED server stub) from Canton 3.7; drop on the next fork bump.
