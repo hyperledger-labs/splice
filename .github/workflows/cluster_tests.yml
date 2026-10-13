@@ -9,6 +9,10 @@ on:
       sha:
         type: string
         required: true
+      scratchnet:
+        type: string
+        required: false
+        default: ''
 
     outputs:
       result:
@@ -46,11 +50,15 @@ jobs:
         id: trigger
         run: |
           set -euo pipefail
+          url="${{ secrets.CLUSTER_TEST_INVOKER_URL }}?workflow=${{ inputs.workflow }}&splice-git-ref=${{ inputs.sha }}"
+          if [ -n "${{ inputs.scratchnet }}" ]; then
+            url="$url&scratchnet=${{ inputs.scratchnet }}"
+          fi
           if ! result=$(curl -sSL -X POST --fail-with-body \
             --retry 3 --retry-delay 10 --retry-max-time 60 \
             --connect-timeout 10 --max-time 60 \
             -H "Authorization: Bearer ${{ steps.auth.outputs.id_token }}" \
-            "${{ secrets.CLUSTER_TEST_INVOKER_URL }}?workflow=${{ inputs.workflow }}&splice-git-ref=${{ inputs.sha }}"); then
+            "$url"); then
             echo "::error::Failed to trigger cluster test workflow '${{ inputs.workflow }}' for sha '${{ inputs.sha }}'"
             echo "Response body: $result"
             exit 1

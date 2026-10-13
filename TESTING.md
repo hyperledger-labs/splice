@@ -80,10 +80,12 @@ There are two types of cluster tests that can be requested on a PR:
 - A basic cluster test, which deploys a scratch cluster, and runs the test suite against it.
 - A Hard Migration test, which tests the full hard migration workflow on a scratch cluster.
 
-To request a cluster test to be run on your PR, comment on your pr `/cluster_test`, `/upgrade_test`, `/hdm_test` or `/lsu_test`
-for a basic test, a hard-migration test or a logical synchronizer upgrade test respectively. After commenting,
-the job needs to be approved to actually run. If you're a Digital Asset employee, you can self-approve; otherwise,
-contact an existing maintainer to approve it.
+To request a cluster test to be run on your PR, comment on your pr `/cluster_test <scratchnet>`, `/upgrade_test`, `/hdm_test` or `/lsu_test`
+for a basic test, a hard-migration test or a logical synchronizer upgrade test respectively, where `<scratchnet>` is one of
+`scratchneta`, `scratchnetb`, `scratchnetc`, `scratchnetd`, `scratchnete` (e.g. `/cluster_test scratchneta`).
+Commenting a bare `/cluster_test` without a scratchnet does not trigger a test; it only posts usage instructions.
+After commenting, the job needs to be approved to actually run. If you're a Digital Asset employee, you can self-approve; otherwise,
+contact an existing maintainer to approve it. Approving a cluster test requires action from DA-internal, so ping someone with access to the DA-internal system.
 
 ## Running Tests Locally
 
