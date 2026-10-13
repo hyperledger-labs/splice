@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.RestrictedOpen
+import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
@@ -23,6 +24,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.SynchronizerPermissionState
+import org.slf4j.event.Level
 
 import java.util.Optional
 import scala.jdk.CollectionConverters.*
@@ -156,6 +158,26 @@ class PermissionedSynchronizerMigrationIntegrationTest
     clue("Bob can onboard a user") {
       bobValidatorBackend.waitForInitialization()
       bobValidatorBackend.onboardUser("bob-user")
+    }
+    clue("Secret based onboarding endpoint is disabled") {
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+        {
+          intercept[com.digitalasset.canton.console.CommandFailure] {
+            sv1Backend.onboardValidator(
+              aliceValidatorBackend.participantClient.id.adminParty,
+              "bogus-secret",
+              "contact-point",
+            )
+          }
+        },
+        lines => {
+          forAtLeast(1, lines) { line =>
+            line.message should include(
+              "Endpoint is disabled: the network has migrated to traffic-based onboarding"
+            )
+          }
+        },
+      )
     }
   }
 

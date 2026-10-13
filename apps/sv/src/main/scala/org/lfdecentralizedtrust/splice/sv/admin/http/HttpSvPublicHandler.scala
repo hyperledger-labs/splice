@@ -102,11 +102,9 @@ class HttpSvPublicHandler(
           dsoStore.getDsoRules().flatMap { dsoRules =>
             if (SwitchOverTimes.permissionedSynchronizerEnabled(clock, dsoRules.payload)) {
               Future.failed(
-                Status.UNAVAILABLE
-                  .withDescription(
-                    "/v0/onboard/validator API is disabled because the network has migrated to RestrictedOpen mode."
-                  )
-                  .asRuntimeException()
+                HttpErrorHandler.badRequest(
+                  s"Endpoint is disabled: the network has migrated to traffic-based onboarding."
+                )
               )
             } else {
               val providedSecret = Secrets.decodeValidatorOnboardingSecret(body.secret, svParty)
