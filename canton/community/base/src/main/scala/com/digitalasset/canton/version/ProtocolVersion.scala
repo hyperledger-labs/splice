@@ -257,7 +257,6 @@ object ProtocolVersion {
       ProtocolVersion.v34,
       ProtocolVersion.v35,
       ProtocolVersion.v36,
-      ProtocolVersion.v37,
     )
 
   // LF versions that should only be used with alpha/beta protocol versions
@@ -275,7 +274,7 @@ object ProtocolVersion {
     s"stable protocol versions $stable should be in sync with build info $releaseStable",
   )
 
-  val alpha: List[AlphaProtocolVersion] = List(almostDev)
+  val alpha: List[AlphaProtocolVersion] = List(v37, almostDev)
 
   val beta: List[BetaProtocolVersion] =
     parseFromBuildInfo(BuildInfo.betaProtocolVersions)
@@ -333,8 +332,8 @@ object ProtocolVersion {
   lazy val v36: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
     ProtocolVersion.createStable(36)
 
-  lazy val v37: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
-    ProtocolVersion.createStable(37)
+  lazy val v37: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
+    ProtocolVersion.createAlpha(37)
 
   // local storage doesn't depend on a synchronizer with a specific protocol version
   lazy val acsCommitmentRedesignStorage
