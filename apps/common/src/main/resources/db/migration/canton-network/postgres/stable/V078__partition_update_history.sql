@@ -72,6 +72,7 @@ create index updt_hist_tran_hi_mi_di_rt on update_history_transactions (history_
 create index updt_hist_tran_hi_mi_rt_di on update_history_transactions (history_id, migration_id, record_time, domain_id);
 create index updt_hist_tran_hi_mi_ui_import_updates on update_history_transactions (history_id, migration_id, update_id)
     where record_time = -62135596800000000;
+create unique index updt_hist_tran_hi_mi_ui_u on update_history_transactions (history_id, migration_id, domain_id, update_id, record_time);
 create index updt_hist_tran_hi_ui on update_history_transactions (history_id, update_id);
 -- Same definition as in SqlIndexInitializationTrigger, which cannot create indexes concurrently on partitioned tables
 create index updt_hist_tran_hi_eth on update_history_transactions (history_id, external_transaction_hash)
@@ -134,4 +135,4 @@ create index updt_hist_unas_hi_mi_di_rt on update_history_unassignments (history
 create index updt_hist_unas_hi_mi_rt_di on update_history_unassignments (history_id, migration_id, record_time, domain_id);
 create unique index updt_hist_unas_hi_mi_ui_u on update_history_unassignments (history_id, migration_id, domain_id, update_id, record_time);
 
--- Initial partitions to be created by Scala code
+-- Initial partitions to be created by the same code
