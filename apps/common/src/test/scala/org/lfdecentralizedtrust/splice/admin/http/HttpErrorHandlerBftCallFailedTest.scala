@@ -21,7 +21,7 @@ class HttpErrorHandlerBftCallFailedTest extends AnyWordSpec with BaseTest with S
 
   private val expectedStatus = Seq[(BftCallFailed, StatusCode)](
     new BftCallFailed.NotYetAvailable("not yet") -> StatusCodes.ServiceUnavailable,
-    new BftCallFailed.NeverAvailable("never") -> StatusCodes.NotFound,
+    new BftCallFailed.NeverAvailable("never") -> StatusCodes.BadGateway,
     new BftCallFailed.Disagreement("disagree") -> StatusCodes.BadGateway,
     new BftCallFailed.NotEnoughScans("not enough") -> StatusCodes.BadGateway,
   )

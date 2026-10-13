@@ -148,8 +148,8 @@ final class HttpErrorHandler(
   private def bftFailureStatusCode(failed: BftCallFailed): StatusCode =
     failed match {
       case _: BftCallFailed.NotYetAvailable => StatusCodes.ServiceUnavailable
-      case _: BftCallFailed.NeverAvailable => StatusCodes.NotFound
-      case _: BftCallFailed.Disagreement | _: BftCallFailed.NotEnoughScans =>
+      case _: BftCallFailed.NeverAvailable | _: BftCallFailed.Disagreement |
+          _: BftCallFailed.NotEnoughScans =>
         StatusCodes.BadGateway
     }
 
