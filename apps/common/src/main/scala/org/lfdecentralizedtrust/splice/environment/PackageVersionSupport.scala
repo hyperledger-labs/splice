@@ -131,7 +131,7 @@ trait PackageVersionSupport extends NamedLogging {
       ),
       now,
       DarResources.amulet,
-      DarResources.amulet_0_1_24,
+      DarResources.amulet_0_1_25,
       ignoreRedundantCheck = false,
     )
   }
