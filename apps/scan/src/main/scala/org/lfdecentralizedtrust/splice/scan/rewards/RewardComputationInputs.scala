@@ -134,9 +134,8 @@ object RewardComputationInputs {
         trafficPrice = fromBigDecimal(trafficPrice),
         appRewardCouponThreshold = fromBigDecimal(rewardConfig.appRewardCouponThreshold),
       )
-      // Daml doesn't bound batchSize, so cap it to what lookupBatchByHash will
-      // serve. Every SV's scan must compute the same tree, so a future release
-      // may raise this cap but must never lower it.
+      // Daml doesn't bound batchSize yet, so cap it to what lookupBatchByHash will
+      // serve
       val batchSize =
         (rewardConfig.batchSize: Long).min(DbScanAppRewardsStore.MaxChildBatches.toLong).toInt
       (inputs, batchSize)
