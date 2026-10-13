@@ -48,10 +48,7 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.{
   ScanPeerObjectSource,
   VerifiedObjectCopier,
 }
-import org.lfdecentralizedtrust.splice.scan.store.historystart.{
-  ScanHistoryReadiness,
-  ScanHistoryStart,
-}
+import org.lfdecentralizedtrust.splice.scan.store.historystart.{HistoryReadiness, ScanHistoryStart}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 class BulkStorage(
@@ -64,6 +61,7 @@ class BulkStorage(
     currentMigrationId: Long,
     kvProvider: ScanKeyValueProvider,
     historyStart: ScanHistoryStart,
+    historyReadiness: HistoryReadiness,
     metricsFactory: LabeledMetricsFactory,
     automationConfig: AutomationConfig,
     backoffClock: Clock,
@@ -98,12 +96,13 @@ class BulkStorage(
     loggerFactory,
   )
 
-  val writersGate = new BulkStorageWritersGate(
-    new ScanHistoryReadiness(updateHistory, historyStart),
-    currentMigrationId,
-    Option.when(appConfig.backfilling.enabled)(implicit tc => backfillingProgress.isComplete),
-    appConfig.updatesPollingInterval.underlying,
-    loggerFactory,
+  private val writersGate = new BulkStorageWritersGate(
+    readiness = historyReadiness,
+    currentMigrationId = currentMigrationId,
+    peerBackfillingEnabled = appConfig.backfilling.enabled,
+    peerBackfillingProgress = backfillingProgress,
+    pollingInterval = appConfig.updatesPollingInterval.underlying,
+    loggerFactory = loggerFactory,
   )
 
   val acsStagingProgress = new AcsSnapshotBulkStoragePersistentProgress(
@@ -321,6 +320,7 @@ object BulkStorage {
       currentMigrationId: Long,
       kvProvider: ScanKeyValueProvider,
       historyStart: ScanHistoryStart,
+      historyReadiness: HistoryReadiness,
       metricsFactory: LabeledMetricsFactory,
       automationConfig: AutomationConfig,
       backoffClock: Clock,
@@ -356,6 +356,7 @@ object BulkStorage {
         currentMigrationId,
         kvProvider,
         historyStart,
+        historyReadiness,
         metricsFactory,
         automationConfig,
         backoffClock,

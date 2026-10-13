@@ -296,6 +296,7 @@ class ScanApp(
             currentMigrationId = domainMigrationId,
             kvProvider,
             historyStart,
+            historyReadiness,
             retryProvider.metricsFactory,
             config.automation,
             backoffClock = new WallClock(retryProvider.timeouts, loggerFactory),

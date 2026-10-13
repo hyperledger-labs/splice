@@ -243,8 +243,7 @@ object AcsSnapshotTriggerBase {
   ): Future[RetrieveTaskForMigrationResult] = {
     mayStart(migrationId).flatMap {
       case false =>
-        // UpdateHistoryBackfillingTrigger is still running for this migration,
-        // wait until it's done.
+        // Snapshots may not start yet for this migration (history backfilling or the snapshot seed is pending).
         Future.successful(RetrieveTaskForMigrationResult.Waiting)
       case true =>
         getIncrementalSnapshot().flatMap {
