@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   transferinstructionv1,
@@ -21,15 +22,16 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions as d0
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
+  AdvanceOpenMiningRoundTrigger,
+  ExpireIssuingMiningRoundTrigger,
+}
 import org.lfdecentralizedtrust.splice.util.{
   SvTestUtil,
   SynchronizerFeesTestUtil,
   TimeTestUtil,
+  TriggerTestUtil,
   WalletTestUtil,
-}
-import org.lfdecentralizedtrust.splice.validator.automation.{
-  ReceiveFaucetCouponTrigger,
-  TopupMemberTrafficTrigger,
 }
 import org.lfdecentralizedtrust.splice.validator.config.AppInstance
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
@@ -39,25 +41,27 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import java.time.Duration
 import java.util.UUID
 
-class WalletNoDevNetTimeBasedIntegrationTest
+class WalletNoDevNetIntegrationTest
     extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with SynchronizerFeesTestUtil
     with TimeTestUtil
-    with SvTestUtil {
+    with SvTestUtil
+    with TriggerTestUtil {
 
   override def environmentDefinition: EnvironmentDefinition = {
     EnvironmentDefinition
-      .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName) // was simpleTopology1SvWithSimTime
       .addConfigTransform((_, config) => ConfigTransforms.noDevNet(config))
-      // Top-ups on (targetThroughput > 0) for non-SV validators, which makes the reserved traffic apply.
-      .withTrafficTopupsEnabled
-      // Stop validators from buying traffic or receiving CC on their own.
+      // very short rounds; we advance them by hand
       .addConfigTransform((_, config) =>
-        updateAutomationConfig(ConfigurableApp.Validator)(
-          _.withPausedTrigger[TopupMemberTrafficTrigger]
-            .withPausedTrigger[ReceiveFaucetCouponTrigger]
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
+      )
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Sv)(
+          _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
+            .withPausedTrigger[ExpireIssuingMiningRoundTrigger]
         )(config)
       )
       // Read the traffic balance fresh on every command.
@@ -120,11 +124,10 @@ class WalletNoDevNetTimeBasedIntegrationTest
       actAndCheck(
         "Advance enough rounds for SV1 to claim rewards", {
           (0 to 3).foreach { _ =>
-            advanceTimeForRewardAutomationToRunForCurrentRound
             eventually() {
               ensureSvRewardCouponReceivedForCurrentRound(sv1ScanBackend, sv1WalletClient)
             }
-            advanceRoundsToNextRoundOpening
+            advanceRoundsByOneTickViaAutomation()
           }
         },
       )(
