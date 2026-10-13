@@ -55,6 +55,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.{
 }
 import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.config.CantonConfigAccess.*
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.{
   CantonConfigError,

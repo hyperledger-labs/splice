@@ -853,7 +853,7 @@ object SigningKeyUsage extends PrettyPrintingCompanion[SigningKeyUsage] {
     * topology requests such as OwnerToKeyMappings and PartyToKeyMappings. Generally, any key not
     * intended for namespace or identity delegation will have this usage automatically assigned.
     */
-  case object ProofOfOwnership extends SigningKeyUsage {
+  private case object ProofOfOwnership extends SigningKeyUsage {
     override val identifier: String = "proof-of-ownership"
     override val dbType: Byte = 4
     override def toProtoEnumV30: Either[String, v30.SigningKeyUsage] =

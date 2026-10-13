@@ -112,7 +112,7 @@ trait PrettyInstances {
     elements =>
       treeOfIterable("Map", elements.map { case (k, v) => Tree.Infix(k.toTree, "->", v.toTree) })
 
-  def treeOfIterable[T: Pretty](prefix: String, elements: Iterable[T]): Tree =
+  private def treeOfIterable[T: Pretty](prefix: String, elements: Iterable[T]): Tree =
     if (elements.sizeCompare(1) == 0) {
       elements.iterator.next().toTree
     } else {
