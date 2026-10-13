@@ -1452,7 +1452,7 @@ object SigningKeyPair {
 
 final case class SigningPublicKey private (
     format: CryptoKeyFormat,
-    val key: ByteString,
+    protected[crypto] val key: ByteString,
     keySpec: SigningKeySpec,
     usage: NonEmpty[Set[SigningKeyUsage]],
     override protected val dataForFingerprintO: Option[ByteString],
@@ -1736,7 +1736,7 @@ object SigningPublicKeyWithName extends PrettyPrintingCompanion[SigningPublicKey
 final case class SigningPrivateKey private (
     id: Fingerprint,
     format: CryptoKeyFormat,
-    val key: ByteString,
+    protected[crypto] val key: ByteString,
     keySpec: SigningKeySpec,
     usage: NonEmpty[Set[SigningKeyUsage]],
 )(

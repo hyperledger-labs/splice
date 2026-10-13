@@ -9,24 +9,26 @@ to know which and/or what changes we'll need to upstream before the switch.
 # Changes
 
 ## Methods or classes with changed visibility
+Where a member only needs wider access at call sites, don't widen it here; instead add an
+`` implicit class `X access` `` in `canton-fork/{app-base,base,common}` (e.g. `AdminCommandAccess`),
+in the member's package, and import it with `XAccess.*` where needed.
+
 * `idHelper`, `tryParticipantNodeParametersByString`,
     `MetricsFactory.registerReporter` made public
 * `testingTimeService` made protected
-* `PrettyInstances.treeOfIterable` and `PrettyInstances.prettyUidString` made public
+* `PrettyInstances.treeOfIterable` made public
 * pretty-printing of hex-only contract-ids shortends the contract-id using readable-hash
-* `ConsoleEnvironment.tracer` made public
+* `ConsoleEnvironment.startupOrderPrecedence` made public
 * `BaseLedgerApiAdministration.consoleEnvironment` made public
-* `BaseLedgerApiAdministration.optionallyAwait` made public
 * `BaseLedgerApiAdministration.timeouts` made public
-* `LedgerApiCommandRunner.ledgerApiCommand` made public
-* `AdminCommandRunner.adminCommand` made public
+* `LocalInstanceReference.adminCommand` made public
+* `LocalInstanceReference.nodes` made `protected[console]`
+* `InstanceReference.instanceType` changed from `protected[canton]` to `protected` so Splice can override it
+* `CantonConfig.parseAndMergeConfigs` made public
 * `DynamicDomainParameters` made public
-* `nonNegativeFiniteDurationWriter` made public
 * `CantonConfig.sequencerNodeParametersByStringX` made public
 * `ActiveContract.loadFromByteString` made public
-* ``PositiveFiniteDuration` config reader and writer made public
 * `ProofOfOwnership` made public
-* `JcePureCrypto#signBytes` overridden to expand to public
 ## Misc
 * Added support for interface filters in ledger api ACS commands. TODO (#638): This should be upstreamed.
 * Generalization of `MetricsFactory`
