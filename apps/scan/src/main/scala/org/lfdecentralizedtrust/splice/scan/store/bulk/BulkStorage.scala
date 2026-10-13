@@ -295,6 +295,7 @@ class BulkStorage(
     }
   }
 
+  // TODO(#7745): remove deleteLegacyKeys and legacyKvStoreKeys once this is deployed on DevNet
   private def deleteLegacyKeys(): Future[Unit] =
     MonadUtil.sequentialTraverse_(legacyKvStoreKeys)(kvProvider.store.deleteKey(_))
 
