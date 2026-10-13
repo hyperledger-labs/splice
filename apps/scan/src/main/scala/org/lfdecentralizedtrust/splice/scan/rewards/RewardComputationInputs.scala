@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.rewards
 import com.digitalasset.daml.lf.data.Numeric
 import com.digitalasset.daml.lf.data.{assertRight as damlRight}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
 import scala.jdk.OptionConverters.RichOptional
 
 /** Derived parameters passed to computeRewardTotals.
@@ -107,6 +108,7 @@ object RewardComputationInputs {
     Numeric.assertFromBigDecimal(scale, x)
 
   /** Build RewardComputationInputs and batchSize from an OpenMiningRound contract.
+    * batchSize is capped at `DbScanAppRewardsStore.MaxChildBatches`.
     *
     * Returns `None` for pre-CIP-104 rounds where `trafficPrice` or `rewardConfig` is absent.
     */
@@ -132,7 +134,12 @@ object RewardComputationInputs {
         trafficPrice = fromBigDecimal(trafficPrice),
         appRewardCouponThreshold = fromBigDecimal(rewardConfig.appRewardCouponThreshold),
       )
-      (inputs, rewardConfig.batchSize.toInt)
+      // Daml doesn't bound batchSize, so cap it to what lookupBatchByHash will
+      // serve. Every SV's scan must compute the same tree, so a future release
+      // may raise this cap but must never lower it.
+      val batchSize =
+        (rewardConfig.batchSize: Long).min(DbScanAppRewardsStore.MaxChildBatches.toLong).toInt
+      (inputs, batchSize)
     }
 
   private def div(a: Numeric, b: Numeric): Numeric =

@@ -129,8 +129,9 @@ object DbScanAppRewardsStore {
   // the RewardConfig.batchSize in effect when it was computed; Daml only
   // requires batchSize > 0. The default is 100 (in DSO config), and
   // Dev+Test+Mainnet still use this value at time of writing, so we assume 100x
-  // that as a practical upper limit.
-  private val MaxChildBatches: Int = 10000
+  // that as a practical upper limit. RewardComputationInputs.fromOpenMiningRound
+  // caps batchSize to this, so trees computed here never exceed it.
+  private[scan] val MaxChildBatches: Int = 10000
 }
 
 class DbScanAppRewardsStore(
