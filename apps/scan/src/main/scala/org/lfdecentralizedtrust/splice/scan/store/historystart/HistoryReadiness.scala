@@ -19,9 +19,9 @@ trait HistoryReadiness {
       tc: TraceContext,
       ec: ExecutionContext,
   ): Future[Boolean] =
-    isHistoryBackfilled(migrationId).flatMap {
-      case true => Future.successful(true)
-      case false =>
+    isHistoryBackfilled(migrationId).flatMap { backfilled =>
+      if (backfilled) Future.successful(true)
+      else
         historyStart().flatMap {
           case Some(HistoryStart.From(_)) => isAcsSnapshotSeeded
           case Some(HistoryStart.Genesis) | None => Future.successful(false)

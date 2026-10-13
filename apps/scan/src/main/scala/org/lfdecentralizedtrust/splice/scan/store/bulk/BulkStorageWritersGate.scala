@@ -25,33 +25,21 @@ class BulkStorageWritersGate(
     extends NamedLogging {
 
   def updatesMayStart()(implicit tc: TraceContext): Future[GateState] =
-    readiness.isHistoryBackfilled(currentMigrationId).flatMap {
-      case true => peerCopyState()
-      case false =>
+    readiness.isHistoryBackfilled(currentMigrationId).flatMap { backfilled =>
+      if (backfilled) peerCopyState()
+      else
         readiness.historyStart().flatMap {
-          case None =>
-            Future.successful(GateState.Closed("the history start of this Scan to be determined"))
-          case Some(HistoryStart.Genesis) =>
-            Future.successful(GateState.Closed("update history backfilling"))
-          case Some(HistoryStart.From(_)) if !peerBackfillingEnabled =>
-            Future.successful(
-              GateState.Misconfigured(
-                "the history of this Scan starts after genesis, so bulkStorage.backfilling.enabled must be set to copy the objects before its first own segment from peers"
-              )
-            )
+          case None => waitingForHistoryStart
+          case Some(HistoryStart.Genesis) => waitingForHistoryBackfilling
+          case Some(HistoryStart.From(_)) if !peerBackfillingEnabled => peerBackfillingDisabled
           case Some(HistoryStart.From(_)) => peerCopyState()
         }
     }
 
   def snapshotsMayStart()(implicit tc: TraceContext): Future[GateState] =
     updatesMayStart().flatMap {
-      case GateState.Open =>
-        readiness.acsSnapshotsMayStart(currentMigrationId).map {
-          case true => GateState.Open
-          case false =>
-            GateState.Closed("the ACS snapshot at the first own segment start to be seeded")
-        }
-      case shut => Future.successful(shut)
+      case GateState.Open => snapshotSeedState()
+      case closed => Future.successful(closed)
     }
 
   def whenUpdatesMayStart(writer: String)(implicit
@@ -64,13 +52,33 @@ class BulkStorageWritersGate(
   ): Source[Boolean, Cancellable] =
     openWhen(writer, () => snapshotsMayStart())
 
+  private val waitingForHistoryStart =
+    Future.successful(GateState.Closed("the history start of this Scan to be determined"))
+
+  private val waitingForHistoryBackfilling =
+    Future.successful(GateState.Closed("update history backfilling"))
+
+  private val peerBackfillingDisabled =
+    Future.successful(
+      GateState.Misconfigured(
+        "the history of this Scan starts after genesis, so bulkStorage.backfilling.enabled must be set to copy the objects before its first own segment from peers"
+      )
+    )
+
   private def peerCopyState()(implicit tc: TraceContext): Future[GateState] =
     if (!peerBackfillingEnabled) Future.successful(GateState.Open)
     else
-      peerBackfillingProgress.isComplete.map {
-        case true => GateState.Open
-        case false => GateState.Closed("bulk storage backfilling from peers")
-      }
+      peerBackfillingProgress.isComplete.map(complete =>
+        if (complete) GateState.Open else GateState.Closed("bulk storage backfilling from peers")
+      )
+
+  private def snapshotSeedState()(implicit tc: TraceContext): Future[GateState] =
+    readiness
+      .acsSnapshotsMayStart(currentMigrationId)
+      .map(mayStart =>
+        if (mayStart) GateState.Open
+        else GateState.Closed("the ACS snapshot at the first own segment start to be seeded")
+      )
 
   private def openWhen(writer: String, currentState: () => Future[GateState])(implicit
       tc: TraceContext
