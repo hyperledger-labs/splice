@@ -249,8 +249,6 @@ object ConsoleCommandTimeout {
     config.NonNegativeDuration.tryFromDuration(30.seconds)
   val defaultTestingBongTimeout: config.NonNegativeDuration =
     config.NonNegativeDuration.tryFromDuration(1.minute)
-  val defaultRequestTimeout: NonNegativeDuration =
-    config.NonNegativeDuration.tryFromDuration(20.seconds)
 }
 
 /** Timeout settings configuration */

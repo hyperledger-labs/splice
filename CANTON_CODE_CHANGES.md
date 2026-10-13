@@ -19,7 +19,6 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Generalization of `MetricsFactory`
 * Removed a trailing comma in many places because the CC Scala compiler doesn't like it (e.g. `.authorize(op, domain, mediator, side, key.some, )` -> `.authorize(op, domain, mediator, side, key.some)`)
 * Added `org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition` to `BaseIntegrationTest.scala`
-* Added `internalErrorGrpc` to `ErrorUtil`
 * Added `resetRetriesAfter` option to `Backoff` retry policy
 * Changed default concurrency limit in `ConcurrencyEnvironmentLimit` to 1
 * LogReporter logs location, message and throwable on TestFailed event.
