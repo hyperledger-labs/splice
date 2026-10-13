@@ -93,7 +93,9 @@ def bootstrapDomainWithUnsignedKeys(
     ((sequencers: Seq[
       com.digitalasset.canton.console.InstanceReference
     ]) ++ mediators ++ synchronizerOwners ++ Seq(extraParticipant)).flatMap(
-      _.topology.transactions.identity_transactions()
+      _.topology.transactions.generate_onboarding_transactions(
+        staticSynchronizerParameters.protocolVersion
+      )
     )
 
   synchronizerOwners.foreach(
@@ -109,6 +111,8 @@ def bootstrapDomainWithUnsignedKeys(
       synchronizerOwners,
       synchronizerThreshold,
       store = tempStoreForBootstrap,
+      protocolVersion = staticSynchronizerParameters.protocolVersion,
+      identityTransactions = Some(identityTransactions),
     )
 
   val synchronizerGenesisTxs = synchronizerOwners.flatMap(
