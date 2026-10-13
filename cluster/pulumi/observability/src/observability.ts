@@ -67,8 +67,6 @@ function istioVirtualService(
   servicePort: number,
   opts: {
     uriPrefix?: string;
-    // Set to false for non-idempotent endpoints such as metric pushes.
-    enableRetries?: boolean;
   } = {}
 ) {
   const host = pulumi.interpolate`${serviceName}.${ns.metadata.name}.svc.cluster.local`;
@@ -136,15 +134,11 @@ function istioVirtualService(
             // headers. reset reason: connection termination". We only retry failures that happen
             // before the request was handed to the upstream, so this stays safe for non-idempotent
             // requests.
-            ...(opts.enableRetries === false
-              ? {}
-              : {
-                  retries: {
-                    attempts: 3,
-                    perTryTimeout: '30s',
-                    retryOn: 'connect-failure,refused-stream,reset-before-request',
-                  },
-                }),
+            retries: {
+              attempts: 3,
+              perTryTimeout: '30s',
+              retryOn: 'connect-failure,refused-stream,reset-before-request',
+            },
           },
         ],
       },
@@ -159,7 +153,6 @@ function istioVirtualService(
 function exposePushgatewayExternally(ns: k8s.core.v1.Namespace, dependsOn: pulumi.Resource[]) {
   istioVirtualService(ns, 'pushgateway', pushgatewayServiceName, pushgatewayServicePort, {
     uriPrefix: '/metrics',
-    enableRetries: false,
   });
   const pushgatewayHosts = [pushgatewayExternalHostname, `${pushgatewayExternalHostname}:*`];
   const pushgatewayAllowFrom = [
