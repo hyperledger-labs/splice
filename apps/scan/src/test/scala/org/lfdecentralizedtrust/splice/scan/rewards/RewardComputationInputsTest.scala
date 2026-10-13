@@ -30,7 +30,7 @@ class RewardComputationInputsTest extends AnyWordSpec with BaseTest with BigDeci
 
     "cap batchSize at MaxChildBatches" in {
       val maxBatchSize = DbScanAppRewardsStore.MaxChildBatches
-      Seq(maxBatchSize.toLong, maxBatchSize + 1L, Long.MaxValue).foreach { batchSize =>
+      forEvery(Seq(maxBatchSize.toLong, maxBatchSize + 1L, Long.MaxValue)) { batchSize =>
         val round = mkOpenMiningRound(rewardConfig =
           Optional.of(
             new RewardConfig(
