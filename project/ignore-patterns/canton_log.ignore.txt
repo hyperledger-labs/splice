@@ -116,6 +116,8 @@ SEQUENCER_UNKNOWN_RECIPIENTS.*(?:alice-validatorLocalForValidatorReonboardingIT|
 Instrument rpc\.server\.duration has exceeded the maximum allowed cardinality
 Too many log messages detected
 
+Instrument daml\.sequencer\.block\.(events|event-bytes) has exceeded the maximum allowed cardinality
+
 
 # TODO(#655) Figure out why this happens
 Thread starvation or clock leap detected
