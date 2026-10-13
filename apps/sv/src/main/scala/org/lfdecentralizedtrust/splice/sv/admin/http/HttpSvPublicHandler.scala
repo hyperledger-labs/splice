@@ -104,7 +104,7 @@ class HttpSvPublicHandler(
               Future.failed(
                 Status.UNAVAILABLE
                   .withDescription(
-                    "The /v0/onboard/validator API is disabled because the network has transitioned to RestrictedOpen mode."
+                    "/v0/onboard/validator API is disabled because the network has migrated to RestrictedOpen mode."
                   )
                   .asRuntimeException()
               )
