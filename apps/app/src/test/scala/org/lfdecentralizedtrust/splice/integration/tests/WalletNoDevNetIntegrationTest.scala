@@ -33,6 +33,10 @@ import org.lfdecentralizedtrust.splice.util.{
   TriggerTestUtil,
   WalletTestUtil,
 }
+import org.lfdecentralizedtrust.splice.validator.automation.{
+  ReceiveFaucetCouponTrigger,
+  TopupMemberTrafficTrigger,
+}
 import org.lfdecentralizedtrust.splice.validator.config.AppInstance
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
 import org.lfdecentralizedtrust.splice.wallet.config.AutoAcceptTransfersConfig
@@ -62,6 +66,12 @@ class WalletNoDevNetIntegrationTest
         updateAutomationConfig(ConfigurableApp.Sv)(
           _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
             .withPausedTrigger[ExpireIssuingMiningRoundTrigger]
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Validator)(
+          _.withPausedTrigger[TopupMemberTrafficTrigger]
+            .withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )
       // Read the traffic balance fresh on every command.
