@@ -39,7 +39,8 @@
       `cip-128_traffic-purchase::1220000000000000000000000000000000000000000000000000000000000000abcd`
       with the memo set to `cip-128/memo:memberId=<member>&synchronizerId=<synchronizer>&migrationId=<int>`
       burns the full transfer `amount` and creates a `MemberTraffic` contract instead of transferring amulet.
-      The purchased traffic is calculated from the referenced configuration prices and rounded down to whole bytes.
+      The purchased traffic is calculated from the CC price and traffic price in the referenced `ExternalPartyConfigState`
+      and rounded down to whole bytes.
       Any sub-byte remainder is also burned. Purchases below the minimum traffic top-up amount are rejected.
 
     - Traffic purchases, including those made through `AmuletRules_BuyMemberTraffic`, now include the purchased
@@ -49,7 +50,10 @@
     - Added three new fields: `trafficPrice`, `supportedSynchronizerIds` and
       `minTrafficTopupAmount` to `ExternalPartyConfigState`.
 
-      **Action required from validator operators:** Upgrade to this release, which vets `splice-amulet 0.1.25` **before** the SVs vote to adopt it. After that vote, new `ExternalPartyConfigState` contracts will set the new fields and can no longer be downgraded to an older `splice-amulet` version. Validators that are not upgraded will no longer process Token Standard transfers and CC allocations.
+      **Action required from validator operators:** Upgrade to this release, which vets `splice-amulet 0.1.25`,
+      **before** the SVs vote to adopt it. After that vote, new `ExternalPartyConfigState` contracts will set the new fields
+      and can no longer be downgraded to an older `splice-amulet` version. Validators that are not upgraded will no longer
+      process Token Standard transfers and CC allocations.
 
 ## Upcoming for next minor release (template):
 
