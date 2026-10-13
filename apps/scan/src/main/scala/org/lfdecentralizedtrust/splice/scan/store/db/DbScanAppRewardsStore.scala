@@ -613,7 +613,7 @@ class DbScanAppRewardsStore(
       """.as[Array[Byte]],
         opName,
       )
-    } yield applyLimit(opName, limit, hashes).map(DbScanAppRewardsStore.RewardHash(_))
+    } yield applyLimitOrFail(opName, limit, hashes).map(DbScanAppRewardsStore.RewardHash(_))
   }
 
   /** Retrieve minting allowances for a leaf batch range.
@@ -646,7 +646,7 @@ class DbScanAppRewardsStore(
         """.as[(String, BigDecimal)],
         opName,
       )
-    } yield applyLimit(opName, limit, allowances).map { case (provider, amount) =>
+    } yield applyLimitOrFail(opName, limit, allowances).map { case (provider, amount) =>
       DbScanAppRewardsStore.MintingAllowance(provider, amount)
     }
   }
