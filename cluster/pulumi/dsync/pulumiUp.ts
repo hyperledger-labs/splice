@@ -6,8 +6,7 @@ import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack }
 
 const abortController = new PulumiAbortController();
 
-async function runUp() {
-}
+async function runUp() {}
 
 runUp().catch(() => {
   console.error('Failed to run up');
