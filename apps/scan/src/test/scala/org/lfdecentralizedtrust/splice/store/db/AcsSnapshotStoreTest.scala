@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.store.{
   StoreErrors,
   StoreTestBase,
   UpdateHistory,
+  UpdateHistoryTestBase,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.FutureUnlessShutdownOps
@@ -1356,6 +1357,9 @@ trait AcsSnapshotStoreTest
       participantId: String = "whatever",
       // Default to backfilling being always complete, to avoid unnecessary complexity in the tests
       backfillingRequired: BackfillingRequirement = BackfillingRequirement.BackfillingNotRequired,
+      timeStart: CantonTimestamp = CantonTimestamp.Epoch,
+      windowSizeDays: Int = 1,
+      partitionRunwayDays: Int = 7,
   ): Future[UpdateHistory] = {
     val updateHistory = new UpdateHistory(
       storage.underlying, // not under test
@@ -1371,7 +1375,15 @@ trait AcsSnapshotStoreTest
       enableImportUpdateBackfill = true,
       HistoryMetrics(NoOpMetricsFactory, migrationId),
     )
-    updateHistory.ingestionSink.initialize().map(_ => updateHistory)
+    for {
+      _ <- updateHistory.ingestionSink.initialize()
+      _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
+        updateHistory,
+        timeStart,
+        windowSizeDays,
+        partitionRunwayDays,
+      )
+    } yield updateHistory
   }
 
   protected def mkStore(

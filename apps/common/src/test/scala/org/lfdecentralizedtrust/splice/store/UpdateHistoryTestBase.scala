@@ -23,7 +23,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodeg
 import org.lfdecentralizedtrust.splice.util.Contract
 import org.scalatest.Assertion
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import UpdateHistory.UpdateHistoryResponse
 import com.daml.metrics.api.noop.NoOpMetricsFactory
@@ -270,25 +270,6 @@ abstract class UpdateHistoryTestBase
     )
   }
 
-  private def createUpdateHistoryPartitions(
-      updateHistory: UpdateHistory,
-      timeStart: CantonTimestamp,
-      windowSizeDays: Int,
-      partitionRunwayDays: Int,
-  ) = {
-    val importUpdatesStart = CantonTimestamp.MinValue
-    val importUpdatesEnd = CantonTimestamp.MinValue.plusSeconds(1L)
-
-    for {
-      _ <- updateHistory.createPartitions(importUpdatesStart, importUpdatesEnd)
-      _ <- MonadUtil.sequentialTraverse(0.until(partitionRunwayDays, step = windowSizeDays)) { n =>
-        val windowStart = timeStart.plus(java.time.Duration.ofDays(n.toLong))
-        val windowEnd = windowStart.plus(java.time.Duration.ofDays(windowSizeDays.toLong))
-        updateHistory.createPartitions(windowStart, windowEnd)
-      }
-    } yield ()
-  }
-
   override def cleanDb(
       storage: DbStorage
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
@@ -513,5 +494,24 @@ object UpdateHistoryTestBase {
         )
       case _ => throw new RuntimeException("Invalid transfer type")
     }
+  }
+
+  def createUpdateHistoryPartitions(
+      updateHistory: UpdateHistory,
+      timeStart: CantonTimestamp,
+      windowSizeDays: Int,
+      partitionRunwayDays: Int,
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
+    val importUpdatesStart = CantonTimestamp.MinValue
+    val importUpdatesEnd = CantonTimestamp.MinValue.plusSeconds(1L)
+
+    for {
+      _ <- updateHistory.createPartitions(importUpdatesStart, importUpdatesEnd)
+      _ <- MonadUtil.sequentialTraverse(0.until(partitionRunwayDays, step = windowSizeDays)) { n =>
+        val windowStart = timeStart.plus(java.time.Duration.ofDays(n.toLong))
+        val windowEnd = windowStart.plus(java.time.Duration.ofDays(windowSizeDays.toLong))
+        updateHistory.createPartitions(windowStart, windowEnd)
+      }
+    } yield ()
   }
 }
