@@ -206,12 +206,13 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
       )
     }
 
-    "answer checksums in request order, from committed before staging" in {
+    "answer checksums in request order, asking staging only for keys missing from committed" in {
       val keys = Vector("in-staging-only", "in-both", "in-neither")
-      def connectionWith(objects: (String, String)*) = {
+      val keysMissingFromCommitted = Vector("in-staging-only", "in-neither")
+      def connectionWith(requestedKeys: Seq[String], objects: (String, String)*) = {
         val connection = mock[S3BucketConnection]
         when(
-          connection.getChecksums(eqTo(keys))(
+          connection.getChecksums(eqTo(requestedKeys))(
             any[ExecutionContext],
             any[ActorSystem],
             any[TraceContext],
@@ -225,8 +226,8 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
         None,
         None,
         stagingS3Connection =
-          connectionWith("in-both" -> "staging-checksum", "in-staging-only" -> "staged"),
-        committedS3Connection = connectionWith("in-both" -> "committed-checksum"),
+          connectionWith(keysMissingFromCommitted, "in-staging-only" -> "staged"),
+        committedS3Connection = connectionWith(keys, "in-both" -> "committed-checksum"),
       )
       withClue(s"checksums for $keys: ") {
         reader.getObjectChecksums(keys).futureValue shouldBe Seq(
