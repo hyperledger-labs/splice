@@ -6,8 +6,7 @@ package com.digitalasset.canton.console
 import io.opentelemetry.api.trace.Tracer
 
 object ConsoleEnvironmentAccess {
-  implicit class `ConsoleEnvironment access`(private val self: ConsoleEnvironment)
-      extends AnyVal {
+  implicit class `ConsoleEnvironment access`(private val self: ConsoleEnvironment) extends AnyVal {
     def tracer: Tracer = self.tracer
   }
 }
