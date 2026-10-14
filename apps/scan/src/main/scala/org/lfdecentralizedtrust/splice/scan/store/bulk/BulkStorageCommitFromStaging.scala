@@ -8,6 +8,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
+import org.lfdecentralizedtrust.splice.http.HttpRequestLimits
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.BftOutcome
 import org.lfdecentralizedtrust.splice.scan.config.BulkStorageConfig
 import org.lfdecentralizedtrust.splice.scan.util.PeerBftScanConnection
@@ -33,6 +34,21 @@ class BulkStorageCommitFromStaging[T](
 ) extends NamedLogging {
 
   private def checkBftForObjects(
+      requiredCatchupTimestamp: CantonTimestamp,
+      objects: Seq[ObjectKeyAndChecksum],
+  ): Future[Boolean] =
+    if (objects.isEmpty) checkBftForBatch(requiredCatchupTimestamp, objects)
+    else
+      objects
+        .grouped(HttpRequestLimits.MaxRequestArrayItems)
+        .foldLeft(Future.successful(true)) { (agreedSoFar, batch) =>
+          agreedSoFar.flatMap(agreed =>
+            if (agreed) checkBftForBatch(requiredCatchupTimestamp, batch)
+            else Future.successful(false)
+          )
+        }
+
+  private def checkBftForBatch(
       requiredCatchupTimestamp: CantonTimestamp,
       objects: Seq[ObjectKeyAndChecksum],
   ): Future[Boolean] = {
