@@ -1088,7 +1088,7 @@ abstract class ScanStoreTest
         val recordTimeThird = now.plusSeconds(9).toInstant
         for {
           store <- mkStore()
-          updateHistory <- mkUpdateHistory(domainMigrationId)
+          updateHistory <- mkUpdateHistory(domainMigrationId, now)
           _ <- updateHistory.ingestionSink.initialize()
           first <- dummyDomain.create(
             firstDsoRules,
@@ -1127,7 +1127,7 @@ abstract class ScanStoreTest
         val recordTimeThird = now.plusSeconds(9).toInstant
         for {
           store <- mkStore()
-          updateHistory <- mkUpdateHistory(domainMigrationId)
+          updateHistory <- mkUpdateHistory(domainMigrationId, now)
           _ <- updateHistory.ingestionSink.initialize()
           first <- dummyDomain.create(
             firstAmuletRules,
@@ -1285,7 +1285,10 @@ abstract class ScanStoreTest
   ): Future[ScanStore]
 
   protected def mkUpdateHistory(
-      migrationId: Long
+      migrationId: Long,
+      timeStart: CantonTimestamp,
+      windowSizeDays: Int = 1,
+      partitionRunwayDays: Int = 7,
   ): Future[UpdateHistory]
 
   private lazy val user1 = userParty(1)
@@ -1749,7 +1752,10 @@ class DbScanStoreTest
   }
 
   override def mkUpdateHistory(
-      migrationId: Long
+      migrationId: Long,
+      timeStart: CantonTimestamp,
+      windowSizeDays: Int = 1,
+      partitionRunwayDays: Int = 7,
   ): Future[UpdateHistory] = {
     val updateHistory = new UpdateHistory(
       storage.underlying, // not under test
@@ -1765,7 +1771,15 @@ class DbScanStoreTest
       enableImportUpdateBackfill = true,
       HistoryMetrics(NoOpMetricsFactory, migrationId),
     )
-    updateHistory.ingestionSink.initialize().map(_ => updateHistory)
+    for {
+      _ <- updateHistory.ingestionSink.initialize()
+      _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
+        updateHistory,
+        timeStart,
+        windowSizeDays,
+        partitionRunwayDays,
+      )
+    } yield updateHistory
   }
 
   override protected def cleanDb(

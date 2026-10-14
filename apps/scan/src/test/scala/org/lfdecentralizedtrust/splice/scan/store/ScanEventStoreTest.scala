@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.store.{
   StoreTestBase,
   TimestampWithMigrationId,
   UpdateHistory,
+  UpdateHistoryTestBase,
 }
 import org.lfdecentralizedtrust.splice.scan.store.db.{DbAppActivityRecordStore, DbScanVerdictStore}
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{EnvelopeT, TrafficSummaryT}
@@ -22,16 +23,23 @@ import io.circe.Json
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 
 class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with SplicePostgresTest {
 
+  // Tests use CantonTimestamp.now() as record time. Partitions are not dropped between tests,
+  // so align the start to a day boundary to avoid creating overlapping partitions.
+  private val partitionsStart: CantonTimestamp =
+    CantonTimestamp.assertFromInstant(Instant.now().truncatedTo(ChronoUnit.DAYS))
+
   "ScanEventStore" should {
 
     "combine verdict and update events by update_id" in {
+      val recordTs = CantonTimestamp.now()
       for {
-        ctx <- newEventStore()
-        recordTs = CantonTimestamp.now()
+        ctx <- newEventStore(timeStart = partitionsStart)
         tx <- insertUpdate(ctx.updateHistory, recordTs, "update1")
         updateId = tx.getUpdateId
 
@@ -54,7 +62,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "combine a verdict that has a traffic summary with update events by update_id" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         recordTs = CantonTimestamp.now()
         tx <- insertUpdate(ctx.updateHistory, recordTs, "update1")
         updateId = tx.getUpdateId
@@ -86,7 +94,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "not insert the same update's verdict twice" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         _ <- insertVerdict(ctx.verdictStore, "update1", CantonTimestamp.MinValue.plusSeconds(1L))
         _ <- loggerFactory.assertLogs(
           ctx.verdictStore.insertVerdictAndTransactionViews(
@@ -111,7 +119,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "Cap the updates till the latest verdict" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         // First update
         recordTs1 = CantonTimestamp.now()
         tx1 <- insertUpdate(ctx.updateHistory, recordTs1, "update1")
@@ -158,7 +166,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "Cap the verdict till the latest update" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         // First update
         recordTs1 = CantonTimestamp.now()
         tx1 <- insertUpdate(ctx.updateHistory, recordTs1, "update1")
@@ -205,7 +213,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "does not filter out the update matching the last verdict" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         recordTs1 = CantonTimestamp.now()
         recordTs2 = recordTs1.plusSeconds(1)
         recordTs3 = recordTs2.plusSeconds(1)
@@ -254,8 +262,8 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       val mig1 = nextDomainMigrationId
       for {
         // Create two stores using the same underlying storage
-        ctx0 <- newEventStore(mig0)
-        ctx1 <- newEventStore(mig1)
+        ctx0 <- newEventStore(mig0, timeStart = partitionsStart)
+        ctx1 <- newEventStore(mig1, timeStart = partitionsStart)
 
         // Insert an update+verdict in migration 0
         recordTs1 = CantonTimestamp.now()
@@ -314,7 +322,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "provide assignment updates" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         recordTs = CantonTimestamp.now()
 
         // Create an assignment (source -> target)
@@ -340,7 +348,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "provide unassignment updates" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         recordTs = CantonTimestamp.now()
 
         // Create an unassignment (source -> target)
@@ -367,8 +375,8 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       val mig0 = domainMigrationId
       val mig1 = mig0 + 1
       for {
-        ctx0 <- newEventStore(mig0)
-        ctx1 <- newEventStore(mig1)
+        ctx0 <- newEventStore(mig0, timeStart = partitionsStart)
+        ctx1 <- newEventStore(mig1, timeStart = partitionsStart)
 
         // Timestamps
         ts1 = CantonTimestamp.now()
@@ -423,7 +431,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "Cap the assignments till the latest verdict" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         // First assignment
         recordTs1 = CantonTimestamp.now()
         assignment1 <- insertAssign(ctx.updateHistory, recordTs1, "assign-cap-1")
@@ -466,7 +474,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "Cap the verdict till the latest assignment" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         // First verdict
         recordTs1 = CantonTimestamp.now()
         updateId1 = "verdict-before-assignment-id"
@@ -512,7 +520,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "Cap the unassignments till the latest verdict" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         // First unassignment
         recordTs1 = CantonTimestamp.now()
         unassignment1 <- insertUnassign(ctx.updateHistory, recordTs1, "unassign-cap-1")
@@ -556,7 +564,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "Cap the verdict till the latest unassignment" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         // First verdict
         recordTs1 = CantonTimestamp.now()
         updateId1 = "verdict-before-unassignment-id"
@@ -605,9 +613,9 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       val mig1 = mig0 + 1
       val mig2 = mig1 + 1
       for {
-        ctx0 <- newEventStore(mig0)
-        ctx1 <- newEventStore(mig1)
-        ctx2 <- newEventStore(mig2)
+        ctx0 <- newEventStore(mig0, timeStart = partitionsStart)
+        ctx1 <- newEventStore(mig1, timeStart = partitionsStart)
+        ctx2 <- newEventStore(mig2, timeStart = partitionsStart)
 
         // mig0: has only one update (T1)
         recordTs1 = CantonTimestamp.now()
@@ -644,9 +652,9 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       val mig1 = mig0 + 1
       val mig2 = mig1 + 1
       for {
-        ctx0 <- newEventStore(mig0)
-        ctx1 <- newEventStore(mig1)
-        ctx2 <- newEventStore(mig2)
+        ctx0 <- newEventStore(mig0, timeStart = partitionsStart)
+        ctx1 <- newEventStore(mig1, timeStart = partitionsStart)
+        ctx2 <- newEventStore(mig2, timeStart = partitionsStart)
 
         // mig0: has only one verdict (T1)
         recordTs1 = CantonTimestamp.now()
@@ -684,9 +692,9 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       val mig1 = mig0 + 1
       val mig2 = mig1 + 1
       for {
-        ctx0 <- newEventStore(mig0)
-        ctx1 <- newEventStore(mig1)
-        ctx2 <- newEventStore(mig2)
+        ctx0 <- newEventStore(mig0, timeStart = partitionsStart)
+        ctx1 <- newEventStore(mig1, timeStart = partitionsStart)
+        ctx2 <- newEventStore(mig2, timeStart = partitionsStart)
 
         // mig0: has only one assignment (T1)
         recordTs1 = CantonTimestamp.now()
@@ -720,9 +728,9 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       val mig1 = mig0 + 1
       val mig2 = mig1 + 1
       for {
-        ctx0 <- newEventStore(mig0)
-        ctx1 <- newEventStore(mig1)
-        ctx2 <- newEventStore(mig2)
+        ctx0 <- newEventStore(mig0, timeStart = partitionsStart)
+        ctx1 <- newEventStore(mig1, timeStart = partitionsStart)
+        ctx2 <- newEventStore(mig2, timeStart = partitionsStart)
 
         // mig0: has only one unassignment (T1)
         recordTs1 = CantonTimestamp.now()
@@ -872,7 +880,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "getLatestEventRecordTime returns the record time of the last event getEvents returns" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         // update + verdict at ts1
         ts1 = CantonTimestamp.now()
         tx1 <- insertUpdate(ctx.updateHistory, ts1, "update1")
@@ -904,7 +912,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "getLatestEventRecordTime returns None when there are no events" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         latest <- ctx.eventStore.getLatestEventRecordTime(domainMigrationId)(traceContext)
       } yield {
         latest shouldBe None
@@ -913,7 +921,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "getLatestEventRecordTime returns None when there is only a loose update" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         _ <- insertUpdate(ctx.updateHistory, CantonTimestamp.now(), "update1")
         latest <- ctx.eventStore.getLatestEventRecordTime(domainMigrationId)(traceContext)
       } yield {
@@ -926,7 +934,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "return a verdict's views in view_id order, failing past the limit" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         verdictStore = ctx.verdictStore
         _ <- verdictStore.insertVerdictAndTransactionViews(
           Seq(
@@ -1054,10 +1062,13 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
     } yield verdict.value.rowId
 
   private def newUpdateHistory(
-      migrationId: Long
+      migrationId: Long,
+      timeStart: CantonTimestamp,
+      windowSizeDays: Int,
+      partitionRunwayDays: Int,
   ): Future[UpdateHistory] = {
     val participantId = mkParticipantId("ScanEventStoreTest")
-    val uh = new UpdateHistory(
+    val updateHistory = new UpdateHistory(
       storage.underlying,
       migrationId,
       "scan_event_store_test",
@@ -1071,7 +1082,15 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       enableImportUpdateBackfill = true,
       HistoryMetrics(NoOpMetricsFactory, migrationId),
     )
-    uh.ingestionSink.initialize().map(_ => uh)
+    for {
+      _ <- updateHistory.ingestionSink.initialize()
+      _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
+        updateHistory,
+        timeStart,
+        windowSizeDays,
+        partitionRunwayDays,
+      )
+    } yield updateHistory
   }
 
   private def newVerdictStore(updateHistory: UpdateHistory) =
@@ -1252,9 +1271,14 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       eventStore: ScanEventStore,
   )
 
-  private def newEventStore(migrationId: Long = domainMigrationId): Future[EventStoreCtx] =
+  private def newEventStore(
+      migrationId: Long = domainMigrationId,
+      timeStart: CantonTimestamp,
+      windowSizeDays: Int = 1,
+      partitionRunwayDays: Int = 7,
+  ): Future[EventStoreCtx] =
     for {
-      uh <- newUpdateHistory(migrationId)
+      uh <- newUpdateHistory(migrationId, timeStart, windowSizeDays, partitionRunwayDays)
       vs = newVerdictStore(uh)
       es = new ScanEventStore(vs, uh, loggerFactory)
     } yield EventStoreCtx(vs, uh, es)
