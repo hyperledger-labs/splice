@@ -56,6 +56,7 @@ class ExpiredAmuletAllocationTrigger(
       task.work.vettedVersion.toString,
       task.work.stakeholders,
       ignoreUnresponsiveParties = true,
+      restoreOnSuccess = false,
     )(completeExpiryTaskAsDsoDelegate(task, controller))
   }
 
@@ -90,53 +91,55 @@ class ExpiredAmuletAllocationTrigger(
               buildExpireInput
             )
 
-            inputs = inputsWithParties.map(_._1)
-            informees = inputsWithParties.flatMap(_._2).toSet
-
             res <-
-              if (inputs.isEmpty) {
+              if (inputsWithParties.isEmpty) {
                 Future.successful(
                   TaskSuccess("No vetted expired Amulet Allocations to process")
                 )
               } else {
-                val expireAllocations =
-                  new splice.externalpartyamuletrules.ExternalPartyAmuletRules_ExpireAmuletAllocations(
-                    dsoRules.payload.dso,
-                    inputs.asJava,
-                    informees.map(_.toProtoPrimitive).toList.asJava,
-                  )
-
-                svTaskContext
-                  .connection(SpliceLedgerConnectionPriority.AmuletExpiry)
-                  .submit(
-                    Seq(store.key.svParty),
-                    Seq(store.key.dsoParty),
-                    update = dsoRules
-                      .exercise(
-                        _.exerciseDsoRules_ExpireAmuletAllocations(
-                          extAmuletRules.contract.contractId,
-                          expireAllocations,
-                          controller,
-                        )
+                submitBatchWithSplitting(inputsWithParties, (c: InputWithParties) => c._2) {
+                  batch =>
+                    val inputs = batch.map(_._1)
+                    val informees = batch.flatMap(_._2).toSet
+                    val expireAllocations =
+                      new splice.externalpartyamuletrules.ExternalPartyAmuletRules_ExpireAmuletAllocations(
+                        dsoRules.payload.dso,
+                        inputs.asJava,
+                        informees.map(_.toProtoPrimitive).toList.asJava,
                       )
-                      .update
-                      .commands()
-                      .asScala
-                      .toSeq,
-                  )
-                  .noDedup
-                  .withSynchronizerId(dsoRules.domain)
-                  .yieldUnit()
-                  .map(_ =>
-                    TaskSuccess(
-                      s"archived batch of ${inputs.size} expired Amulet Allocations"
-                    )
-                  )
+
+                    svTaskContext
+                      .connection(SpliceLedgerConnectionPriority.AmuletExpiry)
+                      .submit(
+                        Seq(store.key.svParty),
+                        Seq(store.key.dsoParty),
+                        update = dsoRules
+                          .exercise(
+                            _.exerciseDsoRules_ExpireAmuletAllocations(
+                              extAmuletRules.contract.contractId,
+                              expireAllocations,
+                              controller,
+                            )
+                          )
+                          .update
+                          .commands()
+                          .asScala
+                          .toSeq,
+                      )
+                      .noDedup
+                      .withSynchronizerId(dsoRules.domain)
+                      .yieldUnit()
+                }
               }
           } yield res
         }
     } yield res
   }
+
+  private type InputWithParties = (
+      splice.externalpartyamuletrules.ExternalPartyAmuletRules_ExpireAmuletAllocationInput,
+      Set[PartyId],
+  )
 
   private def buildExpireInput(
       contract: org.lfdecentralizedtrust.splice.util.AssignedContract[

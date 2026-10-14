@@ -26,6 +26,10 @@ trait UnavailablePartiesGuard extends NamedLogging {
     * and marking the parties on the lowest Amulet version of the offending contract
     * as unavailable.
     * If the feature is disabled, the batch is submitted as a whole.
+    *
+    * This takes care of resetting the unavailable parties of successfully submitted contracts itself,
+    * so callers must pass `restoreOnSuccess = false` to [[completeUnlessAmuletVersionIgnored]];
+    * otherwise parties ignored while splitting would be restored right away.
     */
   protected def submitBatchWithSplitting[C](
       contracts: Seq[C],
@@ -35,7 +39,9 @@ trait UnavailablePartiesGuard extends NamedLogging {
       tc: TraceContext,
   ): Future[TaskOutcome] =
     if (!svConfig.parameters.enabledFeatures.enableVettingFailureBatchSplitting) {
-      submit(contracts).map(_ => TaskSuccess(s"submitted batch of ${contracts.size} contracts"))
+      submit(contracts)
+        .map(_ => TaskSuccess(s"submitted batch of ${contracts.size} contracts"))
+        .flatMap(recoverUnavailableParties(contracts.flatMap(parties).toSet))
     } else {
       new BatchSplitting(
         party =>
@@ -58,6 +64,7 @@ trait UnavailablePartiesGuard extends NamedLogging {
       vettedVersion: String,
       stakeholders: Set[PartyId],
       ignoreUnresponsiveParties: Boolean,
+      restoreOnSuccess: Boolean = true,
   )(task: => Future[TaskOutcome])(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -76,7 +83,10 @@ trait UnavailablePartiesGuard extends NamedLogging {
         )
     } else {
       task
-        .flatMap(recoverUnavailableParties(stakeholders))
+        .flatMap(outcome =>
+          if (restoreOnSuccess) recoverUnavailableParties(stakeholders)(outcome)
+          else Future.successful(outcome)
+        )
         .recoverWith(recoverUnresponsiveParties(ignoreUnresponsiveParties))
     }
 

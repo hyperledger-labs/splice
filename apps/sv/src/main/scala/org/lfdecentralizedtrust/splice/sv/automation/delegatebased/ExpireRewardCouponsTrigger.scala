@@ -167,6 +167,7 @@ class ExpireRewardCouponsTrigger(
       task.vettedAmuletVersion.toString,
       informees,
       ignoreUnresponsiveParties = true,
+      restoreOnSuccess = false,
     )(completeExpiryTaskAsDsoDelegate(task, controller))
   }
 
@@ -177,14 +178,14 @@ class ExpireRewardCouponsTrigger(
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      numCoupons <- expireRewardCouponsForRound(
+      outcomes <- expireRewardCouponsForRound(
         expiredRewardsTask.batch,
         dsoRules,
         amuletRules,
         Optional.of(controller),
       )
     } yield TaskSuccess(
-      show"Expired ${numCoupons} old reward coupons for closed round ${expiredRewardsTask}"
+      show"Expired old reward coupons for closed round ${expiredRewardsTask}: ${outcomes.mkString("; ").unquoted}"
     )
   }
 
@@ -195,111 +196,123 @@ class ExpireRewardCouponsTrigger(
       controller: Optional[String],
   )(implicit
       tc: TraceContext
-  ): Future[Int] = {
-    val validatorRewardCmd = Seq(
-      dsoRules.exercise(
-        _.exerciseDsoRules_ClaimExpiredRewards(
-          amuletRules.contractId,
-          new AmuletRules_ClaimExpiredRewards(
-            expiredRewardsTask.closedRoundCid,
-            expiredRewardsTask.validatorCoupons.map(_.contractId).asJava,
-            Seq.empty.asJava,
-            Seq.empty.asJava,
-            None.toJava,
-            None.toJava,
-          ),
-          controller,
-        )
-      )
-    ).filter(_ => expiredRewardsTask.validatorCoupons.nonEmpty)
-    val validatorFaucetCmd = Seq(
-      dsoRules.exercise(
-        _.exerciseDsoRules_ClaimExpiredRewards(
-          amuletRules.contractId,
-          new AmuletRules_ClaimExpiredRewards(
-            expiredRewardsTask.closedRoundCid,
-            Seq.empty.asJava,
-            Seq.empty.asJava,
-            Seq.empty.asJava,
-            Some(expiredRewardsTask.validatorFaucets.map(_.contractId).asJava).toJava,
-            None.toJava,
-          ),
-          controller,
-        )
-      )
-    ).filter(_ => expiredRewardsTask.validatorFaucets.nonEmpty)
-    val validatorLivenessActivityRecordCmd = Seq(
-      dsoRules.exercise(
-        _.exerciseDsoRules_ClaimExpiredRewards(
-          amuletRules.contractId,
-          new AmuletRules_ClaimExpiredRewards(
-            expiredRewardsTask.closedRoundCid,
-            Seq.empty.asJava,
-            Seq.empty.asJava,
-            Seq.empty.asJava,
-            None.toJava,
-            Some(
-              expiredRewardsTask.validatorLivenessActivityRecords.map(_.contractId).asJava
-            ).toJava,
-          ),
-          controller,
-        )
-      )
-    ).filter(_ => expiredRewardsTask.validatorLivenessActivityRecords.nonEmpty)
-    val appRewardCmd = Seq(
-      dsoRules.exercise(
-        _.exerciseDsoRules_ClaimExpiredRewards(
-          amuletRules.contractId,
-          new AmuletRules_ClaimExpiredRewards(
-            expiredRewardsTask.closedRoundCid,
-            Seq.empty.asJava,
-            expiredRewardsTask.appCoupons.map(_.contractId).asJava,
-            Seq.empty.asJava,
-            None.toJava,
-            None.toJava,
-          ),
-          controller,
-        )
-      )
-    ).filter(_ => expiredRewardsTask.appCoupons.nonEmpty)
-    val svRewardCmd = Seq(
-      dsoRules.exercise(
-        _.exerciseDsoRules_ClaimExpiredRewards(
-          amuletRules.contractId,
-          new AmuletRules_ClaimExpiredRewards(
-            expiredRewardsTask.closedRoundCid,
-            Seq.empty.asJava,
-            Seq.empty.asJava,
-            expiredRewardsTask.svRewardCoupons.map(_.contractId).asJava,
-            None.toJava,
-            None.toJava,
-          ),
-          controller,
-        )
-      )
-    ).filter(_ => expiredRewardsTask.svRewardCoupons.nonEmpty)
-    val cmds = Seq(
-      validatorRewardCmd,
-      appRewardCmd,
-      svRewardCmd,
-      validatorFaucetCmd,
-      validatorLivenessActivityRecordCmd,
-    ).flatten
-    for {
-      _ <- Future.sequence(
-        cmds.map(cmd =>
+  ): Future[Seq[String]] = {
+    val round = expiredRewardsTask.closedRoundCid
+    def noCids[C] = Seq.empty[C].asJava
+
+    // Submits one ClaimExpiredRewards command per (sub-)batch of a single coupon type,
+    // splitting the batch on failures to isolate the offending contracts.
+    def expireWithSplitting[TCid, T](
+        kind: String,
+        coupons: Seq[Contract[TCid, T]],
+        stakeholders: ContractStakeholders[T],
+    )(mkArg: java.util.List[TCid] => AmuletRules_ClaimExpiredRewards): Future[Option[String]] =
+      if (coupons.isEmpty) Future.successful(None)
+      else
+        submitBatchWithSplitting(
+          coupons,
+          (c: Contract[TCid, T]) => stakeholders.getStakeholders(c.payload).toSet,
+        ) { batch =>
           svTaskContext
             .connection(SpliceLedgerConnectionPriority.Low)
             .submit(
               Seq(store.key.svParty),
               Seq(store.key.dsoParty),
-              cmd,
+              dsoRules.exercise(
+                _.exerciseDsoRules_ClaimExpiredRewards(
+                  amuletRules.contractId,
+                  mkArg(batch.map(c => c.contractId: TCid).asJava),
+                  controller,
+                )
+              ),
             )
             .noDedup
-            .yieldResult()
+            .yieldUnit()
+        }.map(outcome => Some(s"$kind: $outcome"))
+
+    // The store query only produces batches with exactly one of the coupon types set,
+    // so running these sequentially does not lose any parallelism.
+    MonadUtil
+      .sequentialTraverse(
+        Seq[() => Future[Option[String]]](
+          () =>
+            expireWithSplitting(
+              "validator coupons",
+              expiredRewardsTask.validatorCoupons,
+              ValidatorCoupons,
+            )(cids =>
+              new AmuletRules_ClaimExpiredRewards(
+                round,
+                cids,
+                noCids,
+                noCids,
+                None.toJava,
+                None.toJava,
+              )
+            ),
+          () =>
+            expireWithSplitting(
+              "app coupons",
+              expiredRewardsTask.appCoupons,
+              AppRewardCoupons,
+            )(cids =>
+              new AmuletRules_ClaimExpiredRewards(
+                round,
+                noCids,
+                cids,
+                noCids,
+                None.toJava,
+                None.toJava,
+              )
+            ),
+          () =>
+            expireWithSplitting(
+              "sv reward coupons",
+              expiredRewardsTask.svRewardCoupons,
+              SvRewardCoupons,
+            )(cids =>
+              new AmuletRules_ClaimExpiredRewards(
+                round,
+                noCids,
+                noCids,
+                cids,
+                None.toJava,
+                None.toJava,
+              )
+            ),
+          () =>
+            expireWithSplitting(
+              "validator faucets",
+              expiredRewardsTask.validatorFaucets,
+              ValidatorFaucetCoupons,
+            )(cids =>
+              new AmuletRules_ClaimExpiredRewards(
+                round,
+                noCids,
+                noCids,
+                noCids,
+                Some(cids).toJava,
+                None.toJava,
+              )
+            ),
+          () =>
+            expireWithSplitting(
+              "validator liveness activity records",
+              expiredRewardsTask.validatorLivenessActivityRecords,
+              ValidatorLivenessActivityRecords,
+            )(cids =>
+              new AmuletRules_ClaimExpiredRewards(
+                round,
+                noCids,
+                noCids,
+                noCids,
+                None.toJava,
+                Some(cids).toJava,
+              )
+            ),
         )
-      )
-    } yield expiredRewardsTask.validatorCoupons.size + expiredRewardsTask.appCoupons.size + expiredRewardsTask.validatorFaucets.size + expiredRewardsTask.svRewardCoupons.size + expiredRewardsTask.validatorLivenessActivityRecords.size
+      )(_())
+      .map(_.flatten)
   }
 }
 
