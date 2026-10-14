@@ -4212,6 +4212,9 @@ components:
         total_asset_reward:
           type: string
           description: The total of all rewards from asset activity for this round, including thresholded.
+        issuance_per_featured_app_activity:
+          type: string
+          description: The issuance of rewards for a unit of app activity in this round.
         issuance_per_featured_asset_activity:
           type: string
           description: The issuance of rewards for a unit of asset activity in this round.
