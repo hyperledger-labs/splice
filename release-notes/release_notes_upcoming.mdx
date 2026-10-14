@@ -20,12 +20,27 @@
 
     - Joining SVs now download the DSO party ACS and sequencer onboarding snapshots from their sponsor
       as files instead of receiving them in memory. This supports large snapshots and resumable downloads.
-      SVs that restrict which endpoints other SVs can reach must allow the new
-      `/api/sv/v0/onboard/sv/party-migration/prepare`, `/api/sv/v0/onboard/sv/sequencer/prepare` and
-      `/api/sv/v0/onboard/sv/download/*` paths to sponsor new SVs;
-      allowlists generated from their `x-external-audience: svs` annotation include them automatically.
-      Sponsoring SVs must upgrade before onboarding SVs on this version.
-      See "Configure storage for SV onboarding snapshots" in the SV operations docs for disk usage and configuration.
+      The new `/v0/onboard/sv/party-migration/prepare`, `/v0/onboard/sv/sequencer/prepare` and
+      `/v0/onboard/sv/download/{id}` endpoints are annotated with `x-external-audience: svs`,
+      so SVs restricting SV app ingress must expose them.
+      Sponsoring SVs must upgrade to this version before they can onboard SVs that run it.
+      Both SVs store the snapshots in `canton.sv-apps.sv.onboarding-snapshots.directory`, which defaults to a
+      temporary directory and should point to a volume with enough free space.
+
+## Upcoming for next minor release:
+
+  - Summary of Breaking Changes:
+
+    | Breaking API Changes | Protocol Changes  | Daml Model Changes |
+    | :------------------- | :---------------- | :----------------- |
+    | yes                  | no                | no                 |
+
+    Details:
+
+    - Breaking API Changes:
+
+      - SV app: joining SVs on this version need a sponsor on this version or later.
+        SVs restricting SV app ingress must expose the new onboarding endpoints.
 
 ## Upcoming for next minor release (template):
 
