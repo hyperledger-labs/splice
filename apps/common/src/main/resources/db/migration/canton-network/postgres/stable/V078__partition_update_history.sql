@@ -59,6 +59,8 @@ alter table update_history_backfilling
 -- Create all new tables:
 -- * For sequences, ALTER SEQUENCE would fail with 'cannot change ownership of identity sequence'.
 -- * The tables no longer have primary key, because it would have to be (row_id, record_time), which wouldn't prevent double inserts.
+-- * We do still have unique checks with record_time added that prevent the same row from being inserted twice.
+--   They can't however prevent two different rows with equal columns except for record_time to be inserted.
 create table update_history_transactions
 (
     like update_history_transactions_legacy including defaults including identity including storage including comments
