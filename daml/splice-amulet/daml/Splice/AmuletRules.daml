@@ -599,7 +599,8 @@ template AmuletRules
               miningRound.tickDuration miningRound.amuletPrice miningRound.issuanceConfig summary
 
         -- record unclaimed reward contract
-        let totalUnclaimedRewards = params.unclaimedValidatorRewards + params.unclaimedAppRewards + params.unclaimedSvRewards
+        let unclaimedAppRewards = fromOptional params.unclaimedAppRewards summary.optUnclaimedAppRewards
+        let totalUnclaimedRewards = params.unclaimedValidatorRewards + unclaimedAppRewards + params.unclaimedSvRewards
         when (totalUnclaimedRewards > 0.0) $
           void $ create UnclaimedReward with
             dso
@@ -623,10 +624,13 @@ template AmuletRules
           opensAt = opensAt
           targetClosesAt = targetClosesAt
           issuancePerValidatorRewardCoupon = params.issuancePerValidatorRewardCoupon
-          issuancePerFeaturedAppRewardCoupon = params.issuancePerFeaturedAppRewardCoupon
+          issuancePerFeaturedAppRewardCoupon = fromOptional
+            params.issuancePerFeaturedAppRewardCoupon
+            summary.optIssuancePerFeaturedAppRewardCoupon
           issuancePerUnfeaturedAppRewardCoupon = params.issuancePerUnfeaturedAppRewardCoupon
           issuancePerSvRewardCoupon = params.issuancePerSvRewardCoupon
           optIssuancePerValidatorFaucetCoupon = Some params.issuancePerValidatorFaucetCoupon
+          optIssuancePerFeaturedAssetRewardCoupon = summary.optIssuancePerFeaturedAssetRewardCoupon
 
         return AmuletRules_MiningRound_StartIssuingResult with ..
 
@@ -648,6 +652,7 @@ template AmuletRules
           issuancePerUnfeaturedAppRewardCoupon = issuingRound.issuancePerUnfeaturedAppRewardCoupon
           issuancePerSvRewardCoupon = issuingRound.issuancePerSvRewardCoupon
           optIssuancePerValidatorFaucetCoupon = issuingRound.optIssuancePerValidatorFaucetCoupon
+          optIssuancePerFeaturedAssetRewardCoupon = issuingRound.optIssuancePerFeaturedAssetRewardCoupon
           round = issuingRound.round
 
         return AmuletRules_MiningRound_CloseResult with ..

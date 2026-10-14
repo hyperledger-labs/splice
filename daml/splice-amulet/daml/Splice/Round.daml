@@ -72,6 +72,8 @@ template IssuingMiningRound
     targetClosesAt : Time -- ^ Time when this round is expected to close during standard DSO. The round SHOULD NOT be archived before this time.
     optIssuancePerValidatorFaucetCoupon : Optional Decimal
       -- ^ Introduced in CIP-3
+    optIssuancePerFeaturedAssetRewardCoupon : Optional Decimal
+      -- ^ Introduced in CIP-0104
   where
     signatory dso
     ensure isDefinedRound round
@@ -93,6 +95,8 @@ template ClosedMiningRound
     issuancePerSvRewardCoupon : Decimal
     optIssuancePerValidatorFaucetCoupon : Optional Decimal
       -- ^ Introduced in CIP-3
+    optIssuancePerFeaturedAssetRewardCoupon : Optional Decimal
+      -- ^ Introduced in CIP-0104
   where
     signatory dso
     ensure isDefinedRound round
