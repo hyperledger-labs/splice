@@ -21,6 +21,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class BulkStorageCommitFromStaging[T](
     stagingS3Connection: S3BucketConnection,
     committedS3Connection: S3BucketConnection,
+    kind: BulkObjectKind,
     getObjects: T => Future[Seq[ObjectKeyAndChecksum]],
     getRequiredCatchupTimestamp: T => CantonTimestamp,
     appConfig: BulkStorageConfig,
@@ -44,6 +45,7 @@ class BulkStorageCommitFromStaging[T](
         connection <- scanConnection.connection
         outcome <- connection.getBulkObjectChecksumsOutcome(
           requiredCatchupTimestamp,
+          kind,
           objects.map(_.key),
         )
       } yield {
@@ -256,6 +258,7 @@ object BulkStorageCommitFromStaging {
   def apply[T](
       stagingS3Connection: S3BucketConnection,
       committedS3Connection: S3BucketConnection,
+      kind: BulkObjectKind,
       getStagingObjects: T => Future[Seq[ObjectKeyAndChecksum]],
       getRequiredCatchupTimestamp: T => CantonTimestamp,
       appConfig: BulkStorageConfig,
@@ -269,6 +272,7 @@ object BulkStorageCommitFromStaging {
     new BulkStorageCommitFromStaging[T](
       stagingS3Connection,
       committedS3Connection,
+      kind,
       getStagingObjects,
       getRequiredCatchupTimestamp,
       appConfig,

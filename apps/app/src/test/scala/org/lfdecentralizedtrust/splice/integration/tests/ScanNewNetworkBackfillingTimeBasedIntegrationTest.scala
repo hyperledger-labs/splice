@@ -135,10 +135,13 @@ class ScanNewNetworkBackfillingTimeBasedIntegrationTest
           }
         }
 
-      clue(s"Advance past sv2's first own segment start $firstOwnSegmentStart") {
-        val target = firstOwnSegmentStart.plus(Duration.ofHours(4))
+      def advanceHourlyTo(target: CantonTimestamp): Unit = {
         val hours = Duration.between(getLedgerTime.toInstant, target.toInstant).toHours + 1
         (1L to hours).foreach(_ => advanceTime(Duration.ofHours(1)))
+      }
+
+      clue(s"Advance past sv2's first own segment start $firstOwnSegmentStart") {
+        advanceHourlyTo(firstOwnSegmentStart.plus(Duration.ofHours(4)))
       }
 
       def toCopyIn(bucketName: String): Map[String, String] =
@@ -165,6 +168,48 @@ class ScanNewNetworkBackfillingTimeBasedIntegrationTest
           sv2ScanBackend.appState.bulkStorage.value.backfillingProgress.isComplete.futureValue shouldBe true
           toCopyIn(bucket("sv2Scan", "staging")) shouldBe toCopyIn(bucket("sv1Scan", "committed"))
         }
+      }
+
+      def ownUpdatesIn(bucketName: String): Map[String, String] =
+        objectsIn(bucketName).filter { case (key, _) =>
+          !isSnapshot(key) && folderRange(key)._1 >= firstOwnSegmentStart
+        }
+
+      val firstOwnSegmentEnd =
+        scanStorageConfigV1.computeBulkSnapshotTimeAfter(firstOwnSegmentStart)
+
+      clue(s"Advance past the end of sv2's first own segment $firstOwnSegmentEnd") {
+        advanceHourlyTo(firstOwnSegmentEnd.plus(Duration.ofHours(1)))
+      }
+
+      clue(
+        "sv2 commits its own update segments from its first own segment start, equal to sv1's"
+      ) {
+        eventually(timeUntilSuccess = 2.minutes) {
+          val sv2Own = ownUpdatesIn(bucket("sv2Scan", "committed"))
+          val sv1Own = ownUpdatesIn(bucket("sv1Scan", "committed"))
+          val sv1OwnStaging = ownUpdatesIn(bucket("sv1Scan", "staging"))
+          val notCommittedEquallyBySv1 = sv2Own.filter { case (key, checksum) =>
+            !sv1Own.get(key).contains(checksum)
+          }
+          withClue(
+            s"sv2 committed ${sv2Own.keys.toSeq.sorted}, sv1 committed ${sv1Own.keys.toSeq.sorted}, " +
+              s"sv1 staging ${sv1OwnStaging.keys.toSeq.sorted}; "
+          ) {
+            sv2Own should not be empty
+            notCommittedEquallyBySv1 shouldBe empty
+          }
+        }
+      }
+
+      clue(
+        "sv2 writes no update segment that starts before and ends after its first own segment start"
+      ) {
+        val crossing = objectsIn(bucket("sv2Scan", "staging")).keys.filter { key =>
+          val (start, end) = folderRange(key)
+          !isSnapshot(key) && start < firstOwnSegmentStart && end > firstOwnSegmentStart
+        }
+        crossing shouldBe empty
       }
   }
 }

@@ -57,6 +57,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.{
   DataAvailabilityResponse,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.Bft
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkObjectKind
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
   BulkStorageObjects,
   DomainScans,
@@ -1057,7 +1058,11 @@ class BftScanConnectionTest
         availability: BulkObjectsAvailability,
     ): Unit =
       when(
-        mock.getBulkObjectsProgress(eqTo(availableAt), eqTo(BulkStorageBucket.Committed))(
+        mock.getBulkObjectsProgress(
+          eqTo(availableAt),
+          eqTo(BulkStorageBucket.Committed),
+          eqTo(BulkObjectKind.Updates),
+        )(
           any[ExecutionContext],
           any[TraceContext],
         )
