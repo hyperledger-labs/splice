@@ -971,7 +971,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "return the same views as listTransactionViews for each verdict" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         verdictStore = ctx.verdictStore
         rowId1 <- insertVerdictWithViews(verdictStore, "update1", 1L, Seq(2, 0, 1))
         rowId2 <- insertVerdictWithViews(verdictStore, "update2", 2L, Seq(0))
@@ -994,7 +994,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
 
     "fail when any verdict has more than maxViewsPerVerdict views" in {
       for {
-        ctx <- newEventStore()
+        ctx <- newEventStore(timeStart = partitionsStart)
         verdictStore = ctx.verdictStore
         rowId1 <- insertVerdictWithViews(verdictStore, "update1", 1L, Seq(0, 1, 2))
         rowId2 <- insertVerdictWithViews(verdictStore, "update2", 2L, Seq(0))
