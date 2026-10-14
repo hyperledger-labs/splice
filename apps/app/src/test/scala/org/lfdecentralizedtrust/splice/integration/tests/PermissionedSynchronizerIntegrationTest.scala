@@ -25,6 +25,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorrepermission
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 
+import scala.concurrent.duration.*
+
 class PermissionedSynchronizerIntegrationTest
     extends IntegrationTest
     with HasExecutionContext
@@ -52,6 +54,13 @@ class PermissionedSynchronizerIntegrationTest
             )
           )
         })(config)
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs {
+          case (name, c) if name == "bobValidator" =>
+            c.copy(enableAutoOnboardingTrafficPurchase = true)
+          case (_, c) => c
+        }(config)
       )
       .withManualStart
 
@@ -126,12 +135,9 @@ class PermissionedSynchronizerIntegrationTest
       },
     )
 
-    clue("Sponser SV Buys Member Traffic for Bob in the DevNet") {
-      sv1Backend.devNetBuyMemberTraffic(bobValidatorBackend.participantClient.id)
-    }
-
-    clue("Verify Bob is granted ParticipantSynchronizerPermission") {
-      eventually() {
+    clue("Bob Validator starts and onboards correctly ") {
+      bobValidatorBackend.start()
+      eventually(40.seconds) {
         sv1ScanBackend.getParticipantSynchronizerPermission(
           decentralizedSynchronizerId.toProtoPrimitive,
           bobValidatorBackend.participantClient.id.toProtoPrimitive,
@@ -139,10 +145,7 @@ class PermissionedSynchronizerIntegrationTest
           SynchronizerPermissionState(None)
         )
       }
-    }
-
-    clue("Bob Validator starts and onboards correctly") {
-      bobValidatorBackend.startSync()
+      bobValidatorBackend.waitForInitialization()
       bobValidatorBackend.onboardUser("TestUserBob")
     }
 

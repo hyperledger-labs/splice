@@ -59,6 +59,7 @@ import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerC
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
 import org.lfdecentralizedtrust.splice.store.db.DbAppStore
+import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.ValidatorApp.OAuthRealms
 import org.lfdecentralizedtrust.splice.validator.admin.http.*
@@ -210,6 +211,34 @@ class ValidatorApp(
             // even if we have already registered which could be an issue after a restart.
             // For now this seems acceptable.
             initialSynchronizerTime = Option.when(!domainAlreadyRegistered)(now)
+
+            // When the permissioned synchronizer is enabled, the domain operates in RestrictedOpen mode.
+            // If we attempt to connect to the domain before our participant has been granted the
+            // ParticipantSynchronizerPermission, the sequencer will immediately reject the connection
+            // with an INITIAL_ONBOARDING_ERROR, crashing the node during startup.
+            // Therefore, we must purchase traffic (if configured) and wait for the permission
+            // to be visible on scan before allowing the synchronizer registration to proceed.
+            _ <- appInitStep("Checking participant synchronizer permissions") {
+              for {
+                dsoRules <- scanConnection.getDsoRules()
+                isPermissionedSynchronizer = SwitchOverTimes.permissionedSynchronizerEnabled(
+                  clock,
+                  dsoRules.payload,
+                )
+                _ <-
+                  if (isPermissionedSynchronizer) {
+                    for {
+                      synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
+                      _ <- config.onboarding match {
+                        case Some(oc) if config.enableAutoOnboardingTrafficPurchase =>
+                          submitBuyMemberTraffic(oc.svClient, participantId)
+                        case _ => Future.unit
+                      }
+                      _ <- waitForTopologyPermission(scanConnection, synchronizerId, participantId)
+                    } yield ()
+                  } else Future.unit
+              } yield ()
+            }
             _ <-
               if (config.svValidator && config.disableSvValidatorBftSequencerConnection)
                 appInitStep("Ensuring decentralized synchronizer already registered") {
@@ -544,6 +573,20 @@ class ValidatorApp(
       logger,
     )
   }
+  private def submitBuyMemberTraffic(
+      svConfig: SvAppClientConfig,
+      participantId: ParticipantId,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    logger.info("Auto-purchasing DevNet traffic via SV faucet")
+    retryProvider.retry(
+      RetryFor.WaitingOnInitDependency,
+      "auto_purchase_traffic",
+      "auto purchase DevNet traffic",
+      withSvConnection(svConfig.adminApi)(_.devNetBuyMemberTraffic(participantId)),
+      logger,
+    )
+  }
+
   private def submitValidatorLicenceRequest(
       validatorParty: PartyId,
       dsoParty: PartyId,

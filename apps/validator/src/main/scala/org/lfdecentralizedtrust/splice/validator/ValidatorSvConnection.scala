@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.validator
 
 import cats.data.EitherT
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.{BuildInfo, HttpAppConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.http.HttpClient
@@ -11,7 +12,6 @@ import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_public as httpPu
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import org.lfdecentralizedtrust.splice.validator.ValidatorSvConnection.OnboardValidator
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
@@ -41,6 +41,16 @@ final class ValidatorSvConnection private (
       mat: Materializer,
   ): Future[Unit] =
     runHttpCmd(config.url, OnboardValidator(validator, secret, contactPoint))
+
+  /** Ask the SV's DevNet faucet to automatically purchase member traffic for the given participant. Used only for validators in test clusters
+    */
+  def devNetBuyMemberTraffic(participantId: ParticipantId)(implicit
+      httpClient: HttpClient,
+      templateDecoder: TemplateJsonDecoder,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[Unit] =
+    runHttpCmd(config.url, ValidatorSvConnection.DevNetBuyMemberTraffic(participantId))
 }
 
 object ValidatorSvConnection {
@@ -61,6 +71,24 @@ object ValidatorSvConnection {
       new ValidatorSvConnection(config, upgradesConfig, retryProvider, loggerFactory),
       retryConnectionOnInitialFailure,
     )
+
+  case class DevNetBuyMemberTraffic(participantId: ParticipantId)
+      extends BaseCommandPublic[httpPublic.DevNetBuyMemberTrafficResponse, Unit] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], httpPublic.DevNetBuyMemberTrafficResponse] =
+      client.devNetBuyMemberTraffic(
+        body = definitions.DevNetBuyMemberTrafficRequest(participantId.toProtoPrimitive),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case httpPublic.DevNetBuyMemberTrafficResponse.OK(_) =>
+      Right(())
+    }
+  }
 
   case class OnboardValidator(candidate: PartyId, secret: String, contactPoint: String)
       extends BaseCommandPublic[httpPublic.OnboardValidatorResponse, Unit] {

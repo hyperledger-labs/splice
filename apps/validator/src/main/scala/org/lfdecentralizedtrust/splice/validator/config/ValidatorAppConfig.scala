@@ -228,6 +228,7 @@ case class ValidatorAppBackendConfig(
     // from running concurrently against the same database.  Only disable for migration scenarios
     // where intentional overlap is required.
     instanceLockEnabled: Boolean = true,
+    enableAutoOnboardingTrafficPurchase: Boolean = false,
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"
