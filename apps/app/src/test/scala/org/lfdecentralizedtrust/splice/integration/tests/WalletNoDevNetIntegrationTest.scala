@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.admin.api.client.data.NodeStatus
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -132,6 +134,31 @@ class WalletNoDevNetIntegrationTest
           else c
         }(config)
       })
+      .copy(
+        preAppStart = implicit env => {
+          // Reset traffic state for alice and bob such that extraTrafficRemainder = 0 to make sure we hit the cases where command priority matters.
+          sv1Backend.sequencerClient.health.status match {
+            case _: NodeStatus.Success[?] =>
+              Seq(
+                aliceValidatorBackend.participantClient.id,
+                bobValidatorBackend.participantClient.id,
+              ).foreach { participantId =>
+                val trafficStateO = sv1Backend.sequencerClient.traffic_control
+                  .traffic_state_of_members(Seq(participantId.member))
+                  .trafficStates
+                  .get(participantId.member)
+                trafficStateO.foreach(ts =>
+                  sv1Backend.sequencerClient.traffic_control.set_traffic_balance(
+                    participantId.member,
+                    serial = ts.serial.fold(PositiveInt.one)(_ + PositiveInt.one),
+                    newBalance = ts.extraTrafficConsumed,
+                  )
+                )
+              }
+            case _ =>
+          }
+        }
+      )
   }
 
   "A validator wallet" should {
