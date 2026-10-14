@@ -19,7 +19,6 @@ import com.google.protobuf.ByteString
 import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.stream.StreamTcpException
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
-import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
@@ -31,6 +30,7 @@ import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.environment.{
   BaseAppConnection,
+  BftCallFailed,
   RetryProvider,
   SpliceLedgerClient,
 }
@@ -53,8 +53,8 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
 }
 
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.{
+  BftOutcome,
   DataAvailabilityResponse,
-  NoScanWillHaveData,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.Bft
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
@@ -439,9 +439,10 @@ class BftScanConnectionTest
       loggerFactory.assertLogs(
         for {
           failure <- bft.getDsoPartyId().failed
-        } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
-          code should be(StatusCodes.BadGateway)
-          message should include("Failed to reach consensus from 3 Scan nodes") // 2f+1 = 3
+        } yield inside(failure) { case failed: BftCallFailed.Disagreement =>
+          failed.getMessage should include(
+            "Failed to reach consensus from 3 Scan nodes"
+          ) // 2f+1 = 3
         },
         _.warningMessage should include("Consensus not reached."),
       )
@@ -552,9 +553,8 @@ class BftScanConnectionTest
       loggerFactory.assertLogs(
         for {
           failure <- bft.getDsoPartyId().failed
-        } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
-          code should be(StatusCodes.BadGateway)
-          message should include(
+        } yield inside(failure) { case failed: BftCallFailed.NotEnoughScans =>
+          failed.getMessage should include(
             s"Only 1 scan instances can be used (out of 4 configured ones), which are fewer than the necessary 2 to achieve BFT guarantees."
           )
         },
@@ -904,9 +904,8 @@ class BftScanConnectionTest
       // Can't accept the matching answer from the two remaining scans, we have f=2, and they could be both malicious
       for {
         failure <- bft.getUpdatesBefore(0, synchronizerId, ctime(5), None, 10).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
-        code should be(StatusCodes.BadGateway)
-        message should include(
+      } yield inside(failure) { case failed: BftCallFailed.NotEnoughScans =>
+        failed.getMessage should include(
           s"Only 2 scan instances can be used (out of 7 configured ones), which are fewer than the necessary 3 to achieve BFT guarantees."
         )
       }
@@ -946,9 +945,8 @@ class BftScanConnectionTest
       // Note: getUpdatesBefore() doesn't produce WARN logs, so we don't need to suppress them
       for {
         failure <- bft.getMigrationInfo(0).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
-        code should be(StatusCodes.BadGateway)
-        message should include("Failed to reach consensus from 5 Scan nodes")
+      } yield inside(failure) { case failed: BftCallFailed.Disagreement =>
+        failed.getMessage should include("Failed to reach consensus from 5 Scan nodes")
       }
     }
 
@@ -995,9 +993,8 @@ class BftScanConnectionTest
       // Note: getUpdatesBefore() doesn't produce WARN logs, so we don't need to suppress them
       for {
         failure <- bft.getUpdatesBefore(0, synchronizerId, ctime(5), None, 10).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
-        code should be(StatusCodes.BadGateway)
-        message should include("Failed to reach consensus from 5 Scan nodes")
+      } yield inside(failure) { case failed: BftCallFailed.Disagreement =>
+        failed.getMessage should include("Failed to reach consensus from 5 Scan nodes")
       }
     }
 
@@ -1042,9 +1039,8 @@ class BftScanConnectionTest
       // Note: getImportUpdates() doesn't produce WARN logs, so we don't need to suppress them
       for {
         failure <- bft.getImportUpdates(0, "", 10).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
-        code should be(StatusCodes.BadGateway)
-        message should include("Failed to reach consensus from 5 Scan nodes")
+      } yield inside(failure) { case failed: BftCallFailed.Disagreement =>
+        failed.getMessage should include("Failed to reach consensus from 5 Scan nodes")
       }
     }
   }
@@ -1094,10 +1090,12 @@ class BftScanConnectionTest
         makeMockReturnUpdateObjects(connection)
       }
 
-      listUpdates(getBft(connections)).map { case (listed, peers) =>
-        listed shouldBe page
-        peers should not be empty
-        connections.map(_.url) should contain allElementsOf peers
+      listUpdates(getBft(connections)).map { outcome =>
+        inside(outcome) { case BftOutcome.Agreed(listed, peers) =>
+          listed shouldBe page
+          peers should not be empty
+          connections.map(_.url) should contain allElementsOf peers
+        }
       }
     }
 
@@ -1111,23 +1109,26 @@ class BftScanConnectionTest
           makeMockReturnCommittedProgress(_, BulkObjectsAvailability.Backfilling)
         )
 
-      listUpdates(getBft(connections)).map { case (listed, peers) =>
-        listed shouldBe page
-        peers shouldBe List(connections(0).url)
-      }
+      listUpdates(getBft(connections)).map(
+        _ shouldBe BftOutcome.Agreed(page, List(connections(0).url))
+      )
     }
 
     "report that no scan will have the objects when every scan is backfilling" in {
       val connections = getMockedConnections(n = 4)
       connections.foreach(makeMockReturnCommittedProgress(_, BulkObjectsAvailability.Backfilling))
 
-      listUpdates(getBft(connections)).failed.map(_ shouldBe a[NoScanWillHaveData])
+      listUpdates(getBft(connections)).map { outcome =>
+        inside(outcome) { case BftOutcome.NeverAvailable(never) =>
+          never should contain theSameElementsAs connections.map(_.url)
+        }
+      }
     }
   }
 
   "BftScanConnection.getRewardAccountingRootHash" should {
 
-    "propagates BadGateway when no quorum agrees on a hash" in {
+    "fail with a disagreement when no quorum agrees on a hash" in {
       val round = 42L
       val connections = getMockedConnections(n = 4)
       connections.zipWithIndex.foreach { case (c, i) =>
@@ -1136,21 +1137,20 @@ class BftScanConnectionTest
       val bft = getBft(connections)
 
       // n=4, f=1, targetSuccess=2. All 4 WithData peers are sampled from cache;
-      // each returns a distinct hash → no consensus → BadGateway.
+      // each returns a distinct hash → no consensus → Disagreement.
       loggerFactory.assertLogs(
         for {
           failure <- bft.getRewardAccountingRootHash(round).failed
-        } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
-          code should be(StatusCodes.BadGateway)
-          message should include("Failed to reach consensus from 4 Scan nodes")
+        } yield inside(failure) { case failed: BftCallFailed.Disagreement =>
+          failed.getMessage should include("Failed to reach consensus from 4 Scan nodes")
         },
         _.warningMessage should include("Consensus not reached."),
       )
     }
 
-    "propagates BadGateway when every peer returns CannotProvide" in {
+    "fail with not enough scans when every peer returns CannotProvide" in {
       // All 4 peers opt out via CannotProvide → connectionsForConsensus is empty
-      // → enoughAvailableScans = false → BadGateway. The "not enough scans"
+      // → enoughAvailableScans = false → NotEnoughScans. The "not enough scans"
       // message is logged at INFO (not WARN) for reward-accounting endpoints
       // where this is expected during bootstrap.
       val round = 42L
@@ -1160,16 +1160,14 @@ class BftScanConnectionTest
 
       for {
         failure <- bft.getRewardAccountingRootHash(round).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
-        code should be(StatusCodes.BadGateway)
-      }
+      } yield failure shouldBe a[BftCallFailed.NotEnoughScans]
     }
 
-    "propagates BadGateway when every peer returns Undetermined" in {
+    "fail with not enough scans when every peer returns Undetermined" in {
       // All 4 Undetermined → probe classifies each as Unavailable → all kept
       // in `n` (n=4, f=1, targetSuccess=2) but none contributes a cached
       // response → 0 WithData scans to sample → enoughAvailableScans=false
-      // → BadGateway. "Not enough scans" is logged at INFO for these endpoints.
+      // → NotEnoughScans. "Not enough scans" is logged at INFO for these endpoints.
       val round = 42L
       val connections = getMockedConnections(n = 4)
       connections.foreach(makeMockReturnRootHashUndetermined(_, round))
@@ -1177,21 +1175,17 @@ class BftScanConnectionTest
 
       for {
         failure <- bft.getRewardAccountingRootHash(round).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
-        code should be(StatusCodes.BadGateway)
-      }
+      } yield failure shouldBe a[BftCallFailed.NotEnoughScans]
     }
 
-    "propagates BadGateway when there are no peer scans" in {
-      // Empty scan list → no probes → connectionsForConsensus empty → BadGateway.
+    "fail with not enough scans when there are no peer scans" in {
+      // Empty scan list → no probes → connectionsForConsensus empty → NotEnoughScans.
       // "Not enough scans" is logged at INFO for these endpoints.
       val bft = getBft(Seq.empty)
 
       for {
         failure <- bft.getRewardAccountingRootHash(1L).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
-        code should be(StatusCodes.BadGateway)
-      }
+      } yield failure shouldBe a[BftCallFailed.NotEnoughScans]
     }
 
     "logs disagreements at WARN level" in {
@@ -1281,11 +1275,11 @@ class BftScanConnectionTest
       }
     }
 
-    "propagates BadGateway when a lone Ok cannot meet BFT quorum against Undetermined peers" in {
+    "fail with not enough scans when a lone Ok cannot meet BFT quorum against Undetermined peers" in {
       // 1 Ok + 3 Undetermined → probe classifies as {WithData, Unavailable*3}.
       // Unavailable peers count in `n`: n=4, f=1, targetSuccess=2. Only SV0
       // (WithData) has a cached response → connections=[SV0] with
-      // requestsToDo=1. `enoughAvailableScans` sees 1 < 2 → BadGateway.
+      // requestsToDo=1. `enoughAvailableScans` sees 1 < 2 → NotEnoughScans.
       val round = 42L
       val connections = getMockedConnections(n = 4)
       makeMockReturnRootHashOk(connections(0), round, "aabb")
@@ -1296,9 +1290,7 @@ class BftScanConnectionTest
 
       for {
         failure <- bft.getRewardAccountingRootHash(round).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
-        code should be(StatusCodes.BadGateway)
-      }
+      } yield failure shouldBe a[BftCallFailed.NotEnoughScans]
     }
 
     "logs a WARN when Oks from the probed subset disagree on the payload" in {
@@ -1327,7 +1319,7 @@ class BftScanConnectionTest
       // Mirrors the integration test's dummy-SV scenario: some peers'
       // connections fail to open (scanConnections.failed > 0), so they
       // never get probed but still count in `n`. The lone Ok cannot
-      // meet the raised targetSuccess and BadGateway propagates.
+      // meet the raised targetSuccess and NotEnoughScans propagates.
       // "Not enough scans" is logged at INFO for these endpoints.
       val round = 42L
       val connections = getMockedConnections(n = 2)
@@ -1340,10 +1332,8 @@ class BftScanConnectionTest
       )
       val bft = getBft(connections, initialFailedConnections = failedConnections)
 
-      for { failure <- bft.getRewardAccountingRootHash(round).failed } yield inside(failure) {
-        case HttpErrorWithHttpCode(code, _) =>
-          code should be(StatusCodes.BadGateway)
-      }
+      for { failure <- bft.getRewardAccountingRootHash(round).failed } yield failure shouldBe
+        a[BftCallFailed.NotEnoughScans]
     }
 
     "reaches consensus on a single Ok when other peers give a mix of CannotProvide, Undetermined, and probe failure" in {
@@ -1373,7 +1363,7 @@ class BftScanConnectionTest
 
   "BftScanConnection.getRewardAccountingActivityTotals" should {
 
-    "propagates BadGateway when no quorum agrees on the totals" in {
+    "fail with a disagreement when no quorum agrees on the totals" in {
       val round = 42L
       val connections = getMockedConnections(n = 4)
       connections.zipWithIndex.foreach { case (c, i) =>
@@ -1382,21 +1372,20 @@ class BftScanConnectionTest
       val bft = getBft(connections)
 
       // n=4, f=1, targetSuccess=2. All 4 WithData peers are sampled from cache;
-      // each returns distinct totals → no consensus → BadGateway.
+      // each returns distinct totals → no consensus → Disagreement.
       loggerFactory.assertLogs(
         for {
           failure <- bft.getRewardAccountingActivityTotals(round).failed
-        } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
-          code should be(StatusCodes.BadGateway)
-          message should include("Failed to reach consensus from 4 Scan nodes")
+        } yield inside(failure) { case failed: BftCallFailed.Disagreement =>
+          failed.getMessage should include("Failed to reach consensus from 4 Scan nodes")
         },
         _.warningMessage should include("Consensus not reached."),
       )
     }
 
-    "propagates BadGateway when every peer returns CannotProvide" in {
+    "fail with not enough scans when every peer returns CannotProvide" in {
       // All 4 peers opt out via CannotProvide → connectionsForConsensus is empty
-      // → enoughAvailableScans = false → BadGateway. "Not enough scans" is
+      // → enoughAvailableScans = false → NotEnoughScans. "Not enough scans" is
       // logged at INFO for these endpoints.
       val round = 42L
       val connections = getMockedConnections(n = 4)
@@ -1405,16 +1394,14 @@ class BftScanConnectionTest
 
       for {
         failure <- bft.getRewardAccountingActivityTotals(round).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
-        code should be(StatusCodes.BadGateway)
-      }
+      } yield failure shouldBe a[BftCallFailed.NotEnoughScans]
     }
 
-    "propagates BadGateway when every peer returns Undetermined" in {
+    "fail with not enough scans when every peer returns Undetermined" in {
       // All 4 Undetermined → probe classifies each as Unavailable → all kept
       // in `n` (n=4, f=1, targetSuccess=2) but none contributes a cached
       // response → 0 WithData scans to sample → enoughAvailableScans=false
-      // → BadGateway. "Not enough scans" is logged at INFO for these endpoints.
+      // → NotEnoughScans. "Not enough scans" is logged at INFO for these endpoints.
       val round = 42L
       val connections = getMockedConnections(n = 4)
       connections.foreach(makeMockReturnActivityTotalsUndetermined(_, round))
@@ -1422,21 +1409,17 @@ class BftScanConnectionTest
 
       for {
         failure <- bft.getRewardAccountingActivityTotals(round).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
-        code should be(StatusCodes.BadGateway)
-      }
+      } yield failure shouldBe a[BftCallFailed.NotEnoughScans]
     }
 
-    "propagates BadGateway when there are no peer scans" in {
-      // Empty scan list → no probes → connectionsForConsensus empty → BadGateway.
+    "fail with not enough scans when there are no peer scans" in {
+      // Empty scan list → no probes → connectionsForConsensus empty → NotEnoughScans.
       // "Not enough scans" is logged at INFO for these endpoints.
       val bft = getBft(Seq.empty)
 
       for {
         failure <- bft.getRewardAccountingActivityTotals(1L).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
-        code should be(StatusCodes.BadGateway)
-      }
+      } yield failure shouldBe a[BftCallFailed.NotEnoughScans]
     }
 
     "logs disagreements at WARN level" in {
@@ -1529,11 +1512,11 @@ class BftScanConnectionTest
       }
     }
 
-    "propagates BadGateway when a lone Ok cannot meet BFT quorum against Undetermined peers" in {
+    "fail with not enough scans when a lone Ok cannot meet BFT quorum against Undetermined peers" in {
       // 1 Ok + 3 Undetermined → probe classifies as {WithData, Unavailable*3}.
       // Unavailable peers count in `n`: n=4, f=1, targetSuccess=2. Only SV0
       // (WithData) has a cached response → connections=[SV0] with
-      // requestsToDo=1. `enoughAvailableScans` sees 1 < 2 → BadGateway.
+      // requestsToDo=1. `enoughAvailableScans` sees 1 < 2 → NotEnoughScans.
       val round = 42L
       val connections = getMockedConnections(n = 4)
       makeMockReturnActivityTotalsOk(connections(0), round, 100L, 10L, 5L)
@@ -1544,9 +1527,7 @@ class BftScanConnectionTest
 
       for {
         failure <- bft.getRewardAccountingActivityTotals(round).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
-        code should be(StatusCodes.BadGateway)
-      }
+      } yield failure shouldBe a[BftCallFailed.NotEnoughScans]
     }
   }
 

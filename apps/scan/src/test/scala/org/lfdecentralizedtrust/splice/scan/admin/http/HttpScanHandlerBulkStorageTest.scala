@@ -40,7 +40,6 @@ import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.store.{
   AppStoreWithIngestion,
   S3BucketConnection,
-  TimestampWithMigrationId,
   UpdateHistory,
 }
 import org.scalatest.wordspec.AnyWordSpec
@@ -113,11 +112,8 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
     grpcEx.getStatus.getDescription should include(expectedDescription)
   }
 
-  private def snapshotProgressAt(instant: String): TimestampWithMigrationId =
-    TimestampWithMigrationId(
-      com.digitalasset.canton.data.CantonTimestamp.assertFromInstant(Instant.parse(instant)),
-      0L,
-    )
+  private def snapshotProgressAt(instant: String): CantonTimestamp =
+    CantonTimestamp.assertFromInstant(Instant.parse(instant))
 
   private def updateProgress(fromInstant: String, toInstant: String): UpdatesSegment =
     UpdatesSegment(
@@ -126,7 +122,7 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
     )
 
   private def snapshotsProgress(
-      progressO: Option[TimestampWithMigrationId]
+      progressO: Option[CantonTimestamp]
   ): AcsSnapshotBulkStoragePersistentProgress = {
     val progress = mock[AcsSnapshotBulkStoragePersistentProgress]
     when(
@@ -145,9 +141,9 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
   }
 
   private def bulkStorageReader(
-      snapshotProgressO: Option[TimestampWithMigrationId],
+      snapshotProgressO: Option[CantonTimestamp],
       updateProgressO: Option[UpdatesSegment],
-      committedSnapshotProgressO: Option[TimestampWithMigrationId] = None,
+      committedSnapshotProgressO: Option[CantonTimestamp] = None,
       committedUpdateProgressO: Option[UpdatesSegment] = None,
       firstOwnSegmentStart: Option[CantonTimestamp] = None,
   ): BulkStorageReader =

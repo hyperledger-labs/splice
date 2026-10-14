@@ -18,11 +18,7 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.{
 }
 import org.lfdecentralizedtrust.splice.scan.store.{ScanKeyValueProvider, ScanKeyValueStore}
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
-import org.lfdecentralizedtrust.splice.store.{
-  HistoryMetrics,
-  StoreTestBase,
-  TimestampWithMigrationId,
-}
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, StoreTestBase}
 
 import java.time.Instant
 import scala.concurrent.Future
@@ -78,11 +74,8 @@ class KvBackfillingProgressTest
     }
 
     "persist and read back both cursors" in {
-      val segment = UpdatesSegment(
-        TimestampWithMigrationId(ts(1), 0L),
-        TimestampWithMigrationId(ts(2), 0L),
-      )
-      val snapshot = TimestampWithMigrationId(ts(2), 0L)
+      val segment = UpdatesSegment(ts(1), ts(2))
+      val snapshot = ts(2)
       for {
         progress <- mkProgress
         _ <- progress.persistUpdatesCursor(segment)

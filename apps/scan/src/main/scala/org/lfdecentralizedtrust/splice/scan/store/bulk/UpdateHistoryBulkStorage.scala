@@ -58,7 +58,7 @@ class UpdateHistoryBulkStoragePersistentProgress(
       tc: TraceContext,
       ec: ExecutionContext,
   ): Future[Unit] = {
-    metric.updateValue(segment.toTimestamp.timestamp)
+    metric.updateValue(segment.toTimestamp)
     kvProvider.store
       .setValue(kvStoreKey, segment)
       .map(_ => {

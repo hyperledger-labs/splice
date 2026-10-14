@@ -7,9 +7,8 @@ import cats.data.NonEmptyList
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import org.apache.pekko.http.scaladsl.model.{StatusCodes, Uri}
-import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.NoScanWillHaveData
+import org.apache.pekko.http.scaladsl.model.Uri
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.BftOutcome
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BulkStorageObjects
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig.Encoding
 import org.lfdecentralizedtrust.splice.scan.util.PeerBftScanConnection
@@ -113,10 +112,10 @@ class BftBulkObjectListing(
     }
   }
 
-  private def inEveryEncoding[T, U](list: Encoding => Future[(T, List[Uri])])(
+  private def inEveryEncoding[T, U](list: Encoding => Future[BftOutcome[T]])(
       merge: NonEmptyList[(T, Seq[Uri])] => PeerListing[U]
   ): Future[PeerListing[U]] =
-    oneEncodingAfterTheOther(encoding => withPeers(list(encoding))).map { listings =>
+    oneEncodingAfterTheOther(encoding => list(encoding).flatMap(listing)).map { listings =>
       listings.traverse[Option, (T, Seq[Uri])] {
         case PeerListing.Available(listed) => Some(listed)
         case PeerListing.NotAvailableYet | PeerListing.NoPeerWillHold => None
@@ -134,14 +133,13 @@ class BftBulkObjectListing(
       (listedSoFar, encoding) => listedSoFar.flatMap(listed => listOne(encoding).map(listed :+ _))
     }
 
-  private def withPeers[T](call: Future[(T, List[Uri])]): Future[PeerListing[(T, Seq[Uri])]] =
-    call
-      .map[PeerListing[(T, Seq[Uri])]] { case (value, peers) =>
-        PeerListing.Available((value, peers))
-      }
-      .recover {
-        case HttpErrorWithHttpCode(StatusCodes.ServiceUnavailable, _) =>
-          PeerListing.NotAvailableYet
-        case _: NoScanWillHaveData => PeerListing.NoPeerWillHold
-      }
+  private def listing[T](outcome: BftOutcome[T]): Future[PeerListing[(T, Seq[Uri])]] =
+    outcome match {
+      case BftOutcome.Agreed(value, peers) =>
+        Future.successful(PeerListing.Available((value, peers)))
+      case _: BftOutcome.NotYetAvailable => Future.successful(PeerListing.NotAvailableYet)
+      case _: BftOutcome.NeverAvailable => Future.successful(PeerListing.NoPeerWillHold)
+      case disagreement: BftOutcome.Disagreement[T] => Future.failed(disagreement.asFailure)
+      case notEnough: BftOutcome.NotEnoughScans => Future.failed(notEnough.asFailure)
+    }
 }

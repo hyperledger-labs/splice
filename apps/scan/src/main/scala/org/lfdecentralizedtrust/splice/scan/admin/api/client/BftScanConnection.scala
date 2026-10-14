@@ -92,7 +92,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.HoldingsSummaryRequest.RecordTimeMatch
 import org.lfdecentralizedtrust.splice.metrics.ScanConnectionMetrics
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.DataAvailabilityResponse
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.{
+  BftOutcome,
+  DataAvailabilityResponse,
+}
 import org.lfdecentralizedtrust.tokenstandard.{
   allocation,
   allocationinstruction,
@@ -808,7 +811,7 @@ class BftScanConnection(
     * (`Unavailable`), reusing cached Ok responses from phase 1.
     * Undetermined and CannotProvide responses are transformed to
     * failures so they never form a consensus. Consensus failures
-    * propagate as `HttpErrorWithHttpCode(BadGateway)` — same
+    * propagate as `BftCallFailed.Disagreement` — same
     * convention as `getMigrationInfo`.
     */
   override def getRewardAccountingActivityTotals(roundNumber: Long)(implicit
@@ -849,7 +852,7 @@ class BftScanConnection(
     * (`Unavailable`), reusing cached Ok responses from phase 1.
     * Undetermined and CannotProvide responses are transformed to
     * failures so they never form a consensus. Consensus failures
-    * propagate as `HttpErrorWithHttpCode(BadGateway)` — same
+    * propagate as `BftCallFailed.Disagreement` — same
     * convention as `getMigrationInfo`.
     */
   override def getRewardAccountingRootHash(roundNumber: Long)(implicit
@@ -917,7 +920,7 @@ class BftScanConnection(
       disagreementLogLevel = Level.WARN,
       // "Not enough scans" here means the probe didn't gather enough cached
       // responses to satisfy BFT quorum — benign during bootstrap or transient
-      // peer unavailability. The caller sees HTTP 502 and retries.
+      // peer unavailability. The caller sees BftCallFailed.NotEnoughScans and retries.
       notEnoughScansLogLevel = Level.INFO,
     )
   }
@@ -948,21 +951,29 @@ class BftScanConnection(
   override def getBulkObjectChecksums(
       requiredCatchupTimestamp: CantonTimestamp,
       objectKeys: Seq[String],
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[GetBulkObjectChecksumsResponse] = {
-    BftCallExecutor
-      .bftCallForEventualConsistencyEndpoints(
-        scanList.scanConnections,
-        connectionMetrics,
-        retryProvider,
-        logger,
-        hasData = _.getBulkObjectsProgress(requiredCatchupTimestamp, BulkStorageBucket.Staging)
-          .map(BftScanConnection.dataAvailability),
-        getData = _.getBulkObjectChecksums(requiredCatchupTimestamp, objectKeys),
-        endpoint = "getBulkObjectChecksums",
-        callConfig = BftCallConfig.default(scanList.scanConnections),
-      )
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[GetBulkObjectChecksumsResponse] =
+    getBulkObjectChecksumsOutcome(requiredCatchupTimestamp, objectKeys)
+      .flatMap(_.toFuture)
       .map(_._1)
-  }
+
+  def getBulkObjectChecksumsOutcome(
+      requiredCatchupTimestamp: CantonTimestamp,
+      objectKeys: Seq[String],
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[BftOutcome[GetBulkObjectChecksumsResponse]] =
+    BftCallExecutor.bftCallForEventualConsistencyEndpoints(
+      scanList.scanConnections,
+      connectionMetrics,
+      retryProvider,
+      logger,
+      hasData = _.getBulkObjectsProgress(requiredCatchupTimestamp, BulkStorageBucket.Staging)
+        .map(BftScanConnection.dataAvailability),
+      getData = _.getBulkObjectChecksums(requiredCatchupTimestamp, objectKeys),
+      endpoint = "getBulkObjectChecksums",
+      callConfig = BftCallConfig.default(scanList.scanConnections),
+    )
 
   override def listBulkAcsSnapshotObjects(
       atOrBeforeRecordTime: CantonTimestamp,
@@ -973,7 +984,7 @@ class BftScanConnection(
   ): Future[Option[BulkStorageObjects.SnapshotObjects]] =
     bftCallOnScansCommittedUpTo(atOrBeforeRecordTime, "listBulkAcsSnapshotObjects")(
       _.listBulkAcsSnapshotObjects(atOrBeforeRecordTime, damlValueEncoding)
-    ).map(_._1)
+    ).flatMap(_.toFuture).map(_._1)
 
   override def listBulkUpdateHistoryObjects(
       startRecordTime: CantonTimestamp,
@@ -990,7 +1001,7 @@ class BftScanConnection(
         nextPageToken,
         damlValueEncoding,
       )
-    ).map(_._1)
+    ).flatMap(_.toFuture).map(_._1)
 
   def listBulkAcsSnapshotObjectsWithPeers(
       atOrBeforeRecordTime: CantonTimestamp,
@@ -998,7 +1009,7 @@ class BftScanConnection(
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[(Option[BulkStorageObjects.SnapshotObjects], List[Uri])] =
+  ): Future[BftOutcome[Option[BulkStorageObjects.SnapshotObjects]]] =
     bftCallOnScansCommittedUpTo(atOrBeforeRecordTime, "listBulkAcsSnapshotObjects")(
       _.listBulkAcsSnapshotObjects(atOrBeforeRecordTime, Some(encoding.damlValueEncoding))
     )
@@ -1012,7 +1023,7 @@ class BftScanConnection(
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[(BulkStorageObjects.UpdateObjectsPage, List[Uri])] =
+  ): Future[BftOutcome[BulkStorageObjects.UpdateObjectsPage]] =
     bftCallOnScansCommittedUpTo(availableAt, "listBulkUpdateHistoryObjects")(
       _.listBulkUpdateHistoryObjects(
         startRecordTime,
@@ -1025,7 +1036,7 @@ class BftScanConnection(
 
   private def bftCallOnScansCommittedUpTo[T](availableAt: CantonTimestamp, endpoint: String)(
       call: SingleScanConnection => Future[T]
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[(T, List[Uri])] =
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[BftOutcome[T]] =
     BftCallExecutor.bftCallForEventualConsistencyEndpoints(
       scanList.scanConnections,
       connectionMetrics,
@@ -1071,21 +1082,22 @@ class BftScanConnection(
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[(T, List[Uri])] = {
-    BftCallExecutor.bftCallWithScanUris(
-      scanList.scanConnections,
-      connectionMetrics,
-      retryProvider,
-      logger,
-      call,
-      endpoint,
-      callConfig,
-      consensusFailureLogLevel,
-      disagreementLogLevel,
-      notEnoughScansLogLevel,
-      shortenResponsesForLog,
-    )
-  }
+  ): Future[(T, List[Uri])] =
+    BftCallExecutor
+      .bftCallWithScanUris(
+        scanList.scanConnections,
+        connectionMetrics,
+        retryProvider,
+        logger,
+        call,
+        endpoint,
+        callConfig,
+        consensusFailureLogLevel,
+        disagreementLogLevel,
+        notEnoughScansLogLevel,
+        shortenResponsesForLog,
+      )
+      .flatMap(_.toFuture)
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     refreshAction.map(r => SyncCloseable("refresh_scan_list", r.close())).toList ++
