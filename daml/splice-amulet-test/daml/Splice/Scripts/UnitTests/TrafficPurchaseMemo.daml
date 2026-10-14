@@ -26,6 +26,7 @@ expectedMemo = TrafficPurchaseMemo with
   memberId = testMemberId
   synchronizerId = testSynchronizerId
   migrationId = 3
+  forfeitValidatorRewardCoupon = False
 
 memoParams : Text
 memoParams =
@@ -66,6 +67,17 @@ test_parseMemo_keyOrderIrrelevant = script do
         "&synchronizerId=" <> testSynchronizerId <>
         "&memberId=" <> testMemberId
   parse reordered === Right expectedMemo
+
+test_parseMemo_forfeitValidatorRewardCoupon : Script ()
+test_parseMemo_forfeitValidatorRewardCoupon = script do
+  parse completeMemo === Right expectedMemo
+  parse (completeMemo <> "&forfeitValidatorRewardCoupon=true") ===
+    Right (expectedMemo with forfeitValidatorRewardCoupon = True)
+  parse (completeMemo <> "&forfeitValidatorRewardCoupon=false") === Right expectedMemo
+  parse (completeMemo <> "&forfeitValidatorRewardCoupon=yes") ===
+    Left "Expected true or false for forfeitValidatorRewardCoupon in traffic purchase memo, got: yes"
+  assertMsg "duplicate forfeit key is rejected" $ isRejected $
+    parse $ completeMemo <> "&forfeitValidatorRewardCoupon=true&forfeitValidatorRewardCoupon=true"
 
 test_parseMemo_rejectsMissingPrefix : Script ()
 test_parseMemo_rejectsMissingPrefix = script do

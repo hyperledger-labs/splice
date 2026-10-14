@@ -101,13 +101,14 @@ data TrafficPurchaseMemo = TrafficPurchaseMemo with
     memberId : Text
     synchronizerId : Text
     migrationId : Int
+    forfeitValidatorRewardCoupon : Bool
   deriving (Eq, Show)
 
 trafficPurchaseMemoPrefix : Text
 trafficPurchaseMemoPrefix = "cip-128/memo:"
 
 -- | Parse the purchase arguments from memo tag using url query param style:
--- `cip-128/memo:memberId=...&synchronizerId=...&migrationId=...`.
+-- `cip-128/memo:memberId=...&synchronizerId=...&migrationId=...[&forfeitValidatorRewardCoupon=true|false]`.
 parseTrafficPurchaseMemo : Text -> Either Text TrafficPurchaseMemo
 parseTrafficPurchaseMemo memo = do
   params <- case T.stripPrefix trafficPurchaseMemoPrefix memo of
@@ -117,9 +118,12 @@ parseTrafficPurchaseMemo memo = do
   memberId <- requiredField fields "memberId"
   synchronizerId <- requiredField fields "synchronizerId"
   migrationId <- requiredField fields "migrationId" >>= parseIntField "migrationId"
+  forfeitValidatorRewardCoupon <- case TextMap.lookup "forfeitValidatorRewardCoupon" fields of
+    None -> Right False
+    Some value -> parseBoolField "forfeitValidatorRewardCoupon" value
   pure TrafficPurchaseMemo with ..
   where
-    knownKeys = ["memberId", "synchronizerId", "migrationId"]
+    knownKeys = ["memberId", "synchronizerId", "migrationId", "forfeitValidatorRewardCoupon"]
     addField fields field = case T.splitOn "=" field of
       [key, value]
         | not (key `elem` knownKeys) ->
@@ -134,6 +138,10 @@ parseTrafficPurchaseMemo memo = do
     parseIntField key value = case T.parseInt value of
       None -> Left $ "Expected an integer for " <> key <> " in traffic purchase memo, got: " <> value
       Some parsed -> Right parsed
+    parseBoolField key value = case value of
+      "true" -> Right True
+      "false" -> Right False
+      _ -> Left $ "Expected true or false for " <> key <> " in traffic purchase memo, got: " <> value
 
 trafficPurchaseReason : MemberTrafficPurchase -> Text
 trafficPurchaseReason purchase =
