@@ -9,6 +9,7 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerSnapshot as Canto
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.{PartyId, SequencerId}
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes, Uri}
+import org.apache.pekko.http.scaladsl.model.headers.{ByteRange, Range}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,
@@ -279,7 +280,8 @@ object HttpSvPublicAppClient {
   }
 
   case class OnboardSvDownload(
-      id: String
+      id: String,
+      offset: Long,
   ) extends HttpCommand[
         SvStreamClient.OnboardSvDownloadResponse,
         SvStreamClient.OnboardSvDownloadResponse,
@@ -288,6 +290,8 @@ object HttpSvPublicAppClient {
     override val createGenClientFn = (fn, host, ec, mat) =>
       SvStreamClient.httpClient(fn, host)(ec, mat)
 
+    override val nonErrorStatusCodes = Set(StatusCodes.RangeNotSatisfiable)
+
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
@@ -295,7 +299,10 @@ object HttpSvPublicAppClient {
       Throwable,
       HttpResponse,
     ], SvStreamClient.OnboardSvDownloadResponse] =
-      client.onboardSvDownload(id, headers = headers)
+      client.onboardSvDownload(
+        id,
+        headers = if (offset > 0) Range(ByteRange.fromOffset(offset)) :: headers else headers,
+      )
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = { case response =>
       Right(response)
