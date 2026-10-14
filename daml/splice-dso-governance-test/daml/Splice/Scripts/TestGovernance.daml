@@ -1189,9 +1189,7 @@ voteFeaturedAppConfigUpdateInstruction app svs provider baseConfig newConfig = d
   existing <- map fst <$> query @FeaturedAppConfigUpdateInstruction app.dso
   initiateAndAcceptVote app svs $ ARC_DsoRules with
     dsoAction = SRARC_CreateFeaturedAppConfigUpdateInstruction DsoRules_CreateFeaturedAppConfigUpdateInstruction with
-      provider
-      update = FeaturedAppRight_UpdateConfig with baseConfig; newConfig
-      additionalUpdates = []
+      updates = [(provider, FeaturedAppRight_UpdateConfig with baseConfig; newConfig)]
   instructions <-queryFilter @FeaturedAppConfigUpdateInstruction app.dso (\i -> i.provider == provider)
   [(instructionCid, instruction)] <- pure $ filter (\(cid, _) -> cid `notElem` existing) instructions
   instruction.update.newConfig === newConfig
@@ -1258,10 +1256,9 @@ testFeaturedAppConfigUpdateMultiple = do
       newConfig3 = baseConfig with appKind = Some FAK_AssetMoving
   initiateAndAcceptVote app svs $ ARC_DsoRules with
     dsoAction = SRARC_CreateFeaturedAppConfigUpdateInstruction DsoRules_CreateFeaturedAppConfigUpdateInstruction with
-      provider = provider1
-      update = FeaturedAppRight_UpdateConfig with baseConfig; newConfig = newConfig1
-      additionalUpdates =
-        [ (provider2, FeaturedAppRight_UpdateConfig with baseConfig; newConfig = newConfig2)
+      updates =
+        [ (provider1, FeaturedAppRight_UpdateConfig with baseConfig; newConfig = newConfig1)
+        , (provider2, FeaturedAppRight_UpdateConfig with baseConfig; newConfig = newConfig2)
         , (provider3, FeaturedAppRight_UpdateConfig with baseConfig; newConfig = newConfig3)
         ]
 
