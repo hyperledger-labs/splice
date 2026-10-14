@@ -195,9 +195,9 @@ class BulkStorageReader(
       committed <- committedS3Connection.getChecksums(objectKeys)
       staging <- stagingS3Connection.getChecksums(objectKeys)
     } yield {
-      objectKeys.map { key =>
-        committed.find(_.key == key).orElse(staging.find(_.key == key)).map(_.checksum)
-      }
+      val committedByKey = committed.map(obj => obj.key -> obj.checksum).toMap
+      val stagingByKey = staging.map(obj => obj.key -> obj.checksum).toMap
+      objectKeys.map(key => committedByKey.get(key).orElse(stagingByKey.get(key)))
     }
   }
 

@@ -2693,7 +2693,7 @@ class HttpScanHandler(
         )
       ) { bulkStorage =>
         for {
-          checksums <- bulkStorage.getObjectChecksums(body.objectKeys)
+          checksums <- bulkStorage.getObjectChecksums(maxSizeOrFail("object_keys", body.objectKeys))
         } yield {
           ScanResource.GetBulkObjectChecksumsResponse.OK(
             definitions.GetBulkObjectChecksumsResponse(

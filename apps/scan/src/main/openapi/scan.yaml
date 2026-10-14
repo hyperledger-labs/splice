@@ -4042,6 +4042,7 @@ components:
           description: |
             The list of keys of the bulk storage objects for which checksums are requested.
           type: array
+          maxItems: 1000
           items:
             type: string
 
