@@ -40,11 +40,11 @@ function getClientId(
   const cfg = auth0Client.getCfg();
   switch (clientName) {
     case 'sv':
-      return getNamespaceConfig(cfg, namespace).backendClientIds.svApp!;
+      return getNamespaceConfig(cfg, namespace).backendClientIds?.svApp!;
     case 'validator':
-      return getNamespaceConfig(cfg, namespace).backendClientIds.validator;
+      return getNamespaceConfig(cfg, namespace).backendClientIds?.validator!;
     case 'splitwell':
-      return getNamespaceConfig(cfg, namespace).backendClientIds.splitwell!;
+      return getNamespaceConfig(cfg, namespace).backendClientIds?.splitwell!;
   }
 }
 
@@ -59,13 +59,13 @@ function getUiClientId(
   }
   switch (uiName) {
     case 'wallet':
-      return getNamespaceConfig(cfg, namespace).uiClientIds.wallet;
+      return getNamespaceConfig(cfg, namespace).uiClientIds?.wallet!;
     case 'cns':
-      return getNamespaceConfig(cfg, namespace).uiClientIds.cns;
+      return getNamespaceConfig(cfg, namespace).uiClientIds?.cns!;
     case 'sv':
-      return getNamespaceConfig(cfg, namespace).uiClientIds.sv!;
+      return getNamespaceConfig(cfg, namespace).uiClientIds?.sv!;
     case 'splitwell':
-      return getNamespaceConfig(cfg, namespace).uiClientIds.splitwell!;
+      return getNamespaceConfig(cfg, namespace).uiClientIds?.splitwell!;
   }
 }
 
