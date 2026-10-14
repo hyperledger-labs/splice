@@ -74,7 +74,7 @@ class TxLogBackfillingStoreTest
       val store = mkStore(acsId = 1, txLogId = Some(1), migrationId = migrationId)
       val history = mkUpdateHistory(dsoParty, migrationId = migrationId)
       for {
-        _ <- history.ingestionSink.initialize()
+        _ <- initHistory(history)
 
         // At this point some ingestion service should call `store.ingestionSink.initialize()`
         // This test simulates the store ingestion being delayed.
@@ -95,7 +95,7 @@ class TxLogBackfillingStoreTest
       for {
         _ <- store.testIngestionSink.initialize()
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
-        _ <- history.ingestionSink.initialize()
+        _ <- initHistory(history)
 
         _ <- sync1.createMulti(c(1), recordTime = t(1))(Seq(history))
 
@@ -118,7 +118,7 @@ class TxLogBackfillingStoreTest
       for {
         _ <- store.testIngestionSink.initialize()
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
-        _ <- history.ingestionSink.initialize()
+        _ <- initHistory(history)
 
         _ <- sync1.createMulti(c(1), recordTime = t(1))(Seq(store, history))
 
@@ -139,7 +139,7 @@ class TxLogBackfillingStoreTest
       for {
         _ <- store.testIngestionSink.initialize()
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
-        _ <- history.ingestionSink.initialize()
+        _ <- initHistory(history)
 
         _ <- sync1.createMulti(c(1), recordTime = t(1))(Seq(history))
         _ <- sync1.createMulti(c(2), recordTime = t(2))(Seq(store, history))
@@ -161,7 +161,7 @@ class TxLogBackfillingStoreTest
       for {
         _ <- store.testIngestionSink.initialize()
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
-        _ <- history.ingestionSink.initialize()
+        _ <- initHistory(history)
 
         _ <- sync1.createMulti(c(1), recordTime = t(1))(Seq(history))
         _ <- sync2.createMulti(c(2), recordTime = t(2))(Seq(history))
@@ -186,7 +186,7 @@ class TxLogBackfillingStoreTest
       for {
         _ <- store.testIngestionSink.initialize()
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
-        _ <- history.ingestionSink.initialize()
+        _ <- initHistory(history)
 
         _ <- sync1.createMulti(c(1), recordTime = t(1))(Seq(history))
         _ <- sync1.ingestMulti(offset =>
@@ -220,14 +220,14 @@ class TxLogBackfillingStoreTest
       val history2 = mkUpdateHistory(dsoParty, migrationId = migrationId2)
       for {
         // Migration 1 (only history)
-        _ <- history1.ingestionSink.initialize()
+        _ <- initHistory(history1)
         _ <- sync1.createMulti(c(1), recordTime = t(1))(Seq(history1))
         _ <- sync1.createMulti(c(2), recordTime = t(2))(Seq(history1))
 
         // Migration 2
         _ <- store2.testIngestionSink.initialize()
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store2)
-        _ <- history2.ingestionSink.initialize()
+        _ <- initHistory(history2)
 
         _ <- sync1.createMulti(
           c(11),
@@ -269,14 +269,14 @@ class TxLogBackfillingStoreTest
       val history2 = mkUpdateHistory(dsoParty, migrationId = migrationId2)
       for {
         // Migration 1 (only history)
-        _ <- history1.ingestionSink.initialize()
+        _ <- initHistory(history1)
         _ <- sync1.createMulti(c(1), recordTime = t(1))(Seq(history1))
         _ <- sync1.createMulti(c(2), recordTime = t(2))(Seq(history1))
 
         // Migration 2
         _ <- store2.testIngestionSink.initialize()
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store2)
-        _ <- history2.ingestionSink.initialize()
+        _ <- initHistory(history2)
 
         _ <- sync1.createMulti(
           c(1),
@@ -324,7 +324,7 @@ class TxLogBackfillingStoreTest
       for {
         _ <- store.testIngestionSink.initialize()
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
-        _ <- history.ingestionSink.initialize()
+        _ <- initHistory(history)
 
         // TxLogBackfillingTrigger initializing backfilling
         _ <- store.initializeTxLogBackfilling()
@@ -352,14 +352,14 @@ class TxLogBackfillingStoreTest
       val history2 = mkUpdateHistory(dsoParty, migrationId = migrationId2)
       for {
         // Migration 1 (only history)
-        _ <- history1.ingestionSink.initialize()
+        _ <- initHistory(history1)
         _ <- sync1.createMulti(c(1), recordTime = t(1))(Seq(history1))
         _ <- sync1.createMulti(c(2), recordTime = t(2))(Seq(history1))
 
         // Migration 2
         _ <- store2.testIngestionSink.initialize()
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store2)
-        _ <- history2.ingestionSink.initialize()
+        _ <- initHistory(history2)
 
         _ <- sync1.createMulti(
           c(1),
@@ -408,7 +408,7 @@ class TxLogBackfillingStoreTest
       for {
         _ <- store.testIngestionSink.initialize()
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
-        _ <- history.ingestionSink.initialize()
+        _ <- initHistory(history)
 
         // The two `createMulti` calls produce one entry each, the `exercise` calls produce no entries,
         // and we want backfilling to skip over those updates.
@@ -437,6 +437,18 @@ class TxLogBackfillingStoreTest
       } yield succeed
     }
   }
+
+  // Partitions are dropped between test cases (see resetAllAppTables), so create them for every history.
+  private def initHistory(history: UpdateHistory): Future[Unit] =
+    for {
+      _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
+        history,
+        CantonTimestamp.Epoch,
+        windowSizeDays = 1,
+        partitionRunwayDays = 1,
+      )
+      _ <- history.ingestionSink.initialize()
+    } yield ()
 
   private def assertEntries(store: DbMultiDomainAcsStore[TestTxLogEntry], expected: Seq[Int]) = {
     for {

@@ -9,7 +9,12 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
 }
-import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsJdbcTypes,
+  AcsTables,
+  AdvisoryLocks,
+  SplicePostgresTest,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
@@ -24,11 +29,12 @@ import org.lfdecentralizedtrust.splice.util.Contract
 import org.scalatest.Assertion
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import UpdateHistory.UpdateHistoryResponse
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.config.NonNegativeDuration
-import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.util.{DelayUtil, MonadUtil}
 
 abstract class UpdateHistoryTestBase
     extends StoreTestBase
@@ -506,12 +512,29 @@ object UpdateHistoryTestBase {
     val importUpdatesEnd = CantonTimestamp.MinValue.plusSeconds(1L)
 
     for {
-      _ <- updateHistory.createPartitions(importUpdatesStart, importUpdatesEnd)
+      _ <- createPartitionsWithRetry(updateHistory, importUpdatesStart, importUpdatesEnd)
       _ <- MonadUtil.sequentialTraverse(0.until(partitionRunwayDays, step = windowSizeDays)) { n =>
         val windowStart = timeStart.plus(java.time.Duration.ofDays(n.toLong))
         val windowEnd = windowStart.plus(java.time.Duration.ofDays(windowSizeDays.toLong))
-        updateHistory.createPartitions(windowStart, windowEnd)
+        createPartitionsWithRetry(updateHistory, windowStart, windowEnd)
       }
     } yield ()
   }
+
+  // createPartitions fails fast if another session is creating partitions at the same time,
+  // e.g. another store of the same test case or another suite using the same database.
+  private def createPartitionsWithRetry(
+      updateHistory: UpdateHistory,
+      windowStart: CantonTimestamp,
+      windowEnd: CantonTimestamp,
+      attemptsLeft: Int = 100,
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] =
+    updateHistory.createPartitions(windowStart, windowEnd).recoverWith {
+      case _: AdvisoryLocks.FailedToAcquireLockException if attemptsLeft > 1 =>
+        DelayUtil
+          .delay(100.millis)
+          .flatMap(_ =>
+            createPartitionsWithRetry(updateHistory, windowStart, windowEnd, attemptsLeft - 1)
+          )
+    }
 }
