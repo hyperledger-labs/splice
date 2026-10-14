@@ -17,12 +17,20 @@ import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import com.digitalasset.canton.topology.{PartyId, SequencerId, UniqueIdentifier}
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.model.{HttpMethods, HttpRequest, ResponseEntity, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.headers.{ByteRange, Range}
+import org.apache.pekko.http.scaladsl.model.{
+  ContentRange,
+  HttpMethods,
+  HttpRequest,
+  ResponseEntity,
+  StatusCodes,
+}
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
 
 import java.nio.file.Files
-import java.util.UUID
+import java.security.MessageDigest
+import java.util.{Base64, UUID}
 
 class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with WalletTestUtil {
 
@@ -220,7 +228,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
       }
 
       clue(
-        "SV1 serves the onboarding state of sv3's sequencer as a snapshot that can be downloaded"
+        "SV1 serves the onboarding state of sv3's sequencer as a snapshot that can be downloaded in ranges"
       ) {
         val sequencerId =
           sv3Backend.appState.localSynchronizerNodes.current.sequencerAdminConnection.getSequencerId.futureValue
@@ -232,7 +240,14 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
             .value
             .futureValue
         val sponsorStream = sponsorStreamClient()
-        def download(id: String) = sponsorStream.onboardSvDownload(id).value.futureValue
+        def download(id: String, offset: Long = 0) =
+          sponsorStream
+            .onboardSvDownload(
+              id,
+              if (offset > 0) List(Range(ByteRange.fromOffset(offset))) else Nil,
+            )
+            .value
+            .futureValue
 
         val id = inside(prepare(sequencerId)) {
           case Right(OnboardSvSequencerPrepareResponse.OK(response)) => response.id
@@ -242,19 +257,36 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
             definitions.OnboardSvSnapshotPrepareResponse(id)
           )
         )
-        val file = eventually() {
+        val (file, sha256) = eventually() {
           inside(
             sv1Backend.appState.svAutomation.onboardingSnapshotService
               .lookup(SvOnboardingSnapshotId(id))
-          ) { case Some(SnapshotState.Ready(file, _)) =>
-            file
+          ) { case Some(SnapshotState.Ready(file, sha256)) =>
+            (file, sha256)
           }
         }
         val snapshot = Files.readAllBytes(file)
+        MessageDigest.getInstance("SHA-256").digest(snapshot) shouldBe sha256.toByteArray
+        val reprDigest =
+          Some(s"sha-256=:${Base64.getEncoder.encodeToString(sha256.toByteArray)}:")
+        val length = snapshot.length.toLong
 
-        inside(download(id)) { case Right(SvStreamClient.OnboardSvDownloadResponse.OK(entity)) =>
-          bytesOf(entity) shouldBe snapshot
+        inside(download(id)) {
+          case Right(SvStreamClient.OnboardSvDownloadResponse.OK(entity, digest)) =>
+            digest shouldBe reprDigest
+            bytesOf(entity) shouldBe snapshot
         }
+        inside(download(id, length / 2)) {
+          case Right(
+                SvStreamClient.OnboardSvDownloadResponse.PartialContent(entity, range, digest)
+              ) =>
+            range shouldBe Some(ContentRange(length / 2, length - 1, length))
+            digest shouldBe reprDigest
+            bytesOf(entity) shouldBe snapshot.drop((length / 2).toInt)
+        }
+        download(id, length) shouldBe Right(
+          SvStreamClient.OnboardSvDownloadResponse.RangeNotSatisfiable
+        )
         inside(download(UUID.randomUUID().toString)) { case Left(Right(response)) =>
           response.status shouldBe StatusCodes.NotFound
           new String(bytesOf(response.entity)) should include("not found")

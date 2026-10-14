@@ -66,13 +66,13 @@ final class SvConnection private (
   ): Future[SvOnboardingSnapshotId] =
     runHttpCmd(config.url, HttpSvPublicAppClient.OnboardSvSequencerPrepare(sequencerId))
 
-  def downloadOnboardingSnapshot(id: SvOnboardingSnapshotId)(implicit
+  def downloadOnboardingSnapshot(id: SvOnboardingSnapshotId, offset: Long)(implicit
       httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[SvStreamClient.OnboardSvDownloadResponse] =
-    runHttpCmd(config.url, HttpSvPublicAppClient.OnboardSvDownload(id))
+    runHttpCmd(config.url, HttpSvPublicAppClient.OnboardSvDownload(id, offset))
 
   def getMigrationId()(implicit
       httpClient: HttpClient,
