@@ -554,7 +554,7 @@ class UpdateHistory(
     val safeObservers = event.createdEvent.getObservers.asScala.toSeq.map(lengthLimited)
     metrics.UpdateHistory.assignments.mark()
     for {
-      _ <- DBIO.from(internEventStrings(templateId, event.createdEvent.getPackageName, None))
+      interned <- DBIO.from(internEventStrings(templateId, event.createdEvent.getPackageName))
       result <- sqlu"""
       insert into update_history_assignments(
         history_id,update_id,record_time,
@@ -564,7 +564,9 @@ class UpdateHistory(
         contract_id, event_id, created_at,
         template_id_package_id, template_id_module_name, template_id_entity_name,
         package_name, create_arguments,
-        signatories, observers, contract_key
+        signatories, observers, contract_key,
+        template_id_package_id_interned, template_id_module_name_interned, template_id_entity_name_interned,
+        package_name_interned
       )
       values (
         $historyId, $safeUpdateId, $safeRecordTime,
@@ -574,8 +576,9 @@ class UpdateHistory(
         $safeContractId, $safeEventId, $safeCreatedAt,
         $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
         $safePackageName, $createArguments::jsonb,
-        $safeSignatories, $safeObservers, $contractKey::jsonb
-
+        $safeSignatories, $safeObservers, $contractKey::jsonb,
+        ${interned.templateIdPackageId}, ${interned.templateIdModuleName}, ${interned.templateIdEntityName},
+        ${interned.packageName}
       )
     """
     } yield result
@@ -674,7 +677,7 @@ class UpdateHistory(
     val safeDomainId = lengthLimited(tree.getSynchronizerId)
 
     for {
-      _ <- DBIO.from(internEventStrings(templateId, event.getPackageName, None))
+      interned <- DBIO.from(internEventStrings(templateId, event.getPackageName))
       result <- sqlu"""
       insert into update_history_creates(
         history_id, event_id, update_row_id,
@@ -682,7 +685,9 @@ class UpdateHistory(
         template_id_package_id, template_id_module_name, template_id_entity_name,
         package_name, create_arguments, signatories, observers,
         contract_key,
-        record_time, update_id, domain_id, migration_id
+        record_time, update_id, domain_id, migration_id,
+        template_id_package_id_interned, template_id_module_name_interned, template_id_entity_name_interned,
+        package_name_interned
       )
       values (
         $historyId, $safeEventId, $updateRowId,
@@ -690,7 +695,9 @@ class UpdateHistory(
         $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
         $safePackageName, $createArguments::jsonb, $safeSignatories, $safeObservers,
         $contractKey::jsonb,
-        $recordTime, $safeUpdateId, $safeDomainId, $migrationId
+        $recordTime, $safeUpdateId, $safeDomainId, $migrationId,
+        ${interned.templateIdPackageId}, ${interned.templateIdModuleName}, ${interned.templateIdEntityName},
+        ${interned.packageName}
       )
     """
     } yield result
@@ -700,20 +707,20 @@ class UpdateHistory(
   private def internEventStrings(
       identifier: Identifier,
       packageName: String,
-      choiceName: Option[String],
   )(implicit
       tc: TraceContext
-  ): Future[Unit] = {
-    import cats.implicits.*
-    // TODO (#6312): use the returned ids in the partitioned table
+  ): Future[InternedEventStrings] =
     for {
-      _ <- internedStringStore.getOrIntern(identifier.getPackageId)
-      _ <- internedStringStore.getOrIntern(identifier.getModuleName)
-      _ <- internedStringStore.getOrIntern(identifier.getEntityName)
-      _ <- internedStringStore.getOrIntern(packageName)
-      _ <- choiceName.traverse(internedStringStore.getOrIntern)
-    } yield ()
-  }
+      templateIdPackageId <- internedStringStore.getOrIntern(identifier.getPackageId)
+      templateIdModuleName <- internedStringStore.getOrIntern(identifier.getModuleName)
+      templateIdEntityName <- internedStringStore.getOrIntern(identifier.getEntityName)
+      packageNameInterned <- internedStringStore.getOrIntern(packageName)
+    } yield InternedEventStrings(
+      templateIdPackageId,
+      templateIdModuleName,
+      templateIdEntityName,
+      packageNameInterned,
+    )
 
   private def insertExerciseEventRow(
       updateId: String,
@@ -752,7 +759,8 @@ class UpdateHistory(
     val safeDomainId = lengthLimited(tree.getSynchronizerId)
 
     for {
-      _ <- DBIO.from(internEventStrings(templateId, event.getPackageName, Some(event.getChoice)))
+      interned <- DBIO.from(internEventStrings(templateId, event.getPackageName))
+      choiceInterned <- DBIO.from(internedStringStore.getOrIntern(event.getChoice))
       result <- sqlu"""
       insert into update_history_exercises(
         history_id, event_id, update_row_id,
@@ -762,7 +770,9 @@ class UpdateHistory(
         package_name, argument, result,
         acting_parties,
         interface_id_package_id, interface_id_module_name, interface_id_entity_name,
-        record_time, update_id, domain_id, migration_id
+        record_time, update_id, domain_id, migration_id,
+        template_id_package_id_interned, template_id_module_name_interned, template_id_entity_name_interned,
+        package_name_interned, choice_interned
       )
       values (
         $historyId, $safeEventId, $updateRowId,
@@ -772,7 +782,9 @@ class UpdateHistory(
         $safePackageName, $choiceArguments::jsonb, $exerciseResult::jsonb,
         $safeActingParties,
         $interfaceIdPackageId, $interfaceIdModuleName, $interfaceIdEntityName,
-        $recordTime, $safeUpdateId, $safeDomainId, $migrationId
+        $recordTime, $safeUpdateId, $safeDomainId, $migrationId,
+        ${interned.templateIdPackageId}, ${interned.templateIdModuleName}, ${interned.templateIdEntityName},
+        ${interned.packageName}, $choiceInterned
       )
     """
     } yield result
@@ -2425,6 +2437,13 @@ object UpdateHistory {
   final case class UpdateHistoryResponse(
       update: TreeUpdate,
       synchronizerId: SynchronizerId,
+  )
+
+  private final case class InternedEventStrings(
+      templateIdPackageId: InternedStringStore.InternedId,
+      templateIdModuleName: InternedStringStore.InternedId,
+      templateIdEntityName: InternedStringStore.InternedId,
+      packageName: InternedStringStore.InternedId,
   )
 
   case class State(

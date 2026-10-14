@@ -34,6 +34,7 @@ import StoreTestBase.*
 import cats.data.NonEmptyList
 import com.google.protobuf.ByteString
 import com.digitalasset.canton.config.NonNegativeDuration
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 class UpdateHistoryTest extends UpdateHistoryTestBase {
 
@@ -232,6 +233,67 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             ExpectedExercise(cid1, domain2, "Archive"),
           ),
         )
+      }
+
+      "write interned strings of create, exercise and assignment events" in {
+        implicit val store = mkStore()
+        val c = appRewardCoupon(1, party1, contractId = cid1)
+        val templateId = c.identifier
+        val expectedTemplateStrings = Seq(
+          "template_id_package_id" -> templateId.getPackageId,
+          "template_id_module_name" -> templateId.getModuleName,
+          "template_id_entity_name" -> templateId.getEntityName,
+          "package_name" -> getPackageName(templateId),
+        )
+        val expectedStrings = Seq(
+          "update_history_creates" -> expectedTemplateStrings,
+          "update_history_assignments" -> expectedTemplateStrings,
+          "update_history_exercises" -> (expectedTemplateStrings :+ ("choice" -> "Archive")),
+        ).flatMap { case (table, columns) =>
+          columns.map { case (column, value) => (table, column, value) }
+        }
+        for {
+          _ <- initStore(store)
+          _ <- domain1.create(c, recordTime = time(1).toInstant)
+          _ <- domain1.unassign(c -> domain2, reassignmentId1, 1, time(2))
+          _ <- domain2.assign(c -> domain1, reassignmentId1, 1, time(3))
+          _ <- domain2.exercise(
+            c,
+            None,
+            "Archive",
+            com.daml.ledger.javaapi.data.Unit.getInstance(),
+            com.daml.ledger.javaapi.data.Unit.getInstance(),
+            recordTime = time(4).toInstant,
+          )
+          internedStrings <- storage
+            .query(
+              sql"select id, value from interned_strings".as[(Long, String)],
+              "internedStrings",
+            )
+            .failOnShutdown
+          storedStrings <- MonadUtil.sequentialTraverse(expectedStrings) {
+            case (table, column, _) =>
+              storage
+                .query(
+                  sql"""
+                    select #$column, #${column}_interned
+                    from #$table
+                    where history_id = ${store.historyId}
+                  """.as[(String, Long)],
+                  "storedStrings",
+                )
+                .failOnShutdown
+          }
+        } yield {
+          val strings = internedStrings.toMap
+          forAll(expectedStrings.zip(storedStrings)) { case ((table, column, expected), rows) =>
+            withClue(s"$table.$column") {
+              val (text, interned) = rows.loneElement
+              text shouldBe expected
+              strings(interned) shouldBe expected
+            }
+          }
+        }
       }
 
       // Note: we do not really want to support multiple UpdateHistory instances ingesting

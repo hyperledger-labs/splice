@@ -61,6 +61,7 @@ alter table update_history_backfilling
 -- * The tables no longer have primary key, because it would have to be (row_id, record_time), which wouldn't prevent double inserts.
 -- * We do still have unique checks with record_time added that prevent the same row from being inserted twice.
 --   They can't however prevent two different rows with equal columns except for record_time to be inserted.
+-- * creates, exercises and assignments get _interned columns (see interned_strings).
 create table update_history_transactions
 (
     like update_history_transactions_legacy including defaults including identity including storage including comments
@@ -82,7 +83,11 @@ create index updt_hist_tran_hi_eth on update_history_transactions (history_id, e
 
 create table update_history_creates
 (
-    like update_history_creates_legacy including defaults including identity including storage including comments
+    like update_history_creates_legacy including defaults including identity including storage including comments,
+    template_id_package_id_interned  bigint not null,
+    template_id_module_name_interned bigint not null,
+    template_id_entity_name_interned bigint not null,
+    package_name_interned            bigint not null
 )
     partition by range (record_time);
 select setval(pg_get_serial_sequence('update_history_creates', 'row_id'), last_value, is_called)
@@ -100,7 +105,12 @@ create index updt_hist_crea_hi_mi_ci_import_updates on update_history_creates (h
 
 create table update_history_exercises
 (
-    like update_history_exercises_legacy including defaults including identity including storage including comments
+    like update_history_exercises_legacy including defaults including identity including storage including comments,
+    template_id_package_id_interned  bigint not null,
+    template_id_module_name_interned bigint not null,
+    template_id_entity_name_interned bigint not null,
+    package_name_interned            bigint not null,
+    choice_interned                  bigint not null
 )
     partition by range (record_time);
 select setval(pg_get_serial_sequence('update_history_exercises', 'row_id'), last_value, is_called)
@@ -112,7 +122,11 @@ create unique index updt_hist_exer_unique on update_history_exercises (update_ro
 
 create table update_history_assignments
 (
-    like update_history_assignments_legacy including defaults including identity including storage including comments
+    like update_history_assignments_legacy including defaults including identity including storage including comments,
+    template_id_package_id_interned  bigint not null,
+    template_id_module_name_interned bigint not null,
+    template_id_entity_name_interned bigint not null,
+    package_name_interned            bigint not null
 )
     partition by range (record_time);
 select setval(pg_get_serial_sequence('update_history_assignments', 'row_id'), last_value, is_called)
