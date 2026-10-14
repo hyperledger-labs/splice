@@ -1,86 +1,22 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
-import { CLUSTER_HOSTNAME, DecentralizedSynchronizerMigrationConfig, EnvVarConfig, envoyClientIpHeaderEnvVar, MigrationInfo, pvcSuffix, standardStorageClassName } from '@canton-network/splice-pulumi-common';
-
-
+import {
+  CLUSTER_HOSTNAME,
+  DecentralizedSynchronizerMigrationConfig,
+  EnvVarConfig,
+  envoyClientIpHeaderEnvVar,
+  MigrationInfo,
+  pvcSuffix,
+  standardStorageClassName,
+} from '@canton-network/splice-pulumi-common';
 
 import { SingleSvConfiguration } from './singleSvConfig';
-import { CometbftSynchronizerNode, DecentralizedSynchronizerNode } from './synchronizer/decentralizedSynchronizerNode';
+import {
+  CometbftSynchronizerNode,
+  DecentralizedSynchronizerNode,
+} from './synchronizer/decentralizedSynchronizerNode';
 import { SynchronizerNodes } from './synchronizer/synchronizerNodes';
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function localSynchronizerNodeValues(
   node: DecentralizedSynchronizerNode,
