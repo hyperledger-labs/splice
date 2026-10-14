@@ -19,6 +19,7 @@ import {
   standardSvConfigsBasic,
   extraSvConfigsBasic,
 } from '@canton-network/splice-pulumi-common-sv/src/svConfigsBasic';
+
 import { infraConfig } from './config';
 
 function tokenLifetime(): number {
