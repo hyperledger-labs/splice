@@ -25,6 +25,7 @@ final class Sha256FileStreamObserver[T] private[environment] (
   }
   private val promise = Promise[ByteString]()
 
+  /** The SHA-256 of the file, once the stream completes. */
   def result: Future[ByteString] = promise.future
 
   override def onNext(value: T): Unit = fileObserver.onNext(value)
