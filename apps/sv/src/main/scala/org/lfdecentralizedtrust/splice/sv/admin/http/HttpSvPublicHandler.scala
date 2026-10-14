@@ -545,6 +545,51 @@ class HttpSvPublicHandler(
     *
     * Protection: Endpoint is protected by IP allowlisting
     */
+  override def onboardSvSequencerPrepare(
+      respond: r0.OnboardSvSequencerPrepareResponse.type
+  )(
+      body: definitions.OnboardSvSequencerRequest
+  )(extracted: TraceContext): Future[r0.OnboardSvSequencerPrepareResponse] = {
+    implicit val traceContext: TraceContext = extracted
+    withSpan(s"$workflowId.onboardSvSequencerPrepare") { _ => _ =>
+      Codec.decode(Codec.Sequencer)(body.sequencerId) match {
+        case Left(err) => Future.failed(HttpErrorHandler.badRequest(err))
+        case Right(sequencerId) =>
+          for {
+            node <- synchronizerNodeService.activeSynchronizerNode()
+            sequencerAdminConnection = node.sequencerAdminConnection
+            observed <- HttpSvPublicHandler.unavailableOnGrpcFailure(
+              s"Checking whether sequencer $sequencerId is observed",
+              logger,
+            )(
+              isNewSequencerObservedByExistingSequencer(
+                node.config.sequencer.isCantonBftSequencer,
+                sequencerAdminConnection,
+                sequencerId,
+              )
+            )
+            response <- HttpSvPublicHandler.onboardSvSequencerPrepareResponse(
+              onboardingSnapshotService,
+              sequencerId,
+              observed,
+              file =>
+                retryProvider.retry(
+                  RetryFor.WaitingOnInitDependency,
+                  "export_sequencer_onboarding_state",
+                  s"Export the onboarding state of sequencer $sequencerId",
+                  sequencerAdminConnection.getOnboardingStateToFile(Left(sequencerId), file),
+                  logger,
+                ),
+            )
+          } yield response
+      }
+    }
+  }
+
+  /** Intended use: Used by other SV operators
+    *
+    * Protection: Endpoint is protected by IP allowlisting
+    */
   override def onboardSvDownload(
       respond: rStream.OnboardSvDownloadResponse.type
   )(id: String)(extracted: TraceContext): Future[rStream.OnboardSvDownloadResponse] = {
@@ -596,6 +641,29 @@ class HttpSvPublicHandler(
       }
       .map(_.isDefined)
   }
+
+  private def isNewSequencerObservedByExistingSequencer(
+      isBftSequencer: Boolean,
+      sequencerAdminConnection: SequencerAdminConnection,
+      sequencerId: SequencerId,
+  )(implicit traceContext: TraceContext): Future[Boolean] =
+    for {
+      decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
+      sequencerStates <- sequencerAdminConnection.listSequencerSynchronizerState(
+        decentralizedSynchronizer,
+        store.TimeQuery.Range(None, None),
+        AuthorizedState,
+      )
+      inSequencerState = sequencerStates
+        .maxByOption(_.base.serial)
+        .exists(_.mapping.allSequencers.contains(sequencerId))
+      observed <-
+        if (isBftSequencer && inSequencerState)
+          sequencerAdminConnection
+            .getSequencerOrderingTopology()
+            .map(_.sequencerIds.contains(sequencerId))
+        else Future.successful(inSequencerState)
+    } yield observed
 
   /** Returns the sequencing time the first topology transaction where the new sequencer is active */
   private def waitForNewSequencerObservedByExistingSequencer(
@@ -926,6 +994,28 @@ object HttpSvPublicHandler {
           .prepare(key, exportSnapshot(key, _))
           .map(id => respond.OK(definitions.OnboardSvSnapshotPrepareResponse(id)))
     }
+  }
+
+  private[http] def onboardSvSequencerPrepareResponse(
+      snapshotService: SvOnboardingSnapshotService,
+      sequencerId: SequencerId,
+      observed: Boolean,
+      exportSnapshot: Path => Future[Unit],
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[r0.OnboardSvSequencerPrepareResponse] = {
+    val respond = r0.OnboardSvSequencerPrepareResponse
+    if (!observed)
+      Future.successful(
+        respond.ServiceUnavailable(
+          definitions.ErrorResponse(s"Sequencer $sequencerId is not yet observed by the sponsor")
+        )
+      )
+    else
+      snapshotService
+        .prepare(SnapshotKey.SequencerOnboardingState(sequencerId), exportSnapshot)
+        .map(id => respond.OK(definitions.OnboardSvSnapshotPrepareResponse(id)))
   }
 
   private[http] def onboardSvDownloadResponse(

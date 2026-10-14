@@ -14,7 +14,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Mutex
 import io.grpc.Status
@@ -283,6 +283,8 @@ object SvOnboardingSnapshotService {
         party: PartyId,
         activationTime: Instant,
     ) extends SnapshotKey
+
+    final case class SequencerOnboardingState(sequencerId: SequencerId) extends SnapshotKey
   }
 
   sealed trait SnapshotState

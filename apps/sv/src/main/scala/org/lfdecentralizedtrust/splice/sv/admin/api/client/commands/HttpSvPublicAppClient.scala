@@ -290,6 +290,27 @@ object HttpSvPublicAppClient {
     }
   }
 
+  case class OnboardSvSequencerPrepare(
+      sequencerId: SequencerId
+  ) extends BaseCommandPublic[http.OnboardSvSequencerPrepareResponse, String] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardSvSequencerPrepareResponse] =
+      client.onboardSvSequencerPrepare(
+        body = definitions.OnboardSvSequencerRequest(
+          Codec.encode(sequencerId)
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.OnboardSvSequencerPrepareResponse.OK(response) =>
+        Right(response.id)
+    }
+  }
+
   case class OnboardSvDownload(
       id: String
   ) extends HttpCommand[
