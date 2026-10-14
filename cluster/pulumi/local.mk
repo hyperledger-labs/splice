@@ -24,7 +24,8 @@ $(dir)/format: $(dir)/.build
 $(dir)/unit-test: $(dir)/.build
 	cd $(@D) && npm run test
 
-pulumi_projects ::= operator deployment gcp infra observability canton-network sv-runbook validator-runbook multi-validator cluster sv-canton validator1 splitwell sv dsync
+# TODO(splice#7780): add dsync once its expected config has something
+pulumi_projects ::= operator deployment gcp infra observability canton-network sv-runbook validator-runbook multi-validator cluster sv-canton validator1 splitwell sv
 
 .PHONY: $(dir)/test $(dir)/update-expected
 $(dir)/test: $(dir)/unit-test $(foreach project,$(pulumi_projects),$(dir)/$(project)/test) $(deployment_dir)/check-resolved-config

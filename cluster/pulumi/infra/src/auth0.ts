@@ -587,7 +587,7 @@ function newWalletGatewayApp(
 function auth0ForDSyncNamespace(
   clusterBasename: string,
   namespace: string,
-  provider: auth0.Provider,
+  provider: auth0.Provider
 ): pulumi.Output<Auth0NamespaceConfig> {
   const id = namespace.replace(/-/g, '');
   const aud = ledgerApiAudience(
@@ -624,7 +624,7 @@ function dsyncAuth0(clusterBasename: string): pulumi.Output<Auth0Config> | undef
   }
   const domain = 'canton-network-dsync-test.us.auth0.com';
   const clientId = config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_ID');
-  const clientSecret = config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_SECRET')
+  const clientSecret = config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_SECRET');
   const provider = new auth0.Provider('dsync', {
     domain,
     clientId,
@@ -843,8 +843,9 @@ export function configureAuth0(
     const validatorRunbookAuth0Cfg = validatorRunbookAuth0(clusterBasename, dnsNames);
     const dsyncAuth0Cfg = dsyncAuth0(clusterBasename);
 
-    return pulumi.all([spliceAuth0Cfg, svRunbookAuth0Cfg, validatorRunbookAuth0Cfg, dsyncAuth0Cfg]).apply(
-      ([splice, sv, validator, dsync]) => {
+    return pulumi
+      .all([spliceAuth0Cfg, svRunbookAuth0Cfg, validatorRunbookAuth0Cfg, dsyncAuth0Cfg])
+      .apply(([splice, sv, validator, dsync]) => {
         return {
           cantonNetwork: splice,
           svRunbook: sv,
