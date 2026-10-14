@@ -34,6 +34,7 @@ describe('the SV OpenAPI specs', () => {
     expect(paths['svs']).toContain('/api/sv/v0/migration-id');
     expect(paths['svs']).toContain('/api/sv/v0/onboard/sv/status/*');
     expect(paths['svs']).toContain('/api/sv/v0/onboard/sv/party-migration/prepare');
+    expect(paths['svs']).toContain('/api/sv/v0/onboard/sv/sequencer/prepare');
     // defined in sv-stream-server.yaml rather than in sv-internal.yaml
     expect(paths['svs']).toContain('/api/sv/v0/onboard/sv/download/*');
     // clients check the version before any other call, so /version must be reachable

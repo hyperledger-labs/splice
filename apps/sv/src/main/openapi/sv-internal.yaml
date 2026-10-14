@@ -486,6 +486,31 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
         "503":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
+  /v0/onboard/sv/sequencer/prepare:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_public
+      x-external-audience: svs
+      operationId: "onboardSvSequencerPrepare"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardSvSequencerRequest"
+      responses:
+        "200":
+          description: |
+            The ID under which the onboarding state of the sequencer is exported in the background.
+            Download it from `/v0/onboard/sv/download/{id}`.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardSvSnapshotPrepareResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "503":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
   /v0/devnet/onboard/validator/prepare:
     post:
       tags: [sv]
@@ -1040,6 +1065,14 @@ components:
             party_to_participant_base_serial:
               type: integer
               description: "The serial of the party to participant accepted state as seen by the sponsor"
+
+    OnboardSvSequencerRequest:
+      type: object
+      required:
+        - sequencer_id
+      properties:
+        sequencer_id:
+          type: string
 
     OnboardSvMediatorRequest:
       type: object

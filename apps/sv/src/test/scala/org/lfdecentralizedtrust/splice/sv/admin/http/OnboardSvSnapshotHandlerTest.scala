@@ -10,7 +10,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{PartyId, SequencerId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.server.Directives.provide
@@ -193,6 +193,29 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
         .ServiceUnavailable(
           definitions.ErrorResponse("The DSO party is not yet hosted on the candidate participant")
         )
+      verifyNothingPrepared(service)
+    }
+  }
+
+  "onboardSvSequencerPrepare" should {
+
+    "return 503 without exporting while the sequencer is not yet observed" in {
+      val service = mock[SvOnboardingSnapshotService]
+      inside(
+        HttpSvPublicHandler
+          .onboardSvSequencerPrepareResponse(
+            service,
+            SnapshotKey.SequencerOnboardingState(
+              SynchronizerId.tryFromString("synchronizer::dummy"),
+              SequencerId(UniqueIdentifier.tryFromProtoPrimitive("sequencer::dummy")),
+            ),
+            observed = false,
+            writeSnapshot,
+          )
+          .futureValue
+      ) { case SvPublicResource.OnboardSvSequencerPrepareResponseServiceUnavailable(response) =>
+        response.error should include("is not yet observed by the sponsor")
+      }
       verifyNothingPrepared(service)
     }
   }

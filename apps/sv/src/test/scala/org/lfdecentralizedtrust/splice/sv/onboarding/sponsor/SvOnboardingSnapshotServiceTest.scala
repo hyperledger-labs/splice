@@ -10,7 +10,7 @@ import com.digitalasset.canton.config.PositiveFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{PartyId, SequencerId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import io.grpc.{Status, StatusRuntimeException}
 import org.lfdecentralizedtrust.splice.automation.{TriggerContext, TriggerEnabledSynchronization}
@@ -454,6 +454,28 @@ class SvOnboardingSnapshotServiceTest
           service.prepare(key("sv1"), writeSnapshot(Future.unit)).futureValue should not be id.get()
         }
       }
+
+    "recover sequencer onboarding snapshots after restart" in File.usingTemporaryDirectory() {
+      directory =>
+        val config = SvOnboardingSnapshotsConfig(directory = Some(directory.path))
+        val sequencerKey = SnapshotKey.SequencerOnboardingState(
+          SynchronizerId.tryFromString("synchronizer::dummy"),
+          SequencerId(UniqueIdentifier.tryFromProtoPrimitive("sequencer::dummy")),
+        )
+        val id = new java.util.concurrent.atomic.AtomicReference[SvOnboardingSnapshotId]()
+        withService(config) { (service, _, _) =>
+          id.set(service.prepare(sequencerKey, writeSnapshot(Future.unit)).futureValue)
+          eventually()(service.lookup(id.get()) should matchPattern {
+            case Some(SnapshotState.Ready(_)) =>
+          })
+        }
+        withService(config) { (service, _, _) =>
+          service
+            .prepare(sequencerKey, _ => fail("must reuse the persisted export"))
+            .futureValue shouldBe id.get()
+          service.prepare(key("sv1"), writeSnapshot(Future.unit)).futureValue should not be id.get()
+        }
+    }
 
     "discard interrupted exports without touching downloads or completed exports on startup" in File
       .usingTemporaryDirectory() { directory =>

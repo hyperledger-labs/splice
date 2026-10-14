@@ -73,6 +73,7 @@ import java.nio.file.{Files, Path}
 import java.util.{Base64, Collections}
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
+import scala.util.Failure
 import scala.util.control.NonFatal
 import org.lfdecentralizedtrust.splice.store.bulk.ZstdGroupedWeight
 
@@ -203,6 +204,23 @@ class SequencerAdminConnection(
       SequencerAdminCommands.OnboardingStateV2(responseObserver, sequencerIdOrTimestamp)
     ).flatMap(_ => responseObserver.resultFuture.map(_.map(_.onboardingStateForSequencer)))
   }
+
+  def getOnboardingStateToFile(
+      sequencerIdOrTimestamp: Either[SequencerId, CantonTimestamp],
+      file: Path,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    Future {
+      blocking {
+        new OutputFileStreamObserver[OnboardingStateV2Response](
+          File(file),
+          _.onboardingStateForSequencer,
+        )
+      }
+    }.flatMap { observer =>
+      runCmd(SequencerAdminCommands.OnboardingStateV2(observer, sequencerIdOrTimestamp))
+        .andThen { case Failure(e) => observer.onError(e) }
+        .flatMap(_ => observer.result)
+    }
 
   /** Streams onboarding state from the gRPC admin service directly to a bucket without writing to memory
     */
