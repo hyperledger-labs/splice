@@ -56,7 +56,7 @@ final case class RewardComputationInputs(
   private val amuletsToIssueInRound: Numeric = div(amuletToIssuePerYear, roundsPerYear)
   private val adjustedAmuletsToIssueInRound: Numeric =
     sub(amuletsToIssueInRound, mul(amuletsToIssueInRound, developmentFundPercentage))
-  private val trafficPriceInCCperMB: Numeric = div(trafficPrice, amuletPrice)
+  private[scan] val trafficPriceInCCperMB: Numeric = div(trafficPrice, amuletPrice)
 
   def deriveIssuanceParams(
       totalRoundAppActivityWeight: Long,
