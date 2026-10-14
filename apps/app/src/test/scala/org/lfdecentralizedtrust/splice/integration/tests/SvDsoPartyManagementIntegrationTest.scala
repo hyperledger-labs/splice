@@ -243,7 +243,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
         )
         val file = eventually() {
           inside(sv1Backend.appState.onboardingSnapshotService.lookup(id)) {
-            case Some(SnapshotState.Ready(file)) => file
+            case Some(SnapshotState.Ready(file, _)) => file
           }
         }
         val snapshot = Files.readAllBytes(file)

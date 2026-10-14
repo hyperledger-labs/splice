@@ -13,10 +13,13 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import io.grpc.Status.Code
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity}
+import org.apache.pekko.http.scaladsl.server.Directive0
+import org.apache.pekko.http.scaladsl.server.Directives.{pass, withRangeSupport}
 import org.apache.pekko.stream.scaladsl.FileIO
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
@@ -55,6 +58,7 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSe
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract}
 
 import java.nio.file.{Files, NoSuchFileException, Path}
+import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -823,6 +827,11 @@ class HttpSvPublicHandler(
 
 object HttpSvPublicHandler {
 
+  private val onboardSvDownloadOperation = "onboardSvDownload"
+
+  def streamOperationDirective(operation: String): Directive0 =
+    if (operation == onboardSvDownloadOperation) withRangeSupport else pass
+
   private[http] def unavailableOnGrpcFailure[T](description: String, logger: TracedLogger)(
       check: Future[T]
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] =
@@ -845,7 +854,7 @@ object HttpSvPublicHandler {
   private[http] def onboardSvPartyMigrationPrepareResponse(
       snapshotService: SvOnboardingSnapshotService,
       prepared: Either[DsoPartyMigrationFailure, Option[SnapshotKey.Acs]],
-      exportSnapshot: (SnapshotKey.Acs, Path) => Future[Unit],
+      exportSnapshot: (SnapshotKey.Acs, Path) => Future[ByteString],
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -873,7 +882,7 @@ object HttpSvPublicHandler {
       snapshotService: SvOnboardingSnapshotService,
       sequencerId: SequencerId,
       observed: Boolean,
-      exportSnapshot: Path => Future[Unit],
+      exportSnapshot: Path => Future[ByteString],
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -911,14 +920,15 @@ object HttpSvPublicHandler {
             respond.InternalServerError(
               definitions.ErrorResponse(s"Export of onboarding snapshot $id failed")
             )
-          case Some(SnapshotState.Ready(file)) =>
+          case Some(SnapshotState.Ready(file, sha256)) =>
             try
               respond.OK(
                 HttpEntity(
                   ContentTypes.`application/octet-stream`,
                   Files.size(file),
                   FileIO.fromPath(file),
-                )
+                ),
+                s"sha-256=:${Base64.getEncoder.encodeToString(sha256.toByteArray)}:",
               )
             catch { case _: NoSuchFileException => notFound }
         }

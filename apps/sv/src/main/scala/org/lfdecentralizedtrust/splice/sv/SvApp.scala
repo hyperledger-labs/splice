@@ -571,6 +571,7 @@ class SvApp(
                 publicHandler,
                 operation =>
                   buildOperation("svPublic", operation)
+                    .tflatMap(_ => HttpSvPublicHandler.streamOperationDirective(operation))
                     .tflatMap(_ => provide(traceContext)),
               ),
               SvOperatorResource.routes(

@@ -17,6 +17,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Mutex
+import com.google.protobuf.ByteString
 import io.grpc.Status
 import org.apache.pekko.Done
 import org.apache.pekko.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
@@ -102,7 +103,7 @@ class SvOnboardingSnapshotService(
     }
   }
 
-  def prepare(key: SnapshotKey, exportTo: Path => Future[Unit])(implicit
+  def prepare(key: SnapshotKey, exportTo: Path => Future[ByteString])(implicit
       tc: TraceContext
   ): Future[String] = Future.fromTry(blocking {
     mutex.exclusive {
@@ -151,7 +152,7 @@ class SvOnboardingSnapshotService(
   private def snapshotState(id: String): Option[SnapshotState] =
     snapshots.get(id).map { snapshot =>
       snapshot.state match {
-        case SnapshotState.Ready(file) if Files.notExists(file) =>
+        case SnapshotState.Ready(file, _) if Files.notExists(file) =>
           val failed = SnapshotState.Failed("Snapshot file is missing")
           snapshots.update(id, snapshot.copy(state = failed))
           if (snapshotIds.get(snapshot.key).contains(id)) snapshotIds.remove(snapshot.key).discard
@@ -215,15 +216,18 @@ class SvOnboardingSnapshotService(
     }
   }
 
-  private def finishExport(queued: QueuedExport, result: Try[Unit])(implicit
+  private def finishExport(queued: QueuedExport, result: Try[ByteString])(implicit
       tc: TraceContext
   ): Unit = {
     blocking {
       mutex.exclusive {
         snapshots.get(queued.id).filter(_ => !shuttingDown).foreach { snapshot =>
           result match {
-            case Success(()) =>
-              snapshots.update(queued.id, snapshot.copy(state = SnapshotState.Ready(queued.file)))
+            case Success(sha256) =>
+              snapshots.update(
+                queued.id,
+                snapshot.copy(state = SnapshotState.Ready(queued.file, sha256)),
+              )
             case Failure(ex) =>
               snapshots
                 .update(queued.id, snapshot.copy(state = SnapshotState.Failed(ex.getMessage)))
@@ -291,7 +295,7 @@ object SvOnboardingSnapshotService {
 
   object SnapshotState {
     case object Exporting extends SnapshotState
-    final case class Ready(file: Path) extends SnapshotState
+    final case class Ready(file: Path, sha256: ByteString) extends SnapshotState
     final case class Failed(error: String) extends SnapshotState
   }
 
@@ -305,7 +309,7 @@ object SvOnboardingSnapshotService {
   private final case class QueuedExport(
       id: String,
       file: Path,
-      exportTo: Path => Future[Unit],
+      exportTo: Path => Future[ByteString],
       traceContext: TraceContext,
   )
 }

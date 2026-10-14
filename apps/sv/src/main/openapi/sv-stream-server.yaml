@@ -22,7 +22,15 @@ paths:
             type: string
       responses:
         "200":
-          description: The exported snapshot.
+          description: |
+            The exported snapshot. Supports `Range` requests; partial responses use status 206
+            and keep the `Repr-Digest` of the whole snapshot.
+          headers:
+            Repr-Digest:
+              description: "SHA-256 of the whole snapshot, as `sha-256=:<base64>:`"
+              required: true
+              schema:
+                type: string
           content:
             application/octet-stream:
               schema:

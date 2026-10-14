@@ -12,6 +12,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
+import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import org.lfdecentralizedtrust.splice.automation.{TriggerContext, TriggerEnabledSynchronization}
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
@@ -36,6 +37,8 @@ class SvOnboardingSnapshotServiceTest
     with HasActorSystem
     with HasExecutionContext {
 
+  private val sha256 = ByteString.copyFromUtf8("sha256")
+
   private def key(name: String) =
     SnapshotKey.Acs(
       SynchronizerId.tryFromString("synchronizer::dummy"),
@@ -44,7 +47,7 @@ class SvOnboardingSnapshotServiceTest
       Instant.EPOCH,
     )
 
-  private def writeSnapshot(result: Future[Unit]): Path => Future[Unit] = file => {
+  private def writeSnapshot(result: Future[ByteString]): Path => Future[ByteString] = file => {
     Files.write(file, "snapshot".getBytes)
     result
   }
@@ -73,7 +76,7 @@ class SvOnboardingSnapshotServiceTest
 
     "export in the background and reuse the snapshot for the same key" in withService() {
       (service, _, _) =>
-        val exported = Promise[Unit]()
+        val exported = Promise[ByteString]()
         val exports = new AtomicInteger()
         def prepare(name: String) = service
           .prepare(
@@ -89,9 +92,9 @@ class SvOnboardingSnapshotServiceTest
         service.lookup(id) shouldBe Some(SnapshotState.Exporting)
         prepare("sv1") shouldBe id
 
-        exported.success(())
+        exported.success(sha256)
         val file = eventually() {
-          inside(service.lookup(id)) { case Some(SnapshotState.Ready(file)) => file }
+          inside(service.lookup(id)) { case Some(SnapshotState.Ready(file, `sha256`)) => file }
         }
         File(file).contentAsString shouldBe "snapshot"
         prepare("sv1") shouldBe id
@@ -119,29 +122,29 @@ class SvOnboardingSnapshotServiceTest
       eventually()(File(service.exportsDirectory).list.toSeq shouldBe empty)
 
       val id =
-        service.prepare(key("sv1"), writeSnapshot(Future.unit)).futureValue
+        service.prepare(key("sv1"), writeSnapshot(Future.successful(sha256))).futureValue
       id should not be failedId
-      eventually()(service.lookup(id) should matchPattern { case Some(SnapshotState.Ready(_)) =>
+      eventually()(service.lookup(id) should matchPattern { case Some(SnapshotState.Ready(_, _)) =>
       })
     }
 
     "prepare a new snapshot if the ready file was deleted" in withService() { (service, _, _) =>
       val snapshotKey = key("sv1")
-      val id = service.prepare(snapshotKey, writeSnapshot(Future.unit)).futureValue
+      val id = service.prepare(snapshotKey, writeSnapshot(Future.successful(sha256))).futureValue
       val file = eventually() {
-        inside(service.lookup(id)) { case Some(SnapshotState.Ready(file)) => file }
+        inside(service.lookup(id)) { case Some(SnapshotState.Ready(file, _)) => file }
       }
       Files.delete(file)
 
       val replacement =
-        service.prepare(snapshotKey, writeSnapshot(Future.unit)).futureValue
+        service.prepare(snapshotKey, writeSnapshot(Future.successful(sha256))).futureValue
       replacement should not be id
       service.lookup(id) shouldBe Some(SnapshotState.Failed("Snapshot file is missing"))
       eventually()(service.lookup(replacement) should matchPattern {
-        case Some(SnapshotState.Ready(_)) =>
+        case Some(SnapshotState.Ready(_, _)) =>
       })
       service
-        .prepare(snapshotKey, writeSnapshot(Future.unit))
+        .prepare(snapshotKey, writeSnapshot(Future.successful(sha256)))
         .futureValue shouldBe replacement
     }
 
@@ -179,7 +182,7 @@ class SvOnboardingSnapshotServiceTest
     ) { (service, _, _) =>
       final class Export(name: String) {
         val started = Promise[Unit]()
-        val done = Promise[Unit]()
+        val done = Promise[ByteString]()
         def prepare(): String = service
           .prepare(
             key(name),
@@ -200,15 +203,15 @@ class SvOnboardingSnapshotServiceTest
         }
         queued.prepare()
         inside(
-          service.prepare(key("sv4"), _ => Future.unit).failed.futureValue
+          service.prepare(key("sv4"), _ => Future.successful(sha256)).failed.futureValue
         ) { case e: StatusRuntimeException =>
           e.getStatus.getCode shouldBe Status.Code.UNAVAILABLE
         }
         queued.started.isCompleted shouldBe false
 
-        fast.done.success(())
+        fast.done.success(sha256)
         queued.started.future.futureValue
-      } finally Seq(slow, fast, queued).foreach(_.done.trySuccess(()))
+      } finally Seq(slow, fast, queued).foreach(_.done.trySuccess(sha256))
     }
 
     "remove snapshots after the retention period from the cleanup trigger" in withService(
@@ -227,17 +230,17 @@ class SvOnboardingSnapshotServiceTest
         service,
       )
       val ready =
-        service.prepare(key("sv1"), writeSnapshot(Future.unit)).futureValue
+        service.prepare(key("sv1"), writeSnapshot(Future.successful(sha256))).futureValue
       val readyFile = eventually() {
-        inside(service.lookup(ready)) { case Some(SnapshotState.Ready(file)) => file }
+        inside(service.lookup(ready)) { case Some(SnapshotState.Ready(file, _)) => file }
       }
-      val exported = Promise[Unit]()
+      val exported = Promise[ByteString]()
       val exporting = service.prepare(key("sv2"), writeSnapshot(exported.future)).futureValue
 
       try {
         clock.advance(Duration.ofHours(24).minusSeconds(1))
         trigger.performWorkIfAvailable().futureValue
-        service.lookup(ready) should matchPattern { case Some(SnapshotState.Ready(_)) => }
+        service.lookup(ready) should matchPattern { case Some(SnapshotState.Ready(_, _)) => }
 
         clock.advance(Duration.ofSeconds(1))
         trigger.performWorkIfAvailable().futureValue
@@ -245,18 +248,18 @@ class SvOnboardingSnapshotServiceTest
         Files.exists(readyFile) shouldBe false
         service.lookup(exporting) shouldBe Some(SnapshotState.Exporting)
         service
-          .prepare(key("sv1"), writeSnapshot(Future.unit))
+          .prepare(key("sv1"), writeSnapshot(Future.successful(sha256)))
           .futureValue should not be ready
 
-        exported.success(())
+        exported.success(sha256)
         val exportedFile = eventually() {
-          inside(service.lookup(exporting)) { case Some(SnapshotState.Ready(file)) => file }
+          inside(service.lookup(exporting)) { case Some(SnapshotState.Ready(file, _)) => file }
         }
         service.removeExpired(clock.now).futureValue shouldBe 1
         service.lookup(exporting) shouldBe None
         Files.exists(exportedFile) shouldBe false
       } finally {
-        exported.trySuccess(())
+        exported.trySuccess(sha256)
         trigger.close()
       }
     }
@@ -287,8 +290,9 @@ class SvOnboardingSnapshotServiceTest
         )
 
         val next =
-          service.prepare(key("sv2"), writeSnapshot(Future.unit)).futureValue
-        eventually()(service.lookup(next) should matchPattern { case Some(SnapshotState.Ready(_)) =>
+          service.prepare(key("sv2"), writeSnapshot(Future.successful(sha256))).futureValue
+        eventually()(service.lookup(next) should matchPattern {
+          case Some(SnapshotState.Ready(_, _)) =>
         })
 
         val child = blocker.future.futureValue
@@ -301,11 +305,11 @@ class SvOnboardingSnapshotServiceTest
     "retry an expired file deletion without retaining download eligibility or blocking other cleanup" in withService() {
       (service, clock, _) =>
         val first =
-          service.prepare(key("sv1"), writeSnapshot(Future.unit)).futureValue
+          service.prepare(key("sv1"), writeSnapshot(Future.successful(sha256))).futureValue
         val second =
-          service.prepare(key("sv2"), writeSnapshot(Future.unit)).futureValue
+          service.prepare(key("sv2"), writeSnapshot(Future.successful(sha256))).futureValue
         def fileOf(id: String): Path = eventually() {
-          inside(service.lookup(id)) { case Some(SnapshotState.Ready(file)) => file }
+          inside(service.lookup(id)) { case Some(SnapshotState.Ready(file, _)) => file }
         }
         val firstFile = fileOf(first)
         val secondFile = fileOf(second)
@@ -322,7 +326,7 @@ class SvOnboardingSnapshotServiceTest
         Files.exists(secondFile) shouldBe false
 
         val replacement =
-          service.prepare(key("sv1"), writeSnapshot(Future.unit)).futureValue
+          service.prepare(key("sv1"), writeSnapshot(Future.successful(sha256))).futureValue
         replacement should not be first
         val replacementFile = fileOf(replacement)
         Files.delete(child)
@@ -348,6 +352,7 @@ class SvOnboardingSnapshotServiceTest
                 exported.future.map { _ =>
                   try output.write(2)
                   finally output.close()
+                  sha256
                 }
               },
             )
@@ -358,7 +363,7 @@ class SvOnboardingSnapshotServiceTest
               key("sv2"),
               _ => {
                 queuedStarted.incrementAndGet()
-                Future.unit
+                Future.successful(sha256)
               },
             )
             .futureValue
@@ -371,7 +376,7 @@ class SvOnboardingSnapshotServiceTest
             Files.exists(file) shouldBe true
             service.lookup(active) shouldBe None
             inside(
-              service.prepare(key("sv1"), _ => Future.unit).failed.futureValue
+              service.prepare(key("sv1"), _ => Future.successful(sha256)).failed.futureValue
             ) { case e: StatusRuntimeException =>
               e.getStatus.getCode shouldBe Status.Code.UNAVAILABLE
             }
@@ -402,7 +407,7 @@ class SvOnboardingSnapshotServiceTest
     "reject exports after shutdown" in withService() { (service, _, retryProvider) =>
       retryProvider.close()
       inside(
-        service.prepare(key("sv1"), _ => Future.unit).failed.futureValue
+        service.prepare(key("sv1"), _ => Future.successful(sha256)).failed.futureValue
       ) { case e: StatusRuntimeException =>
         e.getStatus.getCode shouldBe Status.Code.UNAVAILABLE
       }
