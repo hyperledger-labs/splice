@@ -39,8 +39,6 @@ class SqlIndexInitializationTriggerStoreTest
     with AdvisoryLocksTestHelper {
 
   private val expectedIndexNames = Seq(
-    "updt_hist_crea_hi_mi_ci_import_updates",
-    "updt_hist_tran_hi_eth",
     "dso_acs_store_sid_mid_pn_tid_rbio",
     "scan_txlog_store_sid_effat_en_vot",
   )
@@ -82,7 +80,7 @@ class SqlIndexInitializationTriggerStoreTest
         indexActions = List(
           IndexAction.Create(
             "test_index",
-            sqlu"create index if not exists test_index on update_history_creates (record_time)",
+            sqlu"create index if not exists test_index on dso_acs_store (contract_id)",
           )
         ),
       )
@@ -106,7 +104,7 @@ class SqlIndexInitializationTriggerStoreTest
       for {
         _ <- storage.underlying
           .update(
-            sqlu"create index test_index on update_history_creates (record_time)",
+            sqlu"create index test_index on dso_acs_store (contract_id)",
             "create test index",
           )
           .failOnShutdown
@@ -125,7 +123,7 @@ class SqlIndexInitializationTriggerStoreTest
         indexActions = List(
           IndexAction.Create(
             "test_index",
-            sqlu"create index if not exists test_index on update_history_creates (record_time)",
+            sqlu"create index if not exists test_index on dso_acs_store (contract_id)",
           )
         ),
       )
@@ -133,7 +131,7 @@ class SqlIndexInitializationTriggerStoreTest
       for {
         _ <- storage.underlying
           .update(
-            sqlu"create index test_index on update_history_creates (record_time)",
+            sqlu"create index test_index on dso_acs_store (contract_id)",
             "create test index",
           )
           .failOnShutdown
@@ -359,7 +357,7 @@ class SqlIndexInitializationTriggerStoreTest
         indexActions = List(
           IndexAction.Create(
             "test_index",
-            sqlu"create index concurrently if not exists test_index on update_history_creates (record_time)",
+            sqlu"create index concurrently if not exists test_index on dso_acs_store (contract_id)",
           )
         ),
       )

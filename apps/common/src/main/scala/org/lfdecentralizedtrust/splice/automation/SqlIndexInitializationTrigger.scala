@@ -233,7 +233,9 @@ object SqlIndexInitializationTrigger {
     ) extends IndexAction
   }
 
-  /** Indexes managed by this trigger class */
+  /** Indexes managed by this trigger class
+    *  WARNING: partitioned tables (such as all update_history tables) cannot be indexed 'concurrently'.
+    */
   val defaultIndexActions: List[IndexAction] = List[IndexAction](
     IndexAction
       .Create(
