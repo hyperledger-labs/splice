@@ -9,21 +9,21 @@ This directory contains hard forks from that tree where we no longer wish to tra
 
 `app-base`::
   Splice additions to `canton/community/app-base`, such as access classes for console and
-  admin API client internals, and the `ImportAcsBytes` admin command. sbt project
-  `canton-fork-app-base`, which depends only on `canton-community-app-base`.
+  admin API client internals, and the `ImportAcsBytes` admin command.
 `base`::
   Splice additions to `canton/community/base`, such as access classes for config, crypto and
-  protocol internals, and extension methods for `CantonTimestamp` and `ErrorUtil`. sbt
-  project `canton-fork-base`, which depends only on `canton-community-base`.
+  protocol internals, and extension methods for `CantonTimestamp` and `ErrorUtil`.
 `common`::
   Splice additions to `canton/community/common`, such as access classes for topology admin
-  internals. sbt project `canton-fork-common`, which depends only on `canton-community-common`.
-`integration-testing`::
-  TODO
+  internals.
 `testing`::
   Splice additions to `canton/community/testing`: `BaseTestExtensions`, which Splice's
-  `TestCommon` mixes in. sbt project `canton-fork-testing`, which depends only on
-  `canton-community-testing`.
+  `TestCommon` mixes in.
+
+Additions that only use Canton's public API go in the `org.lfdecentralizedtrust.splice`
+package with the same suffix as the Canton package they extend
+(e.g. `com.digitalasset.canton.data` becomes `org.lfdecentralizedtrust.splice.data`).
+Only access classes need to be in Canton's own packages.
 
 ## Access classes
 

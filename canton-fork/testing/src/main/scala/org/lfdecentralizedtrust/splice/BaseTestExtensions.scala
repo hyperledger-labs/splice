@@ -1,8 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.digitalasset.canton
+package org.lfdecentralizedtrust.splice
 
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.logging.{SuppressingLogger, SuppressionRule}
 import org.scalatest.exceptions.TestFailedException
 import org.slf4j.event.Level

@@ -4,11 +4,11 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import org.apache.pekko.stream.scaladsl.Sink
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorageWritersGate.GateState
 import org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.BackfillingProgress
 import org.lfdecentralizedtrust.splice.scan.store.historystart.{

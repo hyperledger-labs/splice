@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.environment.ledger.api
 
 import com.daml.ledger.api.v2 as lapi
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.data.CantonTimestampExtensions.*
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
 
 final case class TopologyTransactionUpdate(

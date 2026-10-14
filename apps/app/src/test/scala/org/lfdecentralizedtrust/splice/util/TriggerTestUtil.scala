@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.util
 
-import com.digitalasset.canton.{BaseTest, BaseTestExtensions}
+import com.digitalasset.canton.BaseTest
+import org.lfdecentralizedtrust.splice.BaseTestExtensions
 import com.digitalasset.canton.scalatest.ScalaFuturesWithPatience
 import com.typesafe.scalalogging.LazyLogging
 import org.scalatest.concurrent.PatienceConfiguration

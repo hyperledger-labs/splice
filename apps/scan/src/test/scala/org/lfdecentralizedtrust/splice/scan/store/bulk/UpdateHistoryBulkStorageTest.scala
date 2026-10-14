@@ -10,7 +10,7 @@ import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.data.CantonTimestampExtensions.*
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{SuppressingLogger, SuppressionRule}
 import com.digitalasset.canton.protocol.LfContractId

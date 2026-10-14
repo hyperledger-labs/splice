@@ -45,7 +45,7 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.data.CantonTimestampExtensions.*
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}

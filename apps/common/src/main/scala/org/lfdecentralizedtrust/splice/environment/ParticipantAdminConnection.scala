@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
 import cats.implicits.catsSyntaxOptionId
-import com.digitalasset.canton.admin.api.client.commands.ParticipantRepairManagementExtensions
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.ParticipantRepairManagementExtensions
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
   ParticipantAdminCommands,

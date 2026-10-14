@@ -6,7 +6,8 @@ import com.digitalasset.canton.util.MonadUtil
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.digitalasset.canton.{BaseTest, BaseTestExtensions}
+import com.digitalasset.canton.BaseTest
+import org.lfdecentralizedtrust.splice.BaseTestExtensions
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.environment.EnvironmentFactory

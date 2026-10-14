@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.digitalasset.nonempty.NonEmpty
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
-import com.digitalasset.canton.data.CantonTimestampExtensions.*
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.sequencer.admin.{v30 as seqv30}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
