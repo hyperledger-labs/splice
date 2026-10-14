@@ -6,7 +6,9 @@ import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack }
 
 const abortController = new PulumiAbortController();
 
-async function runUp() {}
+async function runUp() {
+  //TODO(splice#7780): integrate into pulumi automation
+}
 
 runUp().catch(() => {
   console.error('Failed to run up');

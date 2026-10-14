@@ -7,7 +7,7 @@ import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack }
 const abortController = new PulumiAbortController();
 
 async function runDown() {
-  //FIXME
+  //TODO(splice#7780): integrate into pulumi automation
 }
 
 runDown().catch(() => {

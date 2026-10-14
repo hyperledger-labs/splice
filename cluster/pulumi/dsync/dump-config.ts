@@ -8,34 +8,7 @@ import {
 
 async function main() {
   await initDumpConfig();
-
-  // const installNode = await import('./src/installNode');
-  // const secrets = new SecretsFixtureMap();
-  // // Need to import this directly to avoid initializing any configs before the mocks are initialized
-  // const { svRunbookConfig } = await import('@canton-network/splice-pulumi-common-sv');
-
-  // const authOClient = {
-  //   getSecrets: () => Promise.resolve(secrets),
-  //   /* eslint-disable @typescript-eslint/no-unused-vars */
-  //   getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
-  //     Promise.resolve('access_token'),
-  //   getCfg: () => svRunbookAuth0Config,
-  //   reuseNamespaceConfig: (fromNamespace: string, toNamespace: string) => {},
-  // };
-  // const buildSvAppConfig = (await import('./src/config')).buildSvAppConfig;
-  // const svAppConfig = buildSvAppConfig(false);
-  // const validatorAppConfig = {
-  //   // sv runbook wallet user is always defined
-  //   walletUserName: svRunbookConfig.validatorWalletUser!,
-  // };
-
-  // await installNode.installNode(
-  //   authOClient,
-  //   svRunbookConfig.nodeName,
-  //   svAppConfig,
-  //   validatorAppConfig,
-  //   () => Promise.resolve('dummy::partyId')
-  // );
+  //TODO(splice#7780): expected
 }
 
 main().catch(e => {
