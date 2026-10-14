@@ -19,6 +19,7 @@ import {
   standardSvConfigsBasic,
   extraSvConfigsBasic,
 } from '@canton-network/splice-pulumi-common-sv/src/svConfigsBasic';
+import { infraConfig } from './config';
 
 function tokenLifetime(): number {
   return fixedTokens() ? 2592000 : 86400; // TODO(DACH-NY/canton-network-internal#2114): Move this to the cluster config? We want it to be long for fixed token clusters
@@ -589,15 +590,16 @@ function auth0ForDSyncNamespace(
   ingressName: string,
   dnsNames: string[]
 ): pulumi.Output<Auth0NamespaceConfig> {
+  const id = namespace.replace(/-/g, '');
   const aud = ledgerApiAudience(
-    'dsync-op-1',
+    `${id}LedgerApi`,
     clusterBasename,
     provider,
     true // We create the audience also for non-prod clusters, as we did not create it manually and don't want to (as opposed to other tenants where we're still using hand-created legacy stuff).
   );
   const opApp = newM2MApp(
-    `${namespace.replace(/-/g, '')}DsyncOpApp`,
-    `${namespace.replace(/-/g, '').toUpperCase()} dSync Operator`,
+    `${id}DsyncOpApp`,
+    `${id.toUpperCase()} dSync Operator`,
     `Used for the dSync operator app for ${namespace} on ${clusterBasename}`,
     clusterBasename,
     aud,
@@ -618,12 +620,16 @@ function auth0ForDSyncNamespace(
 }
 
 function dsyncAuth0(clusterBasename: string, dnsNames: string[]) {
-  const provider = new auth0.Provider('dsync', {
-    domain: 'canton-network-dsync-test.us.auth0.com',
-    clientId: config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_ID'),
-    clientSecret: config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_SECRET'),
-  });
-  auth0ForDSyncNamespace(clusterBasename, 'dsync-op-1', provider, 'dsync-op-1', dnsNames);
+  if (infraConfig.supportDsync) {
+    const provider = new auth0.Provider('dsync', {
+      domain: 'canton-network-dsync-test.us.auth0.com',
+      clientId: config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_ID'),
+      clientSecret: config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_SECRET'),
+    });
+    for (let i = 1; i <= 4; i++) {
+      auth0ForDSyncNamespace(clusterBasename, `dsync-op-${i}`, provider, `dsync-op-${i}`, dnsNames);
+    }
+  }
 }
 
 function svRunbookAuth0(
