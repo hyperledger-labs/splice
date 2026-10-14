@@ -1,1 +1,9 @@
-!include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml) {}
+!include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml)
+svs:
+  sv-da-1:
+    svApp:
+      trafficBasedOnboarding: true
+  sv-1:
+    svApp:
+      trafficBasedOnboarding: true
+

@@ -2,13 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
-import {
-  DecentralizedSynchronizerUpgradeConfig,
-  EnvVarConfigSchema,
-  KmsConfigSchema,
-  LogLevelSchema,
-  K8sResourceSchema,
-} from '@canton-network/splice-pulumi-common';
+import { DecentralizedSynchronizerUpgradeConfig, EnvVarConfigSchema, KmsConfigSchema, LogLevelSchema, K8sResourceSchema } from '@canton-network/splice-pulumi-common';
 import { ValidatorAppConfigSchema } from '@canton-network/splice-pulumi-common-validator/src/config';
 import { clusterYamlConfig } from '@canton-network/splice-pulumi-common/src/config/config';
 import { mergeConfigFragments } from '@canton-network/splice-pulumi-common/src/config/configLoader';
@@ -16,16 +10,31 @@ import { CnChartVersionSchema } from '@canton-network/splice-pulumi-common/src/c
 import util from 'node:util';
 import { z } from 'zod';
 
+
+
 import { TopologySnapshotSchema } from './config';
-import {
-  CloudSqlWithOverrideConfigSchema,
-  PhysicalSynchronizersConfigOverridesSchema,
-  SvMediatorConfig,
-  SvMediatorConfigSchema,
-  SvSequencerConfig,
-  SvSequencerConfigSchema,
-} from './physicalSynchronizerConfig';
+import { CloudSqlWithOverrideConfigSchema, PhysicalSynchronizersConfigOverridesSchema, SvMediatorConfig, SvMediatorConfigSchema, SvSequencerConfig, SvSequencerConfigSchema } from './physicalSynchronizerConfig';
 import { CatchupTestSchema } from './testing';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const SvCometbftConfigSchema = z
   .object({
@@ -87,6 +96,7 @@ const SvAppConfigSchema = z
     cometBftGovernanceKeyGcpSecret: z.string().optional(),
     // Map of package name -> list of versions to explicitly unvet
     additionalPackagesToUnvet: z.record(z.string(), z.array(z.string())).optional(),
+    trafficBasedOnboarding: z.boolean().optional(),
     resources: K8sResourceSchema,
   })
   .strict();
