@@ -43,6 +43,7 @@ import com.digitalasset.canton.{ReassignmentCounter, SequencerCounter, Synchroni
 import io.grpc.Context
 
 import java.util.UUID
+import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
 
 class ParticipantRepairAdministration(
@@ -53,6 +54,7 @@ class ParticipantRepairAdministration(
     with NoTracing
     with Helpful {
   private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
+  private implicit def ec: ExecutionContext = consoleEnvironment.environment.executionContext
 
   @Help.Summary("Purge contracts with specified Contract IDs from local participant")
   @Help.Description(

@@ -18,6 +18,7 @@ import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{Fingerprint, Hash}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, BaseWriteRequest, TopologyStoreId}
@@ -37,7 +38,7 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyMapping,
   TopologyTransaction,
 }
-import com.digitalasset.canton.util.{GrpcStreamingUtils, ResourceUtil}
+import com.digitalasset.canton.util.GrpcStreamingUtils
 import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
 import com.digitalasset.canton.validation.ProtoValidation
 import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation, ReleaseVersion}
@@ -49,7 +50,7 @@ import io.grpc.{Context, ManagedChannel}
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
 object TopologyAdminCommands {
@@ -1040,7 +1041,8 @@ object TopologyAdminCommands {
         topologySnapshot: ByteString,
         store: TopologyStoreId,
         waitToBecomeEffective: Option[NonNegativeDuration],
-    ) extends BaseWriteCommand[
+    )(implicit ec: ExecutionContext, loggingContext: ErrorLoggingContext)
+        extends BaseWriteCommand[
           ImportTopologySnapshotRequest,
           ImportTopologySnapshotResponse,
           Unit,
@@ -1065,7 +1067,7 @@ object TopologyAdminCommands {
           service.withDeadline(null).importTopologySnapshot,
           bytes =>
             ImportTopologySnapshotRequest(
-              ByteString.copyFrom(bytes),
+              bytes,
               Some(store.toProtoV30),
               waitToBecomeEffective.map(_.toProtoPrimitive),
             ),
@@ -1080,7 +1082,8 @@ object TopologyAdminCommands {
         topologySnapshotStream: InputStream,
         store: TopologyStoreId,
         waitToBecomeEffective: Option[NonNegativeDuration],
-    ) extends BaseWriteCommand[
+    )(implicit ec: ExecutionContext, loggingContext: ErrorLoggingContext)
+        extends BaseWriteCommand[
           Unit,
           ImportTopologySnapshotV2Response,
           Unit,
@@ -1092,18 +1095,16 @@ object TopologyAdminCommands {
           service: TopologyManagerWriteServiceStub,
           request: Unit,
       ): Future[ImportTopologySnapshotV2Response] =
-        ResourceUtil.withResource(topologySnapshotStream) { inputStream =>
-          GrpcStreamingUtils.streamToServer(
-            service.importTopologySnapshotV2,
-            bytes =>
-              ImportTopologySnapshotV2Request(
-                ByteString.copyFrom(bytes),
-                Some(store.toProtoV30),
-                waitToBecomeEffective.map(_.toProtoPrimitive),
-              ),
-            inputStream,
-          )
-        }
+        GrpcStreamingUtils.streamToServer(
+          service.importTopologySnapshotV2,
+          bytes =>
+            ImportTopologySnapshotV2Request(
+              bytes,
+              Some(store.toProtoV30),
+              waitToBecomeEffective.map(_.toProtoPrimitive),
+            ),
+          topologySnapshotStream,
+        )
 
       override protected def handleResponse(
           response: ImportTopologySnapshotV2Response
