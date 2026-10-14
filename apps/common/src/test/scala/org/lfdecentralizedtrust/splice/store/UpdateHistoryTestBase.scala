@@ -28,6 +28,7 @@ import scala.jdk.CollectionConverters.*
 import UpdateHistory.UpdateHistoryResponse
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.util.MonadUtil
 
 abstract class UpdateHistoryTestBase
     extends StoreTestBase
@@ -229,9 +230,20 @@ abstract class UpdateHistoryTestBase
     succeed
   }
 
-  protected def initStore(implicit store: UpdateHistory): Future[Unit] = {
-    store.testIngestionSink.initialize().map(_ => ())
-  }
+  protected def initStore(
+      store: UpdateHistory,
+      timeStart: CantonTimestamp = time(0),
+      windowSizeDays: Int = 1,
+      partitionRunwayDays: Int = 7,
+  ): Future[Unit] = for {
+    _ <- createUpdateHistoryPartitions(
+      store,
+      timeStart,
+      windowSizeDays,
+      partitionRunwayDays,
+    )
+    _ <- store.testIngestionSink.initialize()
+  } yield ()
 
   protected def mkStore(
       updateStreamParty: PartyId = party1,
@@ -241,16 +253,7 @@ abstract class UpdateHistoryTestBase
       backfillingRequired: BackfillingRequirement = BackfillingRequirement.NeedsBackfilling,
       analyzableTimeWindowDuration: NonNegativeDuration =
         NonNegativeDuration.tryFromDuration(scala.concurrent.duration.Duration.Inf),
-      timeStart: CantonTimestamp = time(0),
-      windowSizeDays: Int = 1,
-      partitionRunwayDays: Int = 7,
   ): UpdateHistory = {
-    import scala.concurrent.duration.DurationInt
-    // TODO: this involves changing _a lot_ of tests
-    scala.concurrent.Await.result(
-      createUpdateHistoryPartitions(timeStart, windowSizeDays, partitionRunwayDays),
-      10.seconds,
-    )
     new UpdateHistory(
       storage,
       domainMigrationId,
@@ -268,55 +271,22 @@ abstract class UpdateHistoryTestBase
   }
 
   private def createUpdateHistoryPartitions(
+      updateHistory: UpdateHistory,
       timeStart: CantonTimestamp,
       windowSizeDays: Int,
       partitionRunwayDays: Int,
   ) = {
-    import storage.api.jdbcProfile.api.*
-
-    // TODO: put this in trigger or something
-    /*
-    scala> com.digitalasset.canton.data.CantonTimestamp.MinValue
-    val res0: com.digitalasset.canton.data.CantonTimestamp = 0001-01-01T00:00:00Z
-
-    scala> com.digitalasset.canton.data.CantonTimestamp.MinValue.toEpochMilli
-    val res1: Long = -62135596800000
-     */
     val importUpdatesStart = CantonTimestamp.MinValue
-    val importUpdatesEnd = timeStart
-    val statements = DBIO.sequence(
-      0.until(partitionRunwayDays, step = windowSizeDays).map { n =>
+    val importUpdatesEnd = CantonTimestamp.MinValue.plusSeconds(1L)
+
+    for {
+      _ <- updateHistory.createPartitions(importUpdatesStart, importUpdatesEnd)
+      _ <- MonadUtil.sequentialTraverse(0.until(partitionRunwayDays, step = windowSizeDays)) { n =>
         val windowStart = timeStart.plus(java.time.Duration.ofDays(n.toLong))
         val windowEnd = windowStart.plus(java.time.Duration.ofDays(windowSizeDays.toLong))
-        DBIO.sequence(
-          Seq(
-            sql"create table if not exists update_history_transactions_#${windowStart.toMicros} partition of update_history_transactions for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-              .as[Unit],
-            sql"create table if not exists update_history_creates_#${windowStart.toMicros} partition of update_history_creates for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-              .as[Unit],
-            sql"create table if not exists update_history_exercises_#${windowStart.toMicros} partition of update_history_exercises for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-              .as[Unit],
-            sql"create table if not exists update_history_assignments_#${windowStart.toMicros} partition of update_history_assignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-              .as[Unit],
-            sql"create table if not exists update_history_unassignments_#${windowStart.toMicros} partition of update_history_unassignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-              .as[Unit],
-          )
-        )
-      } ++ Seq(
-        sql"create table if not exists update_history_transactions_import_updates partition of update_history_transactions for values from (#${importUpdatesStart.toMicros}) to (#${importUpdatesEnd.toMicros})"
-          .as[Unit],
-        sql"create table if not exists update_history_creates_import_updates partition of update_history_creates for values from (#${importUpdatesStart.toMicros}) to (#${importUpdatesEnd.toMicros})"
-          .as[Unit],
-        sql"create table if not exists update_history_exercises_import_updates partition of update_history_exercises for values from (#${importUpdatesStart.toMicros}) to (#${importUpdatesEnd.toMicros})"
-          .as[Unit],
-        sql"create table if not exists update_history_assignments_import_updates partition of update_history_assignments for values from (#${importUpdatesStart.toMicros}) to (#${importUpdatesEnd.toMicros})"
-          .as[Unit],
-        sql"create table if not exists update_history_unassignments_import_updates partition of update_history_unassignments for values from (#${importUpdatesStart.toMicros}) to (#${importUpdatesEnd.toMicros})"
-          .as[Unit],
-      )
-    )
-
-    storage.query(statements, "createUpdateHistoryPartitions")
+        updateHistory.createPartitions(windowStart, windowEnd)
+      }
+    } yield ()
   }
 
   override def cleanDb(

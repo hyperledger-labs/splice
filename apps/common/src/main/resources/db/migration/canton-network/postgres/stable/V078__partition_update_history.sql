@@ -52,9 +52,9 @@ alter index updt_hist_unas_hi_mi_di_rt rename to updt_hist_unas_hi_mi_di_rt_lega
 alter index updt_hist_unas_hi_mi_rt_di rename to updt_hist_unas_hi_mi_rt_di_legacy;
 alter index updt_hist_unas_hi_mi_ui_u rename to updt_hist_unas_hi_mi_ui_u_legacy;
 
--- TODO: figure out what happens to this
--- alter table update_history_backfilling
---    drop constraint update_history_backfilling_history_id_joining_migration_id_fkey;
+-- this pointed to the old table
+alter table update_history_backfilling
+    drop constraint update_history_backfilling_history_id_joining_migration_id_fkey;
 
 -- Create all new tables:
 -- * For sequences, ALTER SEQUENCE would fail with 'cannot change ownership of identity sequence'.
