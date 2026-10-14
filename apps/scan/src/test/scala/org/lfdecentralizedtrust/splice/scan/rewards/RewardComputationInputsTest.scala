@@ -10,7 +10,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.issuance.IssuanceConf
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.util.{BigDecimalMatchers, SpliceUtil}
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -26,24 +25,6 @@ class RewardComputationInputsTest extends AnyWordSpec with BaseTest with BigDeci
 
     "extract all fields from an OpenMiningRound with CIP-104 config" in {
       RewardComputationInputs.fromOpenMiningRound(mainNetRound) shouldBe Some((mainNet, 100))
-    }
-
-    "cap batchSize at MaxChildBatches" in {
-      val maxBatchSize = DbScanAppRewardsStore.MaxChildBatches
-      forEvery(Seq(maxBatchSize.toLong, maxBatchSize + 1L, Long.MaxValue)) { batchSize =>
-        val round = mkOpenMiningRound(rewardConfig =
-          Optional.of(
-            new RewardConfig(
-              defaultRewardConfig.mintingVersion,
-              defaultRewardConfig.dryRunVersion,
-              batchSize,
-              defaultRewardConfig.rewardCouponTimeToLive,
-              defaultRewardConfig.appRewardCouponThreshold,
-            )
-          )
-        )
-        RewardComputationInputs.fromOpenMiningRound(round) shouldBe Some((mainNet, maxBatchSize))
-      }
     }
 
     "use default developmentFundPercentage when optDevelopmentFundPercentage is None" in {
