@@ -25,7 +25,7 @@ trait BaseTestExtensions { this: BaseTest =>
   /** Keeps evaluating `testCode` until it succeeds or a timeout occurs.
     */
   def eventuallySucceeds[T](
-      timeUntilSuccess: FiniteDuration = 20.seconds,
+      timeUntilSuccess: FiniteDuration = BaseTest.DefaultEventuallyTimeUntilSuccess,
       maxPollInterval: FiniteDuration = 5.seconds,
       suppressErrors: Boolean = true,
   )(testCode: => T): T = {
@@ -38,8 +38,4 @@ trait BaseTestExtensions { this: BaseTest =>
       }
     }
   }
-}
-
-object BaseTestExtensions {
-  val DefaultEventuallyTimeUntilSuccess: FiniteDuration = 20.seconds
 }

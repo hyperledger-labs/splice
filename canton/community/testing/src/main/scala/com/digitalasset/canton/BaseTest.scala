@@ -528,6 +528,8 @@ trait BaseTest
 }
 
 object BaseTest extends EitherValues {
+  val DefaultEventuallyTimeUntilSuccess: FiniteDuration = 20.seconds
+
   implicit class RichSynchronizerIdO(val id: SynchronizerId) {
     def toPhysical: PhysicalSynchronizerId =
       PhysicalSynchronizerId(id, NonNegativeInt.zero, testedProtocolVersion)
@@ -577,7 +579,7 @@ object BaseTest extends EitherValues {
     */
   @SuppressWarnings(Array("org.wartremover.warts.TryPartial"))
   def eventually[T](
-      timeUntilSuccess: FiniteDuration = 20.seconds,
+      timeUntilSuccess: FiniteDuration = DefaultEventuallyTimeUntilSuccess,
       maxPollInterval: FiniteDuration = 100.millis,
       retryOnTestFailuresOnly: Boolean = true,
       logElapsed: Option[(Logger, String)] = None,
