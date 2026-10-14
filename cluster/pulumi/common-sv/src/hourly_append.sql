@@ -3,8 +3,9 @@ BEGIN
   DECLARE current_watermark_ts TIMESTAMP;
   DECLARE max_available_timestamp TIMESTAMP;
   DECLARE max_closed_timestamp TIMESTAMP;
+  DECLARE records_processed INT64 DEFAULT 0;
 
-  -- 1. Check if production table exists; if not, create shell table
+ 
   IF NOT EXISTS (
     SELECT 1 
     FROM {{prodInfoSchema}}
@@ -19,13 +20,25 @@ BEGIN
     WHERE 1 = 0;
   END IF;
 
-  -- 2. Create central watermark tracking table using INT64 (microseconds)
+
   CREATE TABLE IF NOT EXISTS {{watermarksTable}} (
     table_name STRING,
     last_watermark_time INT64
   );
 
-  -- 3. Initialize watermark to epoch zero (0 micros) if missing
+CREATE TABLE IF NOT EXISTS {{prod_logs}} (
+    table_name STRING,
+    from_timestamp INT64,
+    to_timestamp INT64,    
+    record_count INT64,
+    error_message STRING,
+    logged_at TIMESTAMP,
+    record_date DATE
+  )
+  PARTITION BY record_date
+  CLUSTER BY table_name;
+
+  --  Initialize watermark to epoch zero (0 micros) if missing
   IF NOT EXISTS (
     SELECT 1 
     FROM {{watermarksTable}} 
@@ -35,7 +48,7 @@ BEGIN
     VALUES ('{{tableName}}', 0);
   END IF;
 
-  -- 4. Get current scalar watermark in INT64 micros and convert to TIMESTAMP
+
   SET current_watermark_micros = (
     SELECT MAX(last_watermark_time) 
     FROM {{watermarksTable}} 
@@ -44,7 +57,7 @@ BEGIN
 
   SET current_watermark_ts = TIMESTAMP_MICROS(current_watermark_micros);
 
-  -- 5. Fetch max available timestamp from staging WITH PARTITION PRUNING
+  --  Fetch max available timestamp from staging WITH PARTITION PRUNING
   SET max_available_timestamp = COALESCE(
     (
       SELECT MAX({{recordTimestampExpr}}) 
@@ -60,6 +73,7 @@ BEGIN
 
   -- Subtract 1 hour to safely close the ingestion window
   SET max_closed_timestamp = TIMESTAMP_SUB(max_available_timestamp, INTERVAL 1 HOUR);
+
 
   -- 6. Filter incremental data with Primary Key Deduplication & Partition Pruning
   CREATE TEMP TABLE temp_incremental AS (
@@ -83,17 +97,92 @@ BEGIN
         staging.datastream_metadata.change_sequence_number DESC
     ) = 1
   );
+SET records_processed = (SELECT COUNT(1) FROM temp_incremental);
 
-  -- 7. Perform append and update watermark if valid new records exist
-  IF EXISTS (SELECT 1 FROM temp_incremental) THEN
-    
-    INSERT INTO {{prodTable}}
-    SELECT * FROM temp_incremental;
+  IF records_processed > 0 THEN
+    BEGIN TRANSACTION;
+      INSERT INTO {{prodTable}}
+      SELECT * FROM temp_incremental;
 
-    UPDATE {{watermarksTable}}
-    SET last_watermark_time = UNIX_MICROS(max_closed_timestamp)
-    WHERE table_name = '{{tableName}}'
-    AND last_watermark_time < UNIX_MICROS(max_closed_timestamp);
+      UPDATE {{watermarksTable}}
+      SET last_watermark_time = UNIX_MICROS(max_closed_timestamp)
+      WHERE table_name = '{{tableName}}'
+      AND last_watermark_time < UNIX_MICROS(max_closed_timestamp);
 
+      INSERT INTO {{prod_logs}} (
+        table_name,        
+        from_timestamp,
+        to_timestamp,
+        record_count,
+        error_message,
+        logged_at,
+        record_date
+      ) VALUES (
+        '{{tableName}}',
+        current_watermark_micros,
+        UNIX_MICROS(max_closed_timestamp),        
+        records_processed,
+        NULL,
+        CURRENT_TIMESTAMP(),
+        CURRENT_DATE()
+      );
+
+    COMMIT TRANSACTION;
+    ELSE
+
+    -- Record zero-count run when no new rows exist in the window
+    INSERT INTO {{prod_logs}} (
+      table_name,
+      from_timestamp,
+      to_timestamp,
+      record_count,
+      error_message,
+      logged_at,
+      record_date
+    ) VALUES (
+      '{{tableName}}',
+      current_watermark_micros,
+      UNIX_MICROS(max_closed_timestamp),
+      0,
+      NULL,
+      CURRENT_TIMESTAMP(),
+      CURRENT_DATE()
+    );
   END IF;
+EXCEPTION WHEN ERROR THEN
+  -- Preserve original root-cause error message immediately
+  SET pipeline_error = @@error.message;
+
+  
+  BEGIN
+    ROLLBACK TRANSACTION;
+  EXCEPTION WHEN ERROR THEN
+    -- Suppress error if transaction was not open
+  END;
+
+  -- Persist failure record into prod_logs outside the rolled-back transaction
+  BEGIN
+    INSERT INTO {{prod_logs}} (
+      table_name,
+      from_timestamp,
+      to_timestamp,     
+      record_count,
+      error_message,
+      logged_at,
+      record_date
+    ) VALUES (
+      '{{tableName}}',
+      COALESCE(current_watermark_micros, 0),
+      COALESCE(UNIX_MICROS(max_closed_timestamp), 0),
+      0,
+      pipeline_error,
+      CURRENT_TIMESTAMP(),
+      CURRENT_DATE()
+    );
+  EXCEPTION WHEN ERROR THEN
+    -- Prevent logging failure from masking the original pipeline exception
+  END;
+
+  -- Re-raise original root-cause error to orchestrator
+  RAISE USING MESSAGE = pipeline_error;
 END;

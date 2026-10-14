@@ -440,6 +440,7 @@ function installHourlyScheduledQueries(
         const prodTable = `\`${proj}.${prodDs}.${tableName}\``;
         const stagingTable = `\`${proj}.${stagingDs}.${schemaName}_${tableName}\``;
         const watermarksTable = `\`${proj}.${prodDs}.pipeline_watermarks\``;
+        const prodLogsTable = `\`${proj}.${prodDs}.prod_logs\``;
         const prodInfoSchema = `\`${proj}.${prodDs}.INFORMATION_SCHEMA.TABLES\``;
 
         return rawSqlTemplate
@@ -451,7 +452,8 @@ function installHourlyScheduledQueries(
           .replaceAll('{{prodTable}}', prodTable)
           .replaceAll('{{stagingTable}}', stagingTable)
           .replaceAll('{{watermarksTable}}', watermarksTable)
-          .replaceAll('{{prodInfoSchema}}', prodInfoSchema);
+          .replaceAll('{{prodInfoSchema}}', prodInfoSchema)
+          .replaceAll('{{prod_logs}}', prodLogsTable);
       });
 
     const routineId = `sp_append_${tableName}`;
