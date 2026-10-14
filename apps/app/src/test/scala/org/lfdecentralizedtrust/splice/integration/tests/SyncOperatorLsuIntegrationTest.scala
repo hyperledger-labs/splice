@@ -287,6 +287,12 @@ class SyncOperatorLsuIntegrationTest
               )
           }
         }
+
+        clue("stop apps manually to prevent errors from the synchronizer being force stopped") {
+          syncOperatorBackend.stop()
+          aliceValidatorBackend.participantClientWithAdminToken.synchronizers
+            .disconnect(splitwellAlias)
+        }
       }
     }
   }
