@@ -43,6 +43,8 @@ class AnsIntegrationTest
 
   import WalletTestUtil.*
 
+  private val ansEntryLifetime = NonNegativeFiniteDuration.ofSeconds(30)
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       // TODO(#787): make AnsIntegrationTest use simpleTopology4Svs
@@ -58,8 +60,8 @@ class AnsIntegrationTest
           .updateAllSvAppFoundDsoConfigs_(
             _.copy(
               initialAnsConfig = InitialAnsConfig(
-                renewalDuration = NonNegativeFiniteDuration.ofSeconds(10),
-                entryLifetime = NonNegativeFiniteDuration.ofSeconds(10),
+                renewalDuration = ansEntryLifetime,
+                entryLifetime = ansEntryLifetime,
               )
             )
           )(config)
@@ -347,7 +349,9 @@ class AnsIntegrationTest
           renewedEntry.name shouldBe testEntryName
           renewedEntry.url shouldBe testEntryUrl
           renewedEntry.description shouldBe testEntryDescription
-          renewedEntry.expiresAt.value shouldBe entry.expiresAt.value.plus(10, ChronoUnit.SECONDS)
+          renewedEntry.expiresAt.value shouldBe entry.expiresAt.value.plus(
+            ansEntryLifetime.asJava
+          )
         }
 
     }
@@ -404,11 +408,11 @@ class AnsIntegrationTest
           },
         )
 
-        eventually() {
+        eventually(timeUntilSuccess = 1.minute) {
           lookupEntryByName(testEntryName) shouldBe empty withClue s"ANS entry $testEntryName"
         }
         withClue("subscription expires even with disabled trigger") {
-          eventually() {
+          eventually(timeUntilSuccess = 1.minute) {
             aliceWalletClient.listSubscriptions() shouldBe empty withClue "alice Subscriptions"
           }
         }
@@ -419,7 +423,7 @@ class AnsIntegrationTest
         ) {
           withClue("contracts removed with subscription trigger reenabled") {
             // Wait for subscription to be expired.
-            eventually() {
+            eventually(timeUntilSuccess = 1.minute) {
               import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ConstrainedTemplate
               forEvery(
                 Table[ConstrainedTemplate](

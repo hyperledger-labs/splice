@@ -165,12 +165,14 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
       bulkStorage: BulkStorageReader,
       recordTime: String,
       bucket: definitions.BulkStorageBucket = definitions.BulkStorageBucket.Staging,
+      kind: Option[definitions.BulkObjectKind] = None,
   ): definitions.GetBulkObjectsProgressResponse =
     inside(
       handler(bulkStorage = Some(bulkStorage))
         .getBulkObjectsProgress(ScanResource.GetBulkObjectsProgressResponse)(
           Instant.parse(recordTime).atOffset(ZoneOffset.UTC),
           bucket,
+          kind,
         )(TraceContext.empty)
         .futureValue
     ) { case ScanResource.GetBulkObjectsProgressResponseOK(value) => value }
@@ -256,6 +258,20 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
         "2024-01-01T00:00:00Z",
       )
       response.availability shouldBe definitions.BulkObjectsAvailability.Processing
+    }
+
+    "GetBulkObjectsProgress answers from the progress of the requested kind only" in {
+      val reader = bulkStorageReader(
+        Some(snapshotProgressAt("2024-01-01T00:00:00Z")),
+        Some(updateProgress("2024-01-02T00:00:00Z", "2024-01-03T00:00:00Z")),
+      )
+      def availability(kind: Option[definitions.BulkObjectKind]) =
+        progressResponse(reader, "2024-01-03T00:00:00Z", kind = kind).availability
+      availability(Some(definitions.BulkObjectKind.Updates)) shouldBe
+        definitions.BulkObjectsAvailability.Available
+      availability(Some(definitions.BulkObjectKind.Snapshots)) shouldBe
+        definitions.BulkObjectsAvailability.Processing
+      availability(None) shouldBe definitions.BulkObjectsAvailability.Processing
     }
 
     "GetBulkObjectsProgress answers processing when updates progress is behind the requested record time" in {

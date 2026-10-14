@@ -32,6 +32,7 @@ class UpdateHistoryBulkStorageCommitFromStaging(
     BulkStorageCommitFromStaging(
       stagingS3Connection,
       committedS3Connection,
+      BulkObjectKind.Updates,
       segment =>
         bulkStorageReader
           .getStagingObjectsForUpdateHistorySegment(segment)

@@ -106,6 +106,7 @@ class BulkStorageCommitFromStagingTest
       BulkStorageCommitFromStaging[String](
         stagingS3Connection,
         committedS3Connection,
+        BulkObjectKind.Updates,
         _ => Future.successful(objsWithDigests),
         _ => CantonTimestamp.MinValue,
         appConfig,
@@ -417,7 +418,11 @@ class BulkStorageCommitFromStagingTest
           )
           when(mockConn.url) thenReturn Uri(s"http://scan_$i")
           when(
-            mockConn.getBulkObjectChecksums(any[CantonTimestamp], any[Seq[String]])(
+            mockConn.getBulkObjectChecksums(
+              any[CantonTimestamp],
+              eqTo(BulkObjectKind.Updates),
+              any[Seq[String]],
+            )(
               any[ExecutionContext],
               any[TraceContext],
             )
@@ -448,7 +453,11 @@ class BulkStorageCommitFromStagingTest
             }
           }
           when(
-            mockConn.getBulkObjectsProgress(any[CantonTimestamp], any[BulkStorageBucket])(
+            mockConn.getBulkObjectsProgress(
+              any[CantonTimestamp],
+              any[BulkStorageBucket],
+              eqTo(BulkObjectKind.Updates),
+            )(
               any[ExecutionContext],
               any[TraceContext],
             )
@@ -551,6 +560,7 @@ class BulkStorageCommitFromStagingTest
       new BulkStorageCommitFromStaging[String](
         stagingS3Connection,
         committedS3Connection,
+        BulkObjectKind.Updates,
         _ => Future.successful(objsWithDigests),
         _ => CantonTimestamp.MinValue,
         config,

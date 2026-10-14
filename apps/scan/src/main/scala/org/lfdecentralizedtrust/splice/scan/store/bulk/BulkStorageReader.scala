@@ -159,32 +159,30 @@ class BulkStorageReader(
       }
   }
 
-  def getStagingProgressTimestamp(): Future[CantonTimestamp] =
-    progressTimestamp(updateHistoryStagingProgress, acsSnapshotStagingProgress)
+  def getStagingProgressTimestamp(kind: Option[BulkObjectKind]): Future[CantonTimestamp] =
+    progressTimestamp(kind, updateHistoryStagingProgress, acsSnapshotStagingProgress)
 
-  def getCommittedProgressTimestamp(): Future[CantonTimestamp] =
-    progressTimestamp(updateHistoryCommittedProgress, acsSnapshotCommittedProgress)
+  def getCommittedProgressTimestamp(kind: Option[BulkObjectKind]): Future[CantonTimestamp] =
+    progressTimestamp(kind, updateHistoryCommittedProgress, acsSnapshotCommittedProgress)
 
   def getFirstOwnSegmentStart(): Future[Option[CantonTimestamp]] = firstOwnSegmentStart()
 
   private def progressTimestamp(
+      kind: Option[BulkObjectKind],
       updatesProgress: UpdateHistoryBulkStoragePersistentProgress,
       snapshotsProgress: AcsSnapshotBulkStoragePersistentProgress,
   ): Future[CantonTimestamp] = {
-    for {
-      updates <- updatesProgress.readLatestProcessedSegment
-      snapshots <- snapshotsProgress.readLatestProcessedSnapshotTimestamp
-    } yield {
-      (updates, snapshots) match {
-        case (Some(updatesSegment), Some(snapshotTs)) =>
-          if (updatesSegment.toTimestamp > snapshotTs) {
-            snapshotTs
-          } else {
-            updatesSegment.toTimestamp
-          }
-        case _ =>
-          CantonTimestamp.MinValue
-      }
+    def updates = updatesProgress.readLatestProcessedSegment
+      .map(_.fold(CantonTimestamp.MinValue)(_.toTimestamp))
+    def snapshots = snapshotsProgress.readLatestProcessedSnapshotTimestamp
+      .map(_.getOrElse(CantonTimestamp.MinValue))
+    kind match {
+      case Some(BulkObjectKind.Updates) => updates
+      case Some(BulkObjectKind.Snapshots) => snapshots
+      case None =>
+        updates.zip(snapshots).map { case (updatesTs, snapshotsTs) =>
+          if (updatesTs > snapshotsTs) snapshotsTs else updatesTs
+        }
     }
   }
 
