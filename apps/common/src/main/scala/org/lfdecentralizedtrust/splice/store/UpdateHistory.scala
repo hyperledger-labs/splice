@@ -28,7 +28,13 @@ import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{
   SourceMigrationInfo,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
-import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries, InternedStringStore}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsJdbcTypes,
+  AcsQueries,
+  AdvisoryLockIds,
+  AdvisoryLocks,
+  InternedStringStore,
+}
 import db.AsUpdateReturning.*
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
@@ -445,18 +451,21 @@ class UpdateHistory(
       if (windowStart == CantonTimestamp.MinValue) "import_updates"
       else windowStart.toMicros.toString
     storage.query(
-      // if not exists allows any trigger calling this to recover from half-way crashes
-      DBIO.seq(
-        sql"create table if not exists update_history_transactions_#$tableSuffix partition of update_history_transactions for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-          .as[Unit],
-        sql"create table if not exists update_history_creates_#$tableSuffix partition of update_history_creates for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-          .as[Unit],
-        sql"create table if not exists update_history_exercises_#$tableSuffix partition of update_history_exercises for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-          .as[Unit],
-        sql"create table if not exists update_history_assignments_#$tableSuffix partition of update_history_assignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-          .as[Unit],
-        sql"create table if not exists update_history_unassignments_#$tableSuffix partition of update_history_unassignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-          .as[Unit],
+      // if not exists allows any trigger calling this to recover from half-way crashes. Unfortunately it does not prevent races between concurrent sessions.
+      AdvisoryLocks.withSessionLock(
+        AdvisoryLockIds.createUpdateHistoryPartitionStatement,
+        DBIO.seq(
+          sql"create table if not exists update_history_transactions_#$tableSuffix partition of update_history_transactions for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
+            .as[Unit],
+          sql"create table if not exists update_history_creates_#$tableSuffix partition of update_history_creates for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
+            .as[Unit],
+          sql"create table if not exists update_history_exercises_#$tableSuffix partition of update_history_exercises for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
+            .as[Unit],
+          sql"create table if not exists update_history_assignments_#$tableSuffix partition of update_history_assignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
+            .as[Unit],
+          sql"create table if not exists update_history_unassignments_#$tableSuffix partition of update_history_unassignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
+            .as[Unit],
+        ),
       ),
       "createPartitions",
     )
