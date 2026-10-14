@@ -66,4 +66,5 @@ export type Auth0ClusterConfig = {
   svRunbook?: Auth0Config;
   validatorRunbook?: Auth0Config;
   mainnet?: Auth0Config;
+  dSync?: Auth0Config;
 };

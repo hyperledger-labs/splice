@@ -618,14 +618,17 @@ function auth0ForDSyncNamespace(
   });
 }
 
-function dsyncAuth0(clusterBasename: string): pulumi.Output<NamespacedAuth0Configs> {
+function dsyncAuth0(clusterBasename: string): pulumi.Output<Auth0Config> | undefined {
   if (!infraConfig.supportDsync) {
-    return pulumi.output({} as NamespacedAuth0Configs);
+    return undefined;
   }
+  const domain = 'canton-network-dsync-test.us.auth0.com';
+  const clientId = config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_ID');
+  const clientSecret = config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_SECRET')
   const provider = new auth0.Provider('dsync', {
-    domain: 'canton-network-dsync-test.us.auth0.com',
-    clientId: config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_ID'),
-    clientSecret: config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_SECRET'),
+    domain,
+    clientId,
+    clientSecret,
   });
   const configs = [1, 2, 3, 4].map(i =>
     auth0ForDSyncNamespace(clusterBasename, `dsync-op-${i}`, provider)
@@ -635,7 +638,13 @@ function dsyncAuth0(clusterBasename: string): pulumi.Output<NamespacedAuth0Confi
     cfgs.forEach((cfg, i) => {
       namespacedConfig[`dsync-op-${i + 1}`] = cfg;
     });
-    return namespacedConfig;
+    return {
+      namespacedConfigs: namespacedConfig,
+      auth0Domain: domain,
+      auth0MgtClientId: clientId,
+      auth0MgtClientSecret: clientSecret,
+      fixedTokenCacheName: 'auth0-fixed-token-cache-dsync-test',
+    };
   });
 }
 
@@ -840,7 +849,7 @@ export function configureAuth0(
           cantonNetwork: splice,
           svRunbook: sv,
           validatorRunbook: validator,
-          dsync: dsync,
+          dSync: dsync,
         };
       });
   }
