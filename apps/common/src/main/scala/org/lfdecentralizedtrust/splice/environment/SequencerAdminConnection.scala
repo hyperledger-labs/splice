@@ -359,8 +359,11 @@ class SequencerAdminConnection(
 
   def initializeFromOnboardingStateFile(
       file: Path
-  )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
-    runCmd(SequencerAdminCommands.InitializeFromOnboardingStateV2(Files.newInputStream(file)))
+  )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] = {
+    val inputStream = Files.newInputStream(file)
+    runCmd(SequencerAdminCommands.InitializeFromOnboardingStateV2(inputStream))
+      .andThen(_ => inputStream.close())
+  }
 
   def listSequencerTrafficControlState(filterMembers: Seq[Member] = Seq.empty)(implicit
       traceContext: TraceContext

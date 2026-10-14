@@ -283,21 +283,23 @@ class ParticipantAdminConnection(
   ): Future[Unit] = {
     retryProvider.retryForClientCalls(
       "import_party_acs",
-      "Imports the acs in the participant",
-      runCmd(
-        ParticipantAdminCommands.PartyManagement
-          .ImportPartyAcs(
-            Files.newInputStream(file),
-            synchronizerId,
-            IMPORT_ACS_WORKFLOW_ID_PREFIX,
-            contractImportMode = ContractImportMode.Validation,
-            representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
-            // according to docs: enables crash-resilient scheduling of the onboarding flag clearance
-            // ...except that only works from protocol version 35+
-            party = Some(partyId),
-          ),
-        timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
-      ).map(_ => ()),
+      "Imports the acs in the participant", {
+        val inputStream = Files.newInputStream(file)
+        runCmd(
+          ParticipantAdminCommands.PartyManagement
+            .ImportPartyAcs(
+              inputStream,
+              synchronizerId,
+              IMPORT_ACS_WORKFLOW_ID_PREFIX,
+              contractImportMode = ContractImportMode.Validation,
+              representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
+              // according to docs: enables crash-resilient scheduling of the onboarding flag clearance
+              // ...except that only works from protocol version 35+
+              party = Some(partyId),
+            ),
+          timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
+        ).andThen(_ => inputStream.close()).map(_ => ())
+      },
       logger,
     )
   }
