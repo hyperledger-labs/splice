@@ -17,6 +17,7 @@ import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.protocol.messages.TopologyTransactionsBroadcast
 import com.digitalasset.canton.sequencing.client.SequencerClient
@@ -242,13 +243,25 @@ class StoreBasedSynchronizerOutbox(
         val ret = for {
           pendingAndApplicable <- EitherT.right(pendingAndApplicableF)
           (pending, applicable) = pendingAndApplicable
-          _ = lastDispatched.set(applicable.lastOption)
+          converted <- synchronizeWithClosing(functionFullName)(
+            TopologySigningHelper.convertTransactions(
+              applicable,
+              protocolVersion,
+              crypto,
+              topologyConfig,
+            )
+          )
+          // re-check presence after conversion, as the hash is protocol-version-dependent
+          toDispatch <- EitherT.right(
+            synchronizeWithClosing(functionFullName)(notAlreadyPresent(converted))
+          )
+          _ = lastDispatched.set(toDispatch.lastOption)
           // dispatch to synchronizer
-          responses <- dispatch(synchronizerAlias, transactions = applicable)
+          responses <- dispatch(synchronizerAlias, transactions = toDispatch)
           observed <- EitherT.right(
             // we either receive accepted or failed for all transactions in a submission batch.
             // failed submissions are turned into a Left in dispatch. Therefore, it's safe to await without additional checks.
-            applicable.headOption
+            toDispatch.headOption
               .map(
                 awaitTransactionObserved(
                   _,
@@ -266,7 +279,7 @@ class StoreBasedSynchronizerOutbox(
           )
           // update watermark according to responses
           _ <- EitherT.right[String](
-            updateWatermark(pending, applicable, responses)
+            updateWatermark(pending, toDispatch, responses)
           )
         } yield ()
 
@@ -353,7 +366,7 @@ class StoreBasedSynchronizerOutbox(
 
   override protected def onClosed(): Unit = {
     val closeables = maybeObserverCloseable.toList ++ List(handle)
-    LifeCycle.close(closeables*)(logger)
+    LifeCycle.close(closeables)(logger)
     super.onClosed()
   }
 }

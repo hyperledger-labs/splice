@@ -10,12 +10,13 @@ import com.digitalasset.canton.sequencer.admin.v30.*
 import com.digitalasset.canton.sequencer.admin.v30.SequencerBftAdministrationServiceGrpc.SequencerBftAdministrationService
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.ModuleRef
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.{
-  Consensus,
   Mempool,
+  Output,
   P2PNetworkOut,
 }
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
@@ -30,21 +31,21 @@ import SequencerBftAdminData.{
 final class BftOrderingSequencerAdminService(
     mempoolAdminRef: ModuleRef[Mempool.Admin],
     p2pNetworkOutAdminRef: ModuleRef[P2PNetworkOut.Admin],
-    issConsensusAdminRef: ModuleRef[Consensus.Admin],
+    outputAdminRef: ModuleRef[Output.Admin],
     override val loggerFactory: NamedLoggerFactory,
     createWriteReadinessPromise: () => Promise[WriteReadiness] = () => Promise(),
     createBoolPromise: () => Promise[Boolean] = () => Promise(),
     createNetworkStatusPromise: () => Promise[PeerNetworkStatus] = () => Promise(),
-    createOrderingTopologyPromise: () => Promise[Consensus.Admin.GetOrderingTopologyResponse] =
-      () => Promise(),
-    createPeerEndpointSeqPromise: () => Promise[Seq[P2PEndpoint]] = () => Promise(),
+    createOrderingTopologyPromise: () => Promise[Output.Admin.GetOrderingTopologyResponse] = () =>
+      Promise(),
+    createPeerEndpointSeqPromise: () => Promise[Seq[(P2PEndpoint, Option[BftNodeId])]] = () =>
+      Promise(),
 )(implicit executionContext: ExecutionContext, metricsContext: MetricsContext)
     extends SequencerBftAdministrationService
     with NamedLogging {
 
-  private implicit val traceContext: TraceContext = TraceContext.empty
-
   override def addPeerEndpoint(request: AddPeerEndpointRequest): Future[AddPeerEndpointResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     logger.info(
       s"BFT sequencer admin service: adding endpoint ${request.endpoint} to the network."
     )
@@ -65,6 +66,7 @@ final class BftOrderingSequencerAdminService(
   override def removePeerEndpoint(
       request: RemovePeerEndpointRequest
   ): Future[RemovePeerEndpointResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     logger.info(
       s"BFT sequencer admin service: removing endpoint ${request.endpointId} to the network."
     )
@@ -85,19 +87,25 @@ final class BftOrderingSequencerAdminService(
   override def listConfiguredEndpoints(
       request: ListConfiguredEndpointsRequest
   ): Future[ListConfiguredEndpointsResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val resultPromise = createPeerEndpointSeqPromise()
     p2pNetworkOutAdminRef.asyncSend(
       P2PNetworkOut.Admin.ListConfiguredEndpoints(resultPromise.success)
     )
     resultPromise.future.map(endpointSeq =>
-      ListConfiguredEndpointsResponse(endpointSeq.map(endpointToProto))
+      ListConfiguredEndpointsResponse(endpointSeq.map { case (endpoint, nodeIdO) =>
+        endpointToProto(endpoint).copy(
+          sequencerId = nodeIdO
+        )
+      })
     )
   }
 
   override def getPeerNetworkStatus(
       request: GetPeerNetworkStatusRequest
   ): Future[GetPeerNetworkStatusResponse] = {
-    logger.info(
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+    logger.debug(
       "BFT sequencer admin service: getting network status for endpoints " +
         s"${if (request.endpointIds.isEmpty) "<all known>" else request.endpointIds.toString()} " +
         "to the network."
@@ -113,7 +121,9 @@ final class BftOrderingSequencerAdminService(
     resultPromise.future.map(_.toProto)
   }
 
-  private def tryEndpointFromProto(endpoint: PeerEndpoint): P2PEndpoint =
+  private def tryEndpointFromProto(endpoint: PeerEndpoint)(implicit
+      traceContext: TraceContext
+  ): P2PEndpoint =
     endpointFromProto(endpoint).fold(
       error => {
         logger.error(s"Failed to convert endpoint $endpoint from proto: $error")
@@ -122,7 +132,9 @@ final class BftOrderingSequencerAdminService(
       identity,
     )
 
-  private def tryEndpointIdFromProto(endpointId: PeerEndpointId): P2PEndpoint.Id =
+  private def tryEndpointIdFromProto(endpointId: PeerEndpointId)(implicit
+      traceContext: TraceContext
+  ): P2PEndpoint.Id =
     endpointIdFromProto(endpointId).fold(
       error => {
         logger.error(s"Failed to convert endpoint key $endpointId from proto: $error")
@@ -134,9 +146,10 @@ final class BftOrderingSequencerAdminService(
   override def getOrderingTopology(
       request: GetOrderingTopologyRequest
   ): Future[GetOrderingTopologyResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val resultPromise = createOrderingTopologyPromise()
-    issConsensusAdminRef.asyncSend(
-      Consensus.Admin.GetOrderingTopology { orderingResponse =>
+    outputAdminRef.asyncSend(
+      Output.Admin.GetOrderingTopology { orderingResponse =>
         resultPromise.success(orderingResponse).discard
       }
     )
@@ -155,8 +168,9 @@ final class BftOrderingSequencerAdminService(
   override def setPerformanceMetricsEnabled(
       request: SetPerformanceMetricsEnabledRequest
   ): Future[SetPerformanceMetricsEnabledResponse] = {
-    issConsensusAdminRef.asyncSend(
-      Consensus.Admin.SetPerformanceMetricsEnabled(request.enabled)
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+    outputAdminRef.asyncSend(
+      Output.Admin.SetPerformanceMetricsEnabled(request.enabled)
     )
     Future.successful(SetPerformanceMetricsEnabledResponse())
   }
@@ -164,6 +178,7 @@ final class BftOrderingSequencerAdminService(
   override def getWriteReadiness(
       request: GetWriteReadinessRequest
   ): Future[GetWriteReadinessResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val resultPromise = createWriteReadinessPromise()
     mempoolAdminRef.asyncSend(Mempool.Admin.GetWriteReadiness { readiness =>
       resultPromise.success(readiness).discard

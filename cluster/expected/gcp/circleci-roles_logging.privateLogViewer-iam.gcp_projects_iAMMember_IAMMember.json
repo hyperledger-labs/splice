@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "role": "roles/logging.privateLogViewer"
+  },
+  "name": "circleci-roles/logging.privateLogViewer-iam",
+  "provider": "",
+  "type": "gcp:projects/iAMMember:IAMMember"
+}

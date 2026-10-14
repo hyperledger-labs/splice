@@ -1,0 +1,22 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "security.istio.io/v1beta1",
+    "kind": "AuthorizationPolicy",
+    "metadata": {
+      "name": "istio-access-policy-deny-all",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "selector": {
+        "matchLabels": {
+          "app": "istio-ingress"
+        }
+      }
+    }
+  },
+  "name": "istio-access-policy-deny-all",
+  "provider": "",
+  "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
+}

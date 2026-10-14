@@ -7,7 +7,7 @@ import cats.data.{EitherT, OptionT}
 import cats.implicits.catsSyntaxOptionId
 import cats.syntax.applicative.*
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
   SynchronizerTimeCommands,
@@ -37,6 +37,7 @@ import com.digitalasset.canton.crypto.{
   SigningKeyUsage,
   SigningPublicKey,
 }
+import com.digitalasset.canton.crypto.admin.grpc.BaseVaultRequest
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.grpc.ByteStringStreamObserver
@@ -47,14 +48,14 @@ import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.time.{Clock, FetchTimeResponse}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
-import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
+import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, BaseWriteRequest, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.v30.ExportTopologySnapshotResponse
 import com.digitalasset.canton.topology.store.{StoredTopologyTransaction, TimeQuery}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.{ProtocolVersion, ReleaseVersion}
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -164,6 +165,7 @@ abstract class TopologyAdminConnection(
           ops = Some(TopologyChangeOp.Replace),
           filterSigningKey = "",
           protocolVersion = None,
+          clientVersion = None,
         ),
         filterParty,
         "",
@@ -343,42 +345,40 @@ abstract class TopologyAdminConnection(
     }
 
   def lookupSequencingParametersState(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       topologyTransactionType: TopologyTransactionType = AuthorizedState,
   )(implicit
       traceContext: TraceContext
   ): Future[Option[TopologyResult[SequencingParametersState]]] =
     runCommandM(
-      TopologyStoreId.Synchronizer(synchronizerId),
+      TopologyStoreId.Synchronizer(synchronizerId.logical),
       topologyTransactionType,
       TimeQuery.HeadState,
     )(
       baseQuery =>
         TopologyAdminCommands.Read.ListSequencingParametersState(
           baseQuery,
-          filterSynchronizerId = synchronizerId.filterString,
+          filterSynchronizerId = synchronizerId.logical.filterString,
         ),
       (r: ListSequencingParametersStateResult) =>
         TopologyResult(
           r.context,
           SequencingParametersState(
-            synchronizerId,
-            r.item.toInternal.valueOr(err =>
-              throw new IllegalStateException(s"Failed to convert SequencingParameters: $err")
-            ),
+            synchronizerId.logical,
+            r.item.toInternal(synchronizerId.protocolVersion),
           ),
         ),
     ).map(_.headOption)
 
   def ensureSequencingParametersState(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       parameters: SequencingParametersState,
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ): Future[TopologyResult[SequencingParametersState]] =
     ensureTopologyMappingO(
-      synchronizerId,
+      synchronizerId.logical,
       "update sequencing parameters",
       topologyType =>
         EitherT
@@ -604,10 +604,14 @@ abstract class TopologyAdminConnection(
   ): Future[SignedTopologyTransaction[TopologyChangeOp, OwnerToKeyMapping]] =
     proposeMapping(
       TopologyStoreId.Authorized,
-      OwnerToKeyMapping(
-        member,
-        keys = keys,
-      ),
+      OwnerToKeyMapping
+        .create(
+          member,
+          keys = keys,
+        )
+        .valueOr(err =>
+          throw new IllegalArgumentException(s"Failed to create OwnerToKeyMapping: $err")
+        ),
       serial = serial,
       isProposal = false,
       change = TopologyChangeOp.Replace,
@@ -708,15 +712,17 @@ abstract class TopologyAdminConnection(
   )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
     runCmd(
       TopologyAdminCommands.Write.Propose(
+        baseRequest = BaseWriteRequest(clientVersion = None),
         mapping = mapping,
         // let canton figure out the signatures
         signedBy = Seq(),
-        store = store,
+        change = change,
         serial = Some(serial),
         mustFullyAuthorize = !isProposal,
-        change = change,
         forceChanges = forceChanges,
+        store = store,
         waitToBecomeEffective = None,
+        serverVersion = None,
       )
     )
 
@@ -745,7 +751,7 @@ abstract class TopologyAdminConnection(
             isProposal = false,
           )
         }) { existingTxWithSameUniqueCode =>
-          if (existingTxWithSameUniqueCode == mapping) {
+          if (existingTxWithSameUniqueCode.mapping == mapping) {
             logger.info(
               s"Existing mapping found for ${mapping.code}: $mapping, returning existing transaction with serial ${existingTxWithSameUniqueCode.serial}"
             )
@@ -753,7 +759,7 @@ abstract class TopologyAdminConnection(
           } else {
             throw Status.ALREADY_EXISTS
               .withDescription(
-                s"Mapping with unique key ${mapping.uniqueKey} already exists with a different mapping: $existingTxWithSameUniqueCode"
+                s"Mapping with unique key ${mapping.uniqueKey} already exists with a different mapping: expected $mapping, got $existingTxWithSameUniqueCode"
               )
               .asRuntimeException()
           }
@@ -785,7 +791,9 @@ abstract class TopologyAdminConnection(
   ): Future[Seq[TopologyTransaction[TopologyChangeOp, TopologyMapping]]] =
     runCmd(
       TopologyAdminCommands.Write.GenerateTransactions(
-        proposals
+        BaseWriteRequest(clientVersion = None),
+        proposals = proposals,
+        serverVersion = None,
       )
     )
 
@@ -907,7 +915,9 @@ abstract class TopologyAdminConnection(
                           s"Waiting until $minSubmissionTime before submitting topology transaction"
                         )
                         // This is a noop if minSubmissionTime is in the past.
-                        clock.scheduleAt(_ => (), minSubmissionTime).onShutdown(())
+                        clock
+                          .scheduleAt(_ => (), "establish_topology_mapping", minSubmissionTime)
+                          .onShutdown(())
                       }
                     sleep.flatMap { _ =>
                       proposeMapping(
@@ -1550,7 +1560,14 @@ abstract class TopologyAdminConnection(
   def listMyKeys(name: String = "")(implicit
       traceContext: TraceContext
   ): Future[Seq[com.digitalasset.canton.crypto.admin.grpc.PrivateKeyMetadata]] = {
-    runCmd(VaultAdminCommands.ListMyKeys("", name))
+    runCmd(
+      VaultAdminCommands.ListMyKeys(
+        BaseVaultRequest(clientVersion = ReleaseVersion.current),
+        filterFingerprint = "",
+        filterName = name,
+        serverVersion = None,
+      )
+    )
   }
 
   def exportKeyPair(fingerprint: Fingerprint)(implicit
@@ -1562,7 +1579,15 @@ abstract class TopologyAdminConnection(
   def generateKeyPair(name: String, usage: NonEmpty[Set[SigningKeyUsage]])(implicit
       traceContext: TraceContext
   ): Future[SigningPublicKey] = {
-    runCmd(VaultAdminCommands.GenerateSigningKey(name, usage, None))
+    runCmd(
+      VaultAdminCommands.GenerateSigningKey(
+        BaseVaultRequest(clientVersion = ReleaseVersion.current),
+        name,
+        usage,
+        None,
+        serverVersion = None,
+      )
+    )
   }
 
   def generateEncryptionKeyPair(name: String)(implicit
@@ -1574,7 +1599,15 @@ abstract class TopologyAdminConnection(
   def registerKmsSigningKey(kmsKeyId: String, usage: NonEmpty[Set[SigningKeyUsage]], name: String)(
       implicit traceContext: TraceContext
   ): Future[SigningPublicKey] = {
-    runCmd(VaultAdminCommands.RegisterKmsSigningKey(kmsKeyId, usage, name))
+    runCmd(
+      VaultAdminCommands.RegisterKmsSigningKey(
+        BaseVaultRequest(clientVersion = ReleaseVersion.current),
+        kmsKeyId,
+        usage,
+        name,
+        serverVersion = None,
+      )
+    )
   }
 
   def registerKmsEncryptionKey(kmsKeyId: String, name: String)(implicit

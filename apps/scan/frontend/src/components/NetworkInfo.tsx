@@ -48,7 +48,7 @@ const NetworkInfo: React.FC = () => {
       openRoundsDisplay = <ErrorDisplay message="Failed to fetch open rounds" />;
       break;
     case 'success': {
-      const sortedRounds = openRoundsQuery.data.sort(
+      const sortedRounds = openRoundsQuery.data.toSorted(
         (a, b) => parseInt(a.payload.round.number) - parseInt(b.payload.round.number)
       );
       openRoundsDisplay = (
@@ -149,7 +149,7 @@ const NextConfigUpdate: React.FC = () => {
         e =>
           e.payload.targetEffectiveAt !== undefined && dayjs(e.payload.voteBefore).isBefore(dayjs())
       )
-      .sort(
+      .toSorted(
         (a, b) =>
           new Date(b.payload.targetEffectiveAt!).getTime() -
           new Date(a.payload.targetEffectiveAt!).getTime()

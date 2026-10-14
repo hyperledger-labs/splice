@@ -6,6 +6,7 @@ package com.digitalasset.canton.synchronizer.mediator
 import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.NamedLoggingContext
 import com.digitalasset.canton.protocol.messages.{
   ConfirmationResponse,
@@ -24,8 +25,10 @@ final case class FinalizedResponse(
     override val request: MediatorConfirmationRequest,
     finalizationTime: CantonTimestamp,
     verdict: Verdict,
-)(val requestTraceContext: TraceContext)
-    extends ResponseAggregator {
+    override val firstResponseReceived: Option[CantonTimestamp],
+)(
+    val requestTraceContext: TraceContext
+) extends ResponseAggregator {
 
   override def version: CantonTimestamp = finalizationTime
   override def isFinalized: Boolean = true

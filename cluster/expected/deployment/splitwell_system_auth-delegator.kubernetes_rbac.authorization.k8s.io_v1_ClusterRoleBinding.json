@@ -1,0 +1,23 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "ClusterRoleBinding",
+    "roleRef": {
+      "apiGroup": "rbac.authorization.k8s.io",
+      "kind": "ClusterRole",
+      "name": "system:auth-delegator"
+    },
+    "subjects": [
+      {
+        "kind": "ServiceAccount",
+        "name": "splitwell-sa",
+        "namespace": "operator"
+      }
+    ]
+  },
+  "name": "splitwell:system:auth-delegator",
+  "provider": "",
+  "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+}

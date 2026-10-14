@@ -1,0 +1,39 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "source.toolkit.fluxcd.io/v1",
+    "kind": "GitRepository",
+    "metadata": {
+      "labels": {
+        "notifications": "false"
+      },
+      "name": "splice-node-deployment",
+      "namespace": "operator"
+    },
+    "spec": {
+      "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard\n!**/token-standard/*/openapi/**",
+      "include": [
+        {
+          "fromPath": "cluster/stacks/prod/deployment/Pulumi.deployment.mock.yaml",
+          "repository": {
+            "name": "splice-node-deployment-base"
+          },
+          "toPath": "splice/cluster/pulumi/deployment/Pulumi.deployment.mock.yaml"
+        }
+      ],
+      "interval": "5m",
+      "recurseSubmodules": true,
+      "ref": {
+        "name": "refs/heads/main"
+      },
+      "secretRef": {
+        "name": "github"
+      },
+      "url": "https://github.com/DACH-NY/canton-network-internal"
+    }
+  },
+  "name": "splice-node-deployment",
+  "provider": "",
+  "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+}

@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{FullClientConfig, PositiveDurationSeconds}

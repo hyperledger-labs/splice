@@ -1,0 +1,19 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "mock.example.com/v1",
+    "kind": "MockResource",
+    "metadata": {
+      "name": "mock-resource",
+      "namespace": "validator1"
+    },
+    "spec": {
+      "anotherKey": "anotherValue",
+      "key": "value"
+    }
+  },
+  "name": "mock-cr",
+  "provider": "",
+  "type": "kubernetes:mock.example.com/v1:MockResource"
+}

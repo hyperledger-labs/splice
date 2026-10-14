@@ -10,6 +10,7 @@ import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.ProtoDeserializationError.ProtoDeserializationFailure
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasRunOnClosing}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcLogPolicy
@@ -21,7 +22,7 @@ import com.digitalasset.canton.sequencer.api.v30.{
   AcknowledgeSignedResponse,
   SendAsyncRequest,
 }
-import com.digitalasset.canton.sequencing.SequencedEventHandler
+import com.digitalasset.canton.sequencing.MaybeCompressedSequencedEventHandler
 import com.digitalasset.canton.sequencing.client.SequencerSubscription
 import com.digitalasset.canton.sequencing.client.pool.Connection.ConnectionError
 import com.digitalasset.canton.sequencing.client.transports.{
@@ -258,7 +259,7 @@ class GrpcUserSequencerConnectionStub(
 
   override def subscribe[E](
       request: SubscriptionRequest,
-      handler: SequencedEventHandler[E],
+      handler: MaybeCompressedSequencedEventHandler[E],
       timeout: Duration,
   )(implicit
       traceContext: TraceContext

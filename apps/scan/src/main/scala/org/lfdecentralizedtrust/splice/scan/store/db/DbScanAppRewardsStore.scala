@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import org.lfdecentralizedtrust.splice.scan.rewards.{RewardComputationInputs, RewardIssuanceParams}
 import org.lfdecentralizedtrust.splice.scan.store.ScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
@@ -140,6 +140,7 @@ class DbScanAppRewardsStore(
     with HasCloseContext
     with org.lfdecentralizedtrust.splice.store.db.AcsQueries {
 
+  private implicit val dbProfile: DbStorage.Profile = storage.profile
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
 
   override protected def timeouts = new ProcessingTimeout
@@ -1094,6 +1095,6 @@ class DbScanAppRewardsStore(
       operationName: String,
   )(implicit tc: TraceContext): Future[T] =
     futureUnlessShutdownToFuture(
-      storage.queryAndUpdate(action, operationName)(implicitly, implicitly, _ => false)
+      storage.queryAndUpdate(action, operationName)
     )
 }

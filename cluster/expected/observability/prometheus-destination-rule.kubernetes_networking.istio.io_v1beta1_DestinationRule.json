@@ -1,0 +1,32 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "networking.istio.io/v1beta1",
+    "kind": "DestinationRule",
+    "metadata": {
+      "name": "prometheus",
+      "namespace": "observability"
+    },
+    "spec": {
+      "host": "prometheus-prometheus.observability.svc.cluster.local",
+      "trafficPolicy": {
+        "connectionPool": {
+          "http": {
+            "idleTimeout": "30s"
+          },
+          "tcp": {
+            "tcpKeepalive": {
+              "interval": "10s",
+              "probes": 3,
+              "time": "30s"
+            }
+          }
+        }
+      }
+    }
+  },
+  "name": "prometheus-destination-rule",
+  "provider": "",
+  "type": "kubernetes:networking.istio.io/v1beta1:DestinationRule"
+}

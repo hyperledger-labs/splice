@@ -1,0 +1,48 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "alertStrategy": {
+      "autoClose": "3600s",
+      "notificationChannelStrategies": [
+        {
+          "notificationChannelNames": [
+            null
+          ],
+          "renotifyInterval": "14400s"
+        }
+      ]
+    },
+    "combiner": "OR",
+    "conditions": [
+      {
+        "conditionThreshold": {
+          "aggregations": [
+            {
+              "alignmentPeriod": "600s",
+              "crossSeriesReducer": "REDUCE_SUM",
+              "groupByFields": [
+                "metric.label.cluster"
+              ],
+              "perSeriesAligner": "ALIGN_SUM"
+            }
+          ],
+          "comparison": "COMPARISON_GT",
+          "duration": "60s",
+          "filter": "resource.type=\"global\" AND metric.type = \"logging.googleapis.com/user/log_gke_cluster_update_mock\"",
+          "trigger": {
+            "count": 1
+          }
+        },
+        "displayName": "Cluster mock is being updated"
+      }
+    ],
+    "displayName": "Cluster mock is being updated",
+    "notificationChannels": [
+      null
+    ]
+  },
+  "name": "updateClusterAlert",
+  "provider": "",
+  "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+}

@@ -1,0 +1,17 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "managedZone": "canton-global",
+    "name": "mock.network.canton.global.",
+    "project": "da-gcp-canton-domain",
+    "rrdatas": [
+      null
+    ],
+    "ttl": 60,
+    "type": "A"
+  },
+  "name": "mock.network.canton.global",
+  "provider": "",
+  "type": "gcp:dns/recordSet:RecordSet"
+}

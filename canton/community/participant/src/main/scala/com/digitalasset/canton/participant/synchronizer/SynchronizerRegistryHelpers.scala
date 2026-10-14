@@ -26,6 +26,7 @@ import com.digitalasset.canton.crypto.{
 import com.digitalasset.canton.data.SynchronizerPredecessor
 import com.digitalasset.canton.environment.StoreBasedSynchronizerTopologyInitializationCallback
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
@@ -55,16 +56,19 @@ import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
 import com.digitalasset.canton.topology.processing.InitialTopologySnapshotValidator
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersionCompatibility
+import com.digitalasset.nonempty.NonEmpty
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.Success
+import scala.util.chaining.scalaUtilChainingOps
 
 trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with HasCloseContext {
   this: HasFutureSupervision =>
@@ -85,6 +89,7 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
       syncPersistentStateManager: SyncPersistentStateManager,
       sequencerAggregatedInfo: SequencerAggregatedInfo,
       connectionPool: SequencerConnectionPool,
+      onboardingTransactions: Option[NonEmpty[Seq[GenericSignedTopologyTransaction]]],
   )(
       cryptoApiProvider: SyncCryptoApiParticipantProvider,
       clock: Clock,
@@ -127,7 +132,7 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
       synchronizerLoggerFactory = loggerFactory.append("psid", psid.toString)
 
       topologyFactory <- syncPersistentStateManager
-        .topologyFactoryFor(psid)
+        .topologyFactoryFor(psid, Some(metrics.topologyCache))
         .toRight(
           SynchronizerRegistryError.SynchronizerRegistryInternalError
             .InvalidState(
@@ -139,8 +144,11 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
       topologyClient <- EitherT.right(
         synchronizeWithClosing("create caching client")(
           topologyFactory.createTopologyClient(
-            new PackageDependencyResolverImpl(participantId, packageMetadataView, loggerFactory),
-            synchronizerPredecessor,
+            packageDependencyResolver =
+              new PackageDependencyResolverImpl(participantId, packageMetadataView, loggerFactory),
+            synchronizerPredecessor = synchronizerPredecessor,
+            cleanSynchronizerRecordTime = syncPersistentStateManager.ledgerApiStore.value.ledgerEnd
+              .flatMap(_.synchronizerIndices.get(psid.logical).map(_.recordTime)),
           )
         )
       )
@@ -206,6 +214,8 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
           case _: ParticipantId => configO
           case _ => None
         }
+
+        logger.debug(s"Building sequencer client factory for $psid")
         (
           SequencerClientFactory(
             psid,
@@ -225,7 +235,9 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
                   config.copy(recordingConfig = updateMemberRecordingPath(config.recordingConfig))
                 )
             ),
-            metrics.connectedSynchronizerMetrics(config.synchronizerAlias).sequencerClient,
+            metrics
+              .connectedSynchronizerMetrics(config.synchronizerAlias, participantId)
+              .sequencerClient,
             participantNodeParameters.loggingConfig,
             participantNodeParameters.exitOnFatalFailures,
             synchronizerLoggerFactory,
@@ -265,6 +277,7 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
               psid,
               config.synchronizerAlias,
               client,
+              onboardingTransactions,
             )
             _ <- EitherT.cond[FutureUnlessShutdown](
               success,
@@ -281,6 +294,8 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
             }
           } yield ()
         }
+
+      _ = logger.debug(s"Building sequencer client for $psid")
 
       sequencerClient <- sequencerClientFactory
         .create(
@@ -344,6 +359,9 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
       persistentState,
       synchronizerCryptoApi,
       timeouts,
+    ).tap(synchronizerHandle =>
+      if (logger.underlying.isDebugEnabled())
+        logger.debug(s"Synchronizer handle ready for use: $synchronizerHandle")
     )
 
     synchronizerHandleET
@@ -359,23 +377,20 @@ trait SynchronizerRegistryHelpers extends FlagCloseable with NamedLogging with H
       ec: ExecutionContextExecutor,
       traceContext: TraceContext,
   ): EitherT[FutureUnlessShutdown, SynchronizerRegistryError, Unit] =
-    synchronizeWithClosing("check-for-synchronizer-topology-initialization")(
-      EitherT.right[SynchronizerRegistryError](connectivityStatusStore.isTopologyInitialized())
-    ).flatMap {
-      case true =>
-        EitherT.right[SynchronizerRegistryError](FutureUnlessShutdown.unit)
-      case false =>
-        new StoreBasedSynchronizerTopologyInitializationCallback()
-          .callback(
-            topologySnapshotValidator,
-            topologyClient,
-            sequencerClient,
-            staticParameters.protocolVersion,
-          )
-          .leftMap[SynchronizerRegistryError](
-            SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencer.Error(_)
-          )
-          .semiflatMap(_ => connectivityStatusStore.setTopologyInitialized())
+    if (connectivityStatusStore.isTopologyInitialized) {
+      EitherT.right[SynchronizerRegistryError](FutureUnlessShutdown.unit)
+    } else {
+      new StoreBasedSynchronizerTopologyInitializationCallback()
+        .callback(
+          topologySnapshotValidator,
+          topologyClient,
+          sequencerClient,
+          staticParameters.protocolVersion,
+        )
+        .leftMap[SynchronizerRegistryError](
+          SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencer.Error(_)
+        )
+        .semiflatMap(_ => connectivityStatusStore.setTopologyInitialized())
     }
 
   // if participant has provided synchronizer id previously, compare and make sure the synchronizer being
@@ -520,34 +535,32 @@ object SynchronizerRegistryHelpers {
     EitherT.right(
       predecessorSyncStateO
         .traverse_ { case (predecessor, predecessorSyncState) =>
-          for {
-            isTopologyInitialized <- persistentState.connectivityStatusStore.isTopologyInitialized()
+          val isTopologyInitialized = persistentState.connectivityStatusStore.isTopologyInitialized
+          val shouldCopyTopology = !isTopologyInitialized && !predecessor.isLateUpgrade
+          val copyAction = if (shouldCopyTopology) {
+            for {
+              _ <- persistentState.topologyStore
+                .copyFromPredecessorSynchronizerStore(
+                  predecessorSyncState.topologyStore
+                )
 
-            shouldCopyTopology = !isTopologyInitialized && !predecessor.isLateUpgrade
-            _ <-
-              if (shouldCopyTopology) {
-                for {
-                  _ <- persistentState.topologyStore
-                    .copyFromPredecessorSynchronizerStore(
-                      predecessorSyncState.topologyStore
-                    )
+              _ <- persistentState.connectivityStatusStore.setTopologyInitialized()
+            } yield ()
+          } else {
+            if (predecessor.isLateUpgrade)
+              loggingContext.info(
+                s"LSU to ${persistentState.psid.suffix}: Topology will not be copied because of late upgrade"
+              )
 
-                  _ <- persistentState.connectivityStatusStore.setTopologyInitialized()
-                } yield ()
-              } else {
-                if (predecessor.isLateUpgrade)
-                  loggingContext.info(
-                    s"LSU to ${persistentState.psid.suffix}: Topology will not be copied because of late upgrade"
-                  )
+            FutureUnlessShutdown.unit
+          }
 
-                FutureUnlessShutdown.unit
-              }
-
-            _ = metrics.setLsuStatus(
+          copyAction.thereafter(_ =>
+            metrics.setLsuStatus(
               ParticipantMetrics.LsuStatus.LocalCopyDone,
-              persistentState.psid,
+              persistentState.psid.opaque,
             )
-          } yield ()
+          )
         }
     )
   }

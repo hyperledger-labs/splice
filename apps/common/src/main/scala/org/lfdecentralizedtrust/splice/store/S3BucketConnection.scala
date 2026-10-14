@@ -286,6 +286,23 @@ class S3BucketConnection(
       */
     def finish(): Future[Unit] = finishResult
 
+    /** Aborts the multi-part upload, discarding all uploaded parts. The object never becomes visible.
+      */
+    def abort(): Future[Unit] =
+      for {
+        id <- uploadId
+        _ <- s3Client
+          .abortMultipartUpload(
+            AbortMultipartUploadRequest
+              .builder()
+              .bucket(bucketName)
+              .key(key)
+              .uploadId(id)
+              .build()
+          )
+          .asScala
+      } yield ()
+
     private def doFinish(): Future[Unit] = {
       require(numParts.get() > 0)
       require(

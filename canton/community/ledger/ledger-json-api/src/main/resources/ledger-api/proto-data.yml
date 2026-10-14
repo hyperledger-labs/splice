@@ -314,12 +314,6 @@ fileComments:
               Modifiable
 
               Optional: can be empty
-      annotations_entry:
-        message:
-          comments: null
-          fieldComments:
-            key: ''
-            value: ''
     oneOfs:
       ObjectMeta: {}
     services: {}
@@ -629,6 +623,163 @@ fileComments:
         comments: |-
           Prune the ledger specifying the offset before and at which ledger transactions should be removed. Only returns when
           the potentially long-running prune request ends successfully or with an error.
+  admin/party_management_alpha_service.proto:
+    messages:
+      AuthorizePartyUpdateRequest:
+        message:
+          comments: null
+          fieldComments:
+            signatures: |-
+              External signatures authorizing the topology transaction.
+
+              Must be provided for external parties where the namespace keys are held externally.
+              If empty, the local participant will simply append its own node signature to authorize
+              or propose the transaction.
+
+              Optional: can be empty
+            synchronizer_id: |-
+              The synchronizer where the party is being replicated.
+
+              Required
+            user_id: |-
+              If provided, the local user is provisioned and the quota is checked.
+              If omitted, no IAM user provisioning occurs.
+
+              Optional
+            transaction: |-
+              The serialized PartyToParticipant topology transaction.
+
+              Required: must be non-empty
+            identity_provider_id: |-
+              The id of the Identity Provider on the target participant.
+              If not set, assumes the default IDP or uses the token's 'iss' field.
+
+              Optional
+      AuthorizePartyUpdateResponse:
+        message:
+          comments: null
+          fieldComments: {}
+      ErrorDetails:
+        message:
+          comments: null
+          fieldComments:
+            message: |-
+              The descriptive error message.
+
+              Required
+      GeneratePartyTopologyUpdateRequest:
+        message:
+          comments: null
+          fieldComments:
+            party_id: |-
+              The party to replicate.
+
+              Required
+            synchronizer_id: |-
+              The synchronizer in which to replicate the party.
+
+              Required
+            target_participant_uid: |-
+              The unique identifier of the target participant where the party will be replicated.
+
+              Required
+            participant_permission: |-
+              The permission level of the party on the target participant.
+
+              Required
+      GeneratePartyTopologyUpdateResponse:
+        message:
+          comments: null
+          fieldComments:
+            transaction: |-
+              The serialized topology transaction which needs to be signed.
+
+              Required: must be non-empty
+            hash: |-
+              The hash that needs be signed (to sign the topology transaction).
+
+              Required: must be non-empty
+      GetAddPartyStatusRequest:
+        message:
+          comments: null
+          fieldComments:
+            party_id: |-
+              The party replicating to the target participant.
+
+              Required
+            synchronizer_id: |-
+              The synchronizer in which the party is being replicated.
+
+              Required
+            target_participant_uid: |-
+              The unique identifier of the target participant where the party is replicating to.
+
+              Required
+      GetAddPartyStatusResponse:
+        message:
+          comments: null
+          fieldComments:
+            status: Required
+      PartyReplicationStatus:
+        message:
+          comments: Describes the status of a party replication operation.
+          fieldComments:
+            current: |-
+              The overall lifecycle state of the replication operation.
+
+              Required
+            error: |-
+              Diagnostic details, populated when an error occurs (i.e., when state is STATE_FAILED).
+
+              Optional
+    oneOfs:
+      AuthorizePartyUpdateRequest: {}
+      AuthorizePartyUpdateResponse: {}
+      GeneratePartyTopologyUpdateRequest: {}
+      GeneratePartyTopologyUpdateResponse: {}
+      GetAddPartyStatusRequest: {}
+      GetAddPartyStatusResponse: {}
+      PartyReplicationStatus: {}
+    services:
+      PartyManagementAlphaService:
+      - name: GeneratePartyTopologyUpdate
+        comments: |-
+          Generates a PartyToParticipant mapping topology transaction to onboard an already hosted
+          party to a target participant which does not yet host the party.
+
+          For external parties, the returned transaction hash can be signed externally.
+          The transaction and any signatures are then submitted using the AuthorizePartyUpdate RPC.
+          For local (internal) parties, the transaction can be passed directly to AuthorizePartyUpdate
+          without external signatures.
+
+          Note that for external parties, setting a permission other than Confirmation or
+          Observation does not make sense.
+
+          Returns the serialized PartyToParticipant mapping topology transaction along with the
+          hash to sign.
+          Returns INVALID_ARGUMENT if the parameters are invalid or inconsistent with the current
+          topology state.
+      - name: AuthorizePartyUpdate
+        comments: |-
+          Submits a PartyToParticipant mapping topology transaction to onboard an already hosted
+          party to a new target participant.
+
+          This endpoint can be called on the target participant, as well as on any source
+          participant(s) already hosting the party, to collect the necessary signatures
+          to reach the required authorization thresholds.
+
+          The transaction bytes are expected to be generated via GeneratePartyTopologyUpdate RPC.
+
+          Additionally, local user rights and identity provider mapping will be provisioned if
+          provided. Note: IAM user provisioning only occurs if this endpoint is invoked on the
+          target participant.
+
+          Returns INVALID_ARGUMENT if the parameters are invalid or inconsistent with the current
+          topology state.
+      - name: GetAddPartyStatus
+        comments: |-
+          Query the status of an ongoing party replication with information about progress,
+          completion, or errors.
   admin/party_management_service.proto:
     messages:
       AllocateExternalPartyRequest:
@@ -792,7 +943,7 @@ fileComments:
           fieldComments:
             participant_id: |-
               Identifier of the participant, which SHOULD be globally unique.
-              Must be a valid LedgerString (as describe in ``value.proto``).
+              Must be a valid ParticipantIdStrings (as describe in ``value.proto``).
 
               Required
       GetPartiesRequest:
@@ -1018,6 +1169,10 @@ fileComments:
           colon, minus and underscore limited to 255 chars
       - name: AllocateExternalParty
         comments: |-
+          Alpha 3.3: Endpoint to allocate a new external party on a synchronizer
+
+          Expected to be stable in 3.5
+
           The external party must be hosted (at least) on this node with either confirmation or observation permissions
           It can optionally be hosted on other nodes (then called a multi-hosted party).
           If hosted on additional nodes, explicit authorization of the hosting relationship must be performed on those nodes
@@ -1035,6 +1190,10 @@ fileComments:
         comments: Update the assignment of a party from one IDP to another.
       - name: GenerateExternalPartyTopology
         comments: |-
+          Alpha 3.3: Convenience endpoint to generate topology transactions for external signing
+
+          Expected to be stable in 3.5
+
           You may use this endpoint to generate the common external topology transactions
           which can be signed externally and uploaded as part of the allocate party process
 
@@ -1051,6 +1210,12 @@ fileComments:
               The right to authorize commands for this party.
 
               Required
+      CanActAsAnyParty:
+        message:
+          comments: |-
+            The right of a user to authorize commands as any party on a participant.
+            Its utility is predominantly for users that act on behalf of many parties.
+          fieldComments: {}
       CanExecuteAs:
         message:
           comments: null
@@ -1282,9 +1447,10 @@ fileComments:
             can_read_as_any_party: The user can read as any party on a participant
             identity_provider_admin: The user can administer users and parties assigned
               to the same identity provider as the one of the user.
-            can_read_as: The user can read ledger data visible to a specific party.
             participant_admin: The user can administer the participant node.
             can_act_as: The user can act as a specific party.
+            can_read_as: The user can read ledger data visible to a specific party.
+            can_act_as_any_party: The user can act as any party on a participant.
       UpdateUserIdentityProviderIdRequest:
         message:
           comments: 'Required authorization: ``HasRight(ParticipantAdmin)``'
@@ -1418,9 +1584,10 @@ fileComments:
               can_read_as_any_party: The user can read as any party on a participant
               identity_provider_admin: The user can administer users and parties assigned
                 to the same identity provider as the one of the user.
-              can_read_as: The user can read ledger data visible to a specific party.
               participant_admin: The user can administer the participant node.
               can_act_as: The user can act as a specific party.
+              can_read_as: The user can read ledger data visible to a specific party.
+              can_act_as_any_party: The user can act as any party on a participant.
       UpdateUserIdentityProviderIdRequest: {}
       UpdateUserIdentityProviderIdResponse: {}
       UpdateUserRequest: {}
@@ -1484,6 +1651,30 @@ fileComments:
           fieldComments:
             completion: ''
             offset_checkpoint: ''
+      GetCompletionByHashRequest:
+        message:
+          comments: null
+          fieldComments:
+            transaction_hash: |-
+              The transaction hash of the prepared transaction whose completion is being looked up.
+
+              Required: must be non-empty
+      GetCompletionByHashResponse:
+        message:
+          comments: null
+          fieldComments:
+            accepted_completion: |-
+              The accepted completion for the given transaction hash (at most one can exist).
+              Only completions beyond the current pruning offset are visible.
+
+              Optional
+            last_rejected_completions: |-
+              Recent rejected completions for the given transaction hash, in descending offset order.
+              The server may truncate this list if there are too many entries.
+              Use ``submission_id`` to correlate with a specific command submission.
+              Only completions beyond the current pruning offset are visible.
+
+              Optional: can be empty
       GetCompletionsRequest:
         message:
           comments: null
@@ -1512,6 +1703,8 @@ fileComments:
             fieldComments:
               completion: ''
               offset_checkpoint: ''
+      GetCompletionByHashRequest: {}
+      GetCompletionByHashResponse: {}
       GetCompletionsRequest: {}
     services:
       CommandCompletionService:
@@ -1523,6 +1716,16 @@ fileComments:
         comments: |-
           Subscribe to command completion events.
           This streaming endpoint provides more flexibility in filtering than the predecessor ``CompletionStream``.
+      - name: GetCompletionByHash
+        comments: |-
+          Look up a completion by its transaction hash.
+          This is only available for completions received after upgrading to Canton version 3.5.
+          A COMPLETION_NOT_FOUND error will be raised if either of the following is true:
+
+          - there is no completion with this transaction hash,
+          - the completion is not visible to the user,
+          - the completion was populated before upgrading to Canton version 3.5,
+          - respective completions are all pruned.
   command_service.proto:
     messages:
       SubmitAndWaitForReassignmentRequest:
@@ -1940,6 +2143,20 @@ fileComments:
           comments: 'A completion represents the status of a submitted command on
             the ledger: it can be successful or failed.'
           fieldComments:
+            transaction_hash: |-
+              The transaction hash signed by the external party for prepared transactions
+              that were submitted using `InteractiveSubmissionService.ExecuteSubmission`
+              or one of its variants.
+
+              Use this to correlate prepared transactions with their execution result
+              on the *same participant* that executed the transaction.
+
+              Not available for:
+
+              - transactions executed on Canton versions prior to 3.5
+              - transactions of internal parties submitted using `CommandSubmissionService.Submit` and its variants
+
+              Optional: can be empty
             command_id: |-
               The ID of the succeeded or failed command.
               Must be a valid LedgerString (as described in ``value.proto``).
@@ -2683,7 +2900,9 @@ fileComments:
 
               Required
             hashing_scheme_version: |-
-              The hashing scheme version used when building the hash
+              The hashing scheme version used when building the hash.
+              HASHING_SCHEME_VERSION_V4 requires a synchronizer running protocol version 36 or later and is
+              rejected on synchronizers running older protocol versions.
 
               Required
             deduplication_duration: |-
@@ -2744,7 +2963,9 @@ fileComments:
 
               Required
             hashing_scheme_version: |-
-              The hashing scheme version used when building the hash
+              The hashing scheme version used when building the hash.
+              HASHING_SCHEME_VERSION_V4 requires a synchronizer running protocol version 36 or later and is
+              rejected on synchronizers running older protocol versions.
 
               Required
             deduplication_duration: |-
@@ -2801,7 +3022,9 @@ fileComments:
 
               Required
             hashing_scheme_version: |-
-              The hashing scheme version used when building the hash
+              The hashing scheme version used when building the hash.
+              HASHING_SCHEME_VERSION_V4 requires a synchronizer running protocol version 36 or later and is
+              rejected on synchronizers running older protocol versions.
 
               Required
             deduplication_duration: |-
@@ -3090,6 +3313,8 @@ fileComments:
             hashing_scheme_version: |-
               The hashing scheme version to be used when building the hash.
               Defaults to HASHING_SCHEME_VERSION_V2.
+              HASHING_SCHEME_VERSION_V4 requires a synchronizer running protocol version 36 or later and is
+              rejected on synchronizers running older protocol versions.
 
               Optional
             read_as: |-
@@ -3156,7 +3381,9 @@ fileComments:
 
               Optional
             hashing_scheme_version: |-
-              The hashing scheme version used when building the hash
+              The hashing scheme version used when building the hash.
+              HASHING_SCHEME_VERSION_V4 is only returned for synchronizers running protocol version 36 or
+              later.
 
               Required
       PreparedTransaction:
@@ -3305,7 +3532,7 @@ fileComments:
 
           Can be accessed by any Ledger API client with a valid token when Ledger API authorization is enabled.
 
-          Provided for backwards compatibility, it will be removed in the Canton version 3.4.0
+          Deprecated: Use GetPreferredPackages instead.
       - name: GetPreferredPackages
         comments: |-
           Compute the preferred packages for the vetting requirements in the request.
@@ -3322,8 +3549,6 @@ fileComments:
           a `FAILED_PRECONDITION` error will be returned.
 
           Can be accessed by any Ledger API client with a valid token when Ledger API authorization is enabled.
-
-          Experimental API: this endpoint is not guaranteed to provide backwards compatibility in future releases
   interactive/transaction/v1/interactive_submission_data.proto:
     messages:
       Create:
@@ -3352,10 +3577,6 @@ fileComments:
           comments: Exercise node
           fieldComments:
             children: 'Optional: can be empty'
-            interface_id: |-
-              The identifier uses the package-id reference format.
-
-              Optional
             signatories: 'Required: must be non-empty'
             consuming: Required
             key: |-
@@ -3368,6 +3589,19 @@ fileComments:
             chosen_value: Required
             choice_id: Required
             choice_observers: 'Optional: can be empty'
+            external_call_results: |-
+              Can only be populated from lf_version dev.
+
+              Results of external calls made during this exercise.
+              These results are carried for external-call replay and validation.
+              They are encoded into the prepared transaction hash starting with
+              HASHING_SCHEME_VERSION_V4.
+
+              Optional: can be empty
+            interface_id: |-
+              The identifier uses the package-id reference format.
+
+              Optional
             stakeholders: 'Required: must be non-empty'
             by_key: |-
               Can only be true from lf_version >= 2
@@ -3382,6 +3616,33 @@ fileComments:
 
               Required
             contract_id: Required
+      ExternalCallResult:
+        message:
+          comments: |-
+            Result of an external call made during transaction execution.
+            External calls are deterministic calls to participant extension services.
+            Results are stored in the transaction and replayed during validation.
+          fieldComments:
+            config: |-
+              Extension configuration hash bytes.
+
+              Required: must be non-empty
+            function_id: |-
+              Function identifier within the extension.
+
+              Required
+            extension_id: |-
+              Extension service identifier.
+
+              Required
+            output: |-
+              Output data returned by the extension.
+
+              Required: must be non-empty
+            input: |-
+              Input data sent to the extension.
+
+              Required: must be non-empty
       Fetch:
         message:
           comments: Fetch node
@@ -3447,6 +3708,7 @@ fileComments:
     oneOfs:
       Create: {}
       Exercise: {}
+      ExternalCallResult: {}
       Fetch: {}
       Node:
         node_type:
@@ -3461,6 +3723,36 @@ fileComments:
       QueryByKey: {}
       Rollback: {}
     services: {}
+  jose_service.proto:
+    messages:
+      GetJwksRequest:
+        message:
+          comments: null
+          fieldComments:
+            synchronizer_id: |-
+              The synchronizer containing the signing public keys for the party
+
+              Required
+            party_id: |-
+              The party to request the JWKS for
+
+              Required
+      GetJwksResponse:
+        message:
+          comments: null
+          fieldComments:
+            keys: |-
+              List of JWKs for the specified party and synchronizer.
+              Only keys of which the usage allows for Party JWT authentication will be returned.
+
+              Optional: can be empty
+    oneOfs:
+      GetJwksRequest: {}
+      GetJwksResponse: {}
+    services:
+      JoseService:
+      - name: GetJwks
+        comments: ''
   offset_checkpoint.proto:
     messages:
       OffsetCheckpoint:
@@ -3782,9 +4074,10 @@ fileComments:
 
               Required
             reassignment_counter: |-
-              Each corresponding assigned and unassigned event has the same reassignment_counter. This strictly increases
-              with each unassign command for the same contract. Creation of the contract corresponds to reassignment_counter
-              equals zero.
+              The reassignment counter associated with this assignment on the target synchronizer.
+
+              Reassignment counters strictly increase with each unassign command for the same contract.
+              Creation of the contract corresponds to reassignment_counter equal to zero.
 
               Required
             reassignment_id: |-
@@ -3899,9 +4192,10 @@ fileComments:
 
               Required
             reassignment_counter: |-
-              Each corresponding assigned and unassigned event has the same reassignment_counter. This strictly increases
-              with each unassign command for the same contract. Creation of the contract corresponds to reassignment_counter
-              equals zero.
+              The reassignment counter associated with this unassignment on the source synchronizer.
+
+              Reassignment counters strictly increase with each unassign command for the same contract.
+              Creation of the contract corresponds to reassignment_counter equal to zero.
 
               Required
             witness_parties: |-
@@ -4072,11 +4366,12 @@ fileComments:
 
               Required
             reassignment_counter: |-
-              Each corresponding assigned and unassigned event has the same reassignment_counter. This strictly increases
-              with each unassign command for the same contract. Creation of the contract corresponds to reassignment_counter
-              equals zero.
-              This field will be the reassignment_counter of the latest observable activation event on this synchronizer, which is
-              before the active_at_offset.
+              The reassignment counter of this event.
+
+              Reassignment counters strictly increase with each unassign command for the same contract. Creation
+              of the contract corresponds to a reassignment_counter equal to zero.
+              This field will be the reassignment_counter of the latest observable activation event on this synchronizer,
+              which is before the active_at_offset.
 
               Required
       ConnectedSynchronizer:
@@ -4267,7 +4562,14 @@ fileComments:
       GetLedgerEndRequest:
         message:
           comments: null
-          fieldComments: {}
+          fieldComments:
+            synchronizer_id: |-
+              Provide synchronizer_times for the specified synchronizers in the response.
+              If none are specified, only offset will be present in the response.
+              If the request includes a synchronizer for which no updates were observed, it will be omitted in the output.
+              If the request includes a synchronizer that participant was never connected to, it will be omitted in the output.
+
+              Optional: can be empty
       GetLedgerEndResponse:
         message:
           comments: null
@@ -4278,6 +4580,11 @@ fileComments:
               If positive, the absolute offset of the ledger as viewed by the participant.
 
               Optional
+            synchronizer_times: |-
+              Final record times observed by this participant for each of the requested synchronizers.
+              If there is no connection to a sequencer, corresponding record time can be arbitrarily far back in the past.
+
+              Optional: can be empty
       IncompleteAssigned:
         message:
           comments: null
@@ -4506,6 +4813,92 @@ fileComments:
     oneOfs:
       TraceContext: {}
     services: {}
+  traffic_service.proto:
+    messages:
+      GetAccountRequest:
+        message:
+          comments: null
+          fieldComments:
+            account_id: Required
+      GetAccountResponse:
+        message:
+          comments: null
+          fieldComments:
+            account_id: Required
+            balance: Required
+      PruneEventsRequest:
+        message:
+          comments: null
+          fieldComments:
+            before_or_at: |-
+              The timestamp before which events should be pruned.
+              Events with a timestamp less than or equal to this value will be pruned.
+
+              Required
+      PruneEventsResponse:
+        message:
+          comments: null
+          fieldComments:
+            pruned_event_count: |-
+              The number of events that were pruned.
+
+              Required
+      UpdateAccountRequest:
+        message:
+          comments: null
+          fieldComments:
+            account_id: |-
+              The account ID whose account to update.
+
+              NOTE: Currently, the account ID is tied to and identified by a party ID.
+              This constraint is expected to be removed in a future release, allowing for user-defined
+              account IDs that are not necessarily tied to a specific party.
+
+              Required
+            balance_delta: |-
+              Balance DELTA to apply to the current balance.
+              Negative values will decrease the balance, positive values will increase the balance.
+              If unset, the balance will not be updated
+
+              Note that setting a negative value may result in a negative balance if the delta is larger than the current balance.
+              Optional
+            deduplication_id: |-
+              Identifier of this logical update, used to de-duplicate.
+              The caller MUST use a distinct id for every distinct update, and MUST reuse the same id when
+              retrying an update that failed after a retryable error. An already processed id is ignored,
+              while a fresh id applies the delta again.
+
+              Required
+      UpdateAccountResponse:
+        message:
+          comments: null
+          fieldComments:
+            response: |-
+              The account state after the update
+
+              Required
+    oneOfs:
+      GetAccountRequest: {}
+      GetAccountResponse: {}
+      PruneEventsRequest: {}
+      PruneEventsResponse: {}
+      UpdateAccountRequest: {}
+      UpdateAccountResponse: {}
+    services:
+      TrafficService:
+      - name: GetAccount
+        comments: |-
+          Get account state for a given account ID.
+          Permissioned only to users having ActAs or ExecuteAs rights for the party ID associated with the account ID.
+      - name: UpdateAccount
+        comments: |-
+          Update account state for a given account ID.
+          Permissioned only to Ledger API admin users.
+      - name: PruneEvents
+        comments: |-
+          Prune events from the event log that are older than a given timestamp.
+          Permissioned only to Ledger API admin users.
+          WARNING: Affects de-duplication. If an event is pruned, de-duplication UpdateAccount requests on it will NOT be possible.
   transaction.proto:
     messages:
       Transaction:
@@ -4513,12 +4906,27 @@ fileComments:
           comments: Filtered view of an on-ledger transaction's create and archive
             events.
           fieldComments:
+            transaction_hash: |-
+              The transaction hash signed by the external party for prepared transactions
+              that were submitted using `InteractiveSubmissionService.ExecuteSubmission`
+              or one of its variants.
+
+              Use this to correlate prepared transactions with their execution result
+              on the *same participant* that executed the transaction.
+
+              Not available for:
+
+              - transactions executed on Canton versions prior to 3.6
+              - transactions of internal parties submitted using `CommandSubmissionService.Submit` and its variants
+
+              Optional: can be empty
             command_id: |-
               The ID of the command which resulted in this transaction. Missing for everyone except the submitting party.
               Must be a valid LedgerString (as described in ``value.proto``).
 
               Optional
             external_transaction_hash: |-
+              Deprecated: please use ``transaction_hash`` which has the same value.
               For transaction externally signed, contains the external transaction hash
               signed by the external party. Can be used to correlate an external submission with a committed transaction.
 
@@ -4758,12 +5166,6 @@ fileComments:
               for submitting it as a disclosed contract with future commands.
 
               Optional
-      filters_by_party_entry:
-        message:
-          comments: null
-          fieldComments:
-            key: ''
-            value: ''
     oneOfs:
       CumulativeFilter:
         identifier_filter:
@@ -4798,6 +5200,18 @@ fileComments:
     services: {}
   update_service.proto:
     messages:
+      GetUpdateByHashRequest:
+        message:
+          comments: null
+          fieldComments:
+            transaction_hash: |-
+              The transaction hash to look up.
+
+              Required: must be non-empty
+            update_format: |-
+              The format for the update.
+
+              Required
       GetUpdateByIdRequest:
         message:
           comments: null
@@ -4935,6 +5349,7 @@ fileComments:
             offset_checkpoint: ''
             topology_transaction: ''
     oneOfs:
+      GetUpdateByHashRequest: {}
       GetUpdateByIdRequest: {}
       GetUpdateByOffsetRequest: {}
       GetUpdateResponse:
@@ -4981,6 +5396,12 @@ fileComments:
         comments: |-
           Lookup an update by its ID.
           If there is no update with this ID, or all the events are filtered, an UPDATE_NOT_FOUND error will be raised.
+      - name: GetUpdateByHash
+        comments: |-
+          Look up an update by its transaction hash.
+          This is only available for updates received after upgrading to Canton version 3.6.
+          If there is no update with this transaction hash, or all the events are filtered,
+          or the update was populated before upgrading to Canton version 3.6, an UPDATE_NOT_FOUND error will be raised.
       - name: GetUpdatesPage
         comments: |-
           Read a page of ledger's filtered updates. It returns the event types in accordance with

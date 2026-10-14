@@ -3,13 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.store.bulk
 
-import com.github.luben.zstd.ZstdDirectBufferCompressingStreamNoFinalizer
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator
 import org.apache.pekko.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import org.apache.pekko.stream.{Attributes, FlowShape, Inlet, Outlet}
 import org.apache.pekko.util.ByteString
-
-import scala.util.control.NonFatal
 
 /** A Pekko GraphStage that zstd-compresses a stream of bytestrings, and splits the output into zstd objects of size (minWeight + delta).
   * Somewhat similar to Pekko's built-in GroupedWeight, but outputs valid zstd compressed objects.
@@ -17,10 +14,9 @@ import scala.util.control.NonFatal
 case class ZstdGroupedWeight(
     compressionLevel: Int,
     minSize: Long,
+    tmpBufferSize: Int = 10 * 1024 * 1024,
 ) extends GraphStage[FlowShape[ByteString, ByteString]] {
   require(minSize > 0, "minSize must be greater than 0")
-
-  val zstdTmpBufferSize = 10 * 1024 * 1024; // TODO(#3429): make configurable?
 
   val in = Inlet[ByteString]("ZstdGroupedWeight.in")
   val out = Outlet[ByteString]("ZstdGroupedWeight.out")
@@ -48,17 +44,7 @@ case class ZstdGroupedWeight(
   ) extends AutoCloseable {
 
     val bufferAllocator = PooledByteBufAllocator.DEFAULT
-    val tmpBuffer = bufferAllocator.directBuffer(zstdTmpBufferSize)
-    val (tmpNioBuffer, compressingStream) =
-      try {
-        val nioBuffer = tmpBuffer.nioBuffer(0, tmpBuffer.capacity())
-        (nioBuffer, new ZstdDirectBufferCompressingStreamNoFinalizer(nioBuffer, compressionLevel))
-      } catch {
-        // a failed construction never reaches close(), so release the buffer here
-        case NonFatal(e) =>
-          val _ = tmpBuffer.release()
-          throw e
-      }
+    val compressingStream = FlushingBuffer(compressionLevel, tmpBufferSize)
 
     def compress(input: ByteString): ByteString = {
       val inputBB = bufferAllocator.directBuffer(input.size)
@@ -69,25 +55,19 @@ case class ZstdGroupedWeight(
         val _ = inputBB.release()
       }
       compressingStream.flush()
-      tmpNioBuffer.flip()
-      val result = ByteString.fromByteBuffer(tmpNioBuffer)
-      tmpNioBuffer.clear()
-      result
+      compressingStream.read()
     }
 
     def zstdFinish(): ByteString = {
       compressingStream.close()
-      tmpNioBuffer.flip()
-      val result = ByteString.fromByteBuffer(tmpNioBuffer)
-      tmpNioBuffer.clear()
-      result
+      compressingStream.read()
     }
 
     override def close(): Unit = {
       try {
         compressingStream.close()
       } finally {
-        val _ = tmpBuffer.release()
+        val _ = compressingStream.release()
       }
     }
   }

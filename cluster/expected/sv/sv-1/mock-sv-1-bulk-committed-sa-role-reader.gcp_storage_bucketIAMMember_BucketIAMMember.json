@@ -1,0 +1,12 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "bucket": "mock-sv-1-bulk-committed",
+    "member": "serviceAccount:undefined",
+    "role": "roles/storage.objectViewer"
+  },
+  "name": "mock-sv-1-bulk-committed-sa-role-reader",
+  "provider": "",
+  "type": "gcp:storage/bucketIAMMember:BucketIAMMember"
+}

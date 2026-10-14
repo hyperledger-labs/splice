@@ -17,6 +17,7 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.health.ComponentHealthState
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.metrics.DbStorageMetrics
 import com.digitalasset.canton.resource.DbStorage.DatabaseFailureDurationTracker
@@ -161,8 +162,9 @@ final class DbStorageMulti private (
     val nextCheckTime = now.add(checkPeriod.unwrap)
     logger.trace(s"Scheduling the next health check at $nextCheckTime")
     FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-      clock.scheduleAt(
+      clock.scheduleAtCancelledOnShutdown(
         checkHealth,
+        s"${getClass.getName}: scheduling health check",
         nextCheckTime,
       ),
       "failed to schedule next health check",
@@ -234,7 +236,9 @@ final class DbStorageMulti private (
       maxRetries: Int,
   )(implicit traceContext: TraceContext, closeContext: CloseContext): FutureUnlessShutdown[A] =
     runIfSessionIsOpen("reading", operationName, maxRetries)(
-      FutureUnlessShutdown.outcomeF(generalDb.run(action))
+      CloseContext.withCombinedContext(this.closeContext, closeContext, timeouts, logger)(
+        _.context.synchronizeWithClosingF(functionFullName)(generalDb.run(action))
+      )
     )
 
   override protected[canton] def runWrite[A](
@@ -244,10 +248,11 @@ final class DbStorageMulti private (
   )(implicit
       traceContext: TraceContext,
       closeContext: CloseContext,
-      rowsAltered: DbStorage.RowsAltered[A],
   ): FutureUnlessShutdown[A] =
     runIfSessionIsOpen("writing", operationName, maxRetries)(
-      FutureUnlessShutdown.outcomeF(writeDb.run(action))
+      CloseContext.withCombinedContext(this.closeContext, closeContext, timeouts, logger)(
+        _.context.synchronizeWithClosingF(functionFullName)(writeDb.run(action))
+      )
     )
 
   override def isActive: Boolean = writeConnectionPool.isActive
@@ -257,7 +262,7 @@ final class DbStorageMulti private (
     // Slick by default closes first the executor and then the source, which does not work here.
     val clockCloseable = if (closeClock) Seq(clock) else Seq.empty
     val otherCloseables = Seq(generalDb, writeConnectionPool, writeDbExecutor)
-    LifeCycle.close((clockCloseable ++ otherCloseables)*)(logger)
+    LifeCycle.close(clockCloseable ++ otherCloseables)(logger)
   }
 
   def setPassive()(implicit
@@ -270,9 +275,9 @@ final class DbStorageMulti private (
       body: Connection => T,
   ): FutureUnlessShutdown[T] =
     runIfSessionIsOpen("writing", "runGenericJdbcWrite", 0)(
-      FutureUnlessShutdown.outcomeF(
+      closeContext.context.synchronizeWithClosingF(functionFullName)(
         writeDb.run(SimpleJdbcAction(c => body(c.connection)))
-      )
+      )(ec, traceContext)
     )(traceContext, closeContext)
 }
 

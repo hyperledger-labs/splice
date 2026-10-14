@@ -1,0 +1,28 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "action": "throttle",
+    "description": "Per source IP throttle rule for all info API endpoints",
+    "match": {
+      "expr": {
+        "expression": "request.path.lower().urlDecode().startsWith(R\"/\") && request.headers['host'].lower().matches(R\"^(?:info)\\.[\\w-]+\\.mock\\.global\\.canton\\.network\\.digitalasset\\.com(?::[0-9]+)?$\")"
+      }
+    },
+    "preview": true,
+    "priority": 372199281,
+    "rateLimitOptions": {
+      "conformAction": "allow",
+      "enforceOnKey": "IP",
+      "exceedAction": "deny(429)",
+      "rateLimitThreshold": {
+        "count": 10000,
+        "intervalSec": 60
+      }
+    },
+    "securityPolicy": "waf-whitelist-throttle-ban-mock"
+  },
+  "name": "throttle-all-endpoints-per-ip-info",
+  "provider": "",
+  "type": "gcp:compute/regionSecurityPolicyRule:RegionSecurityPolicyRule"
+}

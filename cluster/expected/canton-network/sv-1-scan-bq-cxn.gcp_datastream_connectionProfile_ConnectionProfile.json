@@ -1,0 +1,16 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "bigqueryProfile": {},
+    "connectionProfileId": "sv-1-scan-bq-cxn",
+    "displayName": "sv-1-scan-bq-cxn",
+    "labels": {
+      "cluster": "mock"
+    },
+    "location": "europe-west6"
+  },
+  "name": "sv-1-scan-bq-cxn",
+  "provider": "",
+  "type": "gcp:datastream/connectionProfile:ConnectionProfile"
+}

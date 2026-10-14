@@ -936,7 +936,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         case u => fail(s"unexpected update $u")
       }
 
-    "getExternalTransactionHash" should {
+    "getTransactionHash" should {
       "return stored external transaction hash when empty" in {
         val store = mkStore()
         val externalTransactionHash = ByteString.EMPTY
@@ -957,9 +957,9 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         } yield {
           updates should have size 1
           val storedTransaction = extractTransactionTree(updates)
-          storedTransaction.getExternalTransactionHash should be(externalTransactionHash)
-          storedTransaction.getExternalTransactionHash should be(
-            expectedUpdate.getExternalTransactionHash
+          storedTransaction.getTransactionHash should be(externalTransactionHash)
+          storedTransaction.getTransactionHash should be(
+            expectedUpdate.getTransactionHash
           )
         }
       }
@@ -988,9 +988,9 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         } yield {
           updates should have size 1
           val storedTransaction = extractTransactionTree(updates)
-          storedTransaction.getExternalTransactionHash should be(externalTxnHashByteString)
-          storedTransaction.getExternalTransactionHash should be(
-            expectedUpdate.getExternalTransactionHash
+          storedTransaction.getTransactionHash should be(externalTxnHashByteString)
+          storedTransaction.getTransactionHash should be(
+            expectedUpdate.getTransactionHash
           )
         }
       }

@@ -4,6 +4,7 @@
 package com.digitalasset.canton.crypto
 
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.{BaseTest, FailOnShutdown}
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -35,14 +36,17 @@ trait CryptoKeyFormatMigrationTest
             @nowarn("msg=Der in object CryptoKeyFormat is deprecated")
             val expectedLegacyFormat = keySpec match {
               case SigningKeySpec.EcCurve25519 => CryptoKeyFormat.Raw
-              case SigningKeySpec.EcP256 | SigningKeySpec.EcP384 | SigningKeySpec.EcSecp256k1 =>
+              case SigningKeySpec.EcP256 | SigningKeySpec.EcP384 | SigningKeySpec.EcSecp256k1 |
+                  SigningKeySpec.MlDsa65 =>
                 CryptoKeyFormat.Der
             }
             legacyPublicKey.format shouldBe expectedLegacyFormat
             legacyPrivateKey.format shouldBe expectedLegacyFormat
 
             val newPublicKey = SigningPublicKey
-              .fromProtoV30(legacyPublicKey.toProtoV30)
+              .fromProtoV30(
+                legacyPublicKey.toProtoV30.valueOrFail("serialization of legacy public key")
+              )
               .valueOrFail("deserialize public")
 
             newPublicKey.format shouldBe CryptoKeyFormat.DerX509Spki
@@ -50,7 +54,9 @@ trait CryptoKeyFormatMigrationTest
             newPublicKey shouldBe publicKey
 
             val newPrivateKey = SigningPrivateKey
-              .fromProtoV30(legacyPrivateKey.toProtoV30)
+              .fromProtoV30(
+                legacyPrivateKey.toProtoV30.valueOrFail("serialization of legacy private key")
+              )
               .valueOrFail("deserialize private")
 
             newPrivateKey.format shouldBe CryptoKeyFormat.DerPkcs8Pki

@@ -1,0 +1,17 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "kind": "Namespace",
+    "metadata": {
+      "labels": {
+        "istio-injection": "enabled"
+      },
+      "name": "sv-da-1"
+    }
+  },
+  "name": "sv-da-1",
+  "provider": "",
+  "type": "kubernetes:core/v1:Namespace"
+}

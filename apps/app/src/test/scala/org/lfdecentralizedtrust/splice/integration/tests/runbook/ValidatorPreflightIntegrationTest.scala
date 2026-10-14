@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext

@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.data
 
+import cats.syntax.either.*
 import com.digitalasset.canton.crypto.HashOps
 import com.digitalasset.canton.data.MerkleTree.BlindingCommand
 import com.digitalasset.canton.data.ViewPosition.{MerklePathElement, MerkleSeqIndexFromRoot}
@@ -10,8 +11,9 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.{RootHash, ViewHash, v30}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.{DepthCounter, ProtocolVersion}
 import com.google.common.annotations.VisibleForTesting
+import com.google.protobuf.ByteString
 import monocle.Lens
 import monocle.macros.GenLens
 
@@ -97,20 +99,31 @@ final case class TransactionSubviews private[data] (
     *   function to generate the error message
     */
   def assertAllUnblinded(makeMessage: RootHash => String): Unit =
-    blindedElements.headOption.foreach(hash => throw new IllegalStateException(makeMessage(hash)))
+    allUnblinded(makeMessage).valueOr(err => throw new IllegalStateException(err))
+
+  private[data] def allUnblinded(makeMessage: RootHash => String): Either[String, Unit] =
+    blindedElements.headOption.map(hash => makeMessage(hash)).toLeft(())
 
 }
 
 object TransactionSubviews {
   private[data] def fromProtoV30(
       context: (HashOps, ProtocolVersion),
+      depthCounter: DepthCounter,
       subviewsPO: Option[v30.MerkleSeq],
   ): ParsingResult[TransactionSubviews] = {
     val (hashOps, expectedProtocolVersion) = context
     for {
       subviewsP <- ProtoConverter.required("ViewNode.subviews", subviewsPO)
-      tvParser = TransactionView.fromByteString(expectedProtocolVersion, context) _
-      subviews <- MerkleSeq.fromProtoV30(((hashOps, tvParser), expectedProtocolVersion), subviewsP)
+      tvParser = (bytes: ByteString, tvDepth: DepthCounter) =>
+        TransactionView.fromByteString(
+          expectedProtocolVersion,
+          (hashOps, tvDepth, expectedProtocolVersion),
+        )(bytes)
+      subviews <- MerkleSeq.fromProtoV30(
+        ((hashOps, tvParser, depthCounter), expectedProtocolVersion),
+        subviewsP,
+      )
     } yield TransactionSubviews(subviews)
   }
 
@@ -138,7 +151,7 @@ object TransactionSubviews {
   @VisibleForTesting
   object Optics {
     val subviewsUnsafe: Lens[TransactionSubviews, MerkleSeq[TransactionView]] =
-      GenLens[TransactionSubviews](_.subviews)
+      GenLens.apply[TransactionSubviews](_.subviews)
   }
 
 }

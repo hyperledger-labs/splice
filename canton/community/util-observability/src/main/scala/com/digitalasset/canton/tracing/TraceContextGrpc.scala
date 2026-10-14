@@ -17,6 +17,8 @@ import scala.util.{Try, Using}
   *   - a server interceptor for receiving context values when receiving requests from a client
   */
 object TraceContextGrpc {
+  val TraceContextOptionsKey = CallOptions.Key.create[TraceContext]("traceContext")
+
   // value of trace context in the GRPC Context
   // There are two options for implicitly propagating the trace context within a process: thread-local storage and
   // attaching custom call options to a GRPC call. Thread-local storage does *not* work with Futures, so we recommend

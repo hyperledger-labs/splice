@@ -22,7 +22,6 @@ infra:
     proxyForIstioHttp: false
   istio:
     enableIngressAccessLogging: true
-    enablePublicTokenRegistry: true
     flowControl:
       # See https://github.com/DACH-NY/canton-network-internal/issues/4901
       # The values are somewhat arbitrary so more fine tuning may be appropriate.
@@ -264,6 +263,13 @@ cloudArmor:
   enabled: false
   allRulesPreviewOnly: true
   publicEndpoints:
+    info:
+      hostPrefixRegex: info
+      pathPrefix: /
+      restrictToRateLimitedPaths: false
+      throttleAcrossAllEndpointsPerIp:
+        withinIntervalSeconds: 60
+        maxRequestsBeforeHttp429: 10000
     publicScan:
       hostPrefixRegex: scan
       pathPrefix: /api/scan

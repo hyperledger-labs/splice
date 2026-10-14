@@ -4,11 +4,11 @@
 package com.digitalasset.canton.topology.processing
 
 import cats.syntax.functorFilter.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.topology.cache.TopologyStateLookupByNamespace
 import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
@@ -21,6 +21,7 @@ import com.digitalasset.canton.topology.{Namespace, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext
@@ -51,6 +52,8 @@ trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
       Namespace,
       Option[DecentralizedNamespaceAuthorizationGraph],
     ]()
+
+  protected val warnAboutDanglingKeys: Boolean
 
   protected def lookup: TopologyStateLookupByNamespace
   protected def synchronizerId: Option[PhysicalSynchronizerId] = lookup.synchronizerId
@@ -228,6 +231,7 @@ trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
           val graph = new AuthorizationGraph(
             namespace,
             extraDebugInfo = false,
+            warnAboutDanglingKeys,
             loggerFactory,
           )
           graph.replace(transactions.map(AuthorizedTopologyTransaction(_)))
@@ -251,6 +255,7 @@ trait TransactionAuthorizationCache[+PureCrypto <: CryptoPureApi] {
             new AuthorizationGraph(
               namespace,
               extraDebugInfo = false,
+              warnAboutDanglingKeys,
               loggerFactory,
             ),
           )

@@ -1,0 +1,52 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "allowedLogoutUrls": [
+      "https://wallet.validator.mock.network.canton.global",
+      "https://wallet.validator.mock.global.canton.network.digitalasset.com",
+      "http://localhost:3000",
+      "http://wallet.localhost"
+    ],
+    "allowedOrigins": [
+      "https://wallet.validator.mock.network.canton.global",
+      "https://wallet.validator.mock.global.canton.network.digitalasset.com",
+      "http://localhost:3000",
+      "http://wallet.localhost"
+    ],
+    "appType": "spa",
+    "callbacks": [
+      "https://wallet.validator.mock.network.canton.global",
+      "https://wallet.validator.mock.global.canton.network.digitalasset.com",
+      "http://localhost:3000",
+      "http://wallet.localhost"
+    ],
+    "crossOriginAuth": false,
+    "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet UI for the validator runbook",
+    "grantTypes": [
+      "authorization_code",
+      "implicit",
+      "refresh_token"
+    ],
+    "name": "Wallet UI (Pulumi managed, test-stack)",
+    "oidcConformant": true,
+    "refreshToken": {
+      "expirationType": "expiring",
+      "idleTokenLifetime": 259200,
+      "infiniteIdleTokenLifetime": false,
+      "infiniteTokenLifetime": false,
+      "leeway": 5,
+      "rotationType": "rotating",
+      "tokenLifetime": 604800
+    },
+    "webOrigins": [
+      "https://wallet.validator.mock.network.canton.global",
+      "https://wallet.validator.mock.global.canton.network.digitalasset.com",
+      "http://localhost:3000",
+      "http://wallet.localhost"
+    ]
+  },
+  "name": "validatorWalletUi",
+  "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::validator::04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+  "type": "auth0:index/client:Client"
+}

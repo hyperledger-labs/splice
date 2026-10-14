@@ -1,0 +1,95 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "istiod",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "istiod",
+    "namespace": "cluster-ingress",
+    "repositoryOpts": {
+      "repo": "https://blob.istio.io/istio-release/charts"
+    },
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "autoscaleMax": 30,
+      "autoscaleMin": 2,
+      "global": {
+        "istioNamespace": "cluster-ingress",
+        "logAsJson": true,
+        "proxy": {
+          "excludeInboundPorts": "5432,26657",
+          "excludeOutboundPorts": "5432,26657",
+          "resources": {
+            "limits": {
+              "cpu": "2000m",
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "500m",
+              "memory": "512Mi"
+            }
+          }
+        }
+      },
+      "meshConfig": {
+        "accessLogEncoding": "JSON",
+        "accessLogFile": "",
+        "accessLogFormat": "{\"trace_id\":\"%REQ(traceparent)%\",\"authority\":\"%REQ(:AUTHORITY)%\",\"bytes_received\":\"%BYTES_RECEIVED%\",\"bytes_sent\":\"%BYTES_SENT%\",\"downstream_local_address\":\"%DOWNSTREAM_LOCAL_ADDRESS%\",\"downstream_remote_address\":\"%DOWNSTREAM_REMOTE_ADDRESS%\",\"duration\":\"%DURATION%\",\"method\":\"%REQ(:METHOD)%\",\"path\":\"%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%\",\"protocol\":\"%PROTOCOL%\",\"request_id\":\"%REQ(X-REQUEST-ID)%\",\"requested_server_name\":\"%REQUESTED_SERVER_NAME%\",\"response_code\":\"%RESPONSE_CODE%\",\"response_code_details\":\"%RESPONSE_CODE_DETAILS%\",\"grpc_status\":\"%GRPC_STATUS(CAMEL_STRING)%\",\"response_flags\":\"%RESPONSE_FLAGS%\",\"start_time\":\"%START_TIME%\",\"upstream_cluster\":\"%UPSTREAM_CLUSTER%\",\"upstream_host\":\"%UPSTREAM_HOST%\",\"upstream_local_address\":\"%UPSTREAM_LOCAL_ADDRESS%\",\"upstream_service_time\":\"%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%\",\"user_agent\":\"%REQ(USER-AGENT)%\",\"x_forwarded_for\":\"%REQ(X-FORWARDED-FOR)%\",\"envoy_external_address\":\"%REQ(X-ENVOY-EXTERNAL-ADDRESS)%\",\"masked_remote_address\":\"%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%\",\"local_rate_limited\":\"%RESP(x-local-rate-limit)%\",\"rate_limit_limit\":\"%RESP(x-ratelimit-limit)%\",\"rate_limit_remaining\":\"%RESP(x-ratelimit-remaining)%\",\"rate_limit_reset\":\"%RESP(x-ratelimit-reset)%\"}",
+        "defaultConfig": {
+          "gatewayTopology": {
+            "numTrustedProxies": 0
+          },
+          "holdApplicationUntilProxyStarts": true,
+          "proxyStatsMatcher": {
+            "inclusionRegexps": [
+              ".*http_local_rate_limit.*"
+            ]
+          }
+        },
+        "defaultHttpRetryPolicy": {
+          "attempts": 0
+        },
+        "enablePrometheusMerge": false,
+        "pathNormalization": {
+          "normalization": "MERGE_SLASHES"
+        }
+      },
+      "telemetry": {
+        "enabled": true,
+        "v2": {
+          "enabled": true,
+          "prometheus": {
+            "enabled": true
+          }
+        }
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_infra",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "1.30.5"
+  },
+  "name": "istiod",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

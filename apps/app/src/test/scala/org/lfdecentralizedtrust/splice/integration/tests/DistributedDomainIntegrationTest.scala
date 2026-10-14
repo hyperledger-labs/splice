@@ -4,7 +4,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.{time, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.admin.api.client.data.NodeStatus

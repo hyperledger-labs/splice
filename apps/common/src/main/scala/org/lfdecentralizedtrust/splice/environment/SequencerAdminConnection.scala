@@ -68,6 +68,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
 }
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
+import java.io.SequenceInputStream
 import java.nio.file.{Files, Path}
 import java.util.{Base64, Collections}
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
@@ -173,6 +174,7 @@ class SequencerAdminConnection(
         staticSynchronizerParameters,
         ignorePsidCheck,
         synchronizerId,
+        serverVersion = None,
       )
     ).andThen(_ => inputStream.close())
   }
@@ -331,8 +333,9 @@ class SequencerAdminConnection(
     topologySnapshot.result.foreach(_.writeDelimitedTo(domainParameters.protocolVersion, builder))
     runCmd(
       SequencerAdminCommands.InitializeFromGenesisStateV2(
-        Seq(builder.toByteString),
+        builder.toByteString.newInput,
         domainParameters,
+        serverVersion = None,
       )
     )
   }
@@ -342,7 +345,7 @@ class SequencerAdminConnection(
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
       SequencerAdminCommands.InitializeFromOnboardingStateV2(
-        onboardingState
+        new SequenceInputStream(onboardingState.iterator.map(_.newInput()).asJavaEnumeration)
       )
     )
 
@@ -548,7 +551,11 @@ object SequencerAdminConnection {
     def extraTrafficConsumed: NonNegativeLong = state.extraTrafficConsumed
     def extraTrafficLimit: NonNegativeLong =
       state.extraTrafficPurchased
-    def nextSerial: PositiveInt = state.serial.fold(PositiveInt.one)(_.increment)
+    def nextSerial: PositiveInt = state.serial.fold(PositiveInt.one)(
+      _.increment.valueOr(err =>
+        throw new IllegalStateException(s"Failed to increment serial: $err")
+      )
+    )
 
     override def pretty: Pretty[TrafficState] = prettyOfClass(
       param("member", _.member),

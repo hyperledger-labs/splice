@@ -54,6 +54,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.http.{
   ProtobufJsonScanHttpEncodings,
 }
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.{MultiDomainAcsStore, VoteResultsFilters}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{
@@ -105,6 +106,7 @@ import java.time.Instant
 import scala.concurrent.Future
 import scala.jdk.OptionConverters.*
 import scala.util.Try
+import scala.util.matching.Regex
 
 object HttpScanAppClient {
   import http.ScanClient as ScanClient
@@ -3215,8 +3217,9 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetBulkAcsSnapshot(
-      atOrBeforeTimestamp: CantonTimestamp
+  case class ListBulkAcsSnapshotObjects(
+      atOrBeforeTimestamp: CantonTimestamp,
+      damlValueEncoding: Option[definitions.DamlValueEncoding],
   ) extends InternalBaseCommand[
         http.ListBulkAcsSnapshotObjectsResponse,
         definitions.ListBulkAcsSnapshotObjectsResponse,
@@ -3227,6 +3230,7 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], ListBulkAcsSnapshotObjectsResponse] =
       client.listBulkAcsSnapshotObjects(
         atOrBeforeTimestamp.toInstant.atOffset(java.time.ZoneOffset.UTC),
+        damlValueEncoding,
         headers,
       )
 
@@ -3246,11 +3250,12 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetBulkUpdateHistory(
+  case class ListBulkUpdateHistoryObjects(
       startRecordTime: CantonTimestamp,
       endRecordTime: CantonTimestamp,
       nextPageToken: Option[String],
       limit: Int,
+      damlValueEncoding: Option[definitions.DamlValueEncoding],
   ) extends InternalBaseCommand[
         http.ListBulkUpdateHistoryObjectsResponse,
         definitions.ListBulkUpdateHistoryObjectsResponse,
@@ -3265,6 +3270,7 @@ object HttpScanAppClient {
           endRecordTime.toInstant.atOffset(java.time.ZoneOffset.UTC),
           nextPageToken,
           limit,
+          damlValueEncoding,
         ),
         headers,
       )
@@ -3283,8 +3289,7 @@ object HttpScanAppClient {
   }
 
   case class GetBulkObjectChecksums(
-      requiredCatchupTimestamp: CantonTimestamp,
-      objectKeys: Seq[String],
+      objectKeys: Seq[String]
   ) extends InternalBaseCommand[
         http.GetBulkObjectChecksumsResponse,
         definitions.GetBulkObjectChecksumsResponse,
@@ -3295,8 +3300,7 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], GetBulkObjectChecksumsResponse] =
       client.getBulkObjectChecksums(
         definitions.GetBulkObjectChecksumsRequest(
-          requiredCatchupTimestamp.toInstant.atOffset(java.time.ZoneOffset.UTC),
-          objectKeys.toVector,
+          objectKeys.toVector
         ),
         headers,
       )
@@ -3309,6 +3313,81 @@ object HttpScanAppClient {
     ]] = {
       case http.GetBulkObjectChecksumsResponse.OK(response) => Right(response)
       case http.GetBulkObjectChecksumsResponse.NotImplemented(err) => Left(err.error)
+    }
+  }
+
+  object BulkStorageObjects {
+    final case class SnapshotObjects(
+        recordTime: CantonTimestamp,
+        objects: Seq[ObjectKeyAndChecksum],
+    )
+
+    final case class UpdateObjectsPage(
+        objects: Seq[ObjectKeyAndChecksum],
+        nextPageToken: Option[String],
+    )
+
+    private val DownloadUrl: Regex = """.*/api/scan/v0/history/bulk/download/([^/?]+)""".r
+
+    def objectKeyFromDownloadUrl(url: String): Either[String, String] =
+      url match {
+        case DownloadUrl(encodedKey) =>
+          Right(java.net.URLDecoder.decode(encodedKey, java.nio.charset.StandardCharsets.UTF_8))
+        case _ => Left(s"Not a bulk storage download url: $url")
+      }
+
+    def decodeObjectRefs(
+        refs: Seq[definitions.BulkStorageObjectRef]
+    ): Either[String, Seq[ObjectKeyAndChecksum]] =
+      refs.foldLeft[Either[String, Vector[ObjectKeyAndChecksum]]](Right(Vector.empty)) {
+        (acc, ref) =>
+          for {
+            objects <- acc
+            key <- objectKeyFromDownloadUrl(ref.url)
+          } yield objects :+ ObjectKeyAndChecksum(key, ref.digest)
+      }
+
+    def snapshotObjects(
+        response: definitions.ListBulkAcsSnapshotObjectsResponse
+    ): Either[String, SnapshotObjects] =
+      for {
+        recordTime <- CantonTimestamp.fromInstant(response.recordTime.toInstant)
+        objects <- decodeObjectRefs(response.objectRefs)
+      } yield SnapshotObjects(recordTime, objects)
+
+    def updateObjectsPage(
+        response: definitions.ListBulkUpdateHistoryObjectsResponse
+    ): Either[String, UpdateObjectsPage] =
+      decodeObjectRefs(response.objectRefs).map(UpdateObjectsPage(_, response.nextPageToken))
+  }
+
+  case class GetBulkObjectsProgress(
+      recordTime: CantonTimestamp,
+      bucket: definitions.BulkStorageBucket,
+      kind: Option[definitions.BulkObjectKind],
+  ) extends InternalBaseCommand[
+        http.GetBulkObjectsProgressResponse,
+        definitions.GetBulkObjectsProgressResponse,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetBulkObjectsProgressResponse] =
+      client.getBulkObjectsProgress(
+        recordTime.toInstant.atOffset(java.time.ZoneOffset.UTC),
+        bucket,
+        kind,
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.GetBulkObjectsProgressResponse, Either[
+      String,
+      definitions.GetBulkObjectsProgressResponse,
+    ]] = {
+      case http.GetBulkObjectsProgressResponse.OK(response) => Right(response)
+      case http.GetBulkObjectsProgressResponse.NotImplemented(err) => Left(err.error)
     }
   }
 

@@ -34,9 +34,9 @@
     "start": "nodemon -V -e ts,json -i lib/ -x \"npm run build\""
   },
   "dependencies": {
-    "dompurify": "^3.4.2",
+    "dompurify": "^3.4.16",
     "jose": "^4.15.9",
-    "jsondiffpatch": "^0.7.3",
+    "jsondiffpatch": "^0.7.6",
     "uuid": "^14.0.0",
     "zod": "^3.25.76"
   }

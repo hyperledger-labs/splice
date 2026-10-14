@@ -62,7 +62,7 @@ export type Config = z.infer<typeof InfraConfigSchema>;
 // @ts-ignore
 const fullConfig = InfraConfigSchema.parse(clusterYamlConfig);
 export const enableGCReaperJob = fullConfig.infra.enableGCReaperJob;
-console.error(
+void pulumi.log.debug(
   `Loaded infra config: ${util.inspect(fullConfig, {
     depth: null,
     maxStringLength: null,

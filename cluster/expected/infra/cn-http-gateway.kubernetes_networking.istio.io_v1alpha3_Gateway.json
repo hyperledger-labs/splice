@@ -1,0 +1,53 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "networking.istio.io/v1alpha3",
+    "kind": "Gateway",
+    "metadata": {
+      "name": "cn-http-gateway",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "selector": {
+        "app": "istio-ingress",
+        "istio": "ingress"
+      },
+      "servers": [
+        {
+          "hosts": [
+            "mock.network.canton.global",
+            "*.mock.network.canton.global",
+            "mock.global.canton.network.digitalasset.com",
+            "*.mock.global.canton.network.digitalasset.com"
+          ],
+          "port": {
+            "name": "http",
+            "number": 80,
+            "protocol": "HTTP"
+          }
+        },
+        {
+          "hosts": [
+            "mock.network.canton.global",
+            "*.mock.network.canton.global",
+            "mock.global.canton.network.digitalasset.com",
+            "*.mock.global.canton.network.digitalasset.com"
+          ],
+          "port": {
+            "name": "https",
+            "number": 443,
+            "protocol": "HTTPS"
+          },
+          "tls": {
+            "credentialName": "cn-test-stacknet-tls",
+            "mode": "SIMPLE"
+          }
+        }
+      ]
+    }
+  },
+  "name": "cn-http-gateway",
+  "provider": "",
+  "type": "kubernetes:networking.istio.io/v1alpha3:Gateway"
+}

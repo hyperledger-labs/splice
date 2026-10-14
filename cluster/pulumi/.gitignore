@@ -4,3 +4,4 @@ install
 bin
 **/*.js
 .pulumi
+test-output

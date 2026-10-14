@@ -278,7 +278,7 @@ describe('buildAmuletRulesConfigFromChanges', () => {
     expect(result.decentralizedSynchronizer.activeSynchronizer).toBe('sync2');
     const expectedRequiredSynchronizers = Array.from(
       result.decentralizedSynchronizer.requiredSynchronizers.map.entriesArray().map(e => e[0])
-    ).sort();
+    ).toSorted();
     expect(expectedRequiredSynchronizers).toEqual(['sync1', 'sync2']);
     expect(result.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount).toBe('2000');
     expect(

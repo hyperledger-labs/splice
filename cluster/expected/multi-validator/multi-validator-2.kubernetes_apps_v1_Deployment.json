@@ -1,0 +1,308 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+      "labels": {
+        "app": "multi-validator-2"
+      },
+      "namespace": "multi-validator"
+    },
+    "spec": {
+      "replicas": 1,
+      "selector": {
+        "matchLabels": {
+          "app": "multi-validator-2"
+        }
+      },
+      "strategy": {
+        "type": "Recreate"
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app": "multi-validator-2"
+          }
+        },
+        "spec": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "In",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "containers": [
+            {
+              "env": [
+                {
+                  "name": "SPLICE_APP_DEVNET",
+                  "value": "1"
+                },
+                {
+                  "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
+                  "value": "multi-participant-2-2"
+                },
+                {
+                  "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
+                  "value": "http://scan-app.sv-1:5012"
+                },
+                {
+                  "name": "SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE",
+                  "value": "https://canton.network.global"
+                },
+                {
+                  "name": "SPLICE_APP_VALIDATOR_AUTH_AUDIENCE",
+                  "value": "https://canton.network.global"
+                },
+                {
+                  "name": "SPLICE_APP_VALIDATOR_SV_SPONSOR_ADDRESS",
+                  "value": "http://sv-app.sv-1:5014"
+                },
+                {
+                  "name": "SPLICE_APP_POSTGRES_DATABASE_NAME",
+                  "value": "cantonnet_v"
+                },
+                {
+                  "name": "SPLICE_APP_POSTGRES_SCHEMA",
+                  "value": "cantonnet"
+                },
+                {
+                  "name": "SPLICE_APP_POSTGRES_HOST",
+                  "value": "postgres-2.multi-validator.svc.cluster.local"
+                },
+                {
+                  "name": "SPLICE_APP_POSTGRES_PORT",
+                  "value": "5432"
+                },
+                {
+                  "name": "SPLICE_APP_POSTGRES_USER",
+                  "value": "cnadmin"
+                },
+                {
+                  "name": "SPLICE_APP_POSTGRES_PASSWORD",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "postgresPassword",
+                      "name": "postgres-2-secret"
+                    }
+                  }
+                },
+                {
+                  "name": "SPLICE_APP_VALIDATOR_MIGRATION_ID",
+                  "value": "2"
+                },
+                {
+                  "name": "SPLICE_APP_CONTACT_POINT",
+                  "value": "sv-support@digitalasset.com"
+                },
+                {
+                  "name": "LOG_LEVEL_CANTON",
+                  "value": "INFO"
+                },
+                {
+                  "name": "LOG_LEVEL_API_REQUEST",
+                  "value": "DEBUG"
+                },
+                {
+                  "name": "LOG_LEVEL_STDOUT",
+                  "value": "INFO"
+                },
+                {
+                  "name": "NUM_NODES",
+                  "value": "10"
+                },
+                {
+                  "name": "VALIDATOR_USERNAME_PREFIX",
+                  "value": "validator_user"
+                },
+                {
+                  "name": "AUTH_TARGET_AUDIENCE",
+                  "value": "https://canton.network.global"
+                },
+                {
+                  "name": "JAVA_TOOL_OPTIONS",
+                  "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                },
+                {
+                  "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
+                  "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
+                },
+                {
+                  "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+                  "value": "canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {\n  cron = \"0 /10 * * * ?\"\n  max-duration = \"5m\"\n  retention = \"25h\"\n}\n"
+                }
+              ],
+              "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
+              "livenessProbe": {
+                "exec": {
+                  "command": [
+                    "/bin/bash",
+                    "/app/health-check.sh",
+                    "api/validator/livez"
+                  ]
+                },
+                "failureThreshold": 5,
+                "initialDelaySeconds": 60,
+                "periodSeconds": 60,
+                "timeoutSeconds": 10
+              },
+              "name": "multi-validator",
+              "ports": [
+                {
+                  "containerPort": 5003,
+                  "name": "val-0",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5103,
+                  "name": "val-1",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5203,
+                  "name": "val-2",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5303,
+                  "name": "val-3",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5403,
+                  "name": "val-4",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5503,
+                  "name": "val-5",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5603,
+                  "name": "val-6",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5703,
+                  "name": "val-7",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5803,
+                  "name": "val-8",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 5903,
+                  "name": "val-9",
+                  "protocol": "TCP"
+                },
+                {
+                  "containerPort": 10013,
+                  "name": "metrics"
+                },
+                {
+                  "containerPort": 9010,
+                  "name": "jmx"
+                }
+              ],
+              "readinessProbe": {
+                "exec": {
+                  "command": [
+                    "/bin/bash",
+                    "/app/health-check.sh",
+                    "api/validator/readyz"
+                  ]
+                },
+                "failureThreshold": 5,
+                "initialDelaySeconds": 5,
+                "periodSeconds": 15,
+                "timeoutSeconds": 10
+              },
+              "resources": {
+                "limits": {
+                  "memory": "8Gi"
+                },
+                "requests": {
+                  "cpu": "0.5",
+                  "memory": "2400Mi"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/domain-upgrade-dump",
+                  "name": "domain-upgrade-dump-volume"
+                }
+              ]
+            }
+          ],
+          "initContainers": [
+            {
+              "command": [
+                "bash",
+                "-c",
+                "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-2.multi-validator.svc.cluster.local --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_v_00\ncreateDb cantonnet_v_01\ncreateDb cantonnet_v_02\ncreateDb cantonnet_v_03\ncreateDb cantonnet_v_04\ncreateDb cantonnet_v_05\ncreateDb cantonnet_v_06\ncreateDb cantonnet_v_07\ncreateDb cantonnet_v_08\ncreateDb cantonnet_v_09\n                      "
+              ],
+              "env": [
+                {
+                  "name": "PGPASSWORD",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "postgresPassword",
+                      "name": "postgres-2-secret"
+                    }
+                  }
+                }
+              ],
+              "image": "postgres:18",
+              "name": "pg-init"
+            }
+          ],
+          "securityContext": {
+            "fsGroup": 1001,
+            "runAsGroup": 1001,
+            "runAsUser": 1001
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ],
+          "volumes": [
+            {
+              "name": "domain-upgrade-dump-volume",
+              "persistentVolumeClaim": {
+                "claimName": "multi-validator-2-domain-migration-hd-pvc"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "name": "multi-validator-2",
+  "provider": "",
+  "type": "kubernetes:apps/v1:Deployment"
+}

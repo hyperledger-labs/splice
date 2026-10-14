@@ -4,9 +4,12 @@
 package com.digitalasset.canton.participant.admin.party
 
 import cats.data.EitherT
+import cats.syntax.either.*
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.data.{
@@ -106,7 +109,7 @@ class PartyReplicationTopologyWorkflow(
       connectedSynchronizer: ConnectedSynchronizer,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, Option[EffectiveTime]] =
+  ): EitherT[FutureUnlessShutdown, String, Option[(EffectiveTime, PositiveInt)]] =
     authorizeOnboardingTopology(
       params,
       PartyReplicationTopologyWorkflow.SynchronizerTopologyContext(connectedSynchronizer),
@@ -136,14 +139,15 @@ class PartyReplicationTopologyWorkflow(
     * @param topologyContext
     *   the active synchronizer topology context
     * @return
-    *   effective time of the onboarding topology transaction or None if not yet authorized
+    *   effective time and serial of the onboarding topology transaction or None if not yet
+    *   authorized
     */
   private[party] def authorizeOnboardingTopology(
       params: PartyReplicationStatus.ReplicationParams,
       topologyContext: PartyReplicationTopologyWorkflow.SynchronizerTopologyContext,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, Option[EffectiveTime]] = {
+  ): EitherT[FutureUnlessShutdown, String, Option[(EffectiveTime, PositiveInt)]] = {
     val PartyReplicationStatus
       .ReplicationParams(
         requestId,
@@ -188,7 +192,9 @@ class PartyReplicationTopologyWorkflow(
       _ <- partyToParticipantTopologyPartyAddedO.fold(
         EitherT.rightT[FutureUnlessShutdown, String](())
       )(verifyAuthorizedTopology(params, _))
-    } yield partyToParticipantTopologyPartyAddedO.map(_.validFrom)
+    } yield partyToParticipantTopologyPartyAddedO.map { partyToParticipantTopologyPartyAdded =>
+      (partyToParticipantTopologyPartyAdded.validFrom, partyToParticipantTopologyPartyAdded.serial)
+    }
   }
 
   /** Only called on the target participant. Authorize party replication onboarding from the target
@@ -481,18 +487,22 @@ class PartyReplicationTopologyWorkflow(
             ptpHeadTxn.mapping.participants
               .exists(p => p.participantId == targetParticipantId && p.onboarding)
           ) {
-            PartyToParticipant
-              .create(
-                ptpHeadTxn.mapping.partyId,
-                ptpHeadTxn.mapping.threshold,
-                ptpHeadTxn.mapping.participants.map {
-                  case HostingParticipant(`targetParticipantId`, permission, true) =>
-                    HostingParticipant(targetParticipantId, permission, onboarding = false)
-                  case otherParticipant => otherParticipant
-                },
-                ptpHeadTxn.mapping.partySigningKeysWithThreshold,
-              )
-              .map(ptp => Some(ptp -> ptpHeadTxn.serial.increment))
+            ptpHeadTxn.serial.increment
+              .leftMap(_.message)
+              .flatMap { nextSerial =>
+                PartyToParticipant
+                  .create(
+                    ptpHeadTxn.mapping.partyId,
+                    ptpHeadTxn.mapping.threshold,
+                    ptpHeadTxn.mapping.participants.map {
+                      case HostingParticipant(`targetParticipantId`, permission, true) =>
+                        HostingParticipant(targetParticipantId, permission, onboarding = false)
+                      case otherParticipant => otherParticipant
+                    },
+                    ptpHeadTxn.mapping.partySigningKeysWithThreshold,
+                  )
+                  .map(ptp => Some(ptp -> nextSerial))
+              }
           } else Right(None)
         )
         .leftMap(err => AuthorizeClearanceError.ProposeError(err): AuthorizeClearanceError)

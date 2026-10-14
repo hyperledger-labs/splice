@@ -5,7 +5,6 @@ package com.digitalasset.canton.admin.api.client.data
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.catsinstances.`cats nonempty traverse`
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.console.ConsoleEnvironment
@@ -90,6 +89,7 @@ final case class SynchronizerConnectionConfig(
               `sequencerConnections`.`sequencerLivenessMargin`,
               `sequencerConnections`.submissionRequestAmplification,
               `sequencerConnections`.sequencerConnectionPoolDelays,
+              `sequencerConnections`.subscriptionLivenessLimits,
             ),
             `manualConnect`,
             otherSynchronizerId,
@@ -148,6 +148,7 @@ final case class SynchronizerConnectionConfig(
             sequencerConnections.sequencerLivenessMargin,
             sequencerConnections.submissionRequestAmplification,
             sequencerConnections.sequencerConnectionPoolDelays,
+            sequencerConnections.subscriptionLivenessLimits,
           )
         } yield this.copy(
           synchronizerId = updatedSynchronizerId,
@@ -297,6 +298,7 @@ object SynchronizerConnectionConfig {
         SubmissionRequestAmplification.NoAmplification,
       sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
         SequencerConnectionPoolDelays.default,
+      subscriptionLivenessLimits: SubscriptionLivenessLimits = SubscriptionLivenessLimits.default,
   )(implicit consoleEnvironment: ConsoleEnvironment): SynchronizerConnectionConfig = {
     val sequencerConnections =
       SequencerConnections.tryMany(
@@ -305,6 +307,7 @@ object SynchronizerConnectionConfig {
         sequencerLivenessMargin = sequencerLivenessMargin,
         submissionRequestAmplification = submissionRequestAmplification,
         sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
+        subscriptionLivenessLimits = subscriptionLivenessLimits,
       )
 
     SynchronizerConnectionConfig(

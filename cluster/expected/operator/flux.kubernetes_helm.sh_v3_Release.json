@@ -1,0 +1,112 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "flux2",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "flux",
+    "namespace": "operator",
+    "repositoryOpts": {
+      "repo": "https://fluxcd-community.github.io/helm-charts"
+    },
+    "values": {
+      "cli": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "helmController": {
+        "create": false
+      },
+      "imageAutomationController": {
+        "create": false
+      },
+      "imageReflectionController": {
+        "create": false
+      },
+      "kustomizeController": {
+        "create": false
+      },
+      "notificationController": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "prometheus": {
+        "podMonitor": {
+          "create": true
+        }
+      },
+      "sourceController": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
+      }
+    },
+    "version": "2.14.1"
+  },
+  "name": "flux",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

@@ -8,6 +8,7 @@ import cats.syntax.parallel.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.sequencing.protocol.{SequencerDeliverError, SequencerErrors}
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -78,7 +79,6 @@ trait DatabaseSequencerIntegration extends SequencerIntegration with Spanning {
       executionContext: ExecutionContext,
       traceContext: TraceContext,
   ): FutureUnlessShutdown[Unit] =
-    // TODO(#18394): Batch acknowledgements?
     synchronizeWithClosing(functionFullName)(acknowledgements.toSeq.parTraverse_ {
       case (member, timestamp) =>
         this.writeAcknowledgementInternal(member, timestamp)

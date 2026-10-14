@@ -8,12 +8,17 @@ import {
   NamespacedAuth0Configs,
 } from '@canton-network/splice-pulumi-common';
 
-import { SecretsFixtureMap, initDumpConfig } from '../common/src/dump-config-common';
+import {
+  SecretsFixtureMap,
+  initDumpConfig,
+  withDumpConfigStack,
+} from '../common/src/dump-config-common';
 
 async function main() {
   await initDumpConfig();
+  const validatorName = 'validator-runbook';
   // eslint-disable-next-line no-process-env
-  process.env.SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME = 'validator-runbook';
+  process.env.SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME = validatorName;
   const installNode = await import('./src/installNode');
   const namespaceAuth0Cfg: Auth0NamespaceConfig = {
     audiences: {
@@ -40,13 +45,15 @@ async function main() {
   };
   const secrets = new SecretsFixtureMap();
 
-  await installNode.installNode({
-    getSecrets: () => Promise.resolve(secrets),
-    getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
-      Promise.resolve('access_token'),
-    getCfg: () => auth0Cfg,
-    reuseNamespaceConfig: (fromNamespace: string, toNamespace: string) => {},
-  });
+  await withDumpConfigStack(validatorName, () =>
+    installNode.installNode({
+      getSecrets: () => Promise.resolve(secrets),
+      getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
+        Promise.resolve('access_token'),
+      getCfg: () => auth0Cfg,
+      reuseNamespaceConfig: (fromNamespace: string, toNamespace: string) => {},
+    })
+  );
 }
 
 main().catch(e => {

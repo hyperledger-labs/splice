@@ -3,9 +3,13 @@
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules
 
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData.PeerNetworkStatus
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
+  WorkflowId,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.SignedMessage
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.Membership
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.dependencies.P2PNetworkOutModuleDependencies
@@ -24,8 +28,8 @@ object P2PNetworkOut {
 
   sealed trait Internal extends Message
   object Internal {
-    final case class Connect(p2pEndpoint: P2PEndpoint) extends Internal
-    final case class Disconnect(p2pEndpointId: P2PEndpoint.Id) extends Internal
+    final case class EndpointAdded(p2pEndpoint: P2PEndpoint) extends Internal
+    final case class EndpointRemoved(p2pEndpointId: P2PEndpoint.Id) extends Internal
   }
 
   sealed trait Network extends Message
@@ -47,7 +51,9 @@ object P2PNetworkOut {
         p2pEndpointId: P2PEndpoint.Id,
         callback: Boolean => Unit,
     ) extends Admin
-    final case class ListConfiguredEndpoints(callback: Seq[P2PEndpoint] => Unit) extends Admin
+    final case class ListConfiguredEndpoints(
+        callback: Seq[(P2PEndpoint, Option[BftNodeId])] => Unit
+    ) extends Admin
     final case class GetStatus(
         callback: PeerNetworkStatus => Unit,
         p2pEndpointIds: Option[Iterable[P2PEndpoint.Id]] = None,
@@ -107,6 +113,18 @@ object P2PNetworkOut {
       destinationBftNodeId: BftNodeId,
   ): Multicast =
     Multicast(message, Set(destinationBftNodeId))
+
+  final case class SendToRandomAuthenticated(
+      message: BftOrderingNetworkMessage,
+      firstChoiceRecipientsPool: Seq[BftNodeId],
+      secondChoiceRecipientsPool: Option[Seq[BftNodeId]],
+      workflowId: Option[WorkflowId] = None,
+      nodesThatFailed: Seq[BftNodeId] = Seq.empty,
+      onRecipientsDecision: Option[Seq[BftNodeId] => Unit] = None,
+      howManyRecipients: PositiveInt = PositiveInt.one,
+  ) extends Message
+
+  final case class EndWorkflow(workflowId: WorkflowId) extends Message
 }
 
 trait P2PNetworkOut[

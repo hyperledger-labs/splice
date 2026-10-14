@@ -1,0 +1,323 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "networking.istio.io/v1alpha3",
+    "kind": "Gateway",
+    "metadata": {
+      "name": "cn-apps-gateway",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "selector": {
+        "app": "istio-ingress-cometbft",
+        "istio": "ingress-cometbft"
+      },
+      "servers": [
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-0-0-gw",
+            "number": 26006,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-0-1-gw",
+            "number": 26016,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-0-2-gw",
+            "number": 26026,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-1-0-gw",
+            "number": 26106,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-1-1-gw",
+            "number": 26116,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-1-2-gw",
+            "number": 26126,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-2-0-gw",
+            "number": 26206,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-2-1-gw",
+            "number": 26216,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-2-2-gw",
+            "number": 26226,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-3-0-gw",
+            "number": 26306,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-3-1-gw",
+            "number": 26316,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-3-2-gw",
+            "number": 26326,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-4-0-gw",
+            "number": 26406,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-4-1-gw",
+            "number": 26416,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-4-2-gw",
+            "number": 26426,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-5-0-gw",
+            "number": 26506,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-5-1-gw",
+            "number": 26516,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-5-2-gw",
+            "number": 26526,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-6-0-gw",
+            "number": 26606,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-6-1-gw",
+            "number": 26616,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-6-2-gw",
+            "number": 26626,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-7-0-gw",
+            "number": 26706,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-7-1-gw",
+            "number": 26716,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-7-2-gw",
+            "number": 26726,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-8-0-gw",
+            "number": 26806,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-8-1-gw",
+            "number": 26816,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-8-2-gw",
+            "number": 26826,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-9-0-gw",
+            "number": 26906,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-9-1-gw",
+            "number": 26916,
+            "protocol": "TCP"
+          }
+        },
+        {
+          "hosts": [
+            "*"
+          ],
+          "port": {
+            "name": "cometbft-9-2-gw",
+            "number": 26926,
+            "protocol": "TCP"
+          }
+        }
+      ]
+    }
+  },
+  "name": "cn-apps-gateway",
+  "provider": "",
+  "type": "kubernetes:networking.istio.io/v1alpha3:Gateway"
+}

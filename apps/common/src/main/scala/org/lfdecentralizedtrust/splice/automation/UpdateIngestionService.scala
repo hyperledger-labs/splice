@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.{Materializer, RestartSettings}
@@ -24,7 +25,6 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 
 import scala.concurrent.{ExecutionContext, Future}
-import com.daml.metrics.InstrumentedGraph.*
 import com.daml.metrics.api.MetricHandle.{Counter, LabeledMetricsFactory}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricQualification}
 

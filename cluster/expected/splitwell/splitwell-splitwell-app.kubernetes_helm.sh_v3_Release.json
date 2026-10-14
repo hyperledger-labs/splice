@@ -1,0 +1,72 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-splitwell-app",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "splitwell-app",
+    "namespace": "splitwell",
+    "timeout": 600,
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "cluster": {
+        "dnsName": "mock.global.canton.network.digitalasset.com",
+        "fixedTokens": false,
+        "hostname": "mock.global.canton.network.digitalasset.com",
+        "name": "cn-mocknet"
+      },
+      "failOnAppVersionMismatch": true,
+      "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+      "maxDarVersion": "0.1.8",
+      "metrics": {
+        "enable": true
+      },
+      "migration": {
+        "id": 9
+      },
+      "participantHost": "participant",
+      "persistence": {
+        "databaseName": "app_splitwell",
+        "port": 5432,
+        "schema": "app_splitwell",
+        "secretName": "sw-pg-secrets",
+        "user": "cnadmin"
+      },
+      "scanAddress": "http://scan-app.sv-1:5012",
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "0.3.20"
+  },
+  "name": "splitwell-splitwell-app",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

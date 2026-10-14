@@ -1,7 +1,7 @@
 // Linting plugins
-addSbtPlugin("org.wartremover" % "sbt-wartremover" % "3.3.3")
+addSbtPlugin("org.wartremover" % "sbt-wartremover" % "3.5.8")
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.4")
-addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.2")
+addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.6")
 addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.10.0")
 
 addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.7")

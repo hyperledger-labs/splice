@@ -297,6 +297,23 @@ describe('Proposal Details Content', () => {
     expect(screen.getByTestId('your-vote-reject')).toBeInTheDocument();
   });
 
+  test('should hide the created date when it is unknown', () => {
+    render(
+      <Wrapper>
+        <ProposalDetailsContent
+          currentSvPartyId={voteResult.votingInformation.requester}
+          contractId={voteResult.contractId}
+          proposalDetails={{ ...voteResult.proposalDetails, createdAt: undefined }}
+          votingInformation={voteResult.votingInformation}
+          votes={voteResult.votes}
+        />
+      </Wrapper>
+    );
+
+    expect(screen.queryByTestId('proposal-details-created-at-label')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('proposal-details-created-at-value')).not.toBeInTheDocument();
+  });
+
   test('should render featured app proposal details', () => {
     const featuredAppDetails = {
       actionName: 'Feature App',

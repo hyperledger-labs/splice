@@ -1,0 +1,30 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "description": "Logs with a severity level of warning or above",
+    "filter": "resource.labels.cluster_name=\"cn-mocknet\"\n-(resource.labels.container_name=\"multi-validator\" AND jsonPayload.message=~\"wallet/transfer-offers.* resulted in a timeout\")\n-(resource.labels.container_name=\"multi-participant\" AND jsonPayload.message=~\"The sequencer clock timestamp.*is already past the max sequencing time\")\n-(jsonPayload.\"span-name\"=\"MergeValidatorLicenseContractsTrigger\" AND (severity=WARNING OR \"has not vetted\"))\n-(jsonPayload.\"error-code\"=~\"ACS_COMMITMENT_MISMATCH\" AND jsonPayload.remote=~\"tw-cn-testnet-participant\")\n-(jsonPayload.message=\"Instrument splice.trigger.latency.duration.seconds has exceeded the maximum allowed cardinality (1999).\")\n",
+    "labelExtractors": {
+      "cluster": "EXTRACT(resource.labels.cluster_name)",
+      "namespace": "EXTRACT(resource.labels.namespace_name)"
+    },
+    "metricDescriptor": {
+      "labels": [
+        {
+          "description": "Pod namespace",
+          "key": "namespace"
+        },
+        {
+          "description": "Cluster name",
+          "key": "cluster"
+        }
+      ],
+      "metricKind": "DELTA",
+      "valueType": "INT64"
+    },
+    "name": "log_warnings_mock"
+  },
+  "name": "log_warnings",
+  "provider": "",
+  "type": "gcp:logging/metric:Metric"
+}

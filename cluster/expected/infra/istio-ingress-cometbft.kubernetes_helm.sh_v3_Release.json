@@ -1,0 +1,273 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "gateway",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "istio-ingress-cometbft",
+    "namespace": "cluster-ingress",
+    "repositoryOpts": {
+      "repo": "https://blob.istio.io/istio-release/charts"
+    },
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "annotations": {
+        "cloud.google.com/l4-rbs": "enabled"
+      },
+      "autoscaling": {
+        "maxReplicas": 15,
+        "minReplicas": 2
+      },
+      "podDisruptionBudget": {
+        "maxUnavailable": 1
+      },
+      "resources": {
+        "limits": {
+          "cpu": "4",
+          "memory": "4096Mi"
+        },
+        "requests": {
+          "cpu": "500m",
+          "memory": "1024Mi"
+        }
+      },
+      "service": {
+        "externalTrafficPolicy": "Local",
+        "loadBalancerSourceRanges": [
+          "<internal IPs>",
+          "1.2.3.4/32",
+          "5.6.7.8/32",
+          "11.12.13.14/32",
+          "2.3.4.5/32"
+        ],
+        "ports": [
+          {
+            "name": "status-port",
+            "port": 15021,
+            "protocol": "TCP",
+            "targetPort": 15021
+          },
+          {
+            "name": "http2",
+            "port": 80,
+            "protocol": "TCP",
+            "targetPort": 80
+          },
+          {
+            "name": "https",
+            "port": 443,
+            "protocol": "TCP",
+            "targetPort": 443
+          },
+          {
+            "name": "cometbft-0-0-gw",
+            "port": 26006,
+            "protocol": "TCP",
+            "targetPort": 26006
+          },
+          {
+            "name": "cometbft-0-1-gw",
+            "port": 26016,
+            "protocol": "TCP",
+            "targetPort": 26016
+          },
+          {
+            "name": "cometbft-0-2-gw",
+            "port": 26026,
+            "protocol": "TCP",
+            "targetPort": 26026
+          },
+          {
+            "name": "cometbft-1-0-gw",
+            "port": 26106,
+            "protocol": "TCP",
+            "targetPort": 26106
+          },
+          {
+            "name": "cometbft-1-1-gw",
+            "port": 26116,
+            "protocol": "TCP",
+            "targetPort": 26116
+          },
+          {
+            "name": "cometbft-1-2-gw",
+            "port": 26126,
+            "protocol": "TCP",
+            "targetPort": 26126
+          },
+          {
+            "name": "cometbft-2-0-gw",
+            "port": 26206,
+            "protocol": "TCP",
+            "targetPort": 26206
+          },
+          {
+            "name": "cometbft-2-1-gw",
+            "port": 26216,
+            "protocol": "TCP",
+            "targetPort": 26216
+          },
+          {
+            "name": "cometbft-2-2-gw",
+            "port": 26226,
+            "protocol": "TCP",
+            "targetPort": 26226
+          },
+          {
+            "name": "cometbft-3-0-gw",
+            "port": 26306,
+            "protocol": "TCP",
+            "targetPort": 26306
+          },
+          {
+            "name": "cometbft-3-1-gw",
+            "port": 26316,
+            "protocol": "TCP",
+            "targetPort": 26316
+          },
+          {
+            "name": "cometbft-3-2-gw",
+            "port": 26326,
+            "protocol": "TCP",
+            "targetPort": 26326
+          },
+          {
+            "name": "cometbft-4-0-gw",
+            "port": 26406,
+            "protocol": "TCP",
+            "targetPort": 26406
+          },
+          {
+            "name": "cometbft-4-1-gw",
+            "port": 26416,
+            "protocol": "TCP",
+            "targetPort": 26416
+          },
+          {
+            "name": "cometbft-4-2-gw",
+            "port": 26426,
+            "protocol": "TCP",
+            "targetPort": 26426
+          },
+          {
+            "name": "cometbft-5-0-gw",
+            "port": 26506,
+            "protocol": "TCP",
+            "targetPort": 26506
+          },
+          {
+            "name": "cometbft-5-1-gw",
+            "port": 26516,
+            "protocol": "TCP",
+            "targetPort": 26516
+          },
+          {
+            "name": "cometbft-5-2-gw",
+            "port": 26526,
+            "protocol": "TCP",
+            "targetPort": 26526
+          },
+          {
+            "name": "cometbft-6-0-gw",
+            "port": 26606,
+            "protocol": "TCP",
+            "targetPort": 26606
+          },
+          {
+            "name": "cometbft-6-1-gw",
+            "port": 26616,
+            "protocol": "TCP",
+            "targetPort": 26616
+          },
+          {
+            "name": "cometbft-6-2-gw",
+            "port": 26626,
+            "protocol": "TCP",
+            "targetPort": 26626
+          },
+          {
+            "name": "cometbft-7-0-gw",
+            "port": 26706,
+            "protocol": "TCP",
+            "targetPort": 26706
+          },
+          {
+            "name": "cometbft-7-1-gw",
+            "port": 26716,
+            "protocol": "TCP",
+            "targetPort": 26716
+          },
+          {
+            "name": "cometbft-7-2-gw",
+            "port": 26726,
+            "protocol": "TCP",
+            "targetPort": 26726
+          },
+          {
+            "name": "cometbft-8-0-gw",
+            "port": 26806,
+            "protocol": "TCP",
+            "targetPort": 26806
+          },
+          {
+            "name": "cometbft-8-1-gw",
+            "port": 26816,
+            "protocol": "TCP",
+            "targetPort": 26816
+          },
+          {
+            "name": "cometbft-8-2-gw",
+            "port": 26826,
+            "protocol": "TCP",
+            "targetPort": 26826
+          },
+          {
+            "name": "cometbft-9-0-gw",
+            "port": 26906,
+            "protocol": "TCP",
+            "targetPort": 26906
+          },
+          {
+            "name": "cometbft-9-1-gw",
+            "port": 26916,
+            "protocol": "TCP",
+            "targetPort": 26916
+          },
+          {
+            "name": "cometbft-9-2-gw",
+            "port": 26926,
+            "protocol": "TCP",
+            "targetPort": 26926
+          }
+        ]
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_infra",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "1.30.5"
+  },
+  "name": "istio-ingress-cometbft",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

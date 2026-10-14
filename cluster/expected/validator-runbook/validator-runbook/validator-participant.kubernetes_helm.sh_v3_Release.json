@@ -1,0 +1,94 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "participant",
+    "namespace": "validator",
+    "timeout": 600,
+    "values": {
+      "additionalEnvVars": [
+        {
+          "name": "ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_NAME",
+          "value": "ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_VALUE"
+        }
+      ],
+      "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -Dparticipantoption",
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "auth": {
+        "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+        "targetAudience": "https://ledger_api.example.com"
+      },
+      "cluster": {
+        "dnsName": "mock.global.canton.network.digitalasset.com",
+        "fixedTokens": false,
+        "hostname": "mock.global.canton.network.digitalasset.com",
+        "name": "cn-mocknet"
+      },
+      "disableAuth": false,
+      "enableHealthProbes": true,
+      "enablePostgresMetrics": true,
+      "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+      "metrics": {
+        "enable": true
+      },
+      "participantAdminUserNameFrom": {
+        "secretKeyRef": {
+          "key": "ledger-api-user",
+          "name": "splice-app-validator-ledger-api-auth",
+          "optional": false
+        }
+      },
+      "persistence": {
+        "databaseName": "participant_2",
+        "host": "postgres-helmless.validator.svc.cluster.local",
+        "postgresName": "postgres-helmless",
+        "schema": "participant",
+        "secretName": "postgres-secrets"
+      },
+      "resources": {
+        "limits": {
+          "memory": "8Gi"
+        },
+        "requests": {
+          "memory": "4Gi"
+        }
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "0.3.20"
+  },
+  "name": "validator-participant",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

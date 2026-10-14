@@ -15,8 +15,11 @@ trait PreflightIntegrationTestUtil extends TestCommon {
       timeUntilSuccess: FiniteDuration = this.preflightTimeUntilSuccess,
       maxPollInterval: FiniteDuration = 5.seconds,
       retryOnTestFailuresOnly: Boolean = true,
+      logElapsed: Option[String] = None,
   )(testCode: => T): T =
-    super.eventually(timeUntilSuccess, maxPollInterval, retryOnTestFailuresOnly)(testCode)
+    super.eventually(timeUntilSuccess, maxPollInterval, retryOnTestFailuresOnly, logElapsed)(
+      testCode
+    )
 
   override def eventuallySucceeds[T](
       timeUntilSuccess: FiniteDuration = this.preflightTimeUntilSuccess,

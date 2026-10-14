@@ -5,7 +5,11 @@ package com.digitalasset.canton.participant.scheduler
 
 import cats.syntax.contravariantSemigroupal.*
 import cats.syntax.functorFilter.*
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.store.AcsDigestStore.allCheckpointsFilter
 import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore
 import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore.LsuSource
 import com.digitalasset.canton.participant.sync.SyncPersistentStateManager
@@ -21,12 +25,13 @@ import scala.concurrent.ExecutionContext
 class PostLsuPurgeableStoresComputation(
     synchronizerConnectionConfigStore: SynchronizerConnectionConfigStore,
     syncPersistentStateManager: SyncPersistentStateManager,
-)(implicit
-    ec: ExecutionContext
-) {
+    acsDigestProcessorEnabled: Boolean,
+    override val loggerFactory: NamedLoggerFactory,
+) extends NamedLogging {
 
   def compute()(implicit
-      traceContext: TraceContext
+      ec: ExecutionContext,
+      traceContext: TraceContext,
   ): FutureUnlessShutdown[Seq[ChunkPurgeable]] = {
     val persistentStates = syncPersistentStateManager.getAll
 
@@ -50,19 +55,54 @@ class PostLsuPurgeableStoresComputation(
 
     // Consider only synchronizer that have successor topology initialized
     // so that purging does not get in the way of local copy.
-    MonadUtil
-      .sequentialTraverse(candidates) { psid =>
-        successorPerPsid
-          .get(psid)
-          .flatMap(persistentStates.get) match {
-          case Some(successorPersistentState) =>
-            successorPersistentState.connectivityStatusStore.isTopologyInitialized().map {
-              case true =>
-                persistentStates.get(psid).fold(Seq.empty[ChunkPurgeable])(_.purgeableStores)
-              case false => Nil
-            }
+    val filteredCandidates = for {
+      psid <- candidates
+      successorPsid <- successorPerPsid.get(psid).toList
+      successorPersistentState <- persistentStates.get(successorPsid).toList
+      if (successorPersistentState.connectivityStatusStore.isTopologyInitialized)
+      synchronizerPredecessor <- synchronizerConnectionConfigStore
+        .get(successorPsid)
+        .toOption
+        .flatMap(_.predecessor)
+        .toList
+      predecessorState <- persistentStates.get(psid).toList
+    } yield predecessorState -> synchronizerPredecessor
 
-          case None => FutureUnlessShutdown.pure(Seq.empty)
+    // For each predecessor synchronizer, we check if the latest ACS digest checkpoint is after the upgrade time
+    MonadUtil
+      .sequentialTraverse(filteredCandidates) { case (predecessorState, synchronizerPredecessor) =>
+        if (acsDigestProcessorEnabled) {
+          logger.debug(
+            s"Checking if ACS digest processor has caught up for predecessor synchronizer ${predecessorState.psid}"
+          )
+          val acsDigestCheckpoint = predecessorState.acsDigestStore.latestCheckpointUpTo(
+            Offset.MaxValue,
+            allCheckpointsFilter,
+          )
+
+          acsDigestCheckpoint.map { checkpointO =>
+            logger.debug(
+              s"ACS digest processor latest checkpoint: $acsDigestCheckpoint"
+            )
+            checkpointO.fold(Seq.empty[ChunkPurgeable]) { checkpoint =>
+              if (checkpoint.timepoint.recordTime > synchronizerPredecessor.upgradeTime) {
+                logger.debug(
+                  s"ACS digest processor has progressed beyond upgrade time ${synchronizerPredecessor.upgradeTime}) for predecessor ${synchronizerPredecessor.psid}, stores are safe to be purged"
+                )
+                predecessorState.purgeableStores
+              } else {
+                logger.debug(
+                  s"ACS digest processor has not yet progressed beyond upgrade time ${synchronizerPredecessor.upgradeTime}) for predecessor ${synchronizerPredecessor.psid}"
+                )
+                Seq.empty[ChunkPurgeable]
+              }
+            }
+          }
+        } else {
+          logger.debug(
+            s"Not considering ACS digest processor for store pruging as it is disabled"
+          )
+          FutureUnlessShutdown.pure(predecessorState.purgeableStores)
         }
       }
       .map(_.flatten)

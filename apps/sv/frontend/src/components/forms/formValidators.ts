@@ -212,8 +212,13 @@ export const validatePartyId = (value: string): string | false => {
 export const validateNextScheduledSynchronizerUpgrade = (
   upgradeTime: string,
   migrationId: string,
-  effectiveDate: string | undefined
+  effectiveDate: string | undefined,
+  current: { upgradeTime: string; migrationId: string } = { upgradeTime: '', migrationId: '' }
 ): string | false => {
+  if (upgradeTime === current.upgradeTime && migrationId === current.migrationId) {
+    return false;
+  }
+
   const onlyOneIsProvided = (upgradeTime === '') !== (migrationId === '');
   const bothEmpty = upgradeTime === '' && migrationId === '';
 
@@ -236,12 +241,20 @@ export const validateNextScheduledSynchronizerUpgrade = (
   return false;
 };
 
+export type LogicalSynchronizerUpgradeValues = {
+  topologyFreezeTime: string;
+  upgradeTime: string;
+  newPhysicalSynchronizerSerial: string;
+  newPhysicalSynchronizerProtocolVersion: string;
+};
+
 export const validateNextScheduledLogicalSynchronizerUpgrade = (
   topologyFreezeTime: string,
   upgradeTime: string,
   newPhyiscalSynchronizerSerial: string,
   newPhyiscalSynchronizerProtocolVersion: string,
-  effectiveDate: string | undefined
+  effectiveDate: string | undefined,
+  current?: LogicalSynchronizerUpgradeValues
 ): string | false => {
   const all = [
     topologyFreezeTime,
@@ -249,6 +262,16 @@ export const validateNextScheduledLogicalSynchronizerUpgrade = (
     newPhyiscalSynchronizerSerial,
     newPhyiscalSynchronizerProtocolVersion,
   ];
+  const currentValues = [
+    current?.topologyFreezeTime ?? '',
+    current?.upgradeTime ?? '',
+    current?.newPhysicalSynchronizerSerial ?? '',
+    current?.newPhysicalSynchronizerProtocolVersion ?? '',
+  ];
+
+  if (all.every((value, i) => value === currentValues[i])) {
+    return false;
+  }
 
   if (all.every(value => value === '')) {
     return false;
@@ -296,7 +319,7 @@ export const serializeSwitchOverTimes = (
 export const switchOverEntriesToConfigValue = (entries: SwitchOverEntry[]): string => {
   const normalized = serializeSwitchOverTimes(entries) ?? {};
   const sorted = Object.fromEntries(
-    Object.entries(normalized).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    Object.entries(normalized).toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
   );
   return Object.keys(sorted).length === 0 ? '' : JSON.stringify(sorted);
 };
@@ -345,7 +368,7 @@ export const switchOverConfigValueToDisplayEntries = (
   if (!map) return [];
   return Object.entries(map)
     .filter(([, time]) => !isDamlMinBoundTime(time))
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([key, time]) => {
       const t = dayjs.utc(time);
       return { key, time: t.isValid() ? `${t.format('YYYY-MM-DD HH:mm')} UTC` : time };
@@ -362,10 +385,14 @@ export const visibleSwitchOverRows = (
     .map((entry, index) => ({ entry, index }))
     .filter(({ entry }) => !isDamlMinBoundTime(entry.time));
 
+const isUnchangedSwitchOverEntry = (entry: SwitchOverEntry, current: SwitchOverEntry[]): boolean =>
+  current.some(c => c.key.trim() === entry.key.trim() && dayjs(c.time).isSame(dayjs(entry.time)));
+
 export const validateSwitchOverTimes = (
   entries: SwitchOverEntry[],
   allowNonFutureDated: boolean,
-  effectiveDate: string | undefined
+  effectiveDate: string | undefined,
+  current: SwitchOverEntry[] = []
 ): string | false => {
   // Min-bound placeholders are treated as unset and excluded from validation entirely
   // (they are preserved in form state but not shown as editable rows).
@@ -390,9 +417,14 @@ export const validateSwitchOverTimes = (
     if (!t.isValid()) {
       return `Invalid time for switch-over "${key.trim()}"`;
     }
-    // Skip the ">= 1 day after effectivity" check at threshold (no effective date)
-    // or when the operator has opted into non-future-dated times.
-    if (!allowNonFutureDated && effectiveDate) {
+    // Skip the ">= 1 day after effectivity" check at threshold (no effective date),
+    // when the operator has opted into non-future-dated times, or for an entry left
+    // unchanged from the current config.
+    if (
+      !allowNonFutureDated &&
+      effectiveDate &&
+      !isUnchangedSwitchOverEntry({ key, time }, current)
+    ) {
       const minTime = dayjs(effectiveDate).add(1, 'day');
       if (t.isBefore(minTime)) {
         return `Switch-over "${key.trim()}" must be at least 1 day after the Effective Date`;

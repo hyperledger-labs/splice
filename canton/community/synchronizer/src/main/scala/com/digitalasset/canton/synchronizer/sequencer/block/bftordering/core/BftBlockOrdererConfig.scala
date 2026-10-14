@@ -6,7 +6,12 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core
 import com.daml.jwt.JwtTimestampLeeway
 import com.daml.tls.{TlsClientConfig, TlsServerConfig}
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
+import com.digitalasset.canton.config.RequireTypes.{
+  NonNegativeInt,
+  NonNegativeLong,
+  Port,
+  PositiveInt,
+}
 import com.digitalasset.canton.config.{
   ActiveRequestLimitsConfig,
   AdminTokenConfig,
@@ -16,11 +21,13 @@ import com.digitalasset.canton.config.{
   ClientConfig,
   JwksCacheConfig,
   PemFileOrString,
+  PositiveFiniteDuration,
   ServerConfig,
   StorageConfig,
 }
 import com.digitalasset.canton.networking.grpc.{CantonServerBuilder, ClientChannelParams}
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.BftBlockOrderingP2PSendDelayConfig.DelayByRecipients
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.{
   BftBlockOrderingStandaloneNetworkConfig,
   DefaultAvailabilityDisseminationPatience,
@@ -30,46 +37,65 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.Bft
   DefaultBlockingDbReadTimeout,
   DefaultConsensusBlockCompletionTimeout,
   DefaultConsensusEmptyBlockCreationTimeout,
+  DefaultConsensusFlushingMinBlocks,
+  DefaultConsensusNewEpochTopologyWarnTimeout,
   DefaultConsensusQueueMaxSize,
   DefaultConsensusQueuePerNodeQuota,
   DefaultDedicatedExecutionContextDivisor,
   DefaultDelayedInitQueueMaxSize,
+  DefaultEpochStateTransferHowManyFutureEpochsToDownloadInParallel,
   DefaultEpochStateTransferTimeout,
+  DefaultEpochStateTransferTimeoutForFutureEpoch,
+  DefaultInitQueryTimeout,
+  DefaultInitTimeout,
   DefaultMaxBatchCreationInterval,
-  DefaultMaxBatchesPerProposal,
   DefaultMaxMempoolQueueSize,
-  DefaultMaxRequestPayloadBytes,
-  DefaultMaxRequestsInBatch,
   DefaultMinRequestsInBatch,
+  DefaultNetworkSendAttempts,
+  DefaultNetworkSendRetryMaximumDelay,
+  DefaultNetworkSendRetryMinimumDelay,
   DefaultOutputEnqueueMaxRetries,
   DefaultOutputEnqueueMaxRetryDelay,
+  DefaultOutputFetchHowManyRecipients,
   DefaultOutputFetchMinimumDelay,
   DefaultOutputFetchTimeout,
   DefaultOutputFetchTimeoutCap,
   DefaultOutputSizeOfChunkOfEpochsToLoadAtStart,
+  DefaultSendBlacklistTtl,
   DefaultSequencerCoreSubscriptionConfig,
   P2PNetworkConfig,
   SequencerCoreSubscriptionConfig,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.time.BftTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.EpochLength
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.BlacklistLeaderSelectionPolicyConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.{
+  FiniteDurationDistribution,
+  Probability,
+}
 import com.digitalasset.canton.util.retry
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext
 
 import java.io.File
+import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.duration.*
+import scala.util.Random
 
 /** Configuration class for the BFT Block Orderer.
   *
-  * @param maxRequestPayloadBytes
-  *   The maximum number of bytes allowed per individual request submitted by clients
+  * @param segmentLengthForPv34
+  *   Optionally, the number of blocks per segment (only taken into account in Protocol Version 34).
+  *   If set to [[scala.None]], the default epoch length is used.
+  * @param leaderSelectionPolicyConfigForPv34
+  *   The leader selection policy to enforce in the presence of View Changes of segments (only taken
+  *   into account in Protocol Version 34).
+  * @param viewChangeTimeoutOverride
+  *   Optionally, the base duration to use for view change timeouts for ISS segments. If specified,
+  *   this value will be used instead of the pbftViewChangeTimeout set in the network-wide
+  *   SequencingParameters topology transaction. Note that this value is not persisted (in-memory
+  *   only), and must be set back to None to return using the SequencingParameters value.
   * @param maxMempoolQueueSize
   *   The maximum number of pending requests that will be held in the in-memory mempool. Once this
   *   queue size is reached, subsequent requests are rejected with a mempool overloaded error.
-  * @param maxRequestsInBatch
-  *   The maximum number of requests in a batch. Needs to be the same across the network for the BFT
-  *   time assumptions to hold.
   * @param minRequestsInBatch
   *   When the mempool does not create and send a batch due to other factors (see
   *   [[maxBatchCreationInterval]]), this is the number of requests that the mempool will wait for
@@ -87,9 +113,9 @@ import scala.concurrent.duration.*
   * @param availabilityDisseminationPatience
   *   The amount of time that the availability module waits for a dissemination acknowledgement from
   *   a peer before re-sending the batch. If `None`, re-sending is disabled.
-  * @param maxBatchesPerBlockProposal
-  *   The maximum number of batches per block proposal (pre-prepare). Needs to be the same across
-  *   the network for the BFT time assumptions to hold.
+  * @param availabilityMinProposalCreationDelay
+  *   The minimum delay between consecutive proposal creations in the availability module. This
+  *   prevents the node from creating proposals too frequently.
   * @param consensusQueueMaxSize
   *   The maximum size per consensus-related queue.
   * @param consensusQueuePerNodeQuota
@@ -106,39 +132,84 @@ import scala.concurrent.duration.*
   *   advances at a regular frequency. Note that due to (i), it is recommended that this
   *   consensusEmptyBlockCreationTimeout be substantially less than the
   *   consensusBlockCompletionTimeout to account for latency, retransmissions, etc.
+  * @param consensusNewEpochTopologyWarnTimeout
+  *   The time that nodes will wait at the start of a new epoch for the topology to be activated. If
+  *   the timeout is reached, the node will create a warning log to indicate the reason for delay in
+  *   progress was the topology activation, but the node will continue to wait for the topology to
+  *   be activated.
+  * @param consensusEnableLogEndOfEpochProgress
+  *   If `true`, logs are emitted to track progress at the end of each epoch with the status of
+  *   segments from all leaders.
+  * @param consensusEnableFlushingSegment
+  *   If `true`, when this node detects that a strong quorum of segments are completed while the one
+  *   it leads is in progress, it will flush the segment and complete all slots in parallel to avoid
+  *   making other nodes wait for the epoch to complete. This is a performance optimization that can
+  *   be disabled if issues arise with the flushing logic.
+  * @param consensusFlushingMinBlocks
+  *   The minimum number of blocks that must be missing to complete in a segment before the node
+  *   will be able to decide to flush the segment and complete all slots in parallel if it detects
+  *   that a strong quorum of segments are completed while the one it leads is in progress. If fewer
+  *   blocks than this are missing, the node will complete them normally one at a time.
   * @param delayedInitQueueMaxSize
   *   The maximum size of the delayed init queue. This queue is used by modules to save incoming
   *   events in memory while the module is still initializing. Once startup is complete, the module
   *   processes all events from the delayed init queue first before continuing to read newly
   *   received events.
+  * @param epochStateTransferFutureEpochQueueMaxSize
+  *   The maximum size of future epoch queue.
+  * @param epochStateTransferFutureEpochQueuePerNodeQuota
+  *   The maximum number of messages per node stored in future epoch queue
+  * @param epochStateTransferHowManyFutureEpochsToDownloadInParallel
+  *   The amount of epochs to speculatively download in parallel during State Transfer. Can be 0 to
+  *   turn off speculative downloading
+  * @param epochStateTransferTimeoutForFutureEpoch
+  *   A timeout for how long we will wait if we already potentially have all blocks due to
+  *   speculatively downloaded an epoch before we make a new network request. This timeout should be
+  *   quite short since it is only accounting for local processing.
   * @param epochStateTransferRetryTimeout
   *   The state transfer retry timeout covering periods from requesting blocks from a single epoch
   *   up to receiving all the corresponding batches.
   * @param outputFetchTimeout
   *   The baseline timeout that a node's availability module will wait while fetching batch data
-  *   from a peer before giving up and trying a different peer.
+  *   from a peer before giving up and trying a different peer. Timeouts for subsequent fetch
+  *   attempts are increased via exponential backoff and random jitter between 0 and the computed
+  *   value. The unit is important, as the exponential is computed on the non-converted value.
+  * @param outputFetchMinimumDelay
+  *   The minimum delay between consecutive output fetch attempts. This prevents a node from
+  *   overwhelming peers with rapid successive fetch requests, for example if the jitter returns
+  *   very low values.
   * @param outputFetchTimeoutCap
-  *   The maximum timeout, after jitter and backoff are considered, that a node's availability
-  *   module will wait while fetching batch data from a peer.
+  *   The maximum jittered duration that a node's availability module will wait while fetching batch
+  *   data from a peer. The minimum delay is added to the jittered delay.
+  * @param outputFetchHowManyRecipients
+  *   The number of recipients that a batch will be attempted to be fetched from in parallel.
+  * @param outputEnqueueMaxRetries
+  *   The maximum number of retry attempts when enqueuing ordered output blocks for delivery to the
+  *   sequencer core.
+  * @param outputEnqueueMaxRetryDelay
+  *   The maximum delay between retry attempts when enqueuing ordered output blocks for delivery to
+  *   the sequencer core.
+  * @param outputSizeOfChunkOfEpochsToLoadAtStart
+  *   The number of epochs to load per chunk when restoring output state from the database on
+  *   startup. Larger values may speed up startup but consume more memory.
   * @param blockingDbReadTimeout
   *   The maximum time allowed for block reads to restore state from the database after restarts.
   *   Currently, if the timeout is reached during any of the blocking reads on startup, the node
   *   shuts down and must restart to try again.
+  * @param sendBlacklistTtl
+  *   The time-to-live for blacklisting randomly chosen peers that have failed to respond to a
+  *   request as part of a workflow (e.g., batches fetching or a state transfer session). After this
+  *   time has elapsed, the peer is removed from the blacklist and can be re-contacted.
   * @param initialNetwork
   *   Optionally, the set of peers for which the local node has connections with on startup. If set
   *   to [[scala.None]], the peer starts up with no preexisting peers.
   * @param standalone
   *   Optionally, a startup mode in which the BFT ordering node runs as a "standalone" service,
   *   allowing the BFT layer to bypass the sequencer to directly receive requests from and serve
-  *   reads to clients. This mode is useful for isolated performance and scale testing. If set to
-  *   [[scala.None]], the BFT layer behaves as normal with the co-located Sequencer component.
-  * @param leaderSelectionPolicy
-  *   The leader selection policy to enforce in the presence of View Changes of segments. There are
-  *   currently two policies to choose from: `Simple` and `Blacklisting`. With the `Simple` policy,
-  *   every node in the topology is assigned a segment, regardless of past behavior. Whereas with
-  *   the `Blacklisting` policy, nodes that recently misbehaved (i.e., their segment resulted in a
-  *   View Change) are penalized and not assigned a segment in the following epoch(s) until
-  *   sufficient time has elapsed.
+  *   reads to clients. This mode is useful for performance and scale testing of the CantonBFT
+  *   ordering component in isolation. If set to [[scala.None]] (default), the BFT layer behaves as
+  *   normal with the co-located Sequencer component. It can only be enabled with
+  *   "canton.parameters.non-standard-config = yes".
   * @param storage
   *   Optionally, a dedicated storage solution for the BFT ordering layer, separate from the
   *   co-located sequencer. If set to [[scala.None]], the BFT layer shares the same storage as the
@@ -158,14 +229,30 @@ import scala.concurrent.duration.*
   *   execution context as the sequencer.
   * @param sequencerCoreSubscriptionConfig
   *   Configuration for the subscription of the sequencer core to the BFT block orderer.
+  * @param initTimeout
+  *   The maximum total time allowed for the BFT block orderer to complete initialization, including
+  *   all startup queries and state restoration. If exceeded, the node fails to start.
+  * @param initQueryTimeout
+  *   The maximum time allowed for individual queries during BFT block orderer initialization (e.g.,
+  *   topology or state queries). Must be less than or equal to `initTimeout`.
+  * @param networkSendAttempts
+  *   The maximum number of gRPC message send attempts before dropping the message.
+  * @param networkSendRetryMinimumDelay
+  *   The minimum delay between consecutive gRPC message send attempts. This prevents a node from
+  *   overwhelming peers with rapid successive gRPC message sends, for example if the jitter returns
+  *   very low values.
+  * @param networkSendRetryJitterCap
+  *   The maximum jittered delay that a node will use to wait between consecutive gRPC message send
+  *   attempts. The minimum delay is added to the jittered delay.
+  * @param manualVacuumEnabled
+  *   If `true`, the BFT block orderer will attempt to manually vacuum each partition after it
+  *   becomes cold.
   */
 final case class BftBlockOrdererConfig(
     segmentLengthForPv34: Option[Long] = None,
     leaderSelectionPolicyConfigForPv34: Option[BlacklistLeaderSelectionPolicyConfig] = None,
-    maxRequestPayloadBytes: Int = DefaultMaxRequestPayloadBytes,
+    viewChangeTimeoutOverride: Option[FiniteDuration] = None,
     maxMempoolQueueSize: Int = DefaultMaxMempoolQueueSize,
-    // TODO(#24184) make a sequencing parameter
-    maxRequestsInBatch: Short = DefaultMaxRequestsInBatch,
     minRequestsInBatch: Short = DefaultMinRequestsInBatch,
     maxBatchCreationInterval: FiniteDuration = DefaultMaxBatchCreationInterval,
     availabilityNumberOfAttemptsOfDownloadingOutputFetchBeforeWarning: Int =
@@ -175,21 +262,32 @@ final case class BftBlockOrdererConfig(
       DefaultAvailabilityDisseminationPatience,
     availabilityMinProposalCreationDelay: FiniteDuration =
       DefaultAvailabilityMinProposalCreationDelay,
-    // TODO(#24184) make a sequencing parameter
-    maxBatchesPerBlockProposal: Short = DefaultMaxBatchesPerProposal,
     consensusQueueMaxSize: Int = DefaultConsensusQueueMaxSize,
     consensusQueuePerNodeQuota: Int = DefaultConsensusQueuePerNodeQuota,
     consensusBlockCompletionTimeout: FiniteDuration = DefaultConsensusBlockCompletionTimeout,
     consensusEmptyBlockCreationTimeout: FiniteDuration = DefaultConsensusEmptyBlockCreationTimeout,
+    consensusNewEpochTopologyWarnTimeout: FiniteDuration =
+      DefaultConsensusNewEpochTopologyWarnTimeout,
+    consensusEnableLogEndOfEpochProgress: Boolean = false,
+    consensusEnableFlushingSegment: Boolean = true,
+    consensusFlushingMinBlocks: Int = DefaultConsensusFlushingMinBlocks,
     delayedInitQueueMaxSize: Int = DefaultDelayedInitQueueMaxSize,
+    epochStateTransferFutureEpochQueueMaxSize: Int = DefaultConsensusQueueMaxSize,
+    epochStateTransferFutureEpochQueuePerNodeQuota: Int = DefaultConsensusQueuePerNodeQuota,
+    epochStateTransferHowManyFutureEpochsToDownloadInParallel: NonNegativeLong =
+      DefaultEpochStateTransferHowManyFutureEpochsToDownloadInParallel,
+    epochStateTransferTimeoutForFutureEpoch: FiniteDuration =
+      DefaultEpochStateTransferTimeoutForFutureEpoch,
     epochStateTransferRetryTimeout: FiniteDuration = DefaultEpochStateTransferTimeout,
     outputFetchTimeout: FiniteDuration = DefaultOutputFetchTimeout,
     outputFetchMinimumDelay: FiniteDuration = DefaultOutputFetchMinimumDelay,
     outputFetchTimeoutCap: FiniteDuration = DefaultOutputFetchTimeoutCap,
+    outputFetchHowManyRecipients: PositiveInt = DefaultOutputFetchHowManyRecipients,
     outputEnqueueMaxRetries: Int = DefaultOutputEnqueueMaxRetries,
     outputEnqueueMaxRetryDelay: FiniteDuration = DefaultOutputEnqueueMaxRetryDelay,
     outputSizeOfChunkOfEpochsToLoadAtStart: Int = DefaultOutputSizeOfChunkOfEpochsToLoadAtStart,
     blockingDbReadTimeout: FiniteDuration = DefaultBlockingDbReadTimeout,
+    sendBlacklistTtl: FiniteDuration = DefaultSendBlacklistTtl,
     initialNetwork: Option[P2PNetworkConfig] = None,
     standalone: Option[BftBlockOrderingStandaloneNetworkConfig] = None,
     storage: Option[StorageConfig] = None,
@@ -199,14 +297,16 @@ final case class BftBlockOrdererConfig(
     dedicatedExecutionContextDivisor: Option[Int] = DefaultDedicatedExecutionContextDivisor,
     sequencerCoreSubscriptionConfig: SequencerCoreSubscriptionConfig =
       DefaultSequencerCoreSubscriptionConfig,
+    initTimeout: config.NonNegativeFiniteDuration = DefaultInitTimeout,
+    initQueryTimeout: config.NonNegativeFiniteDuration = DefaultInitQueryTimeout,
+    networkSendAttempts: PositiveInt = DefaultNetworkSendAttempts,
+    networkSendRetryMinimumDelay: PositiveFiniteDuration = DefaultNetworkSendRetryMinimumDelay,
+    networkSendRetryJitterCap: PositiveFiniteDuration = DefaultNetworkSendRetryMaximumDelay,
+    manualVacuumEnabled: Boolean = false,
 ) {
-  private val maxRequestsPerBlock = maxBatchesPerBlockProposal * maxRequestsInBatch
   require(
-    maxRequestsPerBlock < BftTime.MaxRequestsPerBlock,
-    s"Maximum block size too big: $maxRequestsInBatch maximum requests per batch and " +
-      s"$maxBatchesPerBlockProposal maximum batches per block proposal means " +
-      s"$maxRequestsPerBlock maximum requests per block, " +
-      s"but the maximum number allowed of requests per block is ${BftTime.MaxRequestsPerBlock}",
+    initTimeout.underlying >= initQueryTimeout.underlying,
+    s"initTimeout $initTimeout must be >= initQueryTimeout $initQueryTimeout",
   )
 }
 
@@ -215,29 +315,33 @@ object BftBlockOrdererConfig {
   // Minimum epoch length that allows 16 nodes (i.e., the current CN load test target) to all act as consensus leaders
   val DefaultEpochLength: EpochLength = EpochLength(16)
 
-  val DefaultMaxRequestPayloadBytes: Int = 1 * 1024 * 1024
-  val DefaultMaxMempoolQueueSize: Int = 10 * 1024
-  val DefaultMaxRequestsInBatch: Short = 32
+  val DefaultMaxMempoolQueueSize: Int = 10 * 1_024
   val DefaultMinRequestsInBatch: Short = 3
   val DefaultMaxBatchCreationInterval: FiniteDuration = 100.milliseconds
-  val DefaultMaxBatchesPerProposal: Short = 16
   val DefaultAvailabilityNumberOfAttemptsOfDownloadingOutputFetchBeforeWarning: Int = 5
-  val DefaultAvailabilityMaxNonOrderedBatchesPerNode: Short = 1000
+  val DefaultAvailabilityMaxNonOrderedBatchesPerNode: Short = 1_000
   val DefaultAvailabilityDisseminationPatience: Option[FiniteDuration] = Some(5.seconds)
   val DefaultAvailabilityMinProposalCreationDelay: FiniteDuration = 250.millis
-  val DefaultConsensusQueueMaxSize: Int = 10 * 1024
-  val DefaultConsensusQueuePerNodeQuota: Int = 1024
+  val DefaultConsensusQueueMaxSize: Int = 10 * 1_024
+  val DefaultConsensusQueuePerNodeQuota: Int = 1_024
   val DefaultConsensusBlockCompletionTimeout: FiniteDuration = 10.seconds
-  val DefaultConsensusEmptyBlockCreationTimeout: FiniteDuration = 5.seconds
-  val DefaultDelayedInitQueueMaxSize: Int = 1024
-  val DefaultEpochStateTransferTimeout: FiniteDuration = 10.seconds
-  val DefaultOutputFetchTimeout: FiniteDuration = 500.milliseconds
-  val DefaultOutputFetchMinimumDelay: FiniteDuration = 500.milliseconds
-  val DefaultOutputFetchTimeoutCap: FiniteDuration = 5.second
+  val DefaultConsensusEmptyBlockCreationTimeout: FiniteDuration = 500.milliseconds
+  val DefaultConsensusFlushingMinBlocks = 2
+  val DefaultDelayedInitQueueMaxSize: Int = 1_024
+  val DefaultConsensusNewEpochTopologyWarnTimeout: FiniteDuration = 2.seconds
+  val DefaultEpochStateTransferHowManyFutureEpochsToDownloadInParallel: NonNegativeLong =
+    NonNegativeLong.tryCreate(5L)
+  val DefaultEpochStateTransferTimeout: FiniteDuration = 4.seconds
+  val DefaultEpochStateTransferTimeoutForFutureEpoch: FiniteDuration = 500.millis
+  val DefaultOutputFetchTimeout: FiniteDuration = 200.millis
+  val DefaultOutputFetchMinimumDelay: FiniteDuration = 200.millis
+  val DefaultOutputFetchTimeoutCap: FiniteDuration = 200.millis
+  val DefaultOutputFetchHowManyRecipients: PositiveInt = PositiveInt.tryCreate(2)
   val DefaultOutputEnqueueMaxRetries: Int = retry.Forever
   val DefaultOutputEnqueueMaxRetryDelay: FiniteDuration = 5.seconds
   val DefaultOutputSizeOfChunkOfEpochsToLoadAtStart: Int = 10
   val DefaultBlockingDbReadTimeout: FiniteDuration = 1.minute
+  val DefaultSendBlacklistTtl: FiniteDuration = 3.minutes
 
   val DefaultDedicatedExecutionContextDivisor: Option[Int] = None
 
@@ -246,6 +350,17 @@ object BftBlockOrdererConfig {
 
   val DefaultSequencerCoreSubscriptionConfig: SequencerCoreSubscriptionConfig =
     SequencerCoreSubscriptionConfig()
+
+  val DefaultInitTimeout: config.NonNegativeFiniteDuration =
+    config.NonNegativeFiniteDuration(10.minutes)
+  val DefaultInitQueryTimeout: config.NonNegativeFiniteDuration =
+    config.NonNegativeFiniteDuration(5.minutes)
+
+  val DefaultNetworkSendAttempts: PositiveInt = PositiveInt.tryCreate(5)
+  val DefaultNetworkSendRetryMinimumDelay: PositiveFiniteDuration =
+    PositiveFiniteDuration.tryFromDuration(2_000.millis)
+  val DefaultNetworkSendRetryMaximumDelay: PositiveFiniteDuration =
+    PositiveFiniteDuration.tryFromDuration(30_000.millis)
 
   /** Configuration for peer-to-peer network settings
     *
@@ -294,6 +409,20 @@ object BftBlockOrdererConfig {
     *   The maximum delay between retry attempts to connect to a peer
     * @param connectionRetryDelayMultiplier
     *   The backoff factor applied to the delay between subsequent failed retry attempts
+    * @param flowControlEnabled
+    *   Determines whether flow control is enabled on the sender; if enabled, messages are only sent
+    *   over gRPC if the receiver signals readiness, else queued in a max-sized buffer and
+    *   potentially dropped.
+    * @param flowControlBuffer
+    *   If flow control is enabled, it configures the specified buffer size on the sender side. If
+    *   not set, the gRPC implementation will manage send buffers in case of slow receivers (and may
+    *   OOM).
+    * @param flowControlBufferDropNewest
+    *   If true, newest excess sends, rather than oldest, will be dropped from the flow control
+    *   buffer.
+    * @param flowControlReadyAllowance
+    *   If `flowControlBuffer` is set, a "ready to send" signal will be valid for the specified
+    *   number of messages without further checks.
     */
   final case class P2PConnectionManagementConfig(
       // The maximum number of connection attempts before we log a warning.
@@ -308,6 +437,12 @@ object BftBlockOrdererConfig {
       maxConnectionRetryDelay: config.NonNegativeFiniteDuration =
         config.NonNegativeFiniteDuration.ofMinutes(2),
       connectionRetryDelayMultiplier: NonNegativeInt = NonNegativeInt.two,
+      flowControlEnabled: Boolean = true,
+      // These flow control defaults seem to work well on both a happy case benchmark (16 nodes,
+      //  3KB payload, 4k req/s)  and on a catch-up benchmark.
+      flowControlBuffer: PositiveInt = PositiveInt.tryCreate(2048),
+      flowControlBufferDropNewest: Boolean = false,
+      flowControlReadyAllowance: PositiveInt = PositiveInt.one,
   )
 
   /** Configuration for the peer-to-peer server that accepts incoming connections
@@ -355,16 +490,21 @@ object BftBlockOrdererConfig {
       tls: Option[TlsServerConfig] = None,
       override val maxInboundMessageSize: NonNegativeInt =
         ServerConfig.defaultMaxInboundMessageSize,
+      override val flowControlWindow: Option[PositiveInt] = ServerConfig.defaultFlowControlWindow,
+      override val initialFlowControlWindow: Option[PositiveInt] =
+        ServerConfig.defaultInitialFlowControlWindow,
       override val maxConcurrentCallsPerConnection: NonNegativeInt =
         ServerConfig.defaultMaxConcurrentCallsPerConnection,
       override val limits: Option[ActiveRequestLimitsConfig] = None,
+      override val keepAliveServer: Option[BasicKeepAliveServerConfig] = Some(
+        BasicKeepAliveServerConfig()
+      ),
   ) extends ServerConfig {
     override val name: String = "peer-to-peer"
     override val maxTokenLifetime: config.NonNegativeDuration =
       config.NonNegativeDuration(Duration.Inf)
     override val jwksCacheConfig: JwksCacheConfig = JwksCacheConfig()
     override val jwtTimestampLeeway: Option[JwtTimestampLeeway] = None
-    override val keepAliveServer: Option[BasicKeepAliveServerConfig] = None
     override val authServices: Seq[AuthServiceConfig] = Seq.empty
     override val adminTokenConfig: AdminTokenConfig = AdminTokenConfig()
 
@@ -397,14 +537,180 @@ object BftBlockOrdererConfig {
       tls: Boolean,
   )
 
+  /** Configuration for a standalone BFT block ordering network, which allows the BFT layer to
+    * bypass the sequencer to directly receive requests from and serve reads to clients. This mode
+    * is useful for performance and scale testing of the CantonBFT ordering component in isolation.
+    *
+    * @param thisSequencerId
+    *   The sequencer ID of the local node.
+    * @param signingPrivateKeyProtoFile
+    *   The file containing the private key used to sign outgoing messages.
+    * @param signingPublicKeyProtoFile
+    *   The file containing the public key used to verify incoming messages.
+    * @param segmentLength
+    *   The number of blocks per segment.
+    * @param pbftViewChangeTimeout
+    *   The base duration to use for view change timeouts for ISS segments.
+    * @param blacklistLeaderSelectionPolicyConfig
+    *   The leader selection policy to enforce in the presence of View Changes of segments.
+    * @param maxRequestsInBatch
+    *   The maximum number of requests that can be included in a single batch.
+    * @param maxBatchesPerBlockProposal
+    *   The maximum number of batches that can be included in a single block proposal.
+    * @param peers
+    *   The list of peers in the standalone network, including their sequencer IDs and public keys.
+    * @param testSlowdown
+    *   Optional configuration for simulating delays in the standalone network.
+    */
   final case class BftBlockOrderingStandaloneNetworkConfig(
       thisSequencerId: String,
       signingPrivateKeyProtoFile: File,
       signingPublicKeyProtoFile: File,
       segmentLength: Long,
+      pbftViewChangeTimeout: FiniteDuration,
+      blacklistLeaderSelectionPolicyConfig: BlacklistLeaderSelectionPolicyConfig,
+      maxRequestsInBatch: Short,
+      maxBatchesPerBlockProposal: Short,
       peers: Seq[BftBlockOrderingStandalonePeerConfig],
+      testSlowdown: Option[BftBlockOrderingStandaloneTestSlowdownConfig] = None,
   )
 
+  /** Configuration for simulating delays in a standalone BFT block ordering network.
+    *
+    * @param postOrderingDelay
+    *   Optional simulated slowdown applied after ordering a block.
+    * @param sendDelay
+    *   Optional simulated slowdown applied when sending messages to peers.
+    * @param topologyDelay
+    *   Optional simulated slowdown applied when fetching the ordering topology.
+    */
+  final case class BftBlockOrderingStandaloneTestSlowdownConfig(
+      postOrderingDelay: Option[FiniteDurationDistribution] = None,
+      sendDelay: Option[BftBlockOrderingP2PSendDelayConfig] = None,
+      topologyDelay: Option[BftBlockOrderingStandaloneTopologyDelayConfig] = None,
+  )
+
+  /** Configuration for simulating delays in sending messages to peers in a BFT block ordering
+    * network.
+    *
+    * @param defaultDelayDistribution
+    *   Optional default delay distribution applied to all recipients.
+    * @param delaysByRecipients
+    *   Optional list of specific delay distributions and failure probabilities applied to specific
+    *   recipients.
+    */
+  final case class BftBlockOrderingP2PSendDelayConfig(
+      defaultDelayDistribution: Option[FiniteDurationDistribution] = None,
+      delaysByRecipients: Seq[DelayByRecipients] = Seq.empty,
+  ) {
+
+    private val delayByRecipientInstanceName
+        : Map[String, (FiniteDurationDistribution, Option[Probability], Option[Probability])] =
+      delaysByRecipients.flatMap {
+        case DelayByRecipients(
+              instanceNames,
+              delayDistribution,
+              probabilityOfGrpcSendSuccess,
+              probabilityOfGrpcReady,
+            ) =>
+          instanceNames.map(
+            _ -> (delayDistribution, probabilityOfGrpcSendSuccess.map(
+              Probability(_)
+            ), probabilityOfGrpcReady.map(Probability(_)))
+          )
+      }.toMap
+
+    def nextSendDelay(
+        recipientInstanceName: String
+    ): Option[FiniteDuration] =
+      delayByRecipientInstanceName
+        .get(recipientInstanceName)
+        .map(_._1)
+        .orElse(defaultDelayDistribution)
+        // Not used in simulation, so it's fine to use an actual random generator here
+        .map(_.generateRandomDuration(new Random(ThreadLocalRandom.current())))
+
+    def nextGrpcSendSucceeds(recipientInstanceName: String): Boolean =
+      delayByRecipientInstanceName
+        .get(recipientInstanceName)
+        .flatMap(_._2)
+        .fold(true)(p => p.flipCoin(new Random(ThreadLocalRandom.current())))
+
+    def nextGrpcSendAcceptedByFlowControl(recipientInstanceName: String): Boolean =
+      delayByRecipientInstanceName
+        .get(recipientInstanceName)
+        .flatMap(_._3)
+        .fold(true)(p => p.flipCoin(new Random(ThreadLocalRandom.current())))
+  }
+
+  object BftBlockOrderingP2PSendDelayConfig {
+
+    final case class DelayByRecipients(
+        instanceNames: Seq[String],
+        delayDistribution: FiniteDurationDistribution,
+        probabilityOfGrpcSendSuccess: Option[Double] = None,
+        probabilityOfGrpcSendAcceptedByFlowControl: Option[Double] = None,
+    ) {
+      require(
+        probabilityOfGrpcSendSuccess.forall(p => p >= 0.0 && p <= 1.0),
+        "probabilityOfGrpcSendSuccess must be between 0.0 and 1.0",
+      )
+      require(
+        probabilityOfGrpcSendAcceptedByFlowControl.forall(p => p >= 0.0 && p <= 1.0),
+        "probabilityOfGrpcSendAcceptedByFlowControl must be between 0.0 and 1.0",
+      )
+    }
+  }
+
+  /** Configuration for simulating delays in fetching the ordering topology.
+    *
+    * @param broadcastRequestProbability
+    *   Optional probability of a submission request being a broadcast, which triggers a deeper and
+    *   more costly inspection about whether it may affect the ordering topology.
+    * @param possibleOrderingTopologyChangeInRequestProbability
+    *   Optional probability of detecting that a broadcast submission request may also alter the
+    *   ordering topology for the subsequent epoch, which triggers getting an up-to-date ordering
+    *   topology via `getOrderingTopology` before starting a new epoch.
+    * @param pendingTopologyChangesProbability
+    *   Optional probability of the ordering topology returned by `getOrderingTopology` signalling
+    *   that there are pending topology changes, which triggers getting an up-to-date ordering
+    *   topology again before starting the subsequent epoch, regardless of whether broadcast
+    *   submission requests are going to be ordered before the end of the epoch.
+    * @param getOrderingTopologyDelay
+    *   Optional delay distribution (slowdown) applied when fetching the ordering topology.
+    * @param requestInspectionDelay
+    *   Optional delay distribution (slowdown) applied when inspecting a request to determine
+    *   whether it contains submission requests that may alter the ordering topology.
+    */
+  final case class BftBlockOrderingStandaloneTopologyDelayConfig(
+      broadcastRequestProbability: Option[Double] = None,
+      possibleOrderingTopologyChangeInRequestProbability: Option[Double] = None,
+      pendingTopologyChangesProbability: Option[Double] = None,
+      getOrderingTopologyDelay: Option[FiniteDurationDistribution] = None,
+      requestInspectionDelay: Option[FiniteDurationDistribution] = None,
+  ) {
+    require(
+      broadcastRequestProbability.forall(p => p >= 0.0 && p <= 1.0),
+      "broadcastRequestProbability must be between 0.0 and 1.0",
+    )
+    require(
+      possibleOrderingTopologyChangeInRequestProbability.forall(p => p >= 0.0 && p <= 1.0),
+      "possibleOrderingTopologyChangeInRequestProbability must be between 0.0 and 1.0",
+    )
+    require(
+      pendingTopologyChangesProbability.forall(p => p >= 0.0 && p <= 1.0),
+      "pendingTopologyChangesProbability must be between 0.0 and 1.0",
+    )
+  }
+
+  /** Configuration for a peer in a standalone BFT block ordering network, including its sequencer
+    * ID and public key.
+    *
+    * @param sequencerId
+    *   The sequencer ID of the peer.
+    * @param signingPublicKeyProtoFile
+    *   The file containing the public key used to verify incoming messages from the peer.
+    */
   final case class BftBlockOrderingStandalonePeerConfig(
       sequencerId: String,
       signingPublicKeyProtoFile: File,

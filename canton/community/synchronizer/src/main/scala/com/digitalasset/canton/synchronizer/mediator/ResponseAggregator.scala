@@ -11,6 +11,7 @@ import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.data.{CantonTimestamp, ViewConfirmationParameters, ViewPosition}
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggingContext}
 import com.digitalasset.canton.protocol.messages.*
@@ -23,7 +24,6 @@ import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import pprint.Tree
 
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext
 
 trait ResponseAggregator extends HasLoggerName with Product with Serializable {
@@ -44,7 +44,7 @@ trait ResponseAggregator extends HasLoggerName with Product with Serializable {
 
   def isFinalized: Boolean
 
-  private val firstResponseReceived = new AtomicReference[Option[CantonTimestamp]](None)
+  protected def firstResponseReceived: Option[CantonTimestamp]
 
   /** Records the response latency metric */
   def recordResponseMetric(
@@ -52,7 +52,7 @@ trait ResponseAggregator extends HasLoggerName with Product with Serializable {
       responseTimestamp: CantonTimestamp,
       sender: ParticipantId,
   ): Unit =
-    firstResponseReceived.getAndUpdate(_.orElse(Some(responseTimestamp))).foreach { firstTs =>
+    firstResponseReceived.foreach { firstTs =>
       timer.update(responseTimestamp.toEpochMilli - firstTs.toEpochMilli, TimeUnit.MILLISECONDS)(
         new MetricsContext(Map("sender" -> sender.uid.toString))
       )

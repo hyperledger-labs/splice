@@ -11,6 +11,7 @@ import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.participant.state.SynchronizerIndex
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.participant.ledger.api.LedgerApiStore.LastSynchronizerOffset
@@ -20,7 +21,7 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   SequentialIdBatch,
   SynchronizerOffset,
 }
-import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
+import com.digitalasset.canton.platform.store.backend.LedgerEnd
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig
 import com.digitalasset.canton.platform.store.cache.MutableLedgerEndCache
 import com.digitalasset.canton.platform.store.interning.StringInterningView
@@ -101,23 +102,33 @@ class LedgerApiStore(
     )
 
   /** The latest SynchronizerIndex for a synchronizerId until all events are processed fully and
-    * published to the Ledger API DB.
+    * published to the Ledger API DB and in memory state.
+    *
+    * Reads the in-memory cache, so it's only fresh if a live indexer is attached to keep it
+    * updated. Use [[cleanSynchronizerIndexFromDb]] otherwise (in tests, lightweight helpers or
+    * inspection code where the caller isn't backed by a live indexer keeping the cache up to date).
     */
-  def cleanSynchronizerIndex(synchronizerId: SynchronizerId)(implicit
+  def cleanSynchronizerIndex(
+      synchronizerId: SynchronizerId
+  ): Option[SynchronizerIndex] =
+    ledgerEndCache().flatMap(_.synchronizerIndices.get(synchronizerId))
+
+  /** Like [[cleanSynchronizerIndex]], but reads fresh from the database instead of the cache. Use
+    * this in tests/inspection classes if the caller isn't backed by a live indexer keeping the
+    * cache up to date.
+    */
+  @VisibleForTesting
+  def cleanSynchronizerIndexFromDb(
+      synchronizerId: SynchronizerId
+  )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): FutureUnlessShutdown[Option[SynchronizerIndex]] =
-    executeSqlUS(metrics.index.db.getCleanSynchronizerIndex)(
-      parameterStorageBackend.cleanSynchronizerIndex(synchronizerId)
-    )
-
-  def ledgerEnd(implicit
-      traceContext: TraceContext,
-      ec: ExecutionContext,
-  ): FutureUnlessShutdown[Option[LedgerEnd]] =
-    executeSqlUS(metrics.index.db.getLedgerEnd)(
+    executeSqlUS(DatabaseMetrics.ForTesting("cleanSynchronizerIndexFromDb"))(
       parameterStorageBackend.ledgerEnd
-    )
+    ).map(_.flatMap(_.synchronizerIndices.get(synchronizerId)))
+
+  def ledgerEnd: Option[LedgerEnd] = ledgerEndCache()
 
   def topologyPartyEventBatch(eventSequentialIds: SequentialIdBatch)(implicit
       traceContext: TraceContext
@@ -215,10 +226,8 @@ class LedgerApiStore(
   ): FutureUnlessShutdown[Option[LastSynchronizerOffset]] =
     executeSqlUS(metrics.index.db.lastSynchronizerOffsetBeforeOrAtRecordTime)(connection =>
       for {
-        ledgerEnd <- parameterStorageBackend.ledgerEnd(connection)
-        synchronizerIndex <- parameterStorageBackend.cleanSynchronizerIndex(synchronizerId)(
-          connection
-        )
+        ledgerEnd <- ledgerEndCache()
+        synchronizerIndex <- ledgerEnd.synchronizerIndices.get(synchronizerId)
         lastSynchronizerOffset = eventStorageBackend.lastSynchronizerOffsetBeforeOrAtRecordTime(
           synchronizerId,
           beforeOrAtRecordTimeInclusive.underlying,
@@ -250,7 +259,9 @@ class LedgerApiStore(
       executionContext: ExecutionContext,
   ): FutureUnlessShutdown[Unit] =
     for {
-      currentLedgerEnd <- ledgerEnd
+      currentLedgerEnd <- executeSqlUS(metrics.index.db.getLedgerEnd)(
+        parameterStorageBackend.ledgerEnd
+      )
       _ <- FutureUnlessShutdown.outcomeF(
         stringInterningView.update(
           currentLedgerEnd.map(_.lastStringInterningId)

@@ -7,6 +7,7 @@ import cats.data.EitherT
 import com.digitalasset.canton.concurrent.{ExecutorServiceExtensions, Threading}
 import com.digitalasset.canton.config.{ProcessingTimeout, SessionEncryptionKeyCacheConfig}
 import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.protocol.Recipients
@@ -62,8 +63,19 @@ sealed trait ConfirmationRequestSessionKeyStore {
 
   private[canton] def saveSessionKeysInfo(
       toSave: Map[RecipientGroup, SessionKeyInfo]
-  ): Unit =
+  ): Unit = {
     sessionKeysCacheRecipients.putAll(toSave)
+    // Pre-populate the decryption cache so that when this participant acts as a
+    // confirmer for its own submission, the ECIES decrypt is a cache hit.
+    // Without this, the submitter encrypts session key randomness for each recipient
+    // and then the confirmer path decrypts the same bytes — a redundant ECIES operation.
+    toSave.values.foreach { info =>
+      val plainRandomness = info.sessionKeyAndReference.randomness
+      info.encryptedSessionKeys.foreach { encrypted =>
+        sessionKeysCacheDecryptions.put(encrypted, plainRandomness)
+      }
+    }
+  }
 
   private[canton] def getSessionKeyRandomnessIfPresent(
       encryptedRandomness: AsymmetricEncrypted[SecureRandomness]
@@ -164,14 +176,14 @@ final class SessionKeyStoreWithInMemoryCache(
 
   override def close(): Unit =
     LifeCycle.close(
-      {
-        // Invalidate all cache entries and run pending maintenance tasks
+      // Invalidate all cache entries and run pending maintenance tasks
+      () => {
         sessionKeysCacheRecipients.invalidateAll()
         sessionKeysCacheRecipients.cleanUp()
         sessionKeysCacheDecryptions.invalidateAll()
         sessionKeysCacheDecryptions.cleanUp()
-        ExecutorServiceExtensions(scheduledExecutorService)(logger, timeouts)
-      }
+      },
+      ExecutorServiceExtensions(scheduledExecutorService)(logger, timeouts),
     )(logger)
 }
 

@@ -8,7 +8,6 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.*
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader.SequencerAggregatedInfo
 import com.digitalasset.canton.concurrent.{FutureSupervisor, HasFutureSupervision}
@@ -20,6 +19,7 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.config.LsuHandshake
@@ -51,10 +51,12 @@ import com.digitalasset.canton.sequencing.client.{
 import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterAsyncOps
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersionCompatibility
+import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
@@ -95,6 +97,7 @@ class GrpcSynchronizerRegistry(
 ) extends SynchronizerRegistry
     with SynchronizerRegistryHelpers
     with FlagCloseable
+    with HasCloseContext
     with HasFutureSupervision
     with NamedLogging {
 
@@ -140,7 +143,8 @@ class GrpcSynchronizerRegistry(
   }
 
   override def connect(
-      storedConfig: StoredSynchronizerConnectionConfig
+      storedConfig: StoredSynchronizerConnectionConfig,
+      onboardingTransactions: Option[NonEmpty[Seq[GenericSignedTopologyTransaction]]],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[
@@ -163,6 +167,7 @@ class GrpcSynchronizerRegistry(
         syncPersistentStateManager,
         info,
         connectionPool,
+        onboardingTransactions,
       )(
         cryptoApiProvider,
         clock,
@@ -228,7 +233,7 @@ class GrpcSynchronizerRegistry(
       crypto = cryptoApiProvider.crypto,
       seedForRandomnessO = testingConfig.sequencerTransportSeed,
       metrics = metrics
-        .connectedSynchronizerMetrics(storedConfig.config.synchronizerAlias)
+        .connectedSynchronizerMetrics(storedConfig.config.synchronizerAlias, participantId)
         .sequencerClient
         .connectionPool,
       metricsContext = storedConfig.configuredPsid.toOption
@@ -311,6 +316,9 @@ class GrpcSynchronizerRegistry(
 
         NonEmpty.from(connectionPool.getAllSequencerIds) match {
           case Some(aliasToSequencerIdNE) =>
+            if (logger.underlying.isDebugEnabled()) {
+              logger.debug(s"Connection pool initialized: $aliasToSequencerIdNE")
+            }
             val aliasToSequencerConnection = aliasToSequencerIdNE.map { case (alias, sequencerId) =>
               val sequencerConnection = config.sequencerConnections.aliasToConnection
                 .getOrElse(alias, ErrorUtil.invalidState(s"Unknown alias: $alias"))
@@ -324,6 +332,7 @@ class GrpcSynchronizerRegistry(
                 config.sequencerConnections.sequencerLivenessMargin,
                 config.sequencerConnections.submissionRequestAmplification,
                 config.sequencerConnections.sequencerConnectionPoolDelays,
+                config.sequencerConnections.subscriptionLivenessLimits,
               )
               .leftMap(error =>
                 SynchronizerRegistryError.ConnectionErrors.FailedToConnectToSequencers
@@ -353,9 +362,13 @@ class GrpcSynchronizerRegistry(
         )
         .toEitherT[FutureUnlessShutdown]
 
+      _ = logger.debug(s"Crypto handshake validated against crypto config")
+
       _ <- aliasManager
         .processHandshake(config.synchronizerAlias, info.psid)
         .leftMap(SynchronizerRegistryHelpers.fromSynchronizerAliasManagerError)
+
+      _ = logger.debug(s"${config.synchronizerAlias} maps to ${info.psid} after handshake")
 
       // create persistent state for the synchronizer if it does not exist yet
       _ <- syncPersistentStateManager
@@ -364,6 +377,8 @@ class GrpcSynchronizerRegistry(
           info.staticSynchronizerParameters,
           synchronizerPredecessor,
         )
+
+      _ = logger.debug(s"Ensured ${info.psid} persistent state")
     } yield info
 
   override def pureHandshake(
@@ -391,18 +406,38 @@ class GrpcSynchronizerRegistry(
     ): FutureUnlessShutdown[Unit] = {
       val sequencersInPool = connectionPool.getAllSequencerIds.keySet
 
-      def check(): Either[Unit, Unit] =
-        if (expectedSequencers.subsetOf(sequencersInPool))
-          logger.debug(s"Stopping the wait: all $expectedSequencers found in the pool").asRight
-        else if (wallClock.now >= waitUntil)
-          logger.debug("Stopping the wait because max waiting time is reached.").asRight
-        else if (isClosing)
-          logger.debug("Stopping the wait because of shutdown.").asRight
-        else ().asLeft
+      def check(logStopReason: Boolean): Either[Unit, Unit] = {
+        val stopReasonE =
+          if (expectedSequencers.subsetOf(sequencersInPool))
+            s"Stopping the wait: all $expectedSequencers found in the pool".asRight
+          else if (wallClock.now >= waitUntil)
+            "Stopping the wait because max waiting time is reached.".asRight
+          else if (isClosing)
+            "Stopping the wait because of shutdown.".asRight
+          else ().asLeft
 
-      Monad[FutureUnlessShutdown].tailRecM[Unit, Unit](()) { _ =>
-        wallClock.scheduleAfter(_ => check(), step.asJava)
+        stopReasonE.map { reason =>
+          if (logStopReason) logger.debug(reason)
+        }
       }
+
+      // immediately check whether we should wait in the first place, without logging the stop reason
+      check(logStopReason = false).fold(
+        _ /* start the waiting cycles */ => {
+          logger.debug(s"Handshake was successful. Starting to wait until $waitUntil")
+          Monad[FutureUnlessShutdown].tailRecM[Unit, Unit](()) { _ =>
+            wallClock.scheduleAfterCancelledOnShutdown(
+              _ => check(logStopReason = true),
+              s"${getClass.getName}: waiting",
+              step.asJava,
+            )
+          }
+        },
+        _ /* don't start the waiting cycle */ => {
+          logger.debug("Handshake was successful.")
+          FutureUnlessShutdown.unit
+        },
+      )
     }
 
     (for {
@@ -418,7 +453,6 @@ class GrpcSynchronizerRegistry(
         case Some(LsuHandshake(_, Some(minimumDuration), periodicCheck)) =>
           val waitUntil = wallClock.now.plus(minimumDuration.asJava)
 
-          logger.debug(s"Handshake was successful. Starting to wait until $waitUntil")
           EitherT.right[SynchronizerRegistryError](
             waiter(connectionPool, waitUntil, step = periodicCheck)
           )

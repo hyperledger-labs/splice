@@ -21,13 +21,13 @@
     "@mui/icons-material": "^7.3.4",
     "@mui/material": "^7.3.4",
     "@tanstack/react-query": "5.90.20",
-    "dompurify": "^3.4.2",
+    "dompurify": "^3.4.16",
     "jose": "^4.15.9",
-    "jsondiffpatch": "^0.7.3",
+    "jsondiffpatch": "^0.7.6",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-helmet-async": "^2.0.5",
-    "react-router": "^7.12.0",
+    "react-router": "^7.18.2",
     "uuid": "^14.0.0",
     "web-vitals": "4.2.4",
     "zod": "^3.25.76"
@@ -56,7 +56,7 @@
     "typescript": "5.8.3",
     "typescript-eslint": "^8.30.1",
     "vite": "^8.0.7",
-    "vitest": "^3.1.1"
+    "vitest": "^4.1.11"
   },
   "private": true,
   "scripts": {

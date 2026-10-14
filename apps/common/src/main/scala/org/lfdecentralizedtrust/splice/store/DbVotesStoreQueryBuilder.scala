@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.store
 
 import cats.data.NonEmptyList
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.DbStorage
@@ -141,6 +141,8 @@ trait DbVotesTxLogStoreQueryBuilder[TXE]
 /** All column names will be unsafely interpolated, as they're expected to be constant strings.
   */
 trait DbVotesAcsStoreQueryBuilder extends AcsQueries with LimitHelpers with NamedLogging {
+
+  implicit protected def dbProfile: DbStorage.Profile
 
   def listVoteRequestsByTrackingCidQuery(
       acsTableName: String,

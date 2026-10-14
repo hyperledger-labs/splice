@@ -1,0 +1,36 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "security.istio.io/v1beta1",
+    "kind": "AuthorizationPolicy",
+    "metadata": {
+      "name": "istio-access-policy-allow-cometbft-0",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "action": "ALLOW",
+      "rules": [
+        {
+          "from": [
+            {
+              "source": {
+                "remoteIpBlocks": [
+                  "0.0.0.0/0"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "selector": {
+        "matchLabels": {
+          "app": "istio-ingress-cometbft"
+        }
+      }
+    }
+  },
+  "name": "istio-access-policy-allow-cometbft-0",
+  "provider": "",
+  "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
+}

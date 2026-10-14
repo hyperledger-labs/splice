@@ -90,8 +90,8 @@ sealed trait ScanHttpEncodings {
                   eventIdBuilder,
                 )
               }.toMap,
-              Option.when(!tree.getExternalTransactionHash.isEmpty)(
-                OmitNullString(HexString.toHexString(tree.getExternalTransactionHash))
+              Option.when(!tree.getTransactionHash.isEmpty)(
+                OmitNullString(HexString.toHexString(tree.getTransactionHash))
               ),
             )
         )
@@ -896,11 +896,11 @@ object ScanHttpEncodings {
     val externalTransactionHash: ByteString =
       hashInclusionPolicy match {
         case ExternalHashInclusionPolicy.AlwaysInclude =>
-          tree.getExternalTransactionHash
+          tree.getTransactionHash
         case ExternalHashInclusionPolicy.ApplyThreshold =>
           externalTransactionHashThresholdTime match {
             case Some(threshold) if !tree.getRecordTime.isBefore(threshold) =>
-              tree.getExternalTransactionHash
+              tree.getTransactionHash
             case _ =>
               ByteString.EMPTY
           }

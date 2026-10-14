@@ -5,7 +5,6 @@ package com.digitalasset.canton.participant.protocol.party
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
@@ -14,6 +13,7 @@ import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.participant.state.InternalIndexService
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.ActiveContract
 import com.digitalasset.canton.participant.admin.party.PartyReplicationStatus.EphemeralSequencerChannelProgress
@@ -26,9 +26,10 @@ import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
 import com.digitalasset.canton.{RepairCounter, checked}
+import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
 import com.google.protobuf.ByteString
 import org.apache.pekko.NotUsed
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 
 import scala.concurrent.ExecutionContext
@@ -71,7 +72,7 @@ final class PartyReplicationSourceParticipantProcessor private (
     protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
     protected val testOnlyInterceptor: PartyReplicationTestInterceptor,
-)(implicit override val executionContext: ExecutionContext, actorSystem: ActorSystem)
+)(implicit override val executionContext: ExecutionContext, mat: Materializer)
     extends PartyReplicationProcessor {
   protected val processorStore: SourceParticipantStore =
     InMemoryProcessorStore.sourceParticipant(loggerFactory, timeouts)
@@ -316,7 +317,7 @@ object PartyReplicationSourceParticipantProcessor {
         PartyReplicationTestInterceptor.AlwaysProceed,
   )(implicit
       executionContext: ExecutionContext,
-      actorSystem: ActorSystem,
+      mat: Materializer,
   ): PartyReplicationSourceParticipantProcessor =
     new PartyReplicationSourceParticipantProcessor(
       requestId,

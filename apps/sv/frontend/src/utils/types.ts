@@ -119,7 +119,7 @@ export type ProposalActionKeys = keyof ProposalActionMap;
 
 export type ProposalDetails = {
   actionName: string;
-  createdAt: string;
+  createdAt?: string;
   url: string;
   summary: string;
   isVoteRequest?: boolean;

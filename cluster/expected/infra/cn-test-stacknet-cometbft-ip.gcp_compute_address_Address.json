@@ -1,0 +1,11 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "name": "cn-test-stacknet-cometbft-ip",
+    "networkTier": "PREMIUM"
+  },
+  "name": "cn-test-stacknet-cometbft-ip",
+  "provider": "",
+  "type": "gcp:compute/address:Address"
+}

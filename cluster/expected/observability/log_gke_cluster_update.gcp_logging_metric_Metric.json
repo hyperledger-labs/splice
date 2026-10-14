@@ -1,0 +1,25 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "description": "Logs with ClusterUpdate events",
+    "filter": "\nresource.labels.cluster_name=\"cn-mocknet\"\nresource.type=~\"(gke_cluster|gke_nodepool)\"\njsonPayload.@type=~\"UpgradeEvent\"",
+    "labelExtractors": {
+      "cluster": "EXTRACT(resource.labels.cluster_name)"
+    },
+    "metricDescriptor": {
+      "labels": [
+        {
+          "description": "Cluster name",
+          "key": "cluster"
+        }
+      ],
+      "metricKind": "DELTA",
+      "valueType": "INT64"
+    },
+    "name": "log_gke_cluster_update_mock"
+  },
+  "name": "log_gke_cluster_update",
+  "provider": "",
+  "type": "gcp:logging/metric:Metric"
+}

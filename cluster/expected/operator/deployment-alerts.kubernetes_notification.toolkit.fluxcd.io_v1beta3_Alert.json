@@ -1,0 +1,34 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "notification.toolkit.fluxcd.io/v1beta3",
+    "kind": "Alert",
+    "metadata": {
+      "name": "flux-deployment-alert",
+      "namespace": "operator"
+    },
+    "spec": {
+      "eventMetadata": {
+        "cluster": "mock"
+      },
+      "eventSeverity": "info",
+      "eventSources": [
+        {
+          "kind": "GitRepository",
+          "matchLabels": {
+            "notifications": "true"
+          },
+          "name": "*"
+        }
+      ],
+      "providerRef": {
+        "name": "flux-slack-provider"
+      },
+      "summary": "Deployment for stack"
+    }
+  },
+  "name": "deployment-alerts",
+  "provider": "",
+  "type": "kubernetes:notification.toolkit.fluxcd.io/v1beta3:Alert"
+}

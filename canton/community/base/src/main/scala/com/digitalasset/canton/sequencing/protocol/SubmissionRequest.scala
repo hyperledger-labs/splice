@@ -8,7 +8,7 @@ import cats.syntax.traverse.*
 import com.digitalasset.canton.config.RequireTypes.InvariantViolation
 import com.digitalasset.canton.crypto.{HashOps, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.protocol.{v30, v31}
+import com.digitalasset.canton.protocol.{SynchronizerLimits, v30, v31, v32}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{
   DeterministicEncoding,
@@ -16,11 +16,12 @@ import com.digitalasset.canton.serialization.{
   ProtocolVersionedMemoizedEvidence,
 }
 import com.digitalasset.canton.topology.Member
-import com.digitalasset.canton.util.MaxBytesToDecompress
+import com.digitalasset.canton.validation.ProtoValidation
 import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
+  ProtocolVersionValidation,
   RepresentativeProtocolVersion,
   VersionedProtoCodec,
   VersioningCompanionContextMemoizationWithDependency,
@@ -92,11 +93,35 @@ final case class SubmissionRequest private (
       submissionCost = submissionCost.map(_.toProtoV30),
     )
 
+  lazy val toProtoV32: v32.SubmissionRequest =
+    v32.SubmissionRequest(
+      sender = sender.toProtoPrimitive,
+      messageId = messageId.toProtoPrimitive,
+      batch = Some(batch.toProtoV32),
+      maxSequencingTime = maxSequencingTime.toProtoPrimitive,
+      topologyTimestamp = topologyTimestamp.map(_.toProtoPrimitive),
+      aggregationRule = aggregationRule.map(_.toProtoV30),
+      submissionCost = submissionCost.map(_.toProtoV30),
+    )
+
   def updateAggregationRule(aggregationRule: AggregationRule): SubmissionRequest =
     copy(aggregationRule = Some(aggregationRule))
 
   def updateMaxSequencingTime(maxSequencingTime: CantonTimestamp): SubmissionRequest =
     copy(maxSequencingTime = maxSequencingTime)
+
+  /** Sets the policy for the deferred decompression of the batch's envelopes.
+    */
+  def withDecompressionPolicy(decompressionPolicy: DecompressionPolicy): SubmissionRequest =
+    new SubmissionRequest(
+      sender,
+      messageId,
+      Batch.withDecompressionPolicy(batch, decompressionPolicy),
+      maxSequencingTime,
+      topologyTimestamp,
+      aggregationRule,
+      submissionCost,
+    )(representativeProtocolVersion, deserializedFrom)
 
   @VisibleForTesting
   def copy(
@@ -195,7 +220,7 @@ final case class SubmissionRequest private (
 object SubmissionRequest
     extends VersioningCompanionContextMemoizationWithDependency[
       SubmissionRequest,
-      MaxBytesToDecompress,
+      SubmissionRequestDeserializationContext,
       // Recipients is a dependency because its versioning scheme needs to be aligned with this one
       // such that SubmissionRequest and Recipients can be versioned independently
       Recipients,
@@ -205,15 +230,22 @@ object SubmissionRequest
     ProtoVersion(30) -> VersionedProtoCodec.withDependency(
       ProtocolVersion.v34
     )(v30.SubmissionRequest)(
-      supportedProtoVersionMemoized(_)(fromProtoV30),
+      supportedProtoVersionMemoizedPVV(_)(fromProtoV30),
       _.toProtoV30, // Serialization of SubmissionRequest
       _.toProtoV30, // Serialization of Recipients
     ),
     ProtoVersion(31) -> VersionedProtoCodec.withDependency(
       ProtocolVersion.v35
     )(v31.SubmissionRequest)(
-      supportedProtoVersionMemoized(_)(fromProtoV31),
+      supportedProtoVersionMemoizedPVV(_)(fromProtoV31),
       _.toProtoV31, // Serialization of SubmissionRequest
+      _.toProtoV30, // Serialization of Recipients
+    ),
+    ProtoVersion(32) -> VersionedProtoCodec.withDependency(
+      ProtocolVersion.v36
+    )(v32.SubmissionRequest)(
+      supportedProtoVersionMemoizedPVV(_)(fromProtoV32),
+      _.toProtoV32, // Serialization of SubmissionRequest
       _.toProtoV30, // Serialization of Recipients
     ),
   )
@@ -276,33 +308,69 @@ object SubmissionRequest
       extends ProtoSubmissionRequest {
     def batch: Option[ProtoBatchV31] = wrapped.batch.map(ProtoBatchV31.apply)
   }
+  private final case class ProtoSubmissionRequestV32(wrapped: v32.SubmissionRequest)
+      extends ProtoSubmissionRequest {
+    def batch: Option[ProtoBatchV32] = wrapped.batch.map(ProtoBatchV32.apply)
+  }
 
   def fromProtoV30(
-      maxRequestSize: MaxBytesToDecompress,
+      pvv: ProtocolVersionValidation,
+      context: SubmissionRequestDeserializationContext,
       requestP: v30.SubmissionRequest,
   )(bytes: ByteString): ParsingResult[SubmissionRequest] =
-    fromProtoGeneric(maxRequestSize, ProtoSubmissionRequestV30(requestP))(bytes)
+    fromProtoGeneric(
+      pvv,
+      context,
+      ProtoSubmissionRequestV30(requestP),
+    )(
+      bytes
+    )
 
   def fromProtoV31(
-      maxRequestSize: MaxBytesToDecompress,
+      pvv: ProtocolVersionValidation,
+      context: SubmissionRequestDeserializationContext,
       requestP: v31.SubmissionRequest,
   )(bytes: ByteString): ParsingResult[SubmissionRequest] =
-    fromProtoGeneric(maxRequestSize, ProtoSubmissionRequestV31(requestP))(bytes)
+    fromProtoGeneric(
+      pvv,
+      context,
+      ProtoSubmissionRequestV31(requestP),
+    )(bytes)
+
+  def fromProtoV32(
+      pvv: ProtocolVersionValidation,
+      context: SubmissionRequestDeserializationContext,
+      requestP: v32.SubmissionRequest,
+  )(bytes: ByteString): ParsingResult[SubmissionRequest] =
+    fromProtoGeneric(
+      pvv,
+      context,
+      ProtoSubmissionRequestV32(requestP),
+    )(bytes)
 
   private def fromProtoGeneric(
-      maxRequestSize: MaxBytesToDecompress,
+      pvv: ProtocolVersionValidation,
+      context: SubmissionRequestDeserializationContext,
       protoSubmissionRequest: ProtoSubmissionRequest,
   )(bytes: ByteString): ParsingResult[SubmissionRequest] = {
+    val SubmissionRequestDeserializationContext(decompressionPolicy, synchronizerLimits) = context
+    val batchContext = BatchDeserializationContext(decompressionPolicy, synchronizerLimits)
     def batchFromProto: ParsingResult[Batch[ClosedEnvelope]] = protoSubmissionRequest match {
       case ProtoSubmissionRequestV30(wrapped) =>
         ProtoConverter.parseRequired(
-          Batch.fromProtoV30(maxRequestSize, _),
+          Batch.fromProtoV30(pvv, batchContext, _),
           "SubmissionRequest.batch",
           wrapped.batch,
         )
       case ProtoSubmissionRequestV31(wrapped) =>
         ProtoConverter.parseRequired(
-          Batch.fromProtoV31(maxRequestSize, _),
+          Batch.fromProtoV31(pvv, batchContext, _),
+          "SubmissionRequest.batch",
+          wrapped.batch,
+        )
+      case ProtoSubmissionRequestV32(wrapped) =>
+        ProtoConverter.parseRequired(
+          Batch.fromProtoV32(pvv, batchContext, _),
           "SubmissionRequest.batch",
           wrapped.batch,
         )
@@ -322,8 +390,11 @@ object SubmissionRequest
           wrapped.messageId,
           wrapped.maxSequencingTime,
           wrapped.topologyTimestamp,
-          (rpv: ProtocolVersion) =>
-            wrapped.aggregationRule.traverse(AggregationRule.fromProtoV30(rpv, _)),
+          (useMemberIdsAsEligibleMembers: LegacyUseMemberIdsAsEligibleMembers) =>
+            wrapped.aggregationRule.traverse(
+              AggregationRule
+                .fromProtoV30(pvv, useMemberIdsAsEligibleMembers, _)
+            ),
           wrapped.submissionCost,
         )
       case ProtoSubmissionRequestV31(wrapped) =>
@@ -332,8 +403,24 @@ object SubmissionRequest
           wrapped.messageId,
           wrapped.maxSequencingTime,
           wrapped.topologyTimestamp,
-          (rpv: ProtocolVersion) =>
-            wrapped.aggregationRule.traverse(AggregationRule.fromProtoV30(rpv, _)),
+          (useMemberIdsAsEligibleMembers: LegacyUseMemberIdsAsEligibleMembers) =>
+            wrapped.aggregationRule.traverse(
+              AggregationRule
+                .fromProtoV30(pvv, useMemberIdsAsEligibleMembers, _)
+            ),
+          wrapped.submissionCost,
+        )
+      case ProtoSubmissionRequestV32(wrapped) =>
+        (
+          wrapped.sender,
+          wrapped.messageId,
+          wrapped.maxSequencingTime,
+          wrapped.topologyTimestamp,
+          (useMemberIdsAsEligibleMembers: LegacyUseMemberIdsAsEligibleMembers) =>
+            wrapped.aggregationRule.traverse(
+              AggregationRule
+                .fromProtoV30(pvv, useMemberIdsAsEligibleMembers, _)
+            ),
           wrapped.submissionCost,
         )
     }
@@ -341,16 +428,26 @@ object SubmissionRequest
     val protoVersion = protoSubmissionRequest match {
       case ProtoSubmissionRequestV30(_) => ProtoVersion(30)
       case ProtoSubmissionRequestV31(_) => ProtoVersion(31)
+      case ProtoSubmissionRequestV32(_) => ProtoVersion(32)
     }
 
     for {
-      sender <- Member.fromProtoPrimitive(senderP, "sender")
-      messageId <- MessageId.fromProtoPrimitive(messageIdP)
+      sender <- ProtoValidation.validateThen(
+        senderP,
+        "sender",
+        pvv,
+      )(
+        Member.fromProtoPrimitive
+      )
+      messageId <- ProtoValidation.validateThen(messageIdP, "message_id", pvv)(
+        MessageId.fromProtoPrimitive
+      )
       maxSequencingTime <- CantonTimestamp.fromProtoPrimitive(maxSequencingTimeP)
       batch <- batchFromProto
       ts <- topologyTimestamp.traverse(CantonTimestamp.fromProtoPrimitive)
       rpv <- protocolVersionRepresentativeFor(protoVersion)
-      aggregationRule <- aggregationRuleP(rpv.representative)
+      shipAllUids = LegacyUseMemberIdsAsEligibleMembers(protoVersion.v == 30)
+      aggregationRule <- aggregationRuleP(shipAllUids)
       submissionCost <- submissionCostP.traverse(SequencingSubmissionCost.fromProtoV30)
     } yield new SubmissionRequest(
       sender,
@@ -363,3 +460,11 @@ object SubmissionRequest
     )(rpv, Some(bytes))
   }
 }
+
+/** Deserialization context for submission requests, carrying the decompression policy and
+  * synchronizer limits.
+  */
+final case class SubmissionRequestDeserializationContext(
+    decompressionPolicy: DecompressionPolicy,
+    synchronizerLimits: SynchronizerLimits,
+)

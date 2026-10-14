@@ -90,12 +90,12 @@ export const VoteRequestDetails: React.FC = () => {
 
   const action = amuletOrDsoAction.tag as SupportedActionTag;
   const actionName = actionTagToTitle(amuletName)[action];
-  const createdAt = voteRequest ? voteRequest.createdAt : '';
+  const createdAt = voteRequest?.createdAt;
 
   const proposalDetails: ProposalDetails = {
     actionName,
     action: action,
-    createdAt: createdAt,
+    createdAt,
     url: request.reason.url,
     summary: request.reason.body,
     isVoteRequest: hasVoteRequest,

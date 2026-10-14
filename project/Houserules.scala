@@ -36,7 +36,7 @@ object JvmRulesPlugin extends AutoPlugin {
             "-Wunused:imports",
             "-Wunused:locals",
             "-Wunused:nowarn",
-            "-Xsource:3",
+            "-Xsource:3-cross",
           )
       },
       Test / scalacOptions --= Seq(
@@ -44,7 +44,7 @@ object JvmRulesPlugin extends AutoPlugin {
         "-Wnonunit-statement",
       ), // disable value discard and nonunit statement checks on tests
       addCompilerPlugin(
-        "org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full
+        "org.typelevel" % "kind-projector" % "0.13.4" cross CrossVersion.full
       ),
       Compile / compile / wartremoverErrors ++= {
         if (System.getProperty("canton-disable-warts") == "true") Seq()

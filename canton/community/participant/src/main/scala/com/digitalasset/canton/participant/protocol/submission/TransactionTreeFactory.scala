@@ -10,6 +10,7 @@ import com.digitalasset.canton.data.{
   CantonTimestamp,
   GenTransactionTree,
   TransactionView,
+  TransactionViewLimitConfig,
   ViewPosition,
 }
 import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
@@ -46,9 +47,6 @@ trait TransactionTreeFactory {
   def cantonContractIdVersion: CantonContractIdVersion
 
   /** Converts a `transaction: LfTransaction` to the corresponding transaction tree, if possible.
-    *
-    * @param legacyKeyResolver
-    *   The key resolutions recorded while interpreting the transaction.
     * @see
     *   TransactionTreeConversionError for error cases
     */
@@ -61,19 +59,15 @@ trait TransactionTreeFactory {
       transactionUuid: UUID,
       topologySnapshot: TopologySnapshot,
       contractOfId: ContractInstanceOfId,
-      // TODO(#31527): SPM always empty in 3.4, not used in 3.5 => to remove
-      legacyKeyResolver: LfGlobalKeyMapping,
       maxSequencingTime: CantonTimestamp,
       validatePackageVettings: Boolean,
+      limitConfig: TransactionViewLimitConfig,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, GenTransactionTree]
 
   /** Reconstructs a transaction view from a reinterpreted action description, using the supplied
     * salts.
-    *
-    * @param legacyKeyResolver
-    *   The key resolutions recorded while re-interpreting the transaction.
     * @throws java.lang.IllegalArgumentException
     *   if `transaction` does not contain exactly one root node
     */
@@ -87,8 +81,6 @@ trait TransactionTreeFactory {
       topologySnapshot: TopologySnapshot,
       contractOfId: ContractInstanceOfId,
       rbContext: RollbackContext,
-      // TODO(#31527): SPM always empty in 3.4, not used in 3.5 => to remove
-      legacyKeyResolver: LfGlobalKeyMapping,
       absolutizer: ContractIdAbsolutizer,
   )(implicit traceContext: TraceContext): EitherT[
     FutureUnlessShutdown,
@@ -148,6 +140,13 @@ object TransactionTreeFactory {
   /** Supertype for all errors than may arise during the conversion. */
   sealed trait TransactionTreeConversionError extends Product with Serializable with PrettyPrinting
 
+  final case class TransactionViewLimitError(message: String)
+      extends TransactionTreeConversionError {
+    override protected def pretty: Pretty[TransactionViewLimitError] = prettyOfClass(
+      unnamedParam(_.message.unquoted)
+    )
+  }
+
   /** Indicates that a contract instance could not be looked up by an instance of
     * [[ContractInstanceOfId]].
     */
@@ -165,11 +164,10 @@ object TransactionTreeFactory {
     )
   }
 
-  final case class RolledBackEffect(context: RollbackContext, viewPosition: ViewPosition)
+  final case class RolledBackEffect(viewPosition: ViewPosition)
       extends TransactionTreeConversionError {
     override protected def pretty: Pretty[RolledBackEffect] = prettyOfClass(
-      param("context", _.context),
-      param("view position", _.viewPosition),
+      param("view position", _.viewPosition)
     )
   }
 
@@ -217,6 +215,16 @@ object TransactionTreeFactory {
       err =>
         show"Detected conflicting package-ids for the same package name\n${err.conflicts}"
     }
+  }
+
+  /** Indicates that a constructed view failed validation, e.g. because the submitted transaction
+    * records conflicting outputs for the same external call.
+    */
+  final case class InvalidTransactionViewError(message: String)
+      extends TransactionTreeConversionError {
+    override protected def pretty: Pretty[InvalidTransactionViewError] = prettyOfClass(
+      unnamedParam(_.message.unquoted)
+    )
   }
 
   final case class ContractIdAbsolutizationError(message: String)

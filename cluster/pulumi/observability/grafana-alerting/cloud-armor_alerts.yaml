@@ -200,7 +200,7 @@ groups:
             The preconfiguredExprIds field of the logs tells an actual attack apart from a false positive on legitimate traffic.
         labels:
           gcloud_filter_skip_cluster: 'true'
-          gcloud_filter: 'resource.type%3D(%22http_external_regional_lb_rule%22%20OR%20%22http_load_balancer%22)%0A((jsonPayload.enforcedSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.enforcedSecurityPolicy.outcome%3D%22DENY%22%20AND%20jsonPayload.enforcedSecurityPolicy.priority%3D{{ $labels.rule_priority }})%20OR%20(jsonPayload.previewSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.previewSecurityPolicy.outcome%3D%22DENY%22%20AND%20jsonPayload.previewSecurityPolicy.priority%3D{{ $labels.rule_priority }}))'
+          gcloud_filter: 'resource.type%3D(%22http_external_regional_lb_rule%22%20OR%20%22http_load_balancer%22)%0A((jsonPayload.enforcedSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.enforcedSecurityPolicy.outcome%3D%22DENY%22%20AND%20jsonPayload.enforcedSecurityPolicy.priority%3D{{ $$labels.rule_priority }})%20OR%20(jsonPayload.previewSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.previewSecurityPolicy.outcome%3D%22DENY%22%20AND%20jsonPayload.previewSecurityPolicy.priority%3D{{ $$labels.rule_priority }}))'
         isPaused: false
       - uid: cloud-armor-throttle-rejections
         title: Cloud Armor throttle rule rejections
@@ -263,5 +263,5 @@ groups:
             A client exceeded the request rate allowed for an endpoint. This is either an abusive client, or a legitimate client whose load outgrew the configured throttle. Throttle rules in preview mode are included: they only log, they do not reject.
         labels:
           gcloud_filter_skip_cluster: 'true'
-          gcloud_filter: 'resource.type%3D(%22http_external_regional_lb_rule%22%20OR%20%22http_load_balancer%22)%0A((jsonPayload.enforcedSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.enforcedSecurityPolicy.outcome%3D%22DENY%22%20AND%20jsonPayload.enforcedSecurityPolicy.priority%3D{{ $labels.rule_priority }})%20OR%20(jsonPayload.previewSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.previewSecurityPolicy.outcome%3D%22DENY%22%20AND%20jsonPayload.previewSecurityPolicy.priority%3D{{ $labels.rule_priority }}))'
+          gcloud_filter: 'resource.type%3D(%22http_external_regional_lb_rule%22%20OR%20%22http_load_balancer%22)%0A((jsonPayload.enforcedSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.enforcedSecurityPolicy.outcome%3D%22DENY%22%20AND%20jsonPayload.enforcedSecurityPolicy.priority%3D{{ $$labels.rule_priority }})%20OR%20(jsonPayload.previewSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.previewSecurityPolicy.outcome%3D%22DENY%22%20AND%20jsonPayload.previewSecurityPolicy.priority%3D{{ $$labels.rule_priority }}))'
         isPaused: false

@@ -4,10 +4,10 @@
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto
 
 import com.daml.metrics.api.MetricsContext
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
@@ -22,6 +22,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   SignedMessage,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.nonempty.NonEmpty
 
 trait CryptoProvider[E <: Env[E]] {
 

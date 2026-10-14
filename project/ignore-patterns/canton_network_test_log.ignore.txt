@@ -86,8 +86,9 @@ unexpected exception: Task slick.*rejected from slick.util.AsyncExecutorWithMetr
 Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 ForkJoinIdlenessExecutorService.*shutdown did not complete gracefully in allotted
 
-Consensus not reached.*BftScanConnection:BftCallExecutorTest.*
+Consensus not reached.*BftScanConnection:BftScanConnectionTest.*
 Consensus not reached.*BftScanConnection:ConfigurationProvidedBftScanConnectionIntegrationTest.*
+All scans have responded with 'never'.*BftCallExecutorTest:BftCallExecutorTest.*
 
 # internal selenium error. Potentially intermittent
 Exception managing firefox: error sending request for url .* http2 error: stream error received: refused stream before processing any application
@@ -139,7 +140,7 @@ Previous channel ManagedChannelImpl.* was garbage collected without being shut d
 # as we don't want to miss non-shutdown warnings in production.
 Restarting stream due to failure.*Channel shutdown(Now)? invoked
 # TODO(#564) - check what's happening here during shutdown
-Timeout 10 seconds expired, but readers are still active. Shutting down forcibly.*LsuIntegrationTest
+Timeout 10 seconds expired, but readers are still active. Shutting down forcibly
 
 # Warnings in s3Mock log (which we redirect to our logs), that we don't care about
 \[s3Mock\].*Ignoring option --illegal-access=warn

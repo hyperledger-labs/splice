@@ -9,7 +9,7 @@ import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Identifier, Transaction}
 import com.daml.metrics.api.MetricsContext
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.google.protobuf.ByteString
 import com.digitalasset.canton.util.HexString
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
@@ -113,6 +113,7 @@ class UpdateHistory(
     with AutoCloseable {
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
+  private implicit val dbProfile: DbStorage.Profile = storage.profile
 
   import profile.api.jdbcActionExtensionMethods
   import UpdateHistory.*
@@ -602,7 +603,7 @@ class UpdateHistory(
     val safeWorkflowId = lengthLimited(tree.getWorkflowId)
     val safeCommandId = lengthLimited(tree.getCommandId)
     val safeExternalTransactionHash: Option[Array[Byte]] = sanitizedExtTxnHash(
-      tree.getExternalTransactionHash
+      tree.getTransactionHash
     )
 
     import storage.DbStorageConverters.setParameterOptionalByteArray
@@ -931,12 +932,6 @@ class UpdateHistory(
         .update(
           deleteAction.transactionally,
           "deleteUpdatesForTable",
-        )(
-          implicitly,
-          implicitly,
-          { case (n1, n2, n3, n4, n5) =>
-            Seq(n1, n2, n3, n4, n5).exists(_ > 0)
-          },
         )
     } yield (
       logger.info(
@@ -2367,7 +2362,7 @@ class UpdateHistory(
         .queryAndUpdate(
           action.transactionally,
           "destinationHistory.insert",
-        )(implicitly, implicitly, _ => false)
+        )
         .map { nonEmpty =>
           nonEmpty
         }

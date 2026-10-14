@@ -314,6 +314,7 @@ infra:
         key: value
         anotherKey: anotherValue
   istio:
+    enablePublicTokenRegistry: true
     istiodValues: # example istiod overrides
       global:
         proxy:

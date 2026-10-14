@@ -8,10 +8,11 @@ package com.digitalasset.canton.admin.participant.v30;
 import "com/digitalasset/canton/admin/participant/v30/acs_import.proto";
 import "com/digitalasset/canton/admin/participant/v30/synchronizer_connectivity_service.proto";
 import "com/digitalasset/canton/admin/sequencer/v30/sequencer_connection.proto";
+import "com/digitalasset/canton/topology/admin/v30/common.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
-/**
+/*
  * Perform participant repair operations, including exporting and importing ACS, purging
  * contracts, and migrating synchronizers. These operations directly act on the internal state of the participant
  * and should be used with caution.
@@ -55,16 +56,48 @@ service ParticipantRepairService {
 
   rpc RepairCommitmentsUsingAcs(RepairCommitmentsUsingAcsRequest) returns (RepairCommitmentsUsingAcsResponse);
 
-  /**
-     Perform a late logical synchronizer upgrade
-     This endpoint should ONLY be used when the following two conditions are met:
-     - The participant node missed the upgrade on the old synchronizer, and
-     - The old synchronizer has been decommissioned in the meantime.
+  //   Perform a late logical synchronizer upgrade
+  //   This endpoint should ONLY be used when the following two conditions are met:
+  //   - The participant node missed the upgrade on the old synchronizer, and
+  //   - The old synchronizer has been decommissioned in the meantime.
+  //
+  //   After the upgrade has been done, other repair operations might need to be done.
+  //   This includes manually repairing the ACS to account for missed activity on both the old and new synchronizer.
 
-     After the upgrade has been done, other repair operations might need to be done.
-     This includes manually repairing the ACS to account for missed activity on both the old and new synchronizer.
-  */
   rpc PerformLateLsu(PerformLateLsuRequest) returns (PerformLateLsuResponse);
+
+  // Deletes the synchronizer configuration specified by the physical synchronizer id.
+  // WARNING: this should not be executed under normal circumstances, but can be necessary to bring the synchronizer
+  // configuration into a consistent state (e.g. after a failed LSU attempt with the wrong successor synchronizer id).
+  rpc DeleteSynchronizerConnectionConfig(DeleteSynchronizerConnectionConfigRequest) returns (DeleteSynchronizerConnectionConfigResponse);
+
+  // List metadata for pending operations matching the provided filters.
+  //
+  // This endpoint returns only metadata, not the serialized operation payloads.
+  rpc ListPendingOperations(ListPendingOperationsRequest) returns (ListPendingOperationsResponse);
+
+  // Delete any pending operation found by input params.
+  //
+  // Returns empty response if the pending operation was successfully deleted or no matching pending operation was found.
+  rpc DeletePendingOperation(DeletePendingOperationRequest) returns (DeletePendingOperationResponse);
+
+  // Reinitialize the party and participant digests at the current ledger end. Ongoing digest processing is stopped.
+  //
+  // Fetches the topology snapshot for the participant at the current ledger end timestamp
+  // then recalculates and persists the party and participant digests.
+  //
+  rpc ReinitializeDigestCommitments(ReinitializeDigestCommitmentsRequest) returns (ReinitializeDigestCommitmentsResponse);
+
+  // Queries the latest completed ACS digest reinitialization timestamp for the given synchronizer ID.
+  rpc ReinitializeDigestCommitmentsStatus(ReinitializeDigestCommitmentsStatusRequest) returns (ReinitializeDigestCommitmentsStatusResponse);
+
+  // Run a digest consistency check based on the latest checkpoint by:
+  //  - recalculating the digests of the ACS
+  //  - comparing the recalculated results with the digest from the store
+  rpc RunDigestConsistencyCheck(RunDigestConsistencyCheckRequest) returns (RunDigestConsistencyCheckResponse);
+
+  // Checks if the digest consistency check processor is currently running or not
+  rpc DigestConsistencyCheckStatus(DigestConsistencyCheckStatusRequest) returns (DigestConsistencyCheckStatusResponse);
 }
 
 message PurgeContractsRequest {
@@ -308,3 +341,97 @@ message PerformLateLsuRequest {
 }
 
 message PerformLateLsuResponse {}
+
+message DeleteSynchronizerConnectionConfigRequest {
+  // The physical synchronizer id of the synchronizer for which to delete the config
+  // Required
+  string physical_synchronizer_id = 1;
+}
+
+message DeleteSynchronizerConnectionConfigResponse {}
+
+message ListPendingOperationsRequest {
+  // Name of the pending operation type to list.
+  // Optional.
+  optional string operation_name = 1;
+
+  // Restrict results to operations for the specified synchronizer.
+  // Optional.
+  optional com.digitalasset.canton.topology.admin.v30.Synchronizer filter_synchronizer = 2;
+
+  // Restrict results to the specified operation key.
+  // Optional.
+  optional string filter_operation_key = 3;
+}
+
+message ListPendingOperationsResponse {
+  // Metadata entries for all pending operations matching the request filters.
+  repeated PendingOperationMetadata pending_operations = 1;
+}
+
+// All fields are populated for each response item.
+message PendingOperationMetadata {
+  // Name of the pending operation type.
+  string operation_name = 1;
+
+  // Unique key of the pending operation.
+  string operation_key = 2;
+
+  // Synchronizer associated with the pending operation.
+  com.digitalasset.canton.topology.admin.v30.Synchronizer synchronizer = 3;
+}
+
+message DeletePendingOperationRequest {
+  // Name of the pending operation type to delete.
+  // Required.
+  string operation_name = 1;
+
+  // Restrict delete to the specified synchronizer.
+  // Required.
+  com.digitalasset.canton.topology.admin.v30.Synchronizer synchronizer = 2;
+
+  // Restrict delete to the specified operation key.
+  // Required.
+  string operation_key = 3;
+}
+
+message DeletePendingOperationResponse {}
+
+message ReinitializeDigestCommitmentsRequest {
+  // The ID of the synchronizer for which ACS digest reinitialization is requested.
+  string synchronizer_id = 1;
+}
+
+message ReinitializeDigestCommitmentsResponse {
+  // The target record timestamp for the reinitialization
+  // (this is the ACS snapshot timestamp, not the completion time).
+  google.protobuf.Timestamp reinitialization_timestamp = 1;
+}
+
+message ReinitializeDigestCommitmentsStatusRequest {
+  // The ID of the synchronizer for which to query the last ACS digest reinitialization timestamp.
+  string synchronizer_id = 1;
+}
+
+message ReinitializeDigestCommitmentsStatusResponse {
+  // The record timestamp of the last completed ACS digest reinitialization.
+  google.protobuf.Timestamp last_completed_reinitialization_time = 1;
+}
+
+message RunDigestConsistencyCheckRequest {
+  // The ID of the synchronizer for which to query the last ACS digest reinitialization timestamp.
+  string synchronizer_id = 1;
+}
+
+message RunDigestConsistencyCheckResponse {}
+
+message DigestConsistencyCheckStatusRequest {
+  // The ID of the synchronizer for which to query the last ACS digest reinitialization timestamp.
+  string synchronizer_id = 1;
+}
+
+message DigestConsistencyCheckStatusResponse {
+  bool is_running = 1;
+  // The record timestamp of the checkpoint used for the last started consistency check
+  google.protobuf.Timestamp last_started_check_time = 2;
+}

@@ -22,15 +22,13 @@ import {
   hostCondition,
   ipWhitelistRuleChunks,
   matchExpression,
+  seededPriorityOffset,
   wafRuleExpression,
 } from './cloudArmorRules';
 import { loadIPRanges } from './whitelisting/ipRanges';
 
 const DEFAULT_DENY_RULE_NUMBER = 2147483647;
 const PREVIEW_DENY_RULE_NUMBER = DEFAULT_DENY_RULE_NUMBER - 1;
-// Gap between the priorities of consecutive rules, leaving room to
-// insert rules in between.
-const RULE_SPACING = 100;
 
 type ThrottleConfig = CloudArmorConfig['publicEndpoints'];
 
@@ -168,8 +166,12 @@ function addWafRules(
           perNodeHost: false,
         })
       : undefined;
+  const firstOffset = seededPriorityOffset(
+    groups.map(g => g.name),
+    CLOUD_ARMOR_RULE_GROUP_SIZE
+  );
   groups.forEach((group, i) => {
-    const priority = cloudArmorRulePriority('waf', i * RULE_SPACING);
+    const priority = cloudArmorRulePriority('waf', firstOffset + i);
     new PolicyRule(
       group.name,
       {
@@ -251,77 +253,87 @@ function addThrottleAndBanRules(
   preview: boolean,
   opts: pulumi.ResourceOptions
 ): void {
-  _.sortBy(Object.entries(throttles), e => e[0]).forEach(
-    ([confEntryHead, singleServiceThrottle], i) => {
-      const priority = cloudArmorRulePriority('publicEndpoints', i * RULE_SPACING);
-      const {
-        hostname,
-        hostPrefixRegex,
-        pathPrefix,
-        restrictToRateLimitedPaths,
-        throttleAcrossAllEndpointsPerIp,
-      } = singleServiceThrottle;
-      const throttled = throttleAcrossAllEndpointsPerIp !== undefined;
-      // leave out the rule but consume the priority number if max is 0
-      // this makes the pulumi update cleaner if toggling just one service
-      const skipRule = throttled && throttleAcrossAllEndpointsPerIp.maxRequestsBeforeHttp429 === 0;
-
-      if (!skipRule) {
-        const ruleName = throttled
+  const rules = _.sortBy(Object.entries(throttles), e => e[0]).map(
+    ([confEntryHead, singleServiceThrottle]) => ({
+      confEntryHead,
+      singleServiceThrottle,
+      ruleName:
+        singleServiceThrottle.throttleAcrossAllEndpointsPerIp !== undefined
           ? `throttle-all-endpoints-per-ip-${confEntryHead}`
-          : `allow-all-endpoints-all-ips-${confEntryHead}`;
-        const pathExpr = allowedPathsCondition(
-          confEntryHead,
-          scanExternalRateLimits,
-          pathPrefix,
-          restrictToRateLimitedPaths
-        );
-        const hostExpr = hostCondition(
-          confEntryHead,
-          CLUSTER_HOSTNAME,
-          hostname
-            ? { hostname }
-            : hostPrefixRegex
-              ? { hostPrefixRegex, perNodeHost: true }
-              : undefined
-        );
-        const matchExpr = matchExpression(confEntryHead, pathExpr, hostExpr);
-
-        new PolicyRule(
-          ruleName,
-          {
-            securityPolicy: securityPolicy.name,
-            region: securityPolicy.region,
-            description: throttled
-              ? `Per source IP throttle rule for all ${confEntryHead} API endpoints`
-              : `Allow rule for all ${confEntryHead} API endpoints`,
-            priority,
-            preview: preview || singleServiceThrottle.rulePreviewOnly,
-            action: throttled ? 'throttle' : 'allow',
-            match: {
-              expr: {
-                expression: matchExpr,
-              },
-            },
-            ...(throttled
-              ? {
-                  rateLimitOptions: {
-                    enforceOnKey: 'IP',
-                    rateLimitThreshold: {
-                      count: throttleAcrossAllEndpointsPerIp.maxRequestsBeforeHttp429,
-                      intervalSec: throttleAcrossAllEndpointsPerIp.withinIntervalSeconds,
-                    },
-                    conformAction: 'allow',
-                    exceedAction: 'deny(429)', // 429 Too Many Requests
-                  },
-                }
-              : {}),
-          },
-          opts
-        );
-      }
-    }
+          : `allow-all-endpoints-all-ips-${confEntryHead}`,
+    })
   );
+  // skipped rules are part of the seed too, so toggling one does not move the others
+  const firstOffset = seededPriorityOffset(
+    rules.map(r => r.ruleName),
+    CLOUD_ARMOR_RULE_GROUP_SIZE
+  );
+  rules.forEach(({ confEntryHead, singleServiceThrottle, ruleName }, i) => {
+    const priority = cloudArmorRulePriority('publicEndpoints', firstOffset + i);
+    const {
+      hostname,
+      hostPrefixRegex,
+      pathPrefix,
+      restrictToRateLimitedPaths,
+      throttleAcrossAllEndpointsPerIp,
+    } = singleServiceThrottle;
+    const throttled = throttleAcrossAllEndpointsPerIp !== undefined;
+    // leave out the rule but consume the priority number if max is 0
+    // this makes the pulumi update cleaner if toggling just one service
+    const skipRule = throttled && throttleAcrossAllEndpointsPerIp.maxRequestsBeforeHttp429 === 0;
+
+    if (!skipRule) {
+      const pathExpr = allowedPathsCondition(
+        confEntryHead,
+        scanExternalRateLimits,
+        pathPrefix,
+        restrictToRateLimitedPaths
+      );
+      const hostExpr = hostCondition(
+        confEntryHead,
+        CLUSTER_HOSTNAME,
+        hostname
+          ? { hostname }
+          : hostPrefixRegex
+            ? { hostPrefixRegex, perNodeHost: true }
+            : undefined
+      );
+      const matchExpr = matchExpression(confEntryHead, pathExpr, hostExpr);
+
+      new PolicyRule(
+        ruleName,
+        {
+          securityPolicy: securityPolicy.name,
+          region: securityPolicy.region,
+          description: throttled
+            ? `Per source IP throttle rule for all ${confEntryHead} API endpoints`
+            : `Allow rule for all ${confEntryHead} API endpoints`,
+          priority,
+          preview: preview || singleServiceThrottle.rulePreviewOnly,
+          action: throttled ? 'throttle' : 'allow',
+          match: {
+            expr: {
+              expression: matchExpr,
+            },
+          },
+          ...(throttled
+            ? {
+                rateLimitOptions: {
+                  enforceOnKey: 'IP',
+                  rateLimitThreshold: {
+                    count: throttleAcrossAllEndpointsPerIp.maxRequestsBeforeHttp429,
+                    intervalSec: throttleAcrossAllEndpointsPerIp.withinIntervalSeconds,
+                  },
+                  conformAction: 'allow',
+                  exceedAction: 'deny(429)', // 429 Too Many Requests
+                },
+              }
+            : {}),
+        },
+        opts
+      );
+    }
+  });
 }
 
 /**

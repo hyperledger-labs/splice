@@ -1,0 +1,25 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "description": "Requests rejected by a enforced Cloud Armor rule",
+    "filter": "resource.type=(\"http_external_regional_lb_rule\" OR \"http_load_balancer\")\njsonPayload.enforcedSecurityPolicy.name=\"waf-whitelist-throttle-ban-mock\" AND jsonPayload.enforcedSecurityPolicy.outcome=\"DENY\"\n",
+    "labelExtractors": {
+      "rule_priority": "EXTRACT(jsonPayload.enforcedSecurityPolicy.priority)"
+    },
+    "metricDescriptor": {
+      "labels": [
+        {
+          "description": "Priority of the enforced Cloud Armor rule that matched",
+          "key": "rule_priority"
+        }
+      ],
+      "metricKind": "DELTA",
+      "valueType": "INT64"
+    },
+    "name": "cloud_armor_enforced_rejections_mock"
+  },
+  "name": "cloud_armor_enforced_rejections",
+  "provider": "",
+  "type": "gcp:logging/metric:Metric"
+}

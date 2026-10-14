@@ -6,7 +6,10 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.TimeoutManager.TimeoutMetric
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.TimeoutManager.{
+  TimeoutCalculator,
+  TimeoutMetric,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
   CancellableEvent,
   Env,
@@ -14,33 +17,51 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.{Duration, Instant}
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.FiniteDuration
 
 /** Manages cancellable timeouts on behalf of another module; it is parametric in the type of the
   * timeout message to send to the owning module and in the type of the handle that represents a
   * cancellable timeout.
+  *
+  * It is thread-safe, so it can be used like `context.delayedEvent` from non-actor threads as well.
   */
-class TimeoutManager[E <: Env[E], ParentModuleMessageT, TimeoutIdT](
+class TimeoutManager[
+    E <: Env[E],
+    ParentModuleMessageT,
+    TimeoutMessageT <: ParentModuleMessageT,
+    TimeoutIdT,
+](
     override val loggerFactory: NamedLoggerFactory,
-    timeout: FiniteDuration,
+    timeoutCalculator: TimeoutCalculator[TimeoutMessageT],
     timeoutId: TimeoutIdT,
     timeoutMetric: Option[TimeoutMetric],
 )(implicit metricsContext: MetricsContext)
     extends NamedLogging {
 
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private var timeoutCancellable: Option[(Instant, CancellableEvent)] = None
+  case class TimeoutCancellable(
+      timeWhenScheduled: Instant,
+      cancellableEvent: CancellableEvent,
+      eventToBeSent: TimeoutMessageT,
+  )
+  private val timeoutCancellable: AtomicReference[Option[TimeoutCancellable]] =
+    new AtomicReference(None)
 
-  def scheduleTimeout[TimeoutMessageT <: ParentModuleMessageT](
-      timeoutEvent: TimeoutMessageT
+  def scheduleTimeout(
+      timeoutEvent: TimeoutMessageT,
+      overrideTimeout: Option[FiniteDuration] = None,
   )(implicit
       context: E#ActorContextT[ParentModuleMessageT],
       traceContext: TraceContext,
   ): Unit = {
+    val timeout =
+      overrideTimeout.getOrElse(timeoutCalculator.calculateTimeoutForEvent(timeoutEvent))
     val cancellableEvent = context.delayedEvent(timeout, timeoutEvent)
     val timeNow = Instant.now()
-    timeoutCancellable match {
-      case Some((previousTime, previousTimeout)) =>
+    timeoutCancellable.getAndSet(
+      Some(TimeoutCancellable(timeNow, cancellableEvent, timeoutEvent))
+    ) match {
+      case Some(TimeoutCancellable(previousTime, previousTimeout, _)) =>
         previousTimeout.cancel().discard
         val duration = Duration.between(previousTime, timeNow)
         logger.debug(
@@ -52,24 +73,45 @@ class TimeoutManager[E <: Env[E], ParentModuleMessageT, TimeoutIdT](
           s"Scheduling new timeout w/ duration: $timeout; new event: $timeoutEvent"
         )
     }
-    timeoutCancellable = Some(timeNow -> cancellableEvent)
   }
 
-  def cancelTimeout()(implicit traceContext: TraceContext): Unit = {
-    timeoutCancellable.foreach { case (previousTime, timeout) =>
-      timeoutMetric.foreach(
-        _.scheduleChangedAfter(
-          Duration.between(previousTime, Instant.now())
-        )
-      )
-      logger.debug(s"Canceling timeout w/ ID: $timeoutId")
-      timeout.cancel().discard
-    }
-    timeoutCancellable = None
-  }
+  def cancelTimeout()(implicit traceContext: TraceContext): Unit =
+    cancelTimeoutIf(_ => true)
+
+  def cancelTimeoutIf(
+      predicate: TimeoutMessageT => Boolean
+  )(implicit traceContext: TraceContext): Unit =
+    timeoutCancellable.getAndUpdate {
+      case None => None
+      case Some(currentTimeoutCancellable) =>
+        if (predicate(currentTimeoutCancellable.eventToBeSent)) {
+          timeoutMetric.foreach(
+            _.scheduleChangedAfter(
+              Duration.between(currentTimeoutCancellable.timeWhenScheduled, Instant.now())
+            )
+          )
+          logger.debug(
+            s"Canceling timeout w/ ID: $timeoutId event: ${currentTimeoutCancellable.eventToBeSent}"
+          )
+          currentTimeoutCancellable.cancellableEvent.cancel().discard
+          None
+        } else {
+          Some(currentTimeoutCancellable)
+        }
+    }.discard
 }
 
 object TimeoutManager {
+
+  trait TimeoutCalculator[Event] {
+    def calculateTimeoutForEvent(event: Event): FiniteDuration
+  }
+
+  final case class ConstantTimeout[Event](timeout: FiniteDuration)
+      extends TimeoutCalculator[Event] {
+    override def calculateTimeoutForEvent(event: Event): FiniteDuration = timeout
+  }
+
   trait TimeoutMetric {
     def scheduleChangedAfter(duration: Duration): Unit
   }

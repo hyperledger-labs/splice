@@ -18,8 +18,8 @@ jobs:
         shell: bash
         run: |
           commit=$(git rev-parse HEAD)
-          changed_files=$(git diff --name-only HEAD~ HEAD -- '*.md' '*.rst')
-          changed_files_list=$(git diff --name-only HEAD~ HEAD -- '*.md' '*.rst' | sed ':a;N;$!ba;s/\n/\\n/g')
+          changed_files=$(git diff --name-only HEAD~ HEAD -- '*.md' '*.mdx' '*.rst')
+          changed_files_list=$(git diff --name-only HEAD~ HEAD -- '*.md' '*.mdx' '*.rst' | sed ':a;N;$!ba;s/\n/\\n/g')
           if [ -n "$changed_files" ]; then
             echo "Setting GITHUB_COMMIT_URL as document change is detected in commit $commit"
             {
@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           # shellcheck disable=SC2028,SC2016
-          echo 'MESSAGE=*Changes to `.md` or `.rst` files have been detected and merged into the main branch.*\n<${{ steps.detect_changes.outputs.GITHUB_COMMIT_URL }}| View change at ${{ steps.detect_changes.outputs.GIT_LOG }}>\n\nChanged files:\n```\n${{ steps.detect_changes.outputs.CHANGED_DOC_FILES }}\n```' >> "$GITHUB_OUTPUT"
+          echo 'MESSAGE=*Changes to `.md`, `.mdx` or `.rst` files have been detected and merged into the main branch.*\n<${{ steps.detect_changes.outputs.GITHUB_COMMIT_URL }}| View change at ${{ steps.detect_changes.outputs.GIT_LOG }}>\n\nChanged files:\n```\n${{ steps.detect_changes.outputs.CHANGED_DOC_FILES }}\n```' >> "$GITHUB_OUTPUT"
 
       - name: Dry run
         if: steps.detect_changes.outputs.FOUND_DOCUMENT_CHANGES == 'true'

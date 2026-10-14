@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import { SingleResourceSchema } from '@canton-network/splice-pulumi-common';
 import { clusterYamlConfig } from '@canton-network/splice-pulumi-common/src/config/config';
 import util from 'node:util';
@@ -46,7 +47,7 @@ export type Config = z.infer<typeof GhaConfigSchema>;
 // @ts-ignore
 const fullConfig = GhaConfigSchema.parse(clusterYamlConfig);
 
-console.error(
+void pulumi.log.debug(
   `Loaded GHA config: ${util.inspect(fullConfig, {
     depth: null,
     maxStringLength: null,

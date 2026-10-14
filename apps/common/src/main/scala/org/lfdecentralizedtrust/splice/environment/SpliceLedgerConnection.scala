@@ -44,6 +44,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   IncompleteReassignmentEvent,
   LedgerClient,
   NoDedup,
+  TopologyTransactionUpdate,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionFilter
 import org.lfdecentralizedtrust.splice.util.{
@@ -92,6 +93,11 @@ class BaseLedgerConnection(
       traceContext: TraceContext
   ): Future[Long] =
     client.ledgerEnd()
+
+  def ledgerEndWithSynchronizerTimes(synchronizerIds: Seq[SynchronizerId])(implicit
+      traceContext: TraceContext
+  ): Future[(Long, Map[SynchronizerId, CantonTimestamp])] =
+    client.ledgerEndWithSynchronizerTimes(synchronizerIds)
 
   def latestPrunedOffset()(implicit
       traceContext: TraceContext
@@ -191,6 +197,11 @@ class BaseLedgerConnection(
   )(implicit tc: TraceContext): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] =
     client
       .updates(LedgerClient.GetUpdatesRequest(beginOffset, None, filter))
+
+  def topologyTransactions(
+      beginExclusive: Long
+  )(implicit tc: TraceContext): Source[TopologyTransactionUpdate, NotUsed] =
+    client.topologyTransactions(beginExclusive)
 
   def getOptionalPrimaryParty(
       user: String,
@@ -532,6 +543,9 @@ class BaseLedgerConnection(
       )
     client.grantUserRights(user, grants)
   }
+
+  def grantReadAsAnyParty(user: String)(implicit tc: TraceContext): Future[Unit] =
+    client.grantUserRights(user, Seq(User.Right.CanReadAsAnyParty.INSTANCE))
 
   def revokeUserRights(
       user: String,

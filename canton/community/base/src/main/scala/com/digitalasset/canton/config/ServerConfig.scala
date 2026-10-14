@@ -4,18 +4,19 @@
 package com.digitalasset.canton.config
 
 import com.daml.jwt.JwtTimestampLeeway
-import com.daml.nonempty.NonEmpty
 import com.daml.tls.{TlsClientConfig, TlsClientConfigOnlyTrustFile, TlsServerConfig}
 import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.config.AdminServerConfig.defaultAddress
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.networking.grpc.{CantonServerBuilder, ClientChannelParams}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TracingConfig
+import com.digitalasset.nonempty.NonEmpty
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext
 
+import scala.annotation.nowarn
 import scala.concurrent.duration.DurationInt
 import scala.math.Ordering.Implicits.infixOrderingOps
 
@@ -97,6 +98,18 @@ trait ServerConfig extends Product with Serializable {
 
   def maxConcurrentCallsPerConnection: NonNegativeInt
 
+  /** Switches to manual gRPC flow control and sets its window; if `None`, then it is not configured
+    * and the implementation default is used. At most one of `flowControlWindow` and
+    * `initialFlowControlWindow` can be set.
+    */
+  def flowControlWindow: Option[PositiveInt]
+
+  /** Switches to automatic gRPC flow control and sets its initial window; if `None`, then it is not
+    * configured and the implementation default is used. At most one of `flowControlWindow` and
+    * `initialFlowControlWindow` can be set.
+    */
+  def initialFlowControlWindow: Option[PositiveInt]
+
   /** maximum expiration time accepted for tokens */
   def maxTokenLifetime: NonNegativeDuration
 
@@ -111,6 +124,11 @@ object ServerConfig {
   val defaultMaxInboundMessageSize: NonNegativeInt = NonNegativeInt.tryCreate(10 * 1024 * 1024)
   val defaultMaxInboundMetadataSize: NonNegativeInt = NonNegativeInt.tryCreate(8 * 1024)
   val defaultMaxConcurrentCallsPerConnection: NonNegativeInt = NonNegativeInt.tryCreate(100000)
+  // Unset, i.e. impl. (Netty) defaults, unless overridden by initial flow control window
+  val defaultFlowControlWindow: Option[PositiveInt] = None
+  // Explicit auto flow control with 1MB initial window size
+  val defaultInitialFlowControlWindow: Option[PositiveInt] =
+    Some(PositiveInt.tryCreate(1024 * 1024))
 }
 
 /** A variant of [[ServerConfig]] that by default listens to connections only on the loopback
@@ -125,13 +143,18 @@ final case class AdminServerConfig(
       BasicKeepAliveServerConfig()
     ),
     override val maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
+    override val flowControlWindow: Option[PositiveInt] = ServerConfig.defaultFlowControlWindow,
+    override val initialFlowControlWindow: Option[PositiveInt] =
+      ServerConfig.defaultInitialFlowControlWindow,
     override val maxConcurrentCallsPerConnection: NonNegativeInt =
       ServerConfig.defaultMaxConcurrentCallsPerConnection,
     override val authServices: Seq[AuthServiceConfig] = Seq.empty,
     override val adminTokenConfig: AdminTokenConfig = AdminTokenConfig(),
     override val maxTokenLifetime: NonNegativeDuration = NonNegativeDuration(5.minutes),
     override val jwksCacheConfig: JwksCacheConfig = JwksCacheConfig(),
-    override val limits: Option[ActiveRequestLimitsConfig] = None,
+    override val limits: Option[ActiveRequestLimitsConfig] = Some(
+      AdminServerConfig.defaultStreamingRequestLimits
+    ),
 ) extends ServerConfig {
   override val name: String = "admin"
   def clientConfig: FullClientConfig =
@@ -143,6 +166,7 @@ final case class AdminServerConfig(
         maxInboundMessageSize = maxInboundMessageSize,
         keepAliveClient = keepAliveServer.map(_.clientConfigFor),
         flowControlWindow = ClientChannelParams.DefaultFlowControlWindow,
+        initialFlowControlWindow = ClientChannelParams.DefaultInitialFlowControlWindow,
         traceContextPropagation = TracingConfig.Propagation.Enabled,
       ),
     )
@@ -153,6 +177,44 @@ final case class AdminServerConfig(
 }
 object AdminServerConfig {
   val defaultAddress: String = "127.0.0.1"
+
+  private val defaultStreamLimit: NonNegativeInt = NonNegativeInt.tryCreate(10)
+
+  /** Default limits on the number of concurrently open streaming calls on the admin API.
+    *
+    * Entries are matched by full gRPC method name. Keep this list in sync if any of these endpoints
+    * is renamed or moved. Typed `getFullMethodName` entries are checked at compile time, the
+    * spelled-out strings are not.
+    */
+  @nowarn("cat=deprecation") // deprecated V1 streaming endpoints are still served
+  val defaultStreamingRequestLimits: ActiveRequestLimitsConfig = {
+    import com.digitalasset.canton.admin.health.v30.StatusServiceGrpc
+    import com.digitalasset.canton.admin.participant.v30.{
+      ParticipantInspectionServiceGrpc,
+      ParticipantRepairServiceGrpc,
+      PartyManagementServiceGrpc,
+    }
+    import com.digitalasset.canton.topology.admin.v30.TopologyManagerReadServiceGrpc
+
+    ActiveRequestLimitsConfig(
+      active = Seq(
+        TopologyManagerReadServiceGrpc.METHOD_EXPORT_TOPOLOGY_SNAPSHOT.getFullMethodName,
+        TopologyManagerReadServiceGrpc.METHOD_EXPORT_TOPOLOGY_SNAPSHOT_V2.getFullMethodName,
+        TopologyManagerReadServiceGrpc.METHOD_GENESIS_STATE.getFullMethodName,
+        TopologyManagerReadServiceGrpc.METHOD_GENESIS_STATE_V2.getFullMethodName,
+        TopologyManagerReadServiceGrpc.METHOD_SEQUENCER_LSU_STATE.getFullMethodName,
+        ParticipantRepairServiceGrpc.METHOD_EXPORT_ACS.getFullMethodName,
+        PartyManagementServiceGrpc.METHOD_EXPORT_PARTY_ACS.getFullMethodName,
+        ParticipantInspectionServiceGrpc.METHOD_OPEN_COMMITMENT.getFullMethodName,
+        ParticipantInspectionServiceGrpc.METHOD_INSPECT_COMMITMENT_CONTRACTS.getFullMethodName,
+        StatusServiceGrpc.METHOD_HEALTH_DUMP.getFullMethodName,
+        // spelled out because this module cannot depend on the synchronizer module
+        "com.digitalasset.canton.sequencer.admin.v30.SequencerAdministrationService/OnboardingState",
+        "com.digitalasset.canton.sequencer.admin.v30.SequencerAdministrationService/OnboardingStateV2",
+        "com.digitalasset.canton.mediator.admin.v30.MediatorInspectionService/Verdicts",
+      ).map(_ -> defaultStreamLimit).toMap
+    )
+  }
 }
 
 /** GRPC keep alive server configuration. */
@@ -296,6 +358,7 @@ final case class JwksCacheConfig(
     cacheExpiration: NonNegativeFiniteDuration = JwksCacheConfig.DefaultCacheExpiration,
     connectionTimeout: NonNegativeFiniteDuration = JwksCacheConfig.DefaultConnectionTimeout,
     readTimeout: NonNegativeFiniteDuration = JwksCacheConfig.DefaultReadTimeout,
+    autoRefreshAfter: NonNegativeFiniteDuration = JwksCacheConfig.DefaultAutoRefreshAfter,
 )
 
 object JwksCacheConfig {
@@ -306,6 +369,15 @@ object JwksCacheConfig {
     NonNegativeFiniteDuration.ofSeconds(10)
   private val DefaultReadTimeout: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.ofSeconds(10)
+
+  /** Default auto-refresh time of 0 preserves legacy behavior (no background refresh). When set to
+    * a positive duration, the cache begins asynchronous background refresh after this interval
+    * since the entry was written. If the refresh fails, the old verifier continues to be served
+    * until hard eviction at `cacheExpiration`. This value should be less than `cacheExpiration` to
+    * be effective.
+    */
+  private val DefaultAutoRefreshAfter: NonNegativeFiniteDuration =
+    NonNegativeFiniteDuration.ofSeconds(0)
 }
 
 /** Configuration for admin-token based authorization.

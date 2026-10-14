@@ -101,8 +101,18 @@ private[hash] abstract class NodeHashBuilderCommon(
           exerciseResult,
           keyOpt,
           byKey,
+          externalCallResults,
           version,
         ) =>
+      // External-call results are only valid on nodes with serialization version 3 or later
+      // (mirrors the prepared-transaction decoder). HashingSchemeVersion.V4 adds them in its
+      // override; V2/V3 only ever hash older nodes (where the field is empty), so fail here
+      // rather than silently omitting them.
+      if (
+        externalCallResults.nonEmpty &&
+        Ordering[SerializationVersion].lt(version, SerializationVersion.V3)
+      )
+        notSupported("external call results in Exercise node", version)
       if (choiceAuthorizers.nonEmpty)
         notSupported("choiceAuthorizers in Exercise node", version) // 2.dev feature
       if (keyOpt.nonEmpty && version == V1) notSupported("keyOpt in Exercise node", version)
@@ -155,7 +165,7 @@ private[hash] abstract class NodeHashBuilderCommon(
         addContext("Rollback Node")
           .addByte(hash.NodeHashBuilder.NodeTag.RollbackTag.tag, _ => "Rollback Node Tag")
           .withContext("Children")(_.addInt(rollback.children.length))
-      case (node: Node.LookupByKey, _) =>
+      case (node: Node.QueryByKey, _) =>
         notSupported(s"LookupByKey node", node.version)
     }
 

@@ -6,9 +6,23 @@ package com.digitalasset.canton.console.commands
 import cats.syntax.foldable.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
-import com.daml.jwt.{AuthServiceJWTCodec, JwksUrl, Jwt, JwtDecoder, StandardJWTPayload}
+import com.daml.jwt.{
+  AuthServiceJWTCodec,
+  JwksUrl,
+  Jwt,
+  JwtDecoder,
+  PartyJWTPayload,
+  StandardJWTPayload,
+}
 import com.daml.ledger.api.v2.admin.command_inspection_service.CommandState
-import com.daml.ledger.api.v2.admin.package_management_service.PackageDetails
+import com.daml.ledger.api.v2.admin.package_management_service.{
+  PackageDetails,
+  UpdateVettedPackagesForceFlag,
+  UpdateVettedPackagesResponse,
+  VettedPackagesChange,
+  VettedPackagesRef,
+}
+import com.daml.ledger.api.v2.admin.party_management_alpha_service.GeneratePartyTopologyUpdateResponse
 import com.daml.ledger.api.v2.admin.party_management_service.AllocateExternalPartyResponse
 import com.daml.ledger.api.v2.commands.{Command, DisclosedContract, PrefetchContractKey}
 import com.daml.ledger.api.v2.completion.Completion
@@ -25,6 +39,8 @@ import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   PrepareSubmissionResponse as PrepareResponseProto,
   PreparedTransaction,
 }
+import com.daml.ledger.api.v2.package_reference.PriorTopologySerial
+import com.daml.ledger.api.v2.package_service.ListVettedPackagesResponse
 import com.daml.ledger.api.v2.reassignment.Reassignment as ReassignmentProto
 import com.daml.ledger.api.v2.state_service.{
   ActiveContract,
@@ -91,7 +107,6 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.crypto.{Signature, SigningPublicKey}
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.ledger.api.{IdentityProviderConfig, IdentityProviderId}
 import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.networking.grpc.{
@@ -102,7 +117,12 @@ import com.digitalasset.canton.networking.grpc.{
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.platform.apiserver.execution.CommandStatus
 import com.digitalasset.canton.protocol.LfContractId
-import com.digitalasset.canton.tea.v1.{GetAccountResponse, UpdateAccountResponse}
+import com.digitalasset.canton.tea.v1.{
+  GetAccountResponse,
+  PruneEventsResponse,
+  UpdateAccountResponse,
+}
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.GenericTopologyTransaction
 import com.digitalasset.canton.topology.{
   ExternalParty,
@@ -112,9 +132,11 @@ import com.digitalasset.canton.topology.{
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.NoTracing
+import com.digitalasset.canton.user.{IdentityProviderConfig, IdentityProviderId}
 import com.digitalasset.canton.util.FutureUtil
 import com.digitalasset.canton.{LfPackageId, LfPackageName, LfPartyId, config}
 import com.digitalasset.daml.lf.data.Ref
+import com.google.protobuf.ByteString
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.StatusRuntimeException
 import io.grpc.stub.StreamObserver
@@ -140,7 +162,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
   private[canton] lazy val userId: String = token
     .flatMap(encodedToken => JwtDecoder.decode(Jwt(encodedToken)).toOption)
     .flatMap(decodedToken => AuthServiceJWTCodec.readFromString(decodedToken.payload).toOption)
-    .map { case s: StandardJWTPayload => s.userId }
+    .map {
+      case s: StandardJWTPayload => s.userId
+      case s: PartyJWTPayload => s.userId
+    }
     .getOrElse(LedgerApiCommands.defaultUserId)
 
   private def eventFormatAllParties(includeCreatedEventBlob: Boolean = false): Option[EventFormat] =
@@ -716,6 +741,25 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.UpdateService.GetUpdateByOffset(offset, updateFormat)(
+              consoleEnvironment.environment.executionContext
+            )
+          )
+        }
+
+      @Help.Summary("Get an update by its transaction hash")
+      @Help.Description(
+        """Get an update by its transaction hash. Returns None if the update is not (yet) known
+          |at the participant or all the events of the update are filtered due to the update format
+          |or if the update has been pruned via `pruning.prune`.
+          """
+      )
+      def update_by_hash(
+          hash: ByteString,
+          updateFormat: UpdateFormat,
+      ): Option[UpdateWrapper] =
+        consoleEnvironment.run {
+          ledgerApiCommand(
+            LedgerApiCommands.UpdateService.GetUpdateByHash(hash, updateFormat)(
               consoleEnvironment.environment.executionContext
             )
           )
@@ -1644,7 +1688,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       def end(): Long =
         consoleEnvironment.run {
           ledgerApiCommand(
-            LedgerApiCommands.StateService.LedgerEnd()
+            LedgerApiCommands.StateService.LedgerEnd(Seq())
           )
         }
 
@@ -1731,7 +1775,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               case None =>
                 consoleEnvironment.run {
                   ledgerApiCommand(
-                    LedgerApiCommands.StateService.LedgerEnd()
+                    LedgerApiCommands.StateService.LedgerEnd(Seq())
                   )
                 }
               case Some(offset) => offset
@@ -2302,6 +2346,126 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         )
       }
 
+      @Help.Summary(
+        "Query the status of an ongoing party replication",
+        FeatureFlag.Preview,
+      )
+      @Help.Description(
+        """Query the status of an ongoing party replication with information about progress,
+          |completion, or errors.
+          |
+          |Parameters:
+          |- partyId: The party replicating to the target participant.
+          |- synchronizerId: The synchronizer in which the party is being replicated.
+          |- targetParticipantId: The unique identifier of the target participant where
+          |  the party is replicating to.
+          """
+      )
+      def get_add_party_status(
+          partyId: PartyId,
+          synchronizerId: SynchronizerId,
+          targetParticipantId: ParticipantId,
+      ): com.daml.ledger.api.v2.admin.party_management_alpha_service.PartyReplicationStatus =
+        check(FeatureFlag.Preview) {
+          consoleEnvironment.run {
+            ledgerApiCommand(
+              LedgerApiCommands.PartyManagementAlphaService.GetAddPartyStatus(
+                partyId,
+                synchronizerId,
+                targetParticipantId,
+              )
+            )
+          }
+        }
+
+      @Help.Summary(
+        "Generate a topology transaction to onboard an already hosted party to a new participant",
+        FeatureFlag.Preview,
+      )
+      @Help.Description(
+        """Generates a PartyToParticipant mapping topology transaction to add an already hosted
+          |party to a target participant which does not yet host the party.
+          |
+          |For external parties, the returned transaction hash can be signed externally.
+          |The transaction and any signatures are then submitted using the `authorize_party_update`
+          |command. Note that for external parties, setting a permission other than Confirmation or
+          |Observation does not make sense.
+          |
+          |For local (internal) parties, the transaction can be passed directly to
+          |`authorize_party_update` without external signatures.
+          |
+          |Parameters:
+          |- partyId: The party to replicate.
+          |- synchronizerId: The synchronizer on which the party should be replicated.
+          |- targetParticipantId: The identifier of the participant that will host the party.
+          |- participantPermission: The permission level of the party on the target participant.
+          """
+      )
+      def generate_party_topology_update(
+          partyId: PartyId,
+          synchronizerId: SynchronizerId,
+          targetParticipantId: ParticipantId,
+          participantPermission: ParticipantPermission,
+      ): GeneratePartyTopologyUpdateResponse = check(FeatureFlag.Preview) {
+        consoleEnvironment.run {
+          ledgerApiCommand(
+            LedgerApiCommands.PartyManagementAlphaService.GeneratePartyTopologyUpdate(
+              partyId,
+              synchronizerId,
+              targetParticipantId,
+              participantPermission,
+            )
+          )
+        }
+      }
+
+      @Help.Summary(
+        "Authorize a topology change to onboard an already hosted party to another participant",
+        FeatureFlag.Preview,
+      )
+      @Help.Description(
+        """Submits a PartyToParticipant mapping topology transaction to onboard an already hosted
+          |party to a new target participant. The transaction bytes are expected to be generated via
+          |the `generate_party_topology_update` command.
+          |
+          |This command can be called on the target participant, as well as on any source
+          |participant(s) already hosting the party, to collect the necessary node signatures
+          |to reach the required authorization thresholds.
+          |
+          |Additionally, local user rights and identity provider mapping will be provisioned if
+          |provided. Note: IAM user provisioning only occurs if this endpoint is invoked on the
+          |target participant.
+          |
+          |Parameters:
+          |- transaction: The raw PartyToParticipant mapping topology transaction bytes.
+          |- signatures: External signatures authorizing the topology transaction. Required for
+          |  external parties where the namespace keys are held externally.
+          |  If empty, the local participant will simply append its own node signature.
+          |- synchronizerId: The synchronizer on which the party should be replicated.
+          |- userId: (Optional) The local user to provision IAM rights for (target participant
+          |  only).
+          |- identityProviderId: (Optional) The IDP ID for the provisioned user.
+          """
+      )
+      def authorize_party_update(
+          transaction: ByteString,
+          signatures: Seq[Signature],
+          synchronizerId: SynchronizerId,
+          userId: String = "",
+          identityProviderId: String = "",
+      ): Unit = check(FeatureFlag.Preview) {
+        consoleEnvironment.run {
+          ledgerApiCommand(
+            LedgerApiCommands.PartyManagementAlphaService.AuthorizePartyUpdate(
+              transaction,
+              signatures,
+              synchronizerId,
+              userId,
+              identityProviderId,
+            )
+          )
+        }
+      }
     }
 
     @Help.Summary("Manage packages")
@@ -2347,6 +2511,95 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.PackageManagementService.ValidateDarFile(darPath, None)
+          )
+        }
+
+      @Help.Summary("List vetted packages")
+      @Help.Description(
+        """List the packages vetted by participants connected to the same
+           synchronizers as the local participant.
+           - packageIds: Include packages referenced by these package IDs
+             (empty means all package IDs included).
+           - packageNamePrefixes: Include packages whose names start with any of these
+             prefixes (empty means all package names included).
+           - participantIds: Filter packages vetted only by the specified participants
+             (empty means no participant-level filtering).
+           - synchronizerIds: Filter packages vetted only on participants connected to
+             the specified synchronizers only (empty means no synchronizer-level
+             filtering)
+           - pageToken: Pagination token to determine the specific page to fetch.
+             Using the token guarantees that ``VettedPackages`` on a subsequent page
+             are all greater (``VettedPackages`` are sorted by synchronizer ID then
+             participant ID) than the last ``VettedPackages`` on a previous page.
+             Leave None to fetch the first page.
+           - pageSize: Maximum number of ``VettedPackages`` to return in a single page."""
+      )
+      def list_vetted_packages(
+          packageIds: Seq[String] = Seq.empty,
+          packageNamePrefixes: Seq[String] = Seq.empty,
+          participantIds: Seq[ParticipantId] = Seq.empty,
+          synchronizerIds: Seq[SynchronizerId] = Seq.empty,
+          pageToken: Option[String] = None,
+          pageSize: Int = 100,
+      ): ListVettedPackagesResponse =
+        consoleEnvironment.run {
+          ledgerApiCommand(
+            LedgerApiCommands.PackageService.ListVettedPackages(
+              packageIds = packageIds.map(LfPackageId.assertFromString),
+              packageNamePrefixes = packageNamePrefixes,
+              participantIds = participantIds,
+              synchronizerIds = synchronizerIds,
+              pageToken = pageToken,
+              pageSize = pageSize,
+            )
+          )
+        }
+
+      @Help.Summary("Update or remove vetted packages")
+      @Help.Description(
+        """Update the vetted packages of the participant.
+          - addOrUpdate: Packages to add or update the vetting state with bounds for.
+            Each package reference must uniquely identify a package uploaded on the
+            participant otherwise the command fails.
+            If the referenced package is already vetted, previous vetting bounds are
+            overwritten.
+          - remove: Packages whose vetting states should be removed from this
+            participant's topology.
+            If a reference in this list matches multiple packages, they are all unvetted
+          - dryRun: If true, the command only performs validation without applying any
+            changes.
+            Use this flag to preview the effects of a change before applying it.
+          - synchronizerId: The synchronizer on which the vetting is effected.
+            If unset, the sole synchronizer the participant is connected to is used.
+            If unset and the participant is connected to multiple synchronizers, the
+            request will error out with PACKAGE_SERVICE_CANNOT_AUTODETECT_SYNCHRONIZER.
+          - expectedPriorTopologySerial: The serial of the last ``VettedPackages``
+            topology transaction of this participant and on this synchronizer.
+            Execution of the request fails if this is not correct.
+            Use this to guard against concurrent changes.
+            If left unspecified, no validation is done against the last transaction's
+            serial.
+          - forceFlags: Controls whether potentially unsafe vetting updates are allowed.
+          """
+      )
+      def update_vetted_packages(
+          addOrUpdate: Seq[VettedPackagesChange.Vet] = Nil,
+          remove: Seq[VettedPackagesRef] = Nil,
+          dryRun: Boolean = false,
+          synchronizerId: Option[SynchronizerId] = None,
+          expectedPriorTopologySerial: Option[PriorTopologySerial] = None,
+          forceFlags: Seq[UpdateVettedPackagesForceFlag] = Seq.empty,
+      ): UpdateVettedPackagesResponse =
+        consoleEnvironment.run {
+          ledgerApiCommand(
+            LedgerApiCommands.PackageManagementService.UpdateVettedPackages(
+              addOrUpdate = addOrUpdate,
+              remove = remove,
+              dryRun = dryRun,
+              synchronizerId = synchronizerId,
+              expectedPriorTopologySerial = expectedPriorTopologySerial,
+              forceFlags = forceFlags,
+            )
           )
         }
     }
@@ -2536,6 +2789,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           |  submissions.
           |- executeAsAnyParty: Flag (default false) indicating if the user is allowed to operate
           |  interactive submissions as any party.
+          |- actAsAnyParty: Flag (default false) indicating if the user is allowed to act as any
+          |  party.
           """
       )
       def create(
@@ -2551,6 +2806,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           readAsAnyParty: Boolean = false,
           executeAs: Set[PartyId] = Set(),
           executeAsAnyParty: Boolean = false,
+          actAsAnyParty: Boolean = false,
           primaryPartyAuthentication: Boolean = false,
       ): User = {
         val lapiUser = consoleEnvironment.run {
@@ -2568,6 +2824,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               readAsAnyParty = readAsAnyParty,
               executeAs = executeAs.map(_.toLf),
               executeAsAnyParty = executeAsAnyParty,
+              actAsAnyParty = actAsAnyParty,
               primaryPartyAuthentication = primaryPartyAuthentication,
             )
           )
@@ -2769,6 +3026,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           |  submissions.
           |- executeAsAnyParty: Flag (default false) indicating if the user is allowed to operate
           |  interactive submissions as any party.
+          |- actAsAnyParty: Flag (default false) indicating if the user is allowed to act as any
+          |  party.
           """
         )
         def grant(
@@ -2781,6 +3040,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             readAsAnyParty: Boolean = false,
             executeAs: Set[PartyId] = Set(),
             executeAsAnyParty: Boolean = false,
+            actAsAnyParty: Boolean = false,
         ): UserRights =
           consoleEnvironment.run {
             ledgerApiCommand(
@@ -2794,6 +3054,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                 identityProviderId = identityProviderId,
                 readAsAnyParty = readAsAnyParty,
                 executeAsAnyParty = executeAsAnyParty,
+                actAsAnyParty = actAsAnyParty,
               )
             ).flatMap(_ =>
               ledgerApiCommand(
@@ -2823,6 +3084,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             |  submissions.
             |- executeAsAnyParty: Flag (default false) indicating if the user is allowed to operate
             |  interactive submissions as any party.
+            |- actAsAnyParty: Flag (default false) indicating if the user is allowed to act as any
+            |  party.
             """
         )
         def revoke(
@@ -2835,6 +3098,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             readAsAnyParty: Boolean = false,
             executeAs: Set[PartyId] = Set(),
             executeAsAnyParty: Boolean = false,
+            actAsAnyParty: Boolean = false,
         ): UserRights =
           consoleEnvironment.run {
             ledgerApiCommand(
@@ -2848,6 +3112,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                 identityProviderId = identityProviderId,
                 readAsAnyParty = readAsAnyParty,
                 executeAsAnyParty = executeAsAnyParty,
+                actAsAnyParty = actAsAnyParty,
               )
             ).flatMap(_ =>
               ledgerApiCommand(
@@ -3582,26 +3847,49 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
     @Help.Summary("Participant user traffic service")
     @Help.Group("Traffic")
     object traffic extends Helpful {
-      @Help.Summary("Get account details", FeatureFlag.Testing)
+      @Help.Summary("Get account details", FeatureFlag.Stable)
       @Help.Description("Get the details for the specified account-id")
       def get_account(accountId: String): GetAccountResponse =
         consoleEnvironment.run {
           ledgerApiCommand(LedgerApiCommands.Traffic.GetAccount(accountId))
         }
 
-      @Help.Summary("Update details for the account-id", FeatureFlag.Testing)
+      @Help.Summary("Update details for the account-id", FeatureFlag.Stable)
       @Help.Description(
-        """Update the account details (the balance) for the specified account-id.
+        """Update the account details (by adding the balance delta) for the specified account-id.
           |If unset, the balance will not be updated
-          |subsequent balance updates with the same deduplicationId will be ignored"""
+          |subsequent balance updates with the same deduplicationId will be ignored.
+          |If a failed update needs to be retried, pass the same deduplicationId again; the default
+          |generates a fresh id per invocation, so re-running this command after a failure without
+          |passing the original id might apply the delta a second time."""
       )
       def update_account(
           accountId: String,
-          balance: Option[Long],
+          balanceDelta: Option[Long],
           deduplicationId: String = UUID.randomUUID().toString,
       ): UpdateAccountResponse = consoleEnvironment.run {
         ledgerApiCommand(
-          LedgerApiCommands.Traffic.UpdateAccount(accountId, balance, deduplicationId)
+          LedgerApiCommands.Traffic.UpdateAccount(accountId, balanceDelta, deduplicationId)
+        )
+      }
+
+      @Help.Summary("Prune events before or at the given timestamp", FeatureFlag.Stable)
+      @Help.Description(
+        """Prune events before or at the given timestamp.
+          |This command will delete all events that have a record time before or at the given
+          |timestamp. This is useful for cleaning up old events and reducing the size of the
+          |event store.
+          |
+          |WARNING:
+          |- This operation is irreversible and should be used with caution.
+          |- Affects de-duplication. If an event is pruned, de-duplication UpdateAccount
+          |  requests on it will NOT be possible."""
+      )
+      def prune_events(
+          beforeOrAt: CantonTimestamp
+      ): PruneEventsResponse = consoleEnvironment.run {
+        ledgerApiCommand(
+          LedgerApiCommands.Traffic.PruneEvents(beforeOrAt)
         )
       }
     }

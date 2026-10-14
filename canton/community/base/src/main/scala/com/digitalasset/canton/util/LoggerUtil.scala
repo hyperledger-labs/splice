@@ -4,6 +4,7 @@
 package com.digitalasset.canton.util
 
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TraceContext
 import org.slf4j.event.Level
@@ -169,14 +170,6 @@ object LoggerUtil {
       case NonFatal(e) =>
         loggingContext.error("Unhandled exception thrown!", e)
         throw e
-    }
-
-  def logOnThrow_(task: => Unit)(implicit loggingContext: ErrorLoggingContext): Unit =
-    try {
-      task
-    } catch {
-      case NonFatal(e) =>
-        loggingContext.error("Unhandled exception thrown!", e)
     }
 
   /** truncates a string

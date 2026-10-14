@@ -6,7 +6,6 @@ package com.digitalasset.canton.participant.synchronizer
 import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.catsinstances.`cats nonempty traverse`
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.participant.v30
@@ -92,6 +91,7 @@ final case class SynchronizerConnectionConfig(
               `sequencerConnections`.`sequencerLivenessMargin`,
               `sequencerConnections`.submissionRequestAmplification,
               `sequencerConnections`.sequencerConnectionPoolDelays,
+              `sequencerConnections`.subscriptionLivenessLimits,
             ),
             `manualConnect`,
             otherSynchronizerId,
@@ -155,6 +155,7 @@ final case class SynchronizerConnectionConfig(
             sequencerConnections.sequencerLivenessMargin,
             sequencerConnections.submissionRequestAmplification,
             sequencerConnections.sequencerConnectionPoolDelays,
+            sequencerConnections.subscriptionLivenessLimits,
           )
         } yield this.copy(
           psid = updatedSynchronizerId,

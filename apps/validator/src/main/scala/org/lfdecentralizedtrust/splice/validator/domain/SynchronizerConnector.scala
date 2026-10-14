@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.validator.domain
 
 import cats.implicits.catsSyntaxApplicativeId
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
@@ -138,6 +138,7 @@ class SynchronizerConnector(
                 config.sequencerRequestAmplificationPatience.toInternal,
               ),
               sequencerConnectionPoolDelays = config.sequencerConnectionPoolDelays.toInternal,
+              subscriptionLivenessLimits = config.subscriptionLivenessLimits.toInternal,
             ),
         ).pure[Future]
     }
@@ -254,6 +255,7 @@ class SynchronizerConnector(
                   sequencerLivenessMargin =
                     Thresholds.sequencerConnectionsLivenessMargin(nonEmptyConnections.size),
                   sequencerConnectionPoolDelays = config.sequencerConnectionPoolDelays.toInternal,
+                  subscriptionLivenessLimits = config.subscriptionLivenessLimits.toInternal,
                 )
             }
           }

@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.store
 
 import cats.data.NonEmptyVector
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier}
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   AcsSnapshot,
@@ -59,18 +59,16 @@ class AcsSnapshotStore(
     with NamedLogging {
   import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
+  private implicit val dbProfile: DbStorage.Profile = storage.profile
   override val profile: JdbcProfile = storage.profile.jdbc
   import profile.api.jdbcActionExtensionMethods
-
-  private implicit def rowsAlteredByIdempotencyCheck[A](implicit
-      row: DbStorage.RowsAltered[A]
-  ): DbStorage.RowsAltered[Option[A]] = _.exists(row(_))
 
   private def historyId = updateHistory.historyId
 
   def lookupSnapshotAtOrBefore(
       migrationId: Long,
       before: CantonTimestamp,
+      onlyIndexed: Boolean = false,
   )(implicit tc: TraceContext): Future[Option[AcsSnapshot]] = {
     storage
       .querySingle(
@@ -79,6 +77,7 @@ class AcsSnapshotStore(
             where snapshot_record_time <= $before
               and migration_id = $migrationId
               and history_id = $historyId
+              and (indexes_created or not $onlyIndexed)
             order by snapshot_record_time desc
             limit 1""".as[AcsSnapshot].headOption,
         "lookupSnapshotBefore",
@@ -441,11 +440,23 @@ class AcsSnapshotStore(
         .query(
           (sql"""
                with snapshot as (
-                  select create_id, max(row_id) as row_id
-                  from acs_snapshot_data
-                  where row_id between $begin and $end and
+                  -- acs_snapshot_data contains one row per stakeholder of each contract, so we need to deduplicate.
+                  -- The rows of each contract have contiguous row_ids: they are inserted ordered by (created_at, contract_id).
+                  -- We therefore keep only the last matching row of each contract.
+                  -- Unlike a `group by create_id`, this doesn't require fetching all the rows and then grouping them,
+                  -- instead it streams rows until it arrives to LIMIT rows.
+                  -- i.e., at maximum it will fetch limit*length(stakeholders)*length(templates) rows
+                  select create_id, row_id
+                  from (
+                    select
+                      create_id,
+                      row_id,
+                      lead(create_id) over (order by row_id) as next_create_id
+                    from acs_snapshot_data
+                    where row_id between $begin and $end and
                """ ++ stakeholdersFilter(partyIds) ++ templatesFilter(templates) ++ sql"""
-                  group by create_id
+                  ) matching_rows
+                  where next_create_id is distinct from create_id
                   order by row_id asc
                   -- this CTE already will contain all snapshot rows (filtered by party id and template, if necessary).
                   -- They just need to be joined with u_h_creates.
@@ -482,13 +493,20 @@ class AcsSnapshotStore(
     }
   }
 
-  private def stakeholdersFilter(partyIds: Seq[PartyId]) = NonEmpty.from(partyIds) match {
-    case None =>
-      // This expression is always true (scan only processes data where the DSO is stakeholder).
-      // It is included to make sure the query plan uses the right index (acs_snapshot_data_all_filters)
-      sql" stakeholder = ${dsoParty}"
-    case Some(partyIds) =>
-      DbStorage.toInClause("stakeholder", partyIds)
+  private def stakeholdersFilter(partyIds: Seq[PartyId]) = {
+    def dsoClause = sql" stakeholder = ${dsoParty}"
+
+    NonEmpty.from(partyIds) match {
+      case None =>
+        // This expression is always true (scan only processes data where the DSO is stakeholder).
+        // It is included to make sure the query plan uses the right index (acs_snapshot_data_all_filters)
+        dsoClause
+      case Some(partyIds) if partyIds.contains(dsoParty) =>
+        // Optimization: DSO is stakeholder in all contracts so no need to include filters for the other parties
+        dsoClause
+      case Some(partyIds) =>
+        DbStorage.toInClause("stakeholder", partyIds)
+    }
   }
 
   private def templatesFilter(templates: Seq[PackageQualifiedName]) =
@@ -799,12 +817,10 @@ class AcsSnapshotStore(
         saveV2IncrementalSnapshot(table, snapshot, nextSnapshotTargetRecordTime)(tc)
     }
     storage.queryAndUpdate(
-      AdvisoryLocks.withDdlLock(
-        withIncrementalSnapshotIdempotencyCheck(
-          table,
-          statement,
-          Some(snapshot),
-        )
+      withIncrementalSnapshotIdempotencyCheck(
+        table,
+        statement,
+        Some(snapshot),
       ),
       "saveIncrementalSnapshot",
     )
@@ -907,22 +923,18 @@ class AcsSnapshotStore(
     // - otherwise, on retry the `create index IF NOT EXISTS` will just move on.
     for {
       _ <- storage.queryAndUpdate(
-        AdvisoryLocks.withDdlLock(
-          AcsSnapshotDDL.stakeholderIndexAction(
-            snapshot.stakeholdersTableName,
-            historyId,
-            snapshot.snapshotRecordTime,
-          )
+        AcsSnapshotDDL.stakeholderIndexAction(
+          snapshot.stakeholdersTableName,
+          historyId,
+          snapshot.snapshotRecordTime,
         ),
         "index_stakeholders",
       )
       _ <- storage.queryAndUpdate(
-        AdvisoryLocks.withDdlLock(
-          AcsSnapshotDDL.stakeholderTemplateIdIndexAction(
-            snapshot.stakeholdersTableName,
-            historyId,
-            snapshot.snapshotRecordTime,
-          )
+        AcsSnapshotDDL.stakeholderTemplateIdIndexAction(
+          snapshot.stakeholdersTableName,
+          historyId,
+          snapshot.snapshotRecordTime,
         ),
         "index_stakeholders_templateid",
       )
@@ -1495,11 +1507,6 @@ object AcsSnapshotStore {
       createRows: Int,
       stakeholderRows: Int,
   )
-
-  object SaveIncrementalAcsSnapshotInsertedRows {
-    implicit val rowsAltered: DbStorage.RowsAltered[SaveIncrementalAcsSnapshotInsertedRows] =
-      (a: SaveIncrementalAcsSnapshotInsertedRows) => a.stakeholderRows > 0 || a.createRows > 0
-  }
 
   object AcsSnapshotDDL {
     def stakeholderIndexName(historyId: Long, snapshotRecordTime: CantonTimestamp) =

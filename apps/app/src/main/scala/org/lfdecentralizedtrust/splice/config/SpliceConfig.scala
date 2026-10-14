@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.http.UrlValidator
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.{
   AnalyzableTimeWindowConfig,
+  BulkStorageBackfillingConfig,
   BulkStorageConfig,
   CantonBftPeerConfig,
   MediatorVerdictIngestionConfig,
@@ -52,7 +53,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.{
   WalletSynchronizerConfig,
   WalletValidatorAppClientConfig,
 }
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.{
@@ -61,7 +62,7 @@ import com.digitalasset.canton.config.ConfigErrors.{
   NoConfigFiles,
   SubstitutionError,
 }
-import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.{PerClientIpRateLimitConfig as _, RateLimitersConfig as _, *}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
@@ -69,6 +70,7 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.admin.api.client.data.{
   SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
+  SubscriptionLivenessLimits,
   SynchronizerLimits,
   TransactionProtocolLimits,
 }
@@ -402,7 +404,8 @@ object SpliceConfig {
       private val
       elc: ErrorLoggingContext
   ) {
-    import BaseCantonConfig.Readers.*
+    // TODO(#7525) Fail on unknown keys.
+    import BaseCantonConfig.Readers.{preventAllUnknownKeys as _, *}
 
     import cantonConfigReaders.*
 
@@ -518,8 +521,18 @@ object SpliceConfig {
     implicit val tokenStandardSettlementConfigReader
         : ConfigReader[TokenStandardConfig.SettlementConfig] =
       deriveReader[TokenStandardConfig.SettlementConfig]
+    implicit val bulkStorageBackfillingConfigReader: ConfigReader[BulkStorageBackfillingConfig] =
+      deriveReader[BulkStorageBackfillingConfig]
     implicit val bulkStorageConfigReader: ConfigReader[BulkStorageConfig] =
-      deriveReader[BulkStorageConfig]
+      deriveReader[BulkStorageConfig].emap { conf =>
+        Either.cond(
+          conf.dbReadChunkSize > 0,
+          conf,
+          ConfigValidationFailed(
+            s"dbReadChunkSize must be positive, but was ${conf.dbReadChunkSize}"
+          ),
+        )
+      }
     implicit val S3ConfigReader: ConfigReader[S3Config] =
       deriveReader[S3Config]
     implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
@@ -621,6 +634,8 @@ object SpliceConfig {
       deriveReader[SubmissionRequestAmplification]
     implicit val sequencerConnectionPoolDelaysReader: ConfigReader[SequencerConnectionPoolDelays] =
       deriveReader[SequencerConnectionPoolDelays]
+    implicit val subscriptionLivenessLimits: ConfigReader[SubscriptionLivenessLimits] =
+      deriveReader[SubscriptionLivenessLimits]
     implicit val svSequencerConfig: ConfigReader[SvSequencerConfig] = {
       implicit val sequencerPruningConfig2 = sequencerPruningConfig
       deriveReader[SvSequencerConfig]
@@ -1077,6 +1092,8 @@ object SpliceConfig {
     implicit val tokenStandardSettlementConfigWriter
         : ConfigWriter[TokenStandardConfig.SettlementConfig] =
       deriveWriter[TokenStandardConfig.SettlementConfig]
+    implicit val bulkStorageBackfillingConfigWriter: ConfigWriter[BulkStorageBackfillingConfig] =
+      deriveWriter[BulkStorageBackfillingConfig]
     implicit val BulkStorageConfigWriter: ConfigWriter[BulkStorageConfig] =
       deriveWriter[BulkStorageConfig]
     implicit val S3ConfigWriter: ConfigWriter[S3Config] =
@@ -1162,6 +1179,8 @@ object SpliceConfig {
       deriveWriter[SubmissionRequestAmplification]
     implicit val sequencerConnectionPoolDelaysWriter: ConfigWriter[SequencerConnectionPoolDelays] =
       deriveWriter[SequencerConnectionPoolDelays]
+    implicit val subscriptionLivenessLimits: ConfigWriter[SubscriptionLivenessLimits] =
+      deriveWriter[SubscriptionLivenessLimits]
     implicit val sequencerPruningConfig: ConfigWriter[SequencerPruningConfig] =
       deriveWriter[SequencerPruningConfig]
     implicit val svMediatorConfig: ConfigWriter[SvMediatorConfig] =

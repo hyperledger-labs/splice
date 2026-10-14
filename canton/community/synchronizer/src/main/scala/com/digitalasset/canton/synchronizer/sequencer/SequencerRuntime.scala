@@ -16,6 +16,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.HealthListener
 import com.digitalasset.canton.health.admin.data.TopologyQueueStatus
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
@@ -40,7 +41,10 @@ import com.digitalasset.canton.synchronizer.sequencer.admin.data.{
   SequencerAdminStatus,
   SequencerHealthStatus,
 }
-import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
+import com.digitalasset.canton.synchronizer.sequencer.config.{
+  SequencerLimits,
+  SequencerNodeParameters,
+}
 import com.digitalasset.canton.synchronizer.sequencer.time.{
   BroadcastTimeTrackerImpl,
   LsuSequencingBounds,
@@ -110,6 +114,7 @@ class SequencerRuntime(
     @VisibleForTesting val client: SequencerClient,
     staticSynchronizerParameters: StaticSynchronizerParameters,
     localNodeParameters: SequencerNodeParameters,
+    sequencerLimits: SequencerLimits,
     lsuSequencingBounds: Option[LsuSequencingBounds],
     val timeTracker: SynchronizerTimeTracker,
     val metrics: SequencerMetrics,
@@ -123,7 +128,7 @@ class SequencerRuntime(
     topologyManagerStatusO: Option[TopologyManagerStatus],
     topologyConfig: TopologyConfig,
     producePostOrderingTopologyTicks: Boolean,
-    storage: Storage,
+    @VisibleForTesting val storage: Storage,
     clock: Clock,
     staticMembersToRegister: Seq[Member],
     authenticationServices: AuthenticationServices,
@@ -292,6 +297,7 @@ class SequencerRuntime(
             syncCrypto,
             clock,
             lsuSequencingBounds,
+            sequencerLimits,
             sanitizePublicErrorMessages = localNodeParameters.sanitizePublicErrorMessages,
             disableReleaseVersionHandshakeCheck =
               localNodeParameters.disableReleaseVersionHandshakeCheck,
@@ -473,7 +479,11 @@ class SequencerRuntime(
           client.subscribeTracking(
             topologyManagerSequencerCounterTrackerStore,
             DiscardIgnoredEvents(loggerFactory) {
-              EnvelopeOpener(staticSynchronizerParameters.protocolVersion, syncCrypto.pureCrypto)(
+              EnvelopeOpener(
+                staticSynchronizerParameters.protocolVersion,
+                syncCrypto.pureCrypto,
+                topologyClient,
+              )(
                 eventHandler
               )
             },

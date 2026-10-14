@@ -4,6 +4,7 @@
 package com.digitalasset.canton.sequencing.client.transports.replay
 
 import cats.data.EitherT
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import com.daml.metrics.api.MetricsContext.withEmptyMetricsContext
 import com.daml.nameof.NameOf.functionFullName
@@ -14,6 +15,7 @@ import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoApi}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.{MetricValue, SequencerClientMetrics}
@@ -21,8 +23,8 @@ import com.digitalasset.canton.sequencing.client.*
 import com.digitalasset.canton.sequencing.client.pool.{SequencerConnection, SequencerConnectionPool}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.{
-  SequencedEventHandler,
-  SequencedSerializedEvent,
+  MaybeCompressedSequencedEventHandler,
+  MaybeCompressedSerializedEvent,
   SequencerClientRecorder,
 }
 import com.digitalasset.canton.time.Clock
@@ -30,7 +32,7 @@ import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{ErrorUtil, OptionUtil, PekkoUtil}
+import com.digitalasset.canton.util.{ErrorUtil, PekkoUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import io.opentelemetry.sdk.metrics.data.MetricData
 import org.apache.pekko.NotUsed
@@ -162,10 +164,9 @@ class ReplayClientImpl(
   replaySendsConfig.publishReplayClient(this)
 
   private def sendDuration: Option[java.time.Duration] =
-    OptionUtil
-      .zipWith(firstSend.get().map(_.toInstant), lastSend.get().map(_.toInstant))(
-        java.time.Duration.between
-      )
+    (firstSend.get().map(_.toInstant), lastSend.get().map(_.toInstant)).mapN(
+      java.time.Duration.between
+    )
 
   private def getConnection(requester: String): Either[String, SequencerConnection] =
     connectionPool
@@ -323,7 +324,7 @@ class ReplayClientImpl(
 
   private def subscribe(
       request: SubscriptionRequest,
-      handler: SequencedEventHandler[NotUsed],
+      handler: MaybeCompressedSequencedEventHandler[NotUsed],
   ): Either[String, AutoCloseable] =
     for {
       connection <- getConnection("replay-client-subscribe")
@@ -415,7 +416,7 @@ class ReplayClientImpl(
       java.time.Duration.between(from.toInstant, Instant.now())
     }
 
-    private def updateMetrics(event: SequencedEvent[ClosedEnvelope]): Unit =
+    private def updateMetrics(event: SequencedEvent[GenBatch[ClosedEnvelope]]): Unit =
       withEmptyMetricsContext { implicit metricsContext =>
         val messageIdO: Option[MessageId] = event match {
           case Deliver(_, _, _, messageId, _, _, _) => messageId
@@ -431,7 +432,7 @@ class ReplayClientImpl(
       }
 
     private def handle(
-        event: SequencedSerializedEvent
+        event: MaybeCompressedSerializedEvent
     ): FutureUnlessShutdown[Either[NotUsed, Unit]] = {
       val content = event.signedEvent.content
 

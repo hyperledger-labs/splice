@@ -1,0 +1,17 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "datasetId": "mock_da2_scan",
+    "deleteContentsOnDestroy": true,
+    "friendlyName": "mock_da2_scan Dataset",
+    "labels": {
+      "cluster": "mock",
+      "datastream_id": "legacy"
+    },
+    "location": "europe-west6"
+  },
+  "name": "mock_da2_scan",
+  "provider": "",
+  "type": "gcp:bigquery/dataset:Dataset"
+}

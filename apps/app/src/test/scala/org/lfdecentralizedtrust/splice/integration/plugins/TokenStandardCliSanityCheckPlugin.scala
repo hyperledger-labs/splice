@@ -1,8 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.plugins
 
 import com.daml.ledger.javaapi.data.Identifier
-import com.digitalasset.canton.ScalaFuturesWithPatience
 import com.digitalasset.canton.logging.SuppressingLogger
+import com.digitalasset.canton.scalatest.ScalaFuturesWithPatience
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref.PackageVersion

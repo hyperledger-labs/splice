@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "enableServerSideApply": "true"
+  },
+  "name": "k8s-imgpull-sv-da-1-default",
+  "provider": "",
+  "type": "pulumi:providers:kubernetes"
+}

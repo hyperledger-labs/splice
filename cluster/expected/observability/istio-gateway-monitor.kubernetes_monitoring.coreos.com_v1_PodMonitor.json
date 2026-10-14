@@ -1,0 +1,39 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "monitoring.coreos.com/v1",
+    "kind": "PodMonitor",
+    "metadata": {
+      "labels": {
+        "monitoring": "istio-proxies",
+        "release": "prometheus-grafana-monitoring"
+      },
+      "name": "istio-gateway-monitor",
+      "namespace": "observability"
+    },
+    "spec": {
+      "jobLabel": "app",
+      "namespaceSelector": {
+        "matchNames": [
+          "observability"
+        ]
+      },
+      "podMetricsEndpoints": [
+        {
+          "honorLabels": true,
+          "path": "/stats/prometheus",
+          "port": "http-envoy-prom"
+        }
+      ],
+      "selector": {
+        "matchLabels": {
+          "istio": "ingress"
+        }
+      }
+    }
+  },
+  "name": "istio-gateway-monitor",
+  "provider": "",
+  "type": "kubernetes:monitoring.coreos.com/v1:PodMonitor"
+}

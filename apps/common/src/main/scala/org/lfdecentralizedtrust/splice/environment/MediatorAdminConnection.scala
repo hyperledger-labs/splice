@@ -22,6 +22,7 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnectionValidation,
   SequencerConnections,
   SubmissionRequestAmplification,
+  SubscriptionLivenessLimits,
 }
 import com.digitalasset.canton.topology.{MediatorId, NodeIdentity, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -77,6 +78,7 @@ class MediatorAdminConnection(
       sequencerConnection: SequencerConnection,
       submissionRequestAmplification: SubmissionRequestAmplification,
       sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
+      subscriptionLivenessLimits: SubscriptionLivenessLimits,
   )(implicit traceContext: TraceContext): Future[Unit] =
     runCmd(
       MediatorAdministrationCommands.Initialize(
@@ -88,6 +90,7 @@ class MediatorAdminConnection(
           sequencerLivenessMargin = NonNegativeInt.zero,
           submissionRequestAmplification,
           sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
+          subscriptionLivenessLimits = subscriptionLivenessLimits,
         ),
         SequencerConnectionValidation.ThresholdActive,
       )
@@ -114,6 +117,7 @@ class MediatorAdminConnection(
       sequencerConnection: SequencerConnection,
       submissionRequestAmplification: SubmissionRequestAmplification,
       sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
+      subscriptionLivenessLimits: SubscriptionLivenessLimits,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] =
@@ -126,6 +130,7 @@ class MediatorAdminConnection(
           sequencerLivenessMargin = NonNegativeInt.zero,
           submissionRequestAmplification,
           sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
+          subscriptionLivenessLimits = subscriptionLivenessLimits,
         ),
         SequencerConnectionValidation.ThresholdActive,
       )

@@ -32,14 +32,17 @@ trait HttpVotesHandler extends Spanning with NamedLogging {
     }
   }
 
-  def listVoteRequestsByTrackingCid(body: definitions.BatchListVotesByVoteRequestsRequest)(implicit
+  final def listVoteRequestsByTrackingCid(body: definitions.BatchListVotesByVoteRequestsRequest)(
+      implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ): Future[definitions.ListVoteRequestByTrackingCidResponse] = {
     withSpan(s"$workflowId.listVoteRequestsByTrackingCid") { _ => _ =>
+      val voteRequestContractIds =
+        HttpRequestLimits.maxSizeOrFail("vote_request_contract_ids", body.voteRequestContractIds)
       for {
         dsoRulesVotes <- votesStore.listVoteRequestsByTrackingCid(
-          body.voteRequestContractIds.map(new splice.dsorules.VoteRequest.ContractId(_))
+          voteRequestContractIds.map(new splice.dsorules.VoteRequest.ContractId(_))
         )
       } yield definitions.ListVoteRequestByTrackingCidResponse(
         dsoRulesVotes.map(_.toHttp).toVector

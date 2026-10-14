@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "name": "cantonnet"
+  },
+  "name": "validator1-db-validator-pg-cantonnet",
+  "provider": "",
+  "type": "gcp:sql/database:Database"
+}

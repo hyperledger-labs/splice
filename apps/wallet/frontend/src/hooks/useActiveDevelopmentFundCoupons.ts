@@ -41,7 +41,7 @@ export const useActiveDevelopmentFundCoupons = (
   }, [allCoupons, primaryParty]);
 
   const sortedCoupons = React.useMemo(
-    () => [...filteredCoupons].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
+    () => filteredCoupons.toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
     [filteredCoupons]
   );
 

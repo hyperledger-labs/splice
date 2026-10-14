@@ -12,6 +12,8 @@ import com.digitalasset.canton.health.{HealthListener, HealthQuasiComponent}
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.SequencerConnectionPoolMetrics
+import com.digitalasset.canton.sequencing.ProcessingSerializedEvent
+import com.digitalasset.canton.sequencing.SequencerAggregatorXImpl.EventAndOrdinal
 import com.digitalasset.canton.sequencing.client.SequencerClient.CloseReason.UnrecoverableError
 import com.digitalasset.canton.sequencing.client.SequencerClientSubscriptionError.{
   ApplicationHandlerPassive,
@@ -32,7 +34,6 @@ import com.digitalasset.canton.sequencing.client.{
   SequencerClientSubscriptionError,
   SubscriptionCloseReason,
 }
-import com.digitalasset.canton.sequencing.{ProcessingSerializedEvent, SequencedSerializedEvent}
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, WallClock}
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
@@ -214,7 +215,11 @@ final class SequencerSubscriptionPoolImpl private[sequencing] (
             logger.debug(
               s"Scheduling new check in ${LoggerUtil.roundDurationForHumans(delay.duration)}"
             )
-            wallClock.scheduleAfter(_ => adjustInternal(), delay.duration)
+            wallClock.scheduleAfterCancelledOnShutdown(
+              _ => adjustInternal(),
+              s"${getClass.getName}: schedule next adjustment",
+              delay.duration,
+            )
           },
           "adjustConnectionsIfNeeded",
         )
@@ -226,8 +231,11 @@ final class SequencerSubscriptionPoolImpl private[sequencing] (
   private def createSubscription(connection: SequencerConnection)(implicit
       traceContext: TraceContext
   ): SequencerSubscription[SequencerClientSubscriptionError] = {
-    val preSubscriptionEventO =
-      subscriptionStartProvider.getLatestProcessedEventO.orElse(initialSubscriptionEventO)
+    val preSubscriptionEventO = subscriptionStartProvider.getLatestProcessedEventO.orElse(
+      // The aggregator has not yet seen any event, the first one it will see and propagate will be 1.
+      // We subscribe to the previous event, so we set its ordinal to 0.
+      initialSubscriptionEventO.map(EventAndOrdinal.zero)
+    )
 
     sequencerSubscriptionFactory.create(
       connection,
@@ -414,12 +422,25 @@ final class SequencerSubscriptionPoolImpl private[sequencing] (
 
   override def onClosed(): Unit = {
     val instances = lock.exclusive(trackedSubscriptions.toSeq)
-    LifeCycle.close(instances*)(logger)
+    LifeCycle.close(instances)(logger)
     super.onClosed()
   }
 
   override def subscriptions: Set[SequencerSubscription[SequencerClientSubscriptionError]] =
     lock.exclusive(trackedSubscriptions.toSet).map(_.subscription)
+
+  override def checkLiveness(
+      eventAndCounter: EventAndOrdinal
+  )(implicit traceContext: TraceContext): Unit = {
+    val conf = config
+    if (!conf.silentSubscriptionDetectionIsDisabled)
+      lock
+        .exclusive(trackedSubscriptions.toSet)
+        .foreach(
+          _.subscription
+            .checkLiveness(eventAndCounter, conf.maxTimestampDelta, conf.maxOrdinalDelta)
+        )
+  }
 
   private def removeSubscriptionsFromPool(managers: SubscriptionManager*)(implicit
       traceContext: TraceContext
@@ -460,7 +481,7 @@ object SequencerSubscriptionPoolImpl {
 
     /** Return the latest event that was successfully aggregated and deposited in the inbox/
       */
-    def getLatestProcessedEventO: Option[SequencedSerializedEvent]
+    def getLatestProcessedEventO: Option[EventAndOrdinal]
   }
 }
 

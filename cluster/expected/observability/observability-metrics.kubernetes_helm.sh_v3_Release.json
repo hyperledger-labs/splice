@@ -1,0 +1,579 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "kube-prometheus-stack",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "prometheus-grafana-monitoring",
+    "namespace": "observability",
+    "repositoryOpts": {
+      "repo": "https://prometheus-community.github.io/helm-charts"
+    },
+    "values": {
+      "alertmanager": {
+        "alertmanagerSpec": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "externalUrl": "https://alertmanager.mock.global.canton.network.digitalasset.com",
+          "logFormat": "json",
+          "storage": {
+            "volumeClaimTemplate": {
+              "metadata": {
+                "name": "alertmanager-hd-pvc"
+              },
+              "spec": {
+                "accessModes": [
+                  "ReadWriteOnce"
+                ],
+                "resources": {
+                  "requests": {
+                    "storage": "5Gi"
+                  }
+                },
+                "storageClassName": "hyperdisk-standard-rwo"
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
+        },
+        "config": {
+          "receivers": [
+            {
+              "name": "null"
+            },
+            {
+              "name": "slack",
+              "slack_configs": [
+                {
+                  "api_url": "https://slack.com/api/chat.postMessage",
+                  "channel": "MOCK-SLACK-CHANNEL",
+                  "http_config": {
+                    "authorization": {
+                      "credentials": "s3cr3t"
+                    }
+                  },
+                  "send_resolved": true,
+                  "text": "{{ template \"slack_message\" . }}",
+                  "title": "{{ template \"slack_title\" . }}"
+                }
+              ]
+            }
+          ],
+          "route": {
+            "continue": false,
+            "group_by": [
+              "namespace"
+            ],
+            "receiver": "slack",
+            "routes": [
+              {
+                "continue": false,
+                "matchers": [
+                  "alertname=~\"Watchdog|InfoInhibitor\""
+                ],
+                "receiver": "null"
+              }
+            ]
+          }
+        },
+        "enabled": true,
+        "templateFiles": {
+          "template.tmpl": "{{/* Slack treats \"<...>\" as links/mentions and \"&\" as entity start: unescaped values can swallow the rest of the message */}}\n{{ define \"__slack_escape\" -}}\n  {{- . | reReplaceAll \"&\" \"&amp;\" | reReplaceAll \"<\" \"&lt;\" | reReplaceAll \">\" \"&gt;\" -}}\n{{- end }}\n\n{{/* Percent-encode characters that would terminate a Slack <url|text> link early */}}\n{{ define \"__slack_url\" -}}\n  {{- . | reReplaceAll \" \" \"%20\" | reReplaceAll \"\\\"\" \"%22\" | reReplaceAll \"<\" \"%3C\" | reReplaceAll \">\" \"%3E\" | reReplaceAll \"\\\\|\" \"%7C\" -}}\n{{- end }}\n\n{{ define \"__slack_severity_emoji\" -}}\n  {{- if eq . \"critical\" -}}🔥\n  {{- else if eq . \"warning\" -}}⚠️\n  {{- else if eq . \"info\" -}}ℹ️\n  {{- else -}}🔔\n  {{- end -}}\n{{- end }}\n\n{{ define \"__slack_severity_name\" -}}\n  {{- if eq . \"critical\" -}}Critical\n  {{- else if eq . \"warning\" -}}Warning\n  {{- else if eq . \"info\" -}}Info\n  {{- else -}}Other\n  {{- end -}}\n{{- end }}\n\n{{/* Single line, e.g. \"[mainnet] 🔥 2 firing · ✅ 1 resolved | Some alert\" */}}\n{{ define \"slack_title\" -}}\n  {{- $highest := \"\" -}}\n  {{- range .Alerts.Firing -}}\n    {{- $s := or .Labels.severity .Annotations.severity | trimSpace -}}\n    {{- if eq $s \"critical\" -}}\n      {{- $highest = \"critical\" -}}\n    {{- else if and (eq $s \"warning\") (ne $highest \"critical\") -}}\n      {{- $highest = \"warning\" -}}\n    {{- else if and (eq $s \"info\") (eq $highest \"\") -}}\n      {{- $highest = \"info\" -}}\n    {{- end -}}\n  {{- end -}}\n  [mock]\n  {{- if gt (len .Alerts.Firing) 0 }} {{ template \"__slack_severity_emoji\" $highest }} {{ len .Alerts.Firing }} firing{{ end -}}\n  {{- if and (gt (len .Alerts.Firing) 0) (gt (len .Alerts.Resolved) 0) }} ·{{ end -}}\n  {{- if gt (len .Alerts.Resolved) 0 }} ✅ {{ len .Alerts.Resolved }} resolved{{ end -}}\n  {{- with .CommonLabels.alertname }} | {{ . }}{{ end -}}\n{{- end }}\n\n{{/* Firing alerts grouped by severity (critical, warning, info, other), followed by resolved alerts */}}\n{{ define \"slack_message\" -}}\n  {{- $firing := .Alerts.Firing -}}\n  {{- $first := true -}}\n  {{- range $sev := stringSlice \"critical\" \"warning\" \"info\" \"\" -}}\n    {{- $header := false -}}\n    {{- range $firing -}}\n      {{- $s := or .Labels.severity .Annotations.severity | trimSpace -}}\n      {{- $match := eq $s $sev -}}\n      {{- if eq $sev \"\" -}}\n        {{- $match = and (ne $s \"critical\") (ne $s \"warning\") (ne $s \"info\") -}}\n      {{- end -}}\n      {{- if $match -}}\n        {{- if not $header -}}\n          {{- if not $first }}{{ \"\\n\" }}{{ end -}}\n          {{- template \"__slack_severity_emoji\" $sev }} *{{ template \"__slack_severity_name\" $sev }}*{{ \"\\n\" -}}\n          {{- $header = true -}}\n          {{- $first = false -}}\n        {{- end -}}\n        {{- template \"slack_alert_firing\" . -}}\n      {{- end -}}\n    {{- end -}}\n  {{- end -}}\n  {{- if gt (len .Alerts.Resolved) 0 -}}\n    {{- if not $first }}{{ \"\\n\" }}{{ end -}}\n    ✅ *Resolved*{{ \"\\n\" -}}\n    {{- range .Alerts.Resolved -}}\n      {{- template \"slack_alert_resolved\" . -}}\n    {{- end -}}\n  {{- end -}}\n{{- end }}\n\n{{ define \"slack_alert_firing\" -}}\n  • *{{ template \"__slack_escape\" .Labels.alertname }}*{{ with .Annotations.summary }}: {{ template \"__slack_escape\" . }}{{ end }}{{ \"\\n\" -}}\n  {{- with .Annotations.description }}{{ \"    \" }}{{ template \"__slack_escape\" . }}{{ \"\\n\" }}{{ end -}}\n  {{- template \"__slack_alert_labels\" . -}}\n  {{ \"    \" }}Firing since {{ .StartsAt.UTC.Format \"2006-01-02 15:04:05 UTC\" -}}\n  {{- template \"__slack_alert_links\" . }} · {{ template \"slack_gcloud_log_link\" . }}{{ \"\\n\" -}}\n{{- end }}\n\n{{ define \"slack_alert_resolved\" -}}\n  {{- $s := or .Labels.severity .Annotations.severity | trimSpace -}}\n  • *{{ template \"__slack_escape\" .Labels.alertname }}*{{ with .Annotations.summary }}: {{ template \"__slack_escape\" . }}{{ end }}{{ \"\\n\" -}}\n  {{- template \"__slack_alert_labels\" . -}}\n  {{ \"    \" }}{{ if $s }}Was {{ template \"__slack_escape\" $s }} · {{ end -}}\n  Resolved at {{ .EndsAt.UTC.Format \"2006-01-02 15:04:05 UTC\" }} after {{ (.EndsAt.Sub .StartsAt).Round 1000000000 -}}\n  {{- template \"__slack_alert_links\" . }}{{ \"\\n\" -}}\n{{- end }}\n\n{{/* Labels identifying the alert instance, excluding those that are redundant or purely technical (scrape target metadata is covered by job, namespace and pod) */}}\n{{ define \"__slack_alert_labels\" -}}\n  {{- $labels := .Labels.Remove (stringSlice \"alertname\" \"gcloud_filter\" \"priority\" \"team\" \"severity\" \"container\" \"endpoint\" \"instance\" \"node_name\" \"node_type\" \"otel_scope_name\" \"otel_scope_version\" \"prometheus\" \"service\") -}}\n  {{- if gt (len $labels) 0 -}}\n    {{ \"    \" }}{{ range $i, $p := $labels.SortedPairs }}{{ if $i }} {{ end }}`{{ $p.Name }}={{ template \"__slack_escape\" (reReplaceAll \"`\" \"'\" $p.Value) }}`{{ end }}{{ \"\\n\" -}}\n  {{- end -}}\n{{- end }}\n\n{{ define \"__slack_alert_links\" -}}\n  {{- with .GeneratorURL }} · <{{ template \"__slack_url\" . }}|Source>{{ end -}}\n  {{- with .Annotations.runbook_url }} · <{{ template \"__slack_url\" . }}|Runbook>{{ end -}}\n{{- end }}\n\n{{ define \"slack_gcloud_log_link\" }}<https://console.cloud.google.com/logs/query;startTime={{ (.StartsAt.Add -600000000000).UTC.Format \"2006-01-02T15:04:05Z\"  }};endTime={{ (.StartsAt.Add 600000000000).UTC.Format \"2006-01-02T15:04:05Z\"  }};query=resource.labels.cluster_name%3D%22cn-mocknet%22%0A{{ with .Labels.namespace }}resource.labels.namespace_name%3D%22{{ template \"__slack_url\" . }}%22%0A{{ end }}{{ template \"__slack_url\" .Labels.gcloud_filter }}?project=da-cn-devnet|Logs>{{ end }}\n\n{{ define \"slack_color\" -}}\n  {{ $hasCritical := false }}{{ $hasWarning := false }}\n  {{- range .Alerts.Firing -}}\n    {{- $s := or .Labels.severity .Annotations.severity | trimSpace -}}\n    {{- if eq $s \"critical\" -}}\n      {{- $hasCritical = true -}}\n    {{- else if eq $s \"warning\" -}}\n      {{- $hasWarning = true -}}\n    {{- end -}}\n  {{- end -}}\n  {{ if eq .Status \"firing\" -}}\n    {{ if $hasCritical -}}\n      danger\n    {{- else if $hasWarning -}}\n      warning\n    {{- else -}}\n      #439FE0\n    {{- end -}}\n  {{ else -}}\n    good\n  {{- end }}\n{{- end }}\n"
+        }
+      },
+      "commonLabels": {
+        "digitalasset.com/component": "prometheus-stack",
+        "digitalasset.com/scope": "ci"
+      },
+      "coreDns": {
+        "enabled": false
+      },
+      "database": {},
+      "defaultRules": {
+        "create": true,
+        "disabled": {
+          "KubeJobNotCompleted": true
+        }
+      },
+      "fullnameOverride": "prometheus",
+      "grafana": {
+        "adminPassword": "grafana-keys-admin-password",
+        "adminUser": "cn-admin",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "dashboardProviders": {
+          "dashboardproviders.yaml": {
+            "apiVersion": 1,
+            "providers": [
+              {
+                "disableDeletion": false,
+                "editable": true,
+                "folder": "Istio",
+                "name": "istio",
+                "options": {
+                  "path": "/var/lib/grafana/dashboards/istio"
+                },
+                "orgId": 1,
+                "type": "file"
+              },
+              {
+                "disableDeletion": false,
+                "editable": true,
+                "folder": "testing",
+                "name": "gid-testing",
+                "options": {
+                  "path": "/var/lib/grafana/dashboards/k6s"
+                },
+                "orgId": 1,
+                "type": "file"
+              }
+            ]
+          }
+        },
+        "dashboards": {
+          "istio": {
+            "control_plane": {
+              "datasource": "Prometheus",
+              "gnetId": 7645
+            },
+            "mesh": {
+              "datasource": "Prometheus",
+              "gnetId": 7639
+            },
+            "performance": {
+              "datasource": "Prometheus",
+              "gnetId": 11829
+            },
+            "service": {
+              "datasource": "Prometheus",
+              "gnetId": 7636
+            },
+            "wasm": {
+              "datasource": "Prometheus",
+              "gnetId": 13277
+            },
+            "workload": {
+              "datasource": "Prometheus",
+              "gnetId": 7630
+            }
+          },
+          "k6s": {
+            "native_prometheus": {
+              "datasource": "Prometheus",
+              "gnetId": 18030,
+              "revision": 8
+            }
+          }
+        },
+        "deploymentStrategy": {
+          "type": "Recreate"
+        },
+        "envFromSecret": "grafana-postgres-secret",
+        "fullnameOverride": "grafana",
+        "grafana.ini": {
+          "database": {
+            "host": "grafana-postgres.observability.svc.cluster.local:5432",
+            "name": "cantonnet",
+            "password": "${postgresPassword}",
+            "type": "postgres",
+            "user": "cnadmin"
+          },
+          "date_formats": {
+            "default_timezone": "UTC"
+          },
+          "feature_toggles": {
+            "addFieldFromCalculationStatFunctions": true
+          },
+          "server": {
+            "root_url": "https://grafana.mock.global.canton.network.digitalasset.com"
+          }
+        },
+        "ingress": {
+          "enabled": false
+        },
+        "persistence": {
+          "accessModes": [
+            "ReadWriteOnce"
+          ],
+          "enabled": true,
+          "size": "5Gi",
+          "storageClassName": "hyperdisk-standard-rwo",
+          "type": "pvc"
+        },
+        "plugins": [
+          "googlecloud-logging-datasource"
+        ],
+        "sidecar": {
+          "alerts": {
+            "enabled": true
+          },
+          "dashboards": {
+            "enabled": true,
+            "folderAnnotation": "folder",
+            "provider": {
+              "allowUiUpdates": true,
+              "foldersFromFilesStructure": true
+            }
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "kube-state-metrics": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "customResourceState": {
+          "config": {
+            "spec": {
+              "resources": [
+                {
+                  "groupVersionKind": {
+                    "group": "source.toolkit.fluxcd.io",
+                    "kind": "GitRepository",
+                    "version": "v1"
+                  },
+                  "metricNamePrefix": "splice_deployment_flux",
+                  "metrics": [
+                    {
+                      "each": {
+                        "gauge": {
+                          "labelsFromPath": {
+                            "name": [
+                              "metadata",
+                              "name"
+                            ]
+                          }
+                        },
+                        "type": "Gauge"
+                      },
+                      "help": "The current state of a Flux GitRepository resource.",
+                      "labelsFromPath": {
+                        "exported_namespace": [
+                          "metadata",
+                          "namespace"
+                        ],
+                        "ready": [
+                          "status",
+                          "conditions",
+                          "[type=Ready]",
+                          "status"
+                        ],
+                        "revision": [
+                          "status",
+                          "artifact",
+                          "revision"
+                        ],
+                        "suspended": [
+                          "spec",
+                          "suspend"
+                        ],
+                        "url": [
+                          "spec",
+                          "url"
+                        ]
+                      },
+                      "name": "resource_info"
+                    }
+                  ]
+                },
+                {
+                  "groupVersionKind": {
+                    "group": "pulumi.com",
+                    "kind": "Stack",
+                    "version": "v1"
+                  },
+                  "labelsFromPath": {
+                    "generation": [
+                      "status",
+                      "observedGeneration"
+                    ],
+                    "stack": [
+                      "spec",
+                      "stack"
+                    ],
+                    "state": [
+                      "status",
+                      "lastUpdate",
+                      "state"
+                    ]
+                  },
+                  "metricNamePrefix": "splice_deployment_pulumi",
+                  "metrics": [
+                    {
+                      "each": {
+                        "gauge": {
+                          "labelsFromPath": {
+                            "reason": [
+                              "reason"
+                            ],
+                            "type": [
+                              "type"
+                            ]
+                          },
+                          "path": [
+                            "status",
+                            "conditions"
+                          ],
+                          "valueFrom": [
+                            "status"
+                          ]
+                        },
+                        "type": "Gauge"
+                      },
+                      "help": "The current conditions of a Pulumi Stack resource.",
+                      "name": "stack_condition"
+                    },
+                    {
+                      "each": {
+                        "gauge": {
+                          "labelsFromPath": {
+                            "state": [
+                              "lastUpdate",
+                              "state"
+                            ]
+                          },
+                          "path": [
+                            "status"
+                          ],
+                          "valueFrom": [
+                            "observedGeneration"
+                          ]
+                        },
+                        "type": "Gauge"
+                      },
+                      "help": "The current state of a Pulumi Stack resource.",
+                      "name": "stack_status"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "enabled": true
+        },
+        "fullnameOverride": "ksm",
+        "rbac": {
+          "extraRules": [
+            {
+              "apiGroups": [
+                "source.toolkit.fluxcd.io",
+                "notification.toolkit.fluxcd.io"
+              ],
+              "resources": [
+                "gitrepositories",
+                "alerts",
+                "providers",
+                "receivers"
+              ],
+              "verbs": [
+                "list",
+                "watch"
+              ]
+            },
+            {
+              "apiGroups": [
+                "pulumi.com"
+              ],
+              "resources": [
+                "stacks"
+              ],
+              "verbs": [
+                "list",
+                "watch"
+              ]
+            }
+          ]
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "kubeControllerManager": {
+        "enabled": false
+      },
+      "kubeDns": {
+        "enabled": true
+      },
+      "kubeEtcd": {
+        "enabled": false
+      },
+      "kubeProxy": {
+        "enabled": false
+      },
+      "kubeScheduler": {
+        "enabled": false
+      },
+      "prometheus": {
+        "prometheusSpec": {
+          "additionalArgs": [
+            {
+              "name": "storage.tsdb.max-block-duration",
+              "value": "1d"
+            }
+          ],
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "enableFeatures": [
+            "memory-snapshot-on-shutdown",
+            "promql-experimental-functions"
+          ],
+          "enableRemoteWriteReceiver": true,
+          "externalUrl": "https://prometheus.mock.global.canton.network.digitalasset.com",
+          "logFormat": "json",
+          "podMonitorSelector": {
+            "matchLabels": null
+          },
+          "remoteWriteDashboards": true,
+          "resources": {
+            "requests": {
+              "cpu": "2",
+              "memory": "8Gi"
+            }
+          },
+          "retention": "1y",
+          "retentionSize": "1500GB",
+          "scrapeNativeHistograms": true,
+          "serviceMonitorSelector": {
+            "matchLabels": null
+          },
+          "storageSpec": {
+            "volumeClaimTemplate": {
+              "metadata": {
+                "name": "prometheus-hd-pvc"
+              },
+              "spec": {
+                "accessModes": [
+                  "ReadWriteOnce"
+                ],
+                "resources": {
+                  "requests": {
+                    "storage": "2Ti"
+                  }
+                },
+                "storageClassName": "hyperdisk-balanced-rwo"
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
+        }
+      },
+      "prometheus-node-exporter": {
+        "fullnameOverride": "node-exporter"
+      },
+      "prometheusOperator": {
+        "admissionWebhooks": {
+          "enabled": false
+        },
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "logFormat": "json",
+        "tls": {
+          "enabled": false
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
+      }
+    },
+    "version": "91.4.1"
+  },
+  "name": "observability-metrics",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

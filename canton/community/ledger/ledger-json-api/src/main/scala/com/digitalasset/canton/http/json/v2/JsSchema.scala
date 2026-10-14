@@ -120,6 +120,7 @@ object JsSchema {
       recordTime: com.google.protobuf.timestamp.Timestamp,
       externalTransactionHash: Option[String],
       paidTrafficCost: Option[Long],
+      transactionHash: Option[String],
   )
 
   final case class JsTransactionTree(
@@ -374,6 +375,30 @@ object JsSchema {
       },
     )
 
+    def fromUnstructuredError(
+        code: String,
+        cause: String,
+        correlationId: Option[String] = None,
+        traceId: Option[String] = None,
+        context: Map[String, String] = Map.empty,
+        resources: Seq[(String, String)] = Seq.empty,
+        errorCategory: Int = -1,
+        grpcCodeValue: Option[Int] = None,
+        retryInfo: Option[Duration] = None,
+        definiteAnswer: Option[Boolean] = None,
+    ): JsCantonError = JsCantonError(
+      code = code,
+      cause = cause,
+      correlationId = correlationId,
+      traceId = traceId,
+      context = context,
+      resources = resources,
+      errorCategory = errorCategory,
+      grpcCodeValue = grpcCodeValue,
+      retryInfo = retryInfo,
+      definiteAnswer = definiteAnswer,
+    )
+
     def fromDecodedCantonError(decodedCantonError: DecodedCantonError): JsCantonError =
       JsCantonError(
         code = decodedCantonError.code.id,
@@ -383,7 +408,7 @@ object JsSchema {
         correlationId = decodedCantonError.correlationId,
         traceId = decodedCantonError.traceId,
         context = decodedCantonError.context,
-        resources = decodedCantonError.resources.map { case (k, v) => (k.toString, v) },
+        resources = decodedCantonError.resources.map { case (k, v) => (k.asString, v) },
         retryInfo = decodedCantonError.code.category.retryable.map(_.duration),
         definiteAnswer = decodedCantonError.definiteAnswerO,
       )
@@ -469,7 +494,7 @@ object JsSchema {
       }
 
     implicit val decodeIdentifier: Decoder[com.daml.ledger.api.v2.value.Identifier] =
-      Decoder.decodeString.map(IdentifierConverter.fromJson)
+      Decoder.decodeString.emap(IdentifierConverter.fromJsonEither)
 
     implicit val jsEvent: Codec[JsEvent.Event] = deriveConfiguredCodec
     implicit val jsCreatedEvent: Codec[JsEvent.CreatedEvent] = deriveConfiguredCodec

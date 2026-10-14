@@ -373,12 +373,14 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             }
           />
 
-          <DetailItem
-            label={PROPOSAL_CREATED_LABEL}
-            value={formatDatetimeWithOffset(proposalDetails.createdAt)}
-            labelId="proposal-details-created-at-label"
-            valueId="proposal-details-created-at-value"
-          />
+          {proposalDetails.createdAt && (
+            <DetailItem
+              label={PROPOSAL_CREATED_LABEL}
+              value={formatDatetimeWithOffset(proposalDetails.createdAt)}
+              labelId="proposal-details-created-at-label"
+              valueId="proposal-details-created-at-value"
+            />
+          )}
 
           <DetailItem
             label={THRESHOLD_DEADLINE_LABEL}

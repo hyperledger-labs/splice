@@ -6,6 +6,7 @@ import {
   extractPathPrefixes,
   PerEndpointLimits,
 } from '@canton-network/splice-pulumi-common/src/ratelimit/envoyRateLimiter';
+import { createHash } from 'crypto';
 
 // limits from https://cloud.google.com/armor/quotas#limits, in which a
 // "subexpression" is an arg to && or ||
@@ -46,6 +47,32 @@ export function ipWhitelistRuleChunks(ipRanges: string[], availablePriorities: n
     );
   }
   return chunks;
+}
+
+/**
+ * Picks the priority offset of the first of `ruleNames.length` consecutive rules, derived
+ * deterministically from the rule names.
+ *
+ * Cloud Armor rejects a rule whose priority is still held by another rule, and Pulumi
+ * gives no ordering guarantee between the deletes and creates of sibling rules. If
+ * priorities were plain indexes, reordering, inserting or renaming rules would move an
+ * existing priority to a different rule, so the new rule can be created while the old one
+ * still holds that priority. Seeding with the names moves the whole block to fresh,
+ * almost certainly unused, priorities whenever the set or order of the rules changes,
+ * while unchanged rules keep their priorities.
+ *
+ * @param availablePriorities how many rule priority numbers are reserved for these rules
+ */
+export function seededPriorityOffset(ruleNames: string[], availablePriorities: number): number {
+  const range = availablePriorities - ruleNames.length + 1;
+  if (range <= 0) {
+    throw new Error(
+      `${ruleNames.length} rules do not fit into ${availablePriorities} rule priorities`
+    );
+  }
+  // 48 bits are well within Number.MAX_SAFE_INTEGER
+  const hash = createHash('sha256').update(JSON.stringify(ruleNames)).digest().readUIntBE(0, 6);
+  return hash % range;
 }
 
 // the OWASP CRS version behind each Cloud Armor rule set generation, see

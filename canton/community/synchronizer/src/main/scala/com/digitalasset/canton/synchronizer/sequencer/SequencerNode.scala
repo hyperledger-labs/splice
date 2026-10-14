@@ -3,16 +3,22 @@
 
 package com.digitalasset.canton.synchronizer.sequencer
 
+import cats.Eval
 import cats.data.EitherT
+import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.admin.sequencer.v30.SequencerStatusServiceGrpc
 import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.AdminTokenConfig
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
-import com.digitalasset.canton.crypto.{Crypto, SynchronizerCrypto, SynchronizerCryptoClient}
+import com.digitalasset.canton.crypto.{
+  Crypto,
+  CryptoHandshakeValidator,
+  SynchronizerCrypto,
+  SynchronizerCryptoClient,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.*
@@ -31,6 +37,7 @@ import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, CantonMutableHan
 import com.digitalasset.canton.protocol.SynchronizerParameters.MaxRequestSize
 import com.digitalasset.canton.protocol.SynchronizerParametersLookup.SequencerSynchronizerParameters
 import com.digitalasset.canton.protocol.{
+  DynamicSynchronizerParameters,
   DynamicSynchronizerParametersLookup,
   StaticSynchronizerParameters,
   SynchronizerParametersLookup,
@@ -85,7 +92,8 @@ import com.digitalasset.canton.synchronizer.sequencing.service.{
 import com.digitalasset.canton.synchronizer.server.DynamicGrpcServer
 import com.digitalasset.canton.time.*
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.admin.grpc.PsidLookup
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreInitializationStatus.Initialized
+import com.digitalasset.canton.topology.admin.grpc.{PsidLookup, TopologyStoreInitializationStatus}
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
 import com.digitalasset.canton.topology.processing.{
   ApproximateTime,
@@ -172,11 +180,15 @@ class SequencerNodeBootstrap(
   private val topologyClient = new SingleUseCell[SynchronizerTopologyClient]()
   private val synchronizerTimeTracker = new SingleUseCell[SynchronizerTimeTracker]()
 
-  override protected def sequencedTopologyStores: Seq[TopologyStore[SynchronizerStore]] =
-    synchronizerTopologyManager.get.map(_.store).toList
+  override protected def sequencedTopologyStores
+      : Seq[TopologyStoreInitializationStatus[SynchronizerStore, TopologyStore]] =
+    synchronizerTopologyManager.get.map(mgr => Initialized(mgr.store)).toList
 
-  override protected def sequencedTopologyManagers: Seq[SynchronizerTopologyManager] =
-    synchronizerTopologyManager.get.toList
+  override protected def sequencedTopologyManagers
+      : Seq[TopologyStoreInitializationStatus[SynchronizerStore, TopologyManager.Aux]] =
+    synchronizerTopologyManager.get
+      .map(Initialized[SynchronizerStore, TopologyManager.Aux](_))
+      .toList
 
   override protected def lookupTopologyClient(
       psid: PhysicalSynchronizerId
@@ -256,6 +268,7 @@ class SequencerNodeBootstrap(
         storage,
         sequencerId,
         arguments.parameterConfig,
+        config.publicApi,
         arguments.futureSupervisor,
         loggerFactory,
       )(config.sequencer, config.parameters.producePostOrderingTopologyTicks)
@@ -268,13 +281,18 @@ class SequencerNodeBootstrap(
       */
     private def initSequencerNodeServer(): Unit =
       if (nonInitializedSequencerNodeServer.get().isEmpty) {
+        // Check if the node operator explicitly set an override.
+        // If no override exists, fall back to the default.
+        val safeMaxRequestSize = config.publicApi.overrideMaxRequestSize
+          .map(MaxRequestSize.apply)
+          .getOrElse(DynamicSynchronizerParameters.defaultMaxRequestSize)
+
         // the sequential initialisation queue ensures that this is thread safe
         nonInitializedSequencerNodeServer
           .set(
             Some(
               makeDynamicGrpcServer(
-                // We use max value for the request size here as this is the default for a non initialized sequencer
-                MaxRequestSize(NonNegativeInt.maxValue),
+                safeMaxRequestSize,
                 healthReporter,
               )
             )
@@ -409,6 +427,9 @@ class SequencerNodeBootstrap(
                 PhysicalSynchronizerId(synchronizerId, request.synchronizerParameters)
               )
             )
+            _ <- CryptoHandshakeValidator
+              .validate(request.synchronizerParameters, cryptoConfig)
+              .toEitherT[FutureUnlessShutdown]
           } yield StageResult(
             request.synchronizerParameters,
             sequencerFactory,
@@ -744,6 +765,7 @@ class SequencerNodeBootstrap(
                 staticSynchronizerParameters.protocolVersion,
                 disableReleaseVersionHandshakeCheck =
                   parameters.disableReleaseVersionHandshakeCheck,
+                sequencerLimits = config.sequencerLimits,
                 loggerFactory,
               )
 
@@ -788,6 +810,7 @@ class SequencerNodeBootstrap(
             topologyClient,
             config.publicApi.overrideMaxRequestSize,
             parameters,
+            logEventDetails = parameters.loggingConfig.eventDetails,
             staticSynchronizerParameters.protocolVersion,
             topologyStateForInitializationService,
             loggerFactory,
@@ -897,6 +920,7 @@ class SequencerNodeBootstrap(
             sequencerClient,
             staticSynchronizerParameters,
             parameters,
+            config.sequencerLimits,
             lsuSequencingBounds,
             timeTracker,
             arguments.metrics,
@@ -941,6 +965,7 @@ class SequencerNodeBootstrap(
           val node = new SequencerNode(
             config,
             clock,
+            storage,
             sequencerRuntime,
             adminTokenDispenser,
             synchronizerLoggerFactory,
@@ -993,12 +1018,6 @@ class SequencerNodeBootstrap(
   override protected def mkNodeHealthService(
       storage: Storage
   ): (DependenciesHealthService, LivenessHealthService) = {
-    val readiness = DependenciesHealthService(
-      "sequencer",
-      logger,
-      timeouts,
-      Seq(storage),
-    )
     // We use the storage as a fatal dependency so that we transition liveness to NOT_SERVING if
     // the storage fails continuously for longer than `failedToFatalDelay`.
     // The background writer health is fatal as well: once a background write fails, the writer can
@@ -1007,6 +1026,17 @@ class SequencerNodeBootstrap(
       logger,
       timeouts,
       fatalDependencies = Seq(storage, asyncWriterHealth),
+    )
+    val readiness = DependenciesHealthService(
+      "sequencer",
+      logger,
+      timeouts,
+      // we keep `storage` here, since Admin API calls are useless if storage is not ready,
+      // even though a fatal `storage` failure transitively affects readiness via liveness.
+      criticalDependencies = Seq(storage),
+      softDependencies = Eval.now(Seq(sequencerHealth)),
+      // liveness initially is "serving", even though its dependencies may not yet be "serving"
+      serviceCriticalDependencies = Seq(liveness),
     )
     (readiness, liveness)
   }
@@ -1044,16 +1074,28 @@ class SequencerNodeBootstrap(
   ): EitherT[FutureUnlessShutdown, String, DynamicGrpcServer] = {
     runtime.registerAdminGrpcServices(service => adminServerRegistry.addServiceU(service))
     for {
-      maxRequestSize <- EitherT
-        .right(synchronizerParamsLookup.getApproximate())
-        .map(paramsO =>
-          paramsO.map(_.maxRequestSize).getOrElse(MaxRequestSize(NonNegativeInt.maxValue))
-        )
+      synchronizerParameters <- EitherT.right[String](
+        // capture the limit from the topology transactions if available
+        // otherwise, use the configured default
+        synchronizerParamsLookup.getApproximateOrDefaultValue()
+      )
+
+      maxRequestSize = synchronizerParameters.maxRequestSize
+
+      // Note: limits obtained from the topology transactions are active
+      // on Netty only after a node restart, since it is not possible
+      // to change the configured maxRequestSize on a running instance
+      // of Netty. However, the application-layer size checks
+      // (in GrpcSequencerService) are immediately active after an update.
+
+      // Thus, in combination, decreased limits are immediately
+      // enforced, but increased limits require a node restart to update.
       sequencerNodeServer = server
         .getOrElse(
           makeDynamicGrpcServer(maxRequestSize, healthReporter)
         )
         .initialize(runtime)
+
       // wait for the server to be initialized before reporting a serving health state
       _ = sequencerHealth.set(runtime.sequencer)
       // bind the background writer health (block sequencers only) into the liveness fatal dependency
@@ -1065,6 +1107,7 @@ class SequencerNodeBootstrap(
 class SequencerNode(
     config: SequencerNodeConfig,
     override protected val clock: Clock,
+    storage: Storage,
     val sequencer: SequencerRuntime,
     override val adminTokenDispenser: CantonAdminTokenDispenser,
     protected val loggerFactory: NamedLoggerFactory,
@@ -1083,7 +1126,7 @@ class SequencerNode(
 
   logger.info(s"Creating sequencer server with public api ${config.publicApi}")(TraceContext.empty)
 
-  override def isActive = true
+  override def isActive = storage.isActive
 
   override def status: SequencerNodeStatus = {
     val healthStatus = sequencer.health

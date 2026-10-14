@@ -7,7 +7,6 @@ import cats.data.EitherT
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.{KmsConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.kms.KmsError.*
@@ -30,10 +29,12 @@ import com.digitalasset.canton.crypto.{
   SigningKeySpec,
 }
 import com.digitalasset.canton.health.ComponentHealthState
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, TracerProvider}
 import com.digitalasset.canton.util.*
+import com.digitalasset.nonempty.NonEmpty
 import com.google.api.gax.rpc.ResourceExhaustedException
 import com.google.protobuf.ByteString
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
@@ -52,6 +53,7 @@ import software.amazon.awssdk.utils.AttributeMap
 import java.net.URI
 import java.util.concurrent.CompletionException
 import scala.concurrent.ExecutionContext
+import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 
 /** Stands for Amazon Web Services - Key Management Service and is an internal KMS implementation
@@ -78,6 +80,14 @@ class AwsKms(
       "Unable to execute HTTP request: connection timed out",
       "Unable to execute HTTP request: BetterFixedChannelPooled was closed",
     )
+
+  private val keyCreationTags: java.util.Collection[Tag] =
+    (config.customTags + ("CreatedBy" -> "Canton"))
+      .map { case (key, value) =>
+        Tag.builder().tagKey(key).tagValue(value).build()
+      }
+      .toSeq
+      .asJava
 
   private def errorHandler(
       err: Throwable,
@@ -131,7 +141,7 @@ class AwsKms(
               .multiRegion(config.multiRegionKey)
               .keySpec(keySpec)
               .keyUsage(keyUsage)
-              .tags(Tag.builder().tagKey("CreatedBy").tagValue("Canton").build())
+              .tags(keyCreationTags)
               .description(name.map(_.unwrap).getOrElse(""))
               .withTraceContext(_.overrideConfiguration)
               .build
@@ -290,6 +300,8 @@ class AwsKms(
         Right(aws.KeySpec.ECC_NIST_P384)
       case SigningKeySpec.EcSecp256k1 =>
         Right(aws.KeySpec.ECC_SECG_P256_K1)
+      case SigningKeySpec.MlDsa65 =>
+        Right(aws.KeySpec.ML_DSA_65)
     }
 
   private def convertToAwsAlgoSpec(
@@ -302,6 +314,8 @@ class AwsKms(
         Right(aws.SigningAlgorithmSpec.ECDSA_SHA_256)
       case SigningAlgorithmSpec.EcDsaSha384 =>
         Right(aws.SigningAlgorithmSpec.ECDSA_SHA_384)
+      case SigningAlgorithmSpec.MlDsa65 =>
+        Right(aws.SigningAlgorithmSpec.ML_DSA_SHAKE_256)
     }
 
   private def convertToAwsAsymmetricKeyEncryptionSpec(
@@ -329,6 +343,7 @@ class AwsKms(
       case aws.KeySpec.ECC_NIST_P256 => Right(SigningKeySpec.EcP256)
       case aws.KeySpec.ECC_NIST_P384 => Right(SigningKeySpec.EcP384)
       case aws.KeySpec.ECC_SECG_P256_K1 => Right(SigningKeySpec.EcSecp256k1)
+      case aws.KeySpec.ML_DSA_65 => Right(SigningKeySpec.MlDsa65)
       case _ => Left(s"Unsupported signing key type: ${keySpec.toString}")
     }
 
@@ -581,10 +596,21 @@ class AwsKms(
 object AwsKms extends Kms.SupportedSchemes {
 
   val supportedSigningKeySpecs: NonEmpty[Set[SigningKeySpec]] =
-    NonEmpty.mk(Set, SigningKeySpec.EcP256, SigningKeySpec.EcP384, SigningKeySpec.EcSecp256k1)
+    NonEmpty.mk(
+      Set,
+      SigningKeySpec.EcP256,
+      SigningKeySpec.EcP384,
+      SigningKeySpec.EcSecp256k1,
+      SigningKeySpec.MlDsa65,
+    )
 
   val supportedSigningAlgoSpecs: NonEmpty[Set[SigningAlgorithmSpec]] =
-    NonEmpty.mk(Set, SigningAlgorithmSpec.EcDsaSha256, SigningAlgorithmSpec.EcDsaSha384)
+    NonEmpty.mk(
+      Set,
+      SigningAlgorithmSpec.EcDsaSha256,
+      SigningAlgorithmSpec.EcDsaSha384,
+      SigningAlgorithmSpec.MlDsa65,
+    )
 
   val supportedEncryptionKeySpecs: NonEmpty[Set[EncryptionKeySpec]] =
     NonEmpty.mk(Set, EncryptionKeySpec.Rsa2048)

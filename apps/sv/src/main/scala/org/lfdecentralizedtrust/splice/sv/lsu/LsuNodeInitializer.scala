@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.sv.lsu
 
 import cats.implicits.showInterpolator
 import cats.syntax.foldable.*
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.admin.api.client.data.SequencerHealthStatus.implicitPrettyString
 import com.digitalasset.canton.data.CantonTimestamp
@@ -144,6 +144,7 @@ class LsuNodeInitializer(
             successorSynchronizerNode.internalSequencerConnection,
             successorSynchronizerNode.mediatorSequencerAmplification.toInternal,
             successorSynchronizerNode.mediatorSequencerConnectionPoolDelays.toInternal,
+            successorSynchronizerNode.mediatorSubscriptionLivenessLimits.toInternal,
           )
         },
         logger,

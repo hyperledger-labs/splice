@@ -33,6 +33,7 @@ final case class TransactionValidationResult(
       ErrorWithInternalConsistencyCheck,
       Unit,
     ],
+    externalCallCheckResultF: FutureUnlessShutdown[Map[ViewPosition, ExternalCallCheck.Result]],
     consumedInputsOfHostedParties: Map[LfContractId, Set[LfPartyId]],
     witnessed: Map[LfContractId, GenContractInstance],
     createdContracts: Map[LfContractId, NewContractInstance],
@@ -43,7 +44,8 @@ final case class TransactionValidationResult(
     hostedWitnesses: Set[LfPartyId],
     replayCheckResult: Option[String],
     validatedExternalTransactionHash: Option[Hash],
-    commitAfterFailedActivenessCheck: Boolean,
+    crashAfterFailedValidation: Boolean,
+    hostedOnboardingPartiesO: Option[HostedOnboardingParties],
 ) {
 
   def commitSet(
@@ -55,6 +57,7 @@ final case class TransactionValidationResult(
       consumedInputsOfHostedParties,
       transient,
       createdContracts,
-      commitAfterFailedActivenessCheck,
+      crashAfterFailedValidation,
+      hostedOnboardingPartiesO,
     )
 }

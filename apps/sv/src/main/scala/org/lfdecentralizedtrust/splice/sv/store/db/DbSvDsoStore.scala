@@ -7,7 +7,7 @@ import cats.data.OptionT
 import cats.implicits.*
 import com.daml.ledger.javaapi.data as javab
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.*
@@ -122,6 +122,8 @@ class DbSvDsoStore(
     with DbVotesAcsStoreQueryBuilder
     with LimitHelpers {
   import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
+
+  override protected implicit val dbProfile: DbStorage.Profile = storage.profile
 
   val dsoStoreMetrics = new DbSvDsoStoreMetrics(retryProvider.metricsFactory)
 

@@ -41,13 +41,14 @@ trait ParticipantNodeBootstrapFactory {
     ]
 
   protected def createEngine(arguments: Arguments): Engine = DAMLe.newEngine(
-    enableLfDev = arguments.parameterConfig.alphaVersionSupport,
+    enableLfDev = arguments.parameterConfig.devVersionSupport,
     enableLfBeta = arguments.parameterConfig.betaVersionSupport,
     enableStackTraces = arguments.parameterConfig.engine.enableEngineStackTraces,
     profileDir = arguments.config.parameters.engine.profileDir,
     snapshotDir = arguments.config.parameters.engine.snapshotDir,
     iterationsBetweenInterruptions =
       arguments.parameterConfig.engine.iterationsBetweenInterruptions,
+    transactionLimits = arguments.parameterConfig.engine.transactionLimits,
     paranoidMode = arguments.parameterConfig.engine.enableAdditionalConsistencyChecks,
     submissionPhaseLogging = arguments.parameterConfig.engine.submissionPhaseLogging,
     validationPhaseLogging = arguments.parameterConfig.engine.validationPhaseLogging,

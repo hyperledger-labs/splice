@@ -1,0 +1,53 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "source.toolkit.fluxcd.io/v1",
+    "kind": "GitRepository",
+    "metadata": {
+      "labels": {
+        "notifications": "true"
+      },
+      "name": "splice-node-migration-8",
+      "namespace": "operator"
+    },
+    "spec": {
+      "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard\n!**/token-standard/*/openapi/**",
+      "include": [
+        {
+          "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-1-migration-8.mock.yaml",
+          "repository": {
+            "name": "splice-node-migration-8-base"
+          },
+          "toPath": "splice/cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-1-migration-8.mock.yaml"
+        },
+        {
+          "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-da-1-migration-8.mock.yaml",
+          "repository": {
+            "name": "splice-node-migration-8-base"
+          },
+          "toPath": "splice/cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-da-1-migration-8.mock.yaml"
+        },
+        {
+          "fromPath": "cluster/stacks/prod/sv-canton/Pulumi.sv-canton.sv-migration-8.mock.yaml",
+          "repository": {
+            "name": "splice-node-migration-8-base"
+          },
+          "toPath": "splice/cluster/pulumi/sv-canton/Pulumi.sv-canton.sv-migration-8.mock.yaml"
+        }
+      ],
+      "interval": "5m",
+      "recurseSubmodules": true,
+      "ref": {
+        "name": "refs/heads/release-line-0.3.20"
+      },
+      "secretRef": {
+        "name": "github"
+      },
+      "url": "https://github.com/canton-network/splice"
+    }
+  },
+  "name": "splice-node-migration-8",
+  "provider": "",
+  "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+}

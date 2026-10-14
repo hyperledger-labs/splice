@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import * as nodePath from 'path';
 import { PathLike } from 'fs';
@@ -148,7 +149,7 @@ export function loadJsonFromFile(path: PathLike): any {
 
     return JSON.parse(content);
   } catch (e) {
-    console.error(`could not read JSON from: ${path}`);
+    void pulumi.log.error(`could not read JSON from: ${path}`);
     throw e;
   }
 }

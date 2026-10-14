@@ -1,0 +1,17 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "displayName": "mock Slack Alert Notification Channel",
+    "labels": {
+      "channel_name": "#mock-slack-channel"
+    },
+    "sensitiveLabels": {
+      "authToken": "s3cr3t"
+    },
+    "type": "slack"
+  },
+  "name": "mock-slack-channel",
+  "provider": "",
+  "type": "gcp:monitoring/notificationChannel:NotificationChannel"
+}

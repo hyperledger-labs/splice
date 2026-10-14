@@ -292,7 +292,7 @@ function subcmd_cleanup_full() {
 
   subcmd_cleanup_light
 
-  run_and_commit "cleanup: regenerate pulumi expected.json files" "make cluster/pulumi/update-expected"
+  run_and_commit "cleanup: regenerate pulumi expected files" "make cluster/pulumi/update-expected"
 }
 
 subcommand_whitelist[cleanup_light]='Cleanup: format all files and update non-cluster lock files'

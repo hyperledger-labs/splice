@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "enableServerSideApply": "true"
+  },
+  "name": "k8s-imgpull-sv-1-sv-canton-migration-6",
+  "provider": "",
+  "type": "pulumi:providers:kubernetes"
+}

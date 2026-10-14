@@ -239,6 +239,7 @@ trait ParticipantAdminSynchronizerConnection {
         config,
         performHandshake = false,
         SequencerConnectionValidation.ThresholdActive,
+        onboardingTransactions = Seq.empty,
       )
     )
 

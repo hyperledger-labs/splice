@@ -17,6 +17,7 @@ import com.digitalasset.daml.lf.data.{
 import com.digitalasset.daml.lf.typesig
 import com.digitalasset.daml.lf.value.Value as V
 import com.digitalasset.daml.lf.value.Value.ContractId
+import scala.collection.immutable.HashMap
 import scalaz.syntax.std.string.*
 import scalaz.{@@, Tag}
 import spray.json.*
@@ -108,9 +109,7 @@ class ApiCodecCompressed(val encodeDecimalAsString: Boolean, val encodeInt64AsSt
 
   private[this] def apiMapToJsValue(value: V.ValueTextMap): JsValue =
     JsObject(
-      value.value
-        .mapValue(apiValueToJsValue)
-        .toHashMap
+      HashMap(value.value .mapValue(apiValueToJsValue).iterator.toSeq:_*)
     )
 
   private[this] def apiGenMapToJsValue(value: V.ValueGenMap): JsValue =
@@ -184,7 +183,7 @@ class ApiCodecCompressed(val encodeDecimalAsString: Boolean, val encodeInt64AsSt
           case _ if !useArray => V.ValueOptional(Some(jsValueToApiValue(value, typArg, defs)))
         }
       case Model.DamlLfPrimType.TextMap => { case JsObject(a) =>
-        V.ValueTextMap(SortedLookupList(a.transform { (_, v) =>
+        V.ValueTextMap(SortedLookupList.from(a.transform { (_, v) =>
           jsValueToApiValue(v, prim.typArgs.head, defs)
         }))
       }

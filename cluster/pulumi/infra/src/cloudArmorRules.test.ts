@@ -15,6 +15,7 @@ import {
   MAX_IPS_PER_RULE,
   MAX_IP_WHITELIST_RULES,
   MAX_SUBEXPRESSION_LENGTH,
+  seededPriorityOffset,
   wafRuleExpression,
 } from './cloudArmorRules';
 
@@ -275,5 +276,41 @@ describe('wafRuleExpression', () => {
         })),
       })
     ).toThrow(new RegExp(`exceeds the ${MAX_EXPRESSION_LENGTH} character limit`));
+  });
+});
+
+describe('seededPriorityOffset', () => {
+  const available = 100_000_000;
+  const priorities = (names: string[]) => {
+    const first = seededPriorityOffset(names, available);
+    return new Map(names.map((n, i) => [n, first + i]));
+  };
+
+  test('is deterministic and keeps all rules within the available priorities', () => {
+    const names = ['a', 'b', 'c'];
+    const first = seededPriorityOffset(names, available);
+    expect(seededPriorityOffset([...names], available)).toBe(first);
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(first + names.length - 1).toBeLessThan(available);
+    expect(seededPriorityOffset(names, names.length)).toBe(0);
+  });
+
+  test('gives every rule a fresh priority when rules are reordered, added or renamed', () => {
+    const before = priorities(['a', 'b', 'c']);
+    for (const after of [
+      ['b', 'a', 'c'],
+      ['a', 'x', 'b', 'c'],
+      ['a', 'b'],
+      ['a', 'b', 'd'],
+    ]) {
+      const old = new Set(before.values());
+      for (const p of priorities(after).values()) {
+        expect(old.has(p)).toBe(false);
+      }
+    }
+  });
+
+  test('rejects more rules than available priorities', () => {
+    expect(() => seededPriorityOffset(['a', 'b', 'c'], 2)).toThrow();
   });
 });

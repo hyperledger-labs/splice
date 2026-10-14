@@ -33,8 +33,8 @@ function isOpenApiObject(o: any): boolean {
     return false;
   }
 
-  const keys = Object.keys(Object.getPrototypeOf(o).constructor).sort();
-  const expected = ['getAttributeTypeMap', 'discriminator', 'attributeTypeMap'].sort();
+  const keys = Object.keys(Object.getPrototypeOf(o).constructor).toSorted();
+  const expected = ['getAttributeTypeMap', 'discriminator', 'attributeTypeMap'].toSorted();
   return keys.length === expected.length && keys.every((val, index) => val === expected[index]);
 }
 

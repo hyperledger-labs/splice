@@ -1756,11 +1756,21 @@ lazy val `apps-common-frontend` = {
         val copyViteReports = baseDirectory.value / "../../../scripts/copy-vite-reports.sh"
         val log = streams.value.log
         runCommand(Seq(copyViteReports.toString), log, None, None)
+        val rootDir = baseDirectory.value / "../../.."
+        val testReportsDir = rootDir / "test-reports"
+        val reports = (testReportsDir * "TEST-*.xml").get.map(_.toString)
+        val mergedReport = testReportsDir / "vitest-merged.xml"
         runCommand(
-          Seq("npm", "run", "xunit-viewer", "--workspaces", "--if-present"),
+          Seq("junit2html", "--merge", mergedReport.toString) ++ reports,
           log,
           None,
-          Some(npmRootDir.value),
+          None,
+        )
+        runCommand(
+          Seq("junit2html", mergedReport.toString, (rootDir / "log/report.html").toString),
+          log,
+          None,
+          None,
         )
       },
       cleanFiles += damlTsCodegenDir.value,
@@ -2063,8 +2073,9 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
       MergeStrategy.last
     case PathList("org", "checkerframework", _ @_*) => MergeStrategy.first
     case PathList("google", "protobuf", _*) => MergeStrategy.first
-    case "google/longrunning/operations.proto" => MergeStrategy.first
-    case "google/apps/card/v1/card.proto" => MergeStrategy.first
+    case path @ PathList("google", _*) if path.endsWith(".proto") => MergeStrategy.first
+    // we pull these in twice through community-common. Unfortunately we can't just get rid of our fork as some of the modifications do actually matter.
+    case PathList("db", "migration", "canton", _*) => MergeStrategy.first
     case PathList("org", "apache", "logging", _*) => MergeStrategy.first
     case PathList("ch", "qos", "logback", _*) => MergeStrategy.first
     case PathList("META-INF", "okhttp.kotlin_module") => MergeStrategy.first
@@ -2429,7 +2440,8 @@ lazy val `apps-app`: Project =
     .settings(
       // scalatestplus-selenium is lagging behind, it depends on selenium 4.12,
       // but that's fine as it's compatible with selenium 4.44 that we end up using
-      libraryDependencies += "org.scalatestplus" %% "selenium-4-12" % "3.2.17.0" % "test",
+      libraryDependencies += ("org.scalatestplus" %% "selenium-4-12" % "3.2.17.0" % "test")
+        .exclude("org.seleniumhq.selenium", "htmlunit-driver"),
       libraryDependencies += CantonDependencies.scalatest_shouldmatchers,
       libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.44.0" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
@@ -2533,7 +2545,8 @@ updateTestConfigForParallelRuns := {
   def isWithDockerWithoutCantonTest(name: String): Boolean =
     name.contains("LocalNet") || name.contains("BulkStorage") || name.contains("S3Upload")
   def isWithDockerWithSimtimeCantonTest(name: String): Boolean =
-    name contains "ScanTimeBasedIntegrationTest"
+    Seq("ScanTimeBasedIntegrationTest", "ScanNewNetworkBackfillingTimeBasedIntegrationTest")
+      .exists(name.contains)
   def isCometBftTest(name: String): Boolean =
     name contains "CometBft"
   def isDynamicSynchronizerParamsReconciliationTest(name: String): Boolean =

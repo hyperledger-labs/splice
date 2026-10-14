@@ -85,10 +85,6 @@ for a basic test, a hard-migration test or a logical synchronizer upgrade test r
 the job needs to be approved to actually run. If you're a Digital Asset employee, you can self-approve; otherwise,
 contact an existing maintainer to approve it.
 
-### Enabling the new Canton bft ordering layer
-
-If you want to run the integration tests with the new Canton bft, you can do so by including the message `[bft]` in your commit message.
-
 ## Running Tests Locally
 
 ### Managing Canton for Tests

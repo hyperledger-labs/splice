@@ -155,4 +155,6 @@ case class SharedSpliceAppParameters(
   override def sanitizePublicErrorMessages: Boolean = true
 
   override def enableTestingFeatures = false
+
+  override def devVersionSupport = false
 }

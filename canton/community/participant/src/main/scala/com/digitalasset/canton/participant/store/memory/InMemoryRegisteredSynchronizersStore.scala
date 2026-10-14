@@ -5,10 +5,10 @@ package com.digitalasset.canton.participant.store.memory
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.store.RegisteredSynchronizersStore
 import com.digitalasset.canton.participant.store.SynchronizerAliasAndIdStore.{
@@ -19,6 +19,7 @@ import com.digitalasset.canton.participant.store.SynchronizerAliasAndIdStore.{
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Mutex
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext

@@ -3,16 +3,17 @@
 
 package com.digitalasset.canton.protocol.messages
 
-import com.digitalasset.canton.crypto.{HashOps, Signature}
+import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.{
   FullInformeeTree,
+  GenTransactionTreeDeserializationContext,
   ViewConfirmationParameters,
   ViewPosition,
   ViewType,
 }
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
-import com.digitalasset.canton.protocol.{RootHash, v30, v31}
+import com.digitalasset.canton.protocol.{RootHash, v30, v31, v32}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -82,6 +83,9 @@ case class InformeeMessage(
   override def toProtoSomeEnvelopeContentV31: v31.EnvelopeContent.SomeEnvelopeContent =
     v31.EnvelopeContent.SomeEnvelopeContent.InformeeMessage(toProtoV30)
 
+  override def toProtoSomeEnvelopeContentV32: v32.EnvelopeContent.SomeEnvelopeContent =
+    v32.EnvelopeContent.SomeEnvelopeContent.InformeeMessage(toProtoV30)
+
   override def rootHash: RootHash = fullInformeeTree.updateId.toRootHash
 
   override def viewType: ViewType = ViewType.TransactionViewType
@@ -92,7 +96,10 @@ case class InformeeMessage(
 }
 
 object InformeeMessage
-    extends VersioningCompanionContext[InformeeMessage, (HashOps, ProtocolVersion)] {
+    extends VersioningCompanionContext[
+      InformeeMessage,
+      (GenTransactionTreeDeserializationContext, ProtocolVersion),
+    ] {
 
   val versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.InformeeMessage)(
@@ -112,7 +119,7 @@ object InformeeMessage
   // but other classes use something else (e.g. "String").
   // In the end, it is most important that the errors are informative and this can be achieved in different ways.
   private[messages] def fromProtoV30(
-      context: (HashOps, ProtocolVersion)
+      context: (GenTransactionTreeDeserializationContext, ProtocolVersion)
   )(informeeMessageP: v30.InformeeMessage): ParsingResult[InformeeMessage] = {
     val (_, protocolVersion) = context
 

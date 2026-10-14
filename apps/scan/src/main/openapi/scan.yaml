@@ -66,6 +66,7 @@ paths:
             type: array
             items:
               type: string
+            maxItems: 1000
       responses:
         "200":
           description: ok
@@ -1662,6 +1663,10 @@ paths:
           schema:
             type: string
             format: date-time
+        - name: "daml_value_encoding"
+          in: "query"
+          schema:
+            $ref: "#/components/schemas/DamlValueEncoding"
       responses:
         "200":
           description: ok
@@ -1727,6 +1732,42 @@ paths:
         "501":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
 
+  /v0/history/bulk/progress:
+    get:
+      tags: [ internal, pre-alpha, scan ]
+      x-jvm-package: scan
+      operationId: "getBulkObjectsProgress"
+      description: |
+        **Under Development, do not use in production yet** Query whether bulk storage object creation has advanced to a certain record time.
+        Meant for internal use only, as part of the processing pipeline of bulk objects.
+      parameters:
+        - name: "record_time"
+          in: "query"
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: "bucket"
+          in: "query"
+          required: true
+          schema:
+            $ref: "#/components/schemas/BulkStorageBucket"
+        - name: "kind"
+          in: "query"
+          required: false
+          schema:
+            $ref: "#/components/schemas/BulkObjectKind"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetBulkObjectsProgressResponse"
+        "501":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
+
+
 
 components:
   schemas:
@@ -1790,6 +1831,7 @@ components:
             knows about. If unsure, an empty array is fine; only a performance
             penalty is incurred.
           type: array
+          maxItems: 1000
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
         cached_issuing_round_contract_ids:
@@ -1798,6 +1840,7 @@ components:
             caller knows about. If unsure, an empty array is fine; only a
             performance penalty is incurred.
           type: array
+          maxItems: 1000
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
     GetOpenAndIssuingMiningRoundsResponse:
@@ -2746,12 +2789,14 @@ components:
           type: array
           items:
             type: string
+          maxItems: 1000
           description: |
             Filters the ACS by contracts in which these party IDs are stakeholders.
         templates:
           type: array
           items:
             type: string
+          maxItems: 1000
           description: |
             Filters the ACS by contracts with these template IDs, specified as "PACKAGE_NAME:MODULE_NAME:ENTITY_NAME".
     HoldingsStateRequestV2: # subset of AcsRequestV2
@@ -2799,6 +2844,7 @@ components:
           items:
             type: string
           minItems: 1
+          maxItems: 1000
           description: |
             Filters by contracts in which these party_ids are the owners of the amulets.
 
@@ -2836,6 +2882,7 @@ components:
           items:
             type: string
           minItems: 1
+          maxItems: 1000
           description: |
             The owners for which to compute the summary.
         as_of_round:
@@ -2878,6 +2925,7 @@ components:
           items:
             type: string
           minItems: 1
+          maxItems: 1000
           description: |
             The owners for which to compute the summary.
 
@@ -3969,6 +4017,8 @@ components:
           format: int32
           minimum: 1
           maximum: 1000
+        daml_value_encoding:
+          $ref: "#/components/schemas/DamlValueEncoding"
 
     ListBulkUpdateHistoryObjectsResponse:
       type: object
@@ -3991,15 +4041,8 @@ components:
     GetBulkObjectChecksumsRequest:
       type: object
       required:
-        - required_catchup_timestamp
         - object_keys
       properties:
-        required_catchup_timestamp:
-          description: |
-            If bulk storage is not caught up to this timestamp, the request must fail with a 404 error.
-            This is to differentiate between "The data is not available yet" and "The data is not available at all".
-          type: string
-          format: date-time
         object_keys:
           description: |
             The list of keys of the bulk storage objects for which checksums are requested.
@@ -4037,6 +4080,49 @@ components:
           description: |
             The sha256 digest of the bulk storage object, for verification of integrity and consistency across SVs.
           type: string
+
+    GetBulkObjectsProgressResponse:
+      type: object
+      required:
+        - availability
+      properties:
+        availability:
+          $ref: "#/components/schemas/BulkObjectsAvailability"
+
+    BulkStorageBucket:
+      type: string
+      description: |
+        The bulk storage bucket a progress query refers to: "staging" holds the objects this Scan has written or
+        copied but not yet verified against its peers, "committed" the objects that passed that check.
+      enum:
+        - "staging"
+        - "committed"
+
+    BulkObjectKind:
+      type: string
+      description: |
+        The kind of bulk storage objects a progress query refers to: "updates" for update segments, "snapshots" for
+        ACS snapshots. Without a kind, the query refers to both.
+      enum:
+        - "updates"
+        - "snapshots"
+
+    BulkObjectsAvailability:
+      type: string
+      description: |
+        Whether the requested bucket of this Scan holds all bulk storage objects of the requested kind (update
+        segments, ACS snapshots, or both when no kind is given) up to the requested record time.
+        "available": it does.
+        "processing": it does not yet. The record time lies within this Scan's own history, so it produces the
+        objects itself from its own data; they appear once its dump (staging) or its check against the peers
+        (committed) has reached the record time.
+        "backfilling": it does not, and will not produce them itself, because the record time lies before this
+        Scan's own history (it joined after the network started). It copies these objects from its peers instead,
+        and answers "available" once that copy has reached the record time.
+      enum:
+        - "available"
+        - "processing"
+        - "backfilling"
 
     GetRewardAccountingEarliestAvailableRoundResponse:
       type: object

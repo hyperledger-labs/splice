@@ -9,6 +9,7 @@ import com.digitalasset.daml.lf.data.*
 import com.digitalasset.daml.lf.data.Ref.*
 import com.digitalasset.daml.lf.transaction.test.TransactionBuilder
 import com.digitalasset.daml.lf.transaction.{
+  ExternalCallResult,
   GlobalKey,
   GlobalKeyWithMaintainers,
   Node,
@@ -21,8 +22,6 @@ import com.digitalasset.daml.lf.transaction.{
 import com.digitalasset.daml.lf.value.Value.*
 import com.google.protobuf.ByteString
 import org.scalacheck.{Arbitrary, Gen}
-import scalaz.scalacheck.ScalaCheckBinding.*
-import scalaz.syntax.apply.*
 
 import scala.Ordering.Implicits.infixOrderingOps
 import scala.collection.immutable.HashMap
@@ -168,7 +167,7 @@ object ValueGenerators {
       list <- Gen.listOf(for {
         k <- Gen.asciiPrintableStr; v <- valueGen(allowContractIds)
       } yield k -> v)
-    } yield ValueTextMap(SortedLookupList(Map(list*)))
+    } yield ValueTextMap(SortedLookupList.from(Map(list*)))
 
   private def internalValueGenMapGen(allowContractIds: Boolean): Gen[ValueGenMap] =
     Gen
@@ -313,7 +312,10 @@ object ValueGenerators {
   private[lf] val genMaybeEmptyParties: Gen[Set[Party]] = Gen.listOf(party).map(_.toSet)
 
   private val genNonEmptyParties: Gen[Set[Party]] =
-    ^(party, genMaybeEmptyParties)((hd, tl) => tl + hd)
+    for {
+      hd <- party
+      tl <- genMaybeEmptyParties
+    } yield tl + hd
 
   def keyWithMaintainersGen(
       templateId: TypeConId,
@@ -322,18 +324,46 @@ object ValueGenerators {
     for {
       key <- valueGen(allowContractIds = false)
       maintainers <- genNonEmptyParties
-      gkey = GlobalKey
-        .build(
-          templateId,
-          packageName,
-          key,
-          // This hash ensures non-collision but does not ensure that two keys that are equal modulo
-          // smart contract upgrade have the same hash.
-          crypto.Hash.hashPrivateKey(s"$packageName:${templateId.qualifiedName}:${key.toString}"),
-        )
-        .toOption
-      if gkey.isDefined
-    } yield GlobalKeyWithMaintainers(gkey.get, maintainers)
+      gkey = GlobalKey(
+        templateId,
+        packageName,
+        key,
+        // This hash ensures non-collision but does not ensure that two keys that are equal modulo
+        // smart contract upgrade have the same hash.
+        crypto.Hash.hashPrivateKey(s"$packageName:${templateId.qualifiedName}:${key.toString}"),
+      )
+    } yield GlobalKeyWithMaintainers(gkey, maintainers)
+
+  /** Generates a single ExternalCallResult for testing serialization. */
+  val externalCallResultGen: Gen[ExternalCallResult] =
+    for {
+      extensionId <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(_.take(50))
+      functionId <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(_.take(50))
+      config <- Gen
+        .listOf(Arbitrary.arbitrary[Byte])
+        .map(bs => data.Bytes.fromByteArray(bs.toArray))
+      input <- Gen.listOf(Arbitrary.arbitrary[Byte]).map(bs => data.Bytes.fromByteArray(bs.toArray))
+      output <- Gen
+        .listOf(Arbitrary.arbitrary[Byte])
+        .map(bs => data.Bytes.fromByteArray(bs.toArray))
+    } yield ExternalCallResult(
+      extensionId = extensionId,
+      functionId = functionId,
+      config = config,
+      input = input,
+      output = output,
+    )
+
+  /** Generates a list of ExternalCallResults for exercise nodes. */
+  def externalCallResultsGen(
+      version: SerializationVersion
+  ): Gen[ImmArray[ExternalCallResult]] =
+    if (version < SerializationVersion.minExternalCallResults)
+      Gen.const(ImmArray.empty[ExternalCallResult])
+    else
+      Gen
+        .listOf(externalCallResultGen)
+        .map(results => ImmArray.from(results.take(5))) // Limit to 5 for reasonable test sizes
 
   /** Makes create nodes that violate the rules:
     *
@@ -460,6 +490,7 @@ object ValueGenerators {
       byKey <-
         if (version < SerializationVersion.minContractKeys) Gen.const(false)
         else Gen.oneOf(true, false)
+      extCallResults <- externalCallResultsGen(version)
     } yield Node.Exercise(
       targetCoid = targetCoid,
       packageName = pkgName,
@@ -477,6 +508,7 @@ object ValueGenerators {
       exerciseResult = exerciseResult,
       keyOpt = key,
       byKey = byKey,
+      externalCallResults = extCallResults,
       version = version,
     )
 

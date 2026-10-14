@@ -102,7 +102,7 @@ runs:
         target: 'default'
 
     - name: Wait for postgres
-      uses: ./.github/actions/nix/run_bash_command_in_nix
+      uses: ./.github/actions/nix/run
       env:
         POSTGRES_HOST: localhost
         POSTGRES_PORT: 5432
@@ -114,7 +114,7 @@ runs:
 
     # Starting canton before setting up SBT, to gain a bit of time doing both in parallel
     - name: Start Canton
-      uses: ./.github/actions/nix/run_bash_command_in_nix
+      uses: ./.github/actions/nix/run
       env:
         POSTGRES_HOST: localhost
         CANTON_DB_HOST: localhost
@@ -139,7 +139,7 @@ runs:
         cache_version: ${{ inputs.cache_version }}
 
     - name: Set Daml package versions
-      uses: ./.github/actions/nix/run_bash_command_in_nix
+      uses: ./.github/actions/nix/run
       with:
         cmd: |
           if [[ "${{ inputs.daml_base_version }}" != "" ]]; then
@@ -155,13 +155,13 @@ runs:
       id: daml_package_versions
       shell: bash
       run: |
-        # We can't export from within run_bash_command_in_nix so we do it here.
+        # We can't export from within run so we do it here.
         if [[ "${{ inputs.daml_base_version }}" != "" ]]; then
           echo "initial_package_versions='$(cat initial_package_config)'" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Prepare list of tests to run for sbt
-      uses: ./.github/actions/nix/run_bash_command_in_nix
+      uses: ./.github/actions/nix/run
       with:
         cmd: |
           splitted=$(echo "${{ toJson(inputs.test_names) }}" | jq -r '.[${{ inputs.runner_index }}].[]')
@@ -184,6 +184,12 @@ runs:
           echo "No scala test tags configured"
         fi
         echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $(cat /tmp/tests) -- $tags\"" >> "$GITHUB_OUTPUT"
+        # `testOnly` without test names runs every test, so an empty batch must skip sbt instead
+        count=$(wc -w < /tmp/tests)
+        if [[ "$count" == "0" ]]; then
+          echo "No tests assigned to runner ${{ inputs.runner_index }}, skipping the test run"
+        fi
+        echo "test_count=$count" >> "$GITHUB_OUTPUT"
 
     # webpack uses inotify to watch for changes, and we need to increase the limit
     - name: increase inotify limit
@@ -212,7 +218,7 @@ runs:
 
     - name: Build Docker images
       if: ${{ fromJson(inputs.with_docker_images) }}
-      uses: ./.github/actions/nix/run_bash_command_in_nix
+      uses: ./.github/actions/nix/run
       with:
         cmd: |
           export CIRCLE_REPOSITORY_URL="${{ github.repositoryUrl }}"
@@ -238,6 +244,7 @@ runs:
         fi
 
     - name: Run tests
+      if: ${{ steps.list_tests.outputs.test_count != '0' }}
       uses: ./.github/actions/sbt/execute_sbt_command
       with:
         extra_env_vars: "POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres INITIAL_PACKAGE_VERSIONS=${{ steps.daml_package_versions.outputs.initial_package_versions }} PROTOCOL_VERSION=${{ inputs.protocol_version }}"
@@ -267,6 +274,7 @@ runs:
           fi
 
     - name: Check logs for errors
+      if: ${{ steps.list_tests.outputs.test_count != '0' }}
       uses: ./.github/actions/sbt/execute_sbt_command
       with:
         # we don't care if some integration test happened to make the repo dirty

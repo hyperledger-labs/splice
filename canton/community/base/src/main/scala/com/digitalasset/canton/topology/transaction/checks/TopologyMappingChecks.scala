@@ -7,10 +7,11 @@ import cats.data.EitherT
 import cats.instances.order.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
+import cats.syntax.foldable.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{EncryptionPublicKey, KeyPurpose, SigningPublicKey}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.{
   DynamicSynchronizerParameters,
@@ -27,11 +28,14 @@ import com.digitalasset.canton.topology.store.TopologyTransactionRejection.Requi
   NoLsuAnnounced,
 }
 import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.topology.transaction.PartyToParticipant.MaxKeys
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Remove
 import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, MonadUtil}
+import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, LoggerUtil, MonadUtil}
+import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.ExecutionContext
@@ -168,6 +172,7 @@ abstract class TopologyMappingChecksWithStateLookup(
   */
 class RequiredTopologyMappingChecks(
     parameters: Option[StaticSynchronizerParameters],
+    protocolVersion: ProtocolVersion,
     stateLookup: TopologyStateLookup,
     loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -217,7 +222,7 @@ class RequiredTopologyMappingChecks(
 
     def mappingMismatch(expected: TopologyMapping): Boolean = (toValidate.mapping, expected) match {
       // When removing the synchronizer trust certificate, no need to mandate that the removal mapping has the same
-      // feature flags..
+      // feature flags.
       case (
             removeCertificate: SynchronizerTrustCertificate,
             inStoreCertificate: SynchronizerTrustCertificate,
@@ -400,7 +405,7 @@ class RequiredTopologyMappingChecks(
         announcements = NonEmpty.from(
           results.flatMap(
             _.selectMapping[LsuAnnouncement]
-              .filter(_.mapping.successorSynchronizerId > psid)
+              .filter(_.mapping.successorSynchronizerId > psid.opaque)
           ) // past upgrades are irrelevant
         )
         _ <- announcements match {
@@ -664,7 +669,36 @@ class RequiredTopologyMappingChecks(
         )
       } yield ()
 
+    def validateDuplicates =
+      for {
+        _ <- noDuplicates(
+          toValidate.mapping.participants.map(_.participantId),
+          "participants",
+          ProtocolVersion.v36,
+        )
+      } yield ()
+
+    def checkPartyKeys() =
+      if (protocolVersion > ProtocolVersion.v35)
+        EitherT.fromEither[FutureUnlessShutdown](
+          toValidate.mapping.partySigningKeysWithThreshold
+            .traverse_(signingKeysWithThreshold =>
+              KeyMapping.validateKeysSizeSet(
+                signingKeysWithThreshold.keys,
+                MaxKeys,
+              )
+            )
+            .leftMap(err =>
+              TopologyTransactionRejection.RequiredMapping.InvalidTopologyMapping(
+                err
+              )
+            )
+        )
+      else EitherTUtil.unitUS
+
     for {
+      _ <- validateDuplicates
+      _ <- checkPartyKeys()
       _ <- checkParticipants()
       _ <- checkIsNotSelfSignedWithARevokedRootNSDKey()
     } yield ()
@@ -824,7 +858,6 @@ class RequiredTopologyMappingChecks(
     val newMediators = (toValidate.mapping.allMediatorsInGroup.toSet -- inStore.toList.flatMap(
       _.mapping.allMediatorsInGroup
     )).map(identity[Member])
-
     def checkMediatorNotAlreadyAssignedToOtherGroup() =
       for {
         result <- loadFromStoreByUid(
@@ -860,6 +893,12 @@ class RequiredTopologyMappingChecks(
     )
 
     for {
+      _ <- noDuplicatesActiveOrObservers(
+        toValidate.mapping.active,
+        toValidate.mapping.observers,
+        toValidate.mapping.threshold,
+        ProtocolVersion.v36,
+      )
       _ <- notAlreadyAssignedET
       _ <- allNewHaveKeysET
     } yield ()
@@ -879,11 +918,19 @@ class RequiredTopologyMappingChecks(
       _.mapping.allSequencers
     )).map(identity[Member])
 
-    checkNewSynchronizerMembersHaveKeys(
-      effectiveTime,
-      newMembers = newSequencers,
-      relaxChecksForBackwardsCompatibility: Boolean,
-    )
+    for {
+      _ <- noDuplicatesActiveOrObservers(
+        toValidate.mapping.active,
+        toValidate.mapping.observers,
+        toValidate.mapping.threshold,
+        ProtocolVersion.v36,
+      )
+      _ <- checkNewSynchronizerMembersHaveKeys(
+        effectiveTime,
+        newMembers = newSequencers,
+        relaxChecksForBackwardsCompatibility: Boolean,
+      )
+    } yield ()
 
   }
 
@@ -1131,16 +1178,58 @@ class RequiredTopologyMappingChecks(
     )
   }
 
+  private def noDuplicatesActiveOrObservers[T](
+      active: Seq[T],
+      observers: Seq[T],
+      threshold: PositiveInt,
+      minimumProtocolVersion: ProtocolVersion,
+  ): EitherT[FutureUnlessShutdown, TopologyTransactionRejection, Unit] =
+    for {
+      _ <- noDuplicates(active, "active", minimumProtocolVersion)
+      _ <- noDuplicates(observers, "observers", minimumProtocolVersion)
+      _ <- noDuplicates(active ++ observers, "across active and observers", minimumProtocolVersion)
+      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+        active.sizeIs >= threshold.value,
+        TopologyTransactionRejection.RequiredMapping.InvalidTopologyMapping(
+          s"Threshold $threshold is larger than num active ${active.length}"
+        ): TopologyTransactionRejection,
+      )
+    } yield ()
+
+  /** Method to check whether some entries in Seq are duplicates */
+  private def noDuplicates[T](
+      seq: Seq[T],
+      description: String,
+      minimumProtocolVersion: ProtocolVersion,
+  ): EitherT[FutureUnlessShutdown, TopologyTransactionRejection, Unit] =
+    if (protocolVersion < minimumProtocolVersion) EitherTUtil.unitUS
+    else {
+      val (_, duplicates) = seq.foldLeft((Set.empty[T], Seq.empty[T])) {
+        case ((seen, duplicate), item) =>
+          if (seen.contains(item) && !duplicate.contains(item))
+            (seen, item +: duplicate)
+          else (seen + item, duplicate)
+      }
+      EitherTUtil.condUnitET[FutureUnlessShutdown](
+        duplicates.isEmpty,
+        TopologyTransactionRejection.RequiredMapping.InvalidTopologyMapping(
+          s"Duplicate $description ids: ${LoggerUtil.limitForLogging(duplicates.map(_.toString).sorted)}"
+        ),
+      )
+    }
+
 }
 
 object RequiredTopologyMappingChecks {
   def apply(
       parameters: Option[StaticSynchronizerParameters],
+      protocolVersion: ProtocolVersion,
       stateLookup: TopologyStateLookup,
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext): RequiredTopologyMappingChecks =
     new RequiredTopologyMappingChecks(
       parameters,
+      protocolVersion,
       stateLookup,
       loggerFactory,
     )

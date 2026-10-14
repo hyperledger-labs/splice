@@ -1,0 +1,21 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "connectionProfileId": "sv-1-scan-update-history-cxn",
+    "displayName": "sv-1-scan-update-history-cxn",
+    "labels": {
+      "cluster": "mock"
+    },
+    "location": "europe-west6",
+    "postgresqlProfile": {
+      "database": "scan_sv_1",
+      "port": 5432,
+      "username": "bqdatastream"
+    },
+    "privateConnectivity": {}
+  },
+  "name": "sv-1-scan-update-history-cxn",
+  "provider": "",
+  "type": "gcp:datastream/connectionProfile:ConnectionProfile"
+}

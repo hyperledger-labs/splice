@@ -3,8 +3,8 @@
 let
   sources = builtins.fromJSON (builtins.readFile ./dpm-sdk-sources.json);
   system = pkgs.stdenv.hostPlatform.system;
-  os = if pkgs.stdenv.isDarwin then "darwin" else "linux";
-  arch = if pkgs.stdenv.isAarch64 then "arm64" else "amd64";
+  os = if pkgs.stdenv.hostPlatform.isDarwin then "darwin" else "linux";
+  arch = if pkgs.stdenv.hostPlatform.isAarch64 then "arm64" else "amd64";
   dpmHash = sources.${system} or (throw "Unsupported system: ${system}");
 in
 pkgs.stdenv.mkDerivation {

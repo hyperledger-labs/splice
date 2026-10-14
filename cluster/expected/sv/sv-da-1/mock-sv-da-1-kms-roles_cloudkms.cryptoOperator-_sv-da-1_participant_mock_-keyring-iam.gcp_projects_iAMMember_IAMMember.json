@@ -1,0 +1,15 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "condition": {
+      "description": "(managed by Pulumi)",
+      "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/sv-da-1_participant_mock\")",
+      "title": "\"sv-da-1_participant_mock\" keyring"
+    },
+    "role": "roles/cloudkms.cryptoOperator"
+  },
+  "name": "mock-sv-da-1-kms-roles/cloudkms.cryptoOperator-\"sv-da-1_participant_mock\"-keyring-iam",
+  "provider": "",
+  "type": "gcp:projects/iAMMember:IAMMember"
+}

@@ -13,7 +13,7 @@ import scala.concurrent.duration.*
   * for client calls, where a duplicate cannot resolve within the deduplication window, and
   * left off for automation, which retries and then finds its task stale.
   */
-final case class RetryFor private (
+final case class RetryFor(
     maxRetries: Int,
     initialDelay: FiniteDuration,
     maxDelay: Duration,

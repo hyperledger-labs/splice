@@ -79,6 +79,8 @@ MEDIATOR_INVALID_MESSAGE.*Received a confirmation response.*with an unknown requ
 
 # TODO(#964) Investigate why Canton starts warning about this
 periodic acknowledgement failed
+UNAVAILABLE.*acknowledge-signed
+Failed to acknowledge clean timestamp
 
 # TODO(#962) Figure out where this is coming from
 Token refresh failed with Status.*UNAVAILABLE.*Health-check stream unexpectedly closed
@@ -161,8 +163,9 @@ The synchronizer Synchronizer 'global' failed the following topology transaction
 # error code will change in the future to MAX_SEQUENCING_TIME_EXCEEDED
 SEQUENCER_SUBMISSION_REQUEST_REFUSED.* The estimated sequencing time .* is already past the max sequencing time
 
-# Sometimes the CI executor seems to take a break, which leads to spurious failed DB activeness checks, see #9388
+# Sometimes the CI executor seems to take a break, which leads to spurious failed DB activeness checks
 DB_CONNECTION_LOST.*Database health check failed to establish a valid connection.*Connection is not available, request timed out
+Sequencer is unhealthy, so disconnecting all members. Can't connect to database
 
 # Likely a race in the shutdown of the actor system vs us scheduling something else on it
 java.lang.IllegalStateException: cannot enqueue after timer shutdown

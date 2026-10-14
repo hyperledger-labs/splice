@@ -62,10 +62,10 @@ export const Delegations: React.FC = () => {
   }
 
   // Sort by expiration date, earliest first
-  const delegations = [...(delegationsQuery.data || [])].sort((a, b) =>
+  const delegations = (delegationsQuery.data ?? []).toSorted((a, b) =>
     a.contract.payload.expiresAt.localeCompare(b.contract.payload.expiresAt)
   );
-  const proposals = [...(proposalsQuery.data || [])].sort((a, b) =>
+  const proposals = (proposalsQuery.data ?? []).toSorted((a, b) =>
     a.contract.payload.delegation.expiresAt.localeCompare(b.contract.payload.delegation.expiresAt)
   );
 

@@ -11,6 +11,7 @@ import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.{
   SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
+  SubscriptionLivenessLimits,
   SynchronizerLimits,
   TransactionProtocolLimits,
 }
@@ -341,6 +342,7 @@ final case class SvParticipantClientConfig(
       SvAppBackendConfig.DefaultParticipantSequencerRequestAmplification,
     sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
       SequencerConnectionPoolDelays.default,
+    subscriptionLivenessLimits: SubscriptionLivenessLimits = SubscriptionLivenessLimits.default,
 ) extends BaseParticipantClientConfig(adminApi, ledgerApi)
 
 final case class BftSequencingParameters(
@@ -645,6 +647,7 @@ final case class SvMediatorConfig(
       SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification,
     sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
       SequencerConnectionPoolDelays.default,
+    subscriptionLivenessLimits: SubscriptionLivenessLimits = SubscriptionLivenessLimits.default,
     pruning: Option[PruningConfig] = Some(
       PruningConfig(
         cron = "0 /10 * * * ?", // Run every 10min,

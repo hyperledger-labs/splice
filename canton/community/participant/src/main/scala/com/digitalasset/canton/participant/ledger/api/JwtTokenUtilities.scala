@@ -5,13 +5,12 @@ package com.digitalasset.canton.participant.ledger.api
 
 import com.daml.jwt.{
   AuthServiceJWTCodec,
-  DecodedJwt,
   Jwt,
   JwtSigner,
   StandardJWTPayload,
   StandardJWTTokenFormat,
 }
-import com.digitalasset.canton.ledger.localstore.api.UserManagementStore
+import com.digitalasset.canton.user.store.UserManagementStore
 
 import java.time.{Duration, Instant}
 
@@ -35,9 +34,9 @@ object JwtTokenUtilities {
     )
     // stolen from com.digitalasset.canton.ledger.api.auth.Main
     val jwtPayload = AuthServiceJWTCodec.compactPrint(payload)
-    val jwtHeader = s"""{"alg": "HS256", "typ": "JWT"}"""
-    val signed: Jwt = JwtSigner.HMAC256
-      .sign(DecodedJwt(jwtHeader, jwtPayload), secret)
+    val signed: Jwt = JwtSigner
+      .HMAC256(secret)
+      .signPayload(jwtPayload)
       .fold(err => throw new RuntimeException(err.message), identity)
     signed.value
   }

@@ -27,12 +27,14 @@ import com.digitalasset.canton.sequencing.client.RichSequencerClient
 import com.digitalasset.canton.sequencing.client.channel.SequencerChannelClient
 import com.digitalasset.canton.sequencing.client.pool.SequencerConnectionPool
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.{
   PhysicalSynchronizerId,
   SynchronizerId,
   TopologyManagerError,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.nonempty.NonEmpty
 import org.slf4j.event.Level
 
 /** A registry of synchronizers. */
@@ -47,7 +49,8 @@ trait SynchronizerRegistry extends AutoCloseable {
     *   set).
     */
   def connect(
-      storedConfig: StoredSynchronizerConnectionConfig
+      storedConfig: StoredSynchronizerConnectionConfig,
+      onboardingTransactions: Option[NonEmpty[Seq[GenericSignedTopologyTransaction]]],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[
@@ -223,7 +226,7 @@ object SynchronizerRegistryError extends SynchronizerRegistryErrorGroup {
       final case class Error(override val cause: String)(implicit
           val loggingContext: ErrorLoggingContext
       ) extends CantonError.Impl(cause)
-          with SynchronizerRegistryError {}
+          with SynchronizerRegistryError
     }
 
     @Explanation(
@@ -238,7 +241,7 @@ object SynchronizerRegistryError extends SynchronizerRegistryErrorGroup {
       final case class Error(override val cause: String)(implicit
           val loggingContext: ErrorLoggingContext
       ) extends CantonError.Impl(cause)
-          with SynchronizerRegistryError {}
+          with SynchronizerRegistryError
     }
 
     @Explanation(
@@ -260,7 +263,7 @@ object SynchronizerRegistryError extends SynchronizerRegistryErrorGroup {
       ) extends CantonError.Impl(
             cause = s"Can not auto-issue a synchronizer-trust certificate on this node: $reason"
           )
-          with SynchronizerRegistryError {}
+          with SynchronizerRegistryError
     }
 
     @Explanation(

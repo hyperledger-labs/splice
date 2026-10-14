@@ -9,6 +9,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.NonEmptyString
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.party.PartyReplicationStatus
@@ -29,8 +30,10 @@ import scala.concurrent.ExecutionContext
 import scala.util.chaining.scalaUtilChainingOps
 
 /** ACS replication progress specific read and write methods.
+  *
+  * Note: Non-sealed for testing.
   */
-sealed trait AcsReplicationProgress {
+private[canton] trait AcsReplicationProgress {
   def getAcsReplicationProgress(requestId: AddPartyRequestId)(implicit
       traceContext: TraceContext
   ): Option[PartyReplicationStatus.AcsReplicationProgress]
@@ -204,6 +207,20 @@ final class PartyReplicationStateManager(
     */
   def get(requestId: AddPartyRequestId): Option[PartyReplicationStatus] =
     partyReplications.get(requestId)
+
+  /** Finds replication status by Daml sequencer channel agreement contract id.
+    *
+    * @param agreementContractId
+    *   Daml replication agreement contract id
+    * @return
+    *   party replication status if found, None otherwise
+    */
+  def findByAgreementContractId(agreementContractId: String): Option[PartyReplicationStatus] =
+    partyReplications.values.find(_.agreementStatus match {
+      case PartyReplicationStatus.AgreementStatus.Exists(contractId, _) =>
+        contractId.coid == agreementContractId
+      case _ => false
+    })
 
   def collectFirst[T](
       f: PartialFunction[(AddPartyRequestId, PartyReplicationStatus), T]

@@ -5,9 +5,7 @@ package com.digitalasset.canton.topology.store
 
 import cats.Monoid
 import cats.syntax.either.*
-import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.CantonRequireTypes.{String185, String300}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -15,6 +13,7 @@ import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
@@ -63,6 +62,7 @@ import com.digitalasset.canton.version.{
   ProtocolVersion,
 }
 import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
@@ -127,13 +127,22 @@ object TopologyStoreId {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def select[StoreId <: TopologyStoreId: ClassTag](
-      store: TopologyStore[TopologyStoreId]
-  ): Option[TopologyStore[StoreId]] = store.storeId match {
+  def select[StoreId <: TopologyStoreId: ClassTag, TopologyStoreContainer[
+      +_ <: TopologyStoreId
+  ] <: HasTopologyStoreId[? <: TopologyStoreId]](
+      container: TopologyStoreContainer[TopologyStoreId]
+  ): Option[TopologyStoreContainer[StoreId]] = container.storeId match {
     // this typecheck is safe to do, because we have a ClassTag in scope
-    case _: StoreId => Some(store.asInstanceOf[TopologyStore[StoreId]])
+    case _: StoreId => Some(container.asInstanceOf[TopologyStoreContainer[StoreId]])
     case _ => None
   }
+}
+
+/** This is a marker trait for types that refer to a
+  * [[com.digitalasset.canton.topology.store.TopologyStoreId]].
+  */
+trait HasTopologyStoreId[+StoreId <: TopologyStoreId] {
+  def storeId: StoreId
 }
 
 final case class StoredTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapping](
@@ -205,7 +214,7 @@ object StoredTopologyTransaction
       rejectionReason <- proto.rejectionReason.traverse(
         String300.fromProtoPrimitive(_, "rejection_reason")
       )
-      signedTx <- SignedTopologyTransaction.fromTrustedByteStringPVV(proto.transaction)
+      signedTx <- SignedTopologyTransaction.fromTrustedByteString(proto.transaction)
     } yield StoredTopologyTransaction(sequenced, validFrom, validUntil, signedTx, rejectionReason)
 
   override def supportedProtoVersions: StoredTopologyTransaction.SupportedProtoVersions =
@@ -250,11 +259,10 @@ object ValidatedTopologyTransaction {
 
 abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
     protected val ec: ExecutionContext
-) extends FlagCloseable
+) extends HasTopologyStoreId[StoreID]
+    with FlagCloseable
     with ChunkPurgeable {
   this: NamedLogging =>
-
-  def storeId: StoreID
 
   def protocolVersion: ProtocolVersion
 
@@ -357,7 +365,7 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
       namespaceFilter = Some(currentPsid.namespace.toProtoPrimitive),
     ).map(
       _.collectOfMapping[LsuAnnouncement]
-        .filter(_.mapping.successor.psid == currentPsid)
+        .filter(_.mapping.successor.psid == currentPsid.opaque)
         .result
         .maxByOption(_.serial)
         .map(_.mapping.upgradeTime)
@@ -516,15 +524,23 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
       transaction: GenericSignedTopologyTransaction
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean] =
     findStored(CantonTimestamp.MaxValue, transaction).map(_.forall { inStore =>
-      // check whether source still could provide an additional signature
-      transaction.signatures
-        .map(_.authorizingLongTermKey)
-        .diff(inStore.transaction.signatures.map(_.authorizingLongTermKey))
-        .nonEmpty &&
-      // but only if the transaction in the target store is a valid proposal
-      inStore.transaction.isProposal &&
-      inStore.validUntil.isEmpty
+      TopologyStore.providesAdditionalSignatures(transaction, inStore)
     })
+
+  /** Filters a sequence of topology transactions, returning only those that provide additional
+    * signatures not yet present in the store for unexpired proposals.
+    *
+    * @note
+    *   Callers (e.g., the queue-based outbox) typically pre-batch transactions based on network
+    *   broadcast limits (e.g., `topologyConfig.broadcastBatchSize`). I/O implementations of this
+    *   method (e.g., database) should independently ensure safety (e.g., via
+    *   `batchingConfig.maxItemsInBatch`).
+    */
+  def filterProvidesAdditionalSignatures(
+      transactions: Seq[GenericSignedTopologyTransaction]
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Seq[GenericSignedTopologyTransaction]]
 
   /** Returns initial set of onboarding transactions that should be dispatched to the synchronizer.
     * Includes:
@@ -747,6 +763,71 @@ object TopologyStore {
       signedTx.mapping.restrictedToSynchronizer.forall(_ == synchronizerId)
     }
 
+  /** Best-effort ordering key for initial participant onboarding transactions: namespace
+    * delegations (root certificates first), then the owner-to-key mapping, then the synchronizer
+    * trust certificate.
+    */
+  def initialParticipantDispatchingOrder(signedTx: GenericSignedTopologyTransaction): Int =
+    signedTx.mapping.code match {
+      case TopologyMapping.Code.NamespaceDelegation =>
+        if (NamespaceDelegation.isRootCertificate(signedTx)) 0 else 1
+      case TopologyMapping.Code.OwnerToKeyMapping => 2
+      case TopologyMapping.Code.SynchronizerTrustCertificate => 3
+      case _ => 4
+    }
+
+  /** Checks that the given transactions form a valid initial participant onboarding set: only
+    * onboarding mappings, exactly one owner-to-key mapping (holding a signing and an encryption
+    * key) and exactly one synchronizer trust certificate.
+    */
+  def validateInitialParticipantDispatchingTransactions(
+      participantId: ParticipantId,
+      transactions: Seq[GenericSignedTopologyTransaction],
+  ): Either[String, Unit] = {
+    val mappings = transactions.map(_.mapping)
+
+    // a mapping is expected only if it is an onboarding mapping for this participant
+    val unexpected = mappings.filterNot { m =>
+      initialParticipantDispatchingSet.contains(m.code) &&
+      m.maybeUid.forall(_ == participantId.uid) &&
+      m.namespace == participantId.namespace
+    }
+    val ownerToKeyMappings = mappings.collect { case otk @ OwnerToKeyMapping(`participantId`, _) =>
+      otk
+    }
+    val providedKeys = ownerToKeyMappings.flatMap(_.keys)
+    val trustCertificates = mappings.collect { case cert: SynchronizerTrustCertificate => cert }
+
+    for {
+      _ <- Either.cond(
+        unexpected.isEmpty,
+        (),
+        s"Onboarding transactions contain unexpected mappings (only ${initialParticipantDispatchingSet
+            .mkString(", ")} are allowed): ${unexpected.mkString(", ")}",
+      )
+      _ <- Either.cond(
+        ownerToKeyMappings.sizeIs == 1,
+        (),
+        s"Onboarding transactions must contain exactly one owner-to-key mapping for the participant, found ${ownerToKeyMappings.size}",
+      )
+      _ <- Either.cond(
+        trustCertificates.sizeIs == 1,
+        (),
+        s"Onboarding transactions must contain exactly one synchronizer trust certificate, found ${trustCertificates.size}",
+      )
+      _ <- Either.cond(
+        providedKeys.exists(_.isEncryption),
+        (),
+        "Onboarding transactions do not contain a valid encryption key for the participant",
+      )
+      _ <- Either.cond(
+        providedKeys.exists(_.isSigning),
+        (),
+        "Onboarding transactions do not contain a valid signing key for the participant",
+      )
+    } yield ()
+  }
+
   /** convenience method waiting until the last eligible transaction inserted into the source store
     * has been dispatched successfully to the target synchronizer
     */
@@ -839,6 +920,20 @@ object TopologyStore {
       param("cutoff", _.validUntilCutoff.value),
     )
   }
+
+  /** Shared predicate to determine if an incoming transaction provides fresh signatures compared to
+    * the currently stored transaction.
+    */
+  def providesAdditionalSignatures(
+      incomingTx: GenericSignedTopologyTransaction,
+      inStoreTx: StoredTopologyTransaction[TopologyChangeOp, TopologyMapping],
+  ): Boolean =
+    incomingTx.signatures
+      .map(_.authorizingLongTermKey)
+      .diff(inStoreTx.transaction.signatures.map(_.authorizingLongTermKey))
+      .nonEmpty &&
+      inStoreTx.transaction.isProposal &&
+      inStoreTx.validUntil.isEmpty
 
 }
 

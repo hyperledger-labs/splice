@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import better.files.*
 import cats.implicits.catsSyntaxOptionId
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.concurrent.Threading

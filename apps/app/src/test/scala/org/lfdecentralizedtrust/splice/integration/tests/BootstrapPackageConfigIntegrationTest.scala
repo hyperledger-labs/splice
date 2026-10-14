@@ -296,6 +296,7 @@ class BootstrapPackageConfigIntegrationTest
       env.environment.clock
         .scheduleAt(
           _ => (),
+          "wait_for_scheduled_time",
           CantonTimestamp.assertFromInstant(scheduledTime.plus(500, ChronoUnit.MILLIS)),
         )
         .unwrap

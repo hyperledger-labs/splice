@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
@@ -13,6 +13,7 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnectionPoolDelays,
   SequencerConnections,
   SubmissionRequestAmplification,
+  SubscriptionLivenessLimits,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -39,6 +40,7 @@ class LocalSequencerConnectionsTrigger(
     synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     sequencerRequestAmplification: SubmissionRequestAmplification,
     sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
+    subscriptionLivenessLimits: SubscriptionLivenessLimits,
     reconnectOnSynchronizerConfigurationChange: Boolean,
     useInternalSequencerApi: Boolean,
 )(implicit
@@ -128,6 +130,7 @@ class LocalSequencerConnectionsTrigger(
             sequencerLivenessMargin = NonNegativeInt.zero,
             submissionRequestAmplification = sequencerRequestAmplification,
             sequencerConnectionPoolDelays = sequencerConnectionPoolDelays,
+            subscriptionLivenessLimits = subscriptionLivenessLimits,
           )
           if (
             ParticipantAdminConnection.dropSequencerId(

@@ -287,7 +287,7 @@ class LsuIntegrationTest
             sv1Backend.participantClientWithAdminToken.topology.lsu.sequencer_successors
               .list(store = Some(Synchronizer(decentralizedSynchronizerId)))
           successors should have size svNodesDoingTheLsu.size.toLong
-          successors.map(_.item.successorPsid).toSet shouldBe Set(successorPsid)
+          successors.map(_.item.successorPsid).toSet shouldBe Set(successorPsid.opaque)
         }
       }
 

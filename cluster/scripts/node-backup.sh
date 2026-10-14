@@ -145,6 +145,7 @@ function wait_for_cloudsql_backup() {
   _info "Waiting for $description db backup to complete for $db_id..."
   while true; do
     backup=$(gcloud sql backups list --instance "$db_id" --filter="description=\"$RUN_ID\"" --format=json)
+    _info "$(date -u --iso-8601=seconds) backups list: $backup"
     status=$(echo "$backup" | jq -r '.[].status')
     id=$(echo "$backup" | jq -r '.[].id')
 
@@ -154,7 +155,7 @@ function wait_for_cloudsql_backup() {
     else
       (( i++ ))&& (( i > 300 )) &&_error "Timed out waiting for backup of $description db"
       sleep 5
-      _info "still waiting..."
+      _info "$(date -u --iso-8601=seconds) still waiting..."
     fi
   done
 }
@@ -291,7 +292,8 @@ function main() {
     backup_component "$namespace" "participant" "$requested_component" "$migration_id"
     wait_for_backup "$namespace" "participant" "$requested_component" "$migration_id"
   elif [ "$1" == "sv" ]; then
-    _info "Backing up SV node $namespace"
+    _info "$(date -u --iso-8601=seconds) Backing up SV node $namespace"
+    _info "RUN_ID = $RUN_ID"
 
     local bft_enabled
     bft_enabled=$(canton_bft_db_enabled "$migration_id" "$config")

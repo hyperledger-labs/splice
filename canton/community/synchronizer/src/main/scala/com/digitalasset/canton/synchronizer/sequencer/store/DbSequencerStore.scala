@@ -9,13 +9,10 @@ import cats.syntax.alternative.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
-import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import com.daml.metrics.CacheMetrics
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.catsinstances.*
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.caching.ScaffeineCache
 import com.digitalasset.canton.caching.ScaffeineCache.TracedAsyncLoadingCache
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
@@ -27,6 +24,7 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
 }
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   CloseContext,
   FlagCloseable,
@@ -58,6 +56,7 @@ import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext, 
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{BatchAggregator, BytesUnit, EitherTUtil, ErrorUtil, retry}
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import org.h2.api.ErrorCode as H2ErrorCode
@@ -420,7 +419,7 @@ class DbSequencerStore(
               .map((RegisteredMember.apply _).tupled)
         } yield (updated, registeredMember),
         "registerMember",
-      )(traceContext, closeContext, { case (updated, _) => updated > 0 })
+      )(traceContext, closeContext)
       .map { case (_, registeredMember) => registeredMember }
 
   protected override def lookupMemberInternal(member: Member)(implicit
@@ -870,7 +869,7 @@ class DbSequencerStore(
             )
 
         storage
-          .update_(action, functionFullName)(traceContext, cc, implicitly)
+          .update_(action, functionFullName)(traceContext, cc)
           .recover { case _: TimeoutException =>
             logger.debug(s"goOffline of instance $instanceIndex timed out")
             if (cc.context.isClosing) UnlessShutdown.AbortedDueToShutdown else UnlessShutdown.unit
@@ -912,7 +911,7 @@ class DbSequencerStore(
           )
         },
         functionFullName,
-      )(traceContext, closeContext, { case (updated, _) => updated > 0 })
+      )(traceContext, closeContext)
       .map { case (_, watermark) => watermark }
 
   override def fetchOnlineInstances(implicit

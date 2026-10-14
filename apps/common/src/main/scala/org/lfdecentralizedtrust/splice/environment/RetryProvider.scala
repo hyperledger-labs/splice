@@ -169,6 +169,7 @@ final class RetryProvider(
               // No work done here, as we are only interested in the scheduling notification
               ()
             },
+            "schedule_after_unless_shutdown",
             java.time.Duration.ofNanos(delayNanos),
           )
       )
@@ -722,6 +723,16 @@ object RetryProvider {
               )
               FatalErrorKind
             }
+          case ex: BftCallFailed.NeverAvailable =>
+            logger.info(
+              s"The operation ${operationName.singleQuoted} failed with a non retryable error, $fatalBehavior: $ex"
+            )
+            FatalErrorKind
+          case ex: BftCallFailed =>
+            logger.info(
+              s"The operation ${operationName.singleQuoted} failed with a $transientDescription BFT error: $ex"
+            )
+            TransientErrorKind()
           case ex @ HttpErrorWithHttpCode(code, _) =>
             if (retryableHttpStatusCodes.contains(code)) {
               logger.info(

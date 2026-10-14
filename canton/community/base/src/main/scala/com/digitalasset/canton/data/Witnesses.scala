@@ -5,9 +5,9 @@ package com.digitalasset.canton.data
 
 import cats.data.EitherT
 import cats.syntax.foldable.*
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.sequencing.protocol.{
   MemberRecipient,
@@ -17,6 +17,7 @@ import com.digitalasset.canton.sequencing.protocol.{
 }
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
 
 import scala.concurrent.ExecutionContext
 

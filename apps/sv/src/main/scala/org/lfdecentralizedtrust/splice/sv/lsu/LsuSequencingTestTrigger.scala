@@ -61,7 +61,7 @@ class LsuSequencingTestTrigger(
         announcement.base.validFrom
           .isBefore(now.toInstant) && now.toInstant.isBefore(
           announcement.mapping.upgradeTime.toInstant
-        ) && announcement.mapping.successorSynchronizerId != synchronizerId
+        ) && announcement.mapping.successorSynchronizerId != synchronizerId.opaque
       })
   }
 }

@@ -1,0 +1,15 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "kind": "Namespace",
+    "metadata": {
+      "labels": {},
+      "name": "cluster-ingress"
+    }
+  },
+  "name": "cluster-ingress",
+  "provider": "",
+  "type": "kubernetes:core/v1:Namespace"
+}

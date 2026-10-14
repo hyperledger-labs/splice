@@ -1,0 +1,37 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "gateway.networking.k8s.io/v1",
+    "kind": "HTTPRoute",
+    "metadata": {
+      "name": "cn-gke-l7-gateway-http-redirect",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "parentRefs": [
+        {
+          "name": "cn-gke-l7-gateway",
+          "namespace": "cluster-ingress",
+          "sectionName": "listen-http"
+        }
+      ],
+      "rules": [
+        {
+          "filters": [
+            {
+              "requestRedirect": {
+                "scheme": "https",
+                "statusCode": 301
+              },
+              "type": "RequestRedirect"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "name": "cn-gke-l7-gateway-http-redirect",
+  "provider": "",
+  "type": "kubernetes:gateway.networking.k8s.io/v1:HTTPRoute"
+}

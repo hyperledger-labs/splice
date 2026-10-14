@@ -39,7 +39,7 @@ async function getLatestObject(
 ): Promise<File> {
   const [objects] = await bucket.getFiles({ startOffset, endOffset });
   if (objects.length === 0) {
-    console.error(`No files between ${startOffset} and ${endOffset}`);
+    await pulumi.log.error(`No files between ${startOffset} and ${endOffset}`);
     exit(1);
   }
   return objects.reduce((prev, cur) => (cur.name > prev.name ? cur : prev));

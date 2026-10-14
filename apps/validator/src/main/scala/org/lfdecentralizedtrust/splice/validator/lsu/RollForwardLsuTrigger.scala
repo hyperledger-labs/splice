@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.lsu
 
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.networking
 import com.digitalasset.canton.topology.transaction.GrpcConnection

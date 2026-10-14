@@ -13,7 +13,6 @@ import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.{
-  Consensus,
   Output,
   P2PNetworkOut,
   Pruning,
@@ -68,7 +67,7 @@ trait Module[E <: Env[E], MessageT] extends NamedLogging with FlagCloseable with
     *
     * It is also called by the module system when the module changes behavior.
     */
-  def ready(self: ModuleRef[MessageT]): Unit = ()
+  def ready(self: ModuleRef[MessageT])(implicit traceContext: TraceContext): Unit = ()
 
   protected def receiveInternal(
       message: MessageT
@@ -153,17 +152,13 @@ trait ModuleRef[-AcceptedMessageT] {
   def asyncSend(
       msg: AcceptedMessageT
   )(implicit traceContext: TraceContext, metricsContext: MetricsContext): Unit
-
-  def asyncSendNoTrace(
-      msg: AcceptedMessageT
-  )(implicit metricsContext: MetricsContext): Unit =
-    asyncSend(msg)(traceContext = TraceContext.empty, metricsContext = metricsContext)
 }
 
 /** An abstraction of the network for deterministic simulation testing purposes.
   */
 trait P2PNetworkRef[-P2PMessageT] extends FlagCloseable {
-  def asyncP2PSend(createMessage: Option[Instant] => P2PMessageT)(implicit
+  def asyncP2PSend(recipientBftNodeId: BftNodeId, createMessage: Option[Instant] => P2PMessageT)(
+      implicit
       traceContext: TraceContext,
       metricsContext: MetricsContext,
   ): Unit
@@ -182,7 +177,7 @@ trait P2PConnectionEventListener {
 
   def onDisconnect(p2pEndpointId: P2PEndpoint.Id)(implicit traceContext: TraceContext): Unit
 
-  def onSequencerId(bftNodeId: BftNodeId, maybeP2PEndpoint: Option[P2PEndpoint])(implicit
+  def onNodeId(bftNodeId: BftNodeId, maybeP2PEndpoint: Option[P2PEndpoint])(implicit
       traceContext: TraceContext
   ): Unit
 }
@@ -200,8 +195,8 @@ object P2PConnectionEventListener {
           traceContext: TraceContext
       ): Unit = ()
 
-      override def onSequencerId(bftNodeId: BftNodeId, maybeP2PEndpoint: Option[P2PEndpoint])(
-          implicit traceContext: TraceContext
+      override def onNodeId(bftNodeId: BftNodeId, maybeP2PEndpoint: Option[P2PEndpoint])(implicit
+          traceContext: TraceContext
       ): Unit =
         ()
     }
@@ -237,6 +232,16 @@ object P2PAddress {
   ) extends P2PAddress {
     override val maybeP2PEndpoint: Option[P2PEndpoint] = maybeCommunicatedEndpoint
   }
+
+  def maybeId(
+      maybeBftNodeId: Option[BftNodeId],
+      maybeP2PEndpointId: Option[P2PEndpoint.Id],
+  ): Option[P2PAddress.Id] =
+    (maybeBftNodeId, maybeP2PEndpointId) match {
+      case (Some(bftNodeId), _) => Some(Right(bftNodeId))
+      case (None, Some(p2pEndpointId)) => Some(Left(p2pEndpointId))
+      case (None, None) => None
+    }
 }
 
 /** An abstraction of the P2P network reference factory for deterministic simulation testing
@@ -277,6 +282,20 @@ trait FutureContext[E <: Env[E]] {
   ): E#FutureUnlessShutdownT[X]
 
   def pureFuture[X](x: X): E#FutureUnlessShutdownT[X]
+
+  /** Runs a synchronous computation off the actor thread on the future execution context. The
+    * computation must be pure.
+    *
+    * Unlike [[pureFuture]], which evaluates its argument eagerly on the calling (actor) thread,
+    * [[runAsync]] defers evaluation to the future's executor. It can therefore be used to move
+    * expensive work (e.g. hashing) out of the actor thread so that it does not block the module's
+    * message processing.
+    */
+  def runAsync[X](
+      action: String,
+      compute: () => X,
+      orderingStage: Option[String] = None,
+  ): E#FutureUnlessShutdownT[X]
 
   /** [[mapFuture]] requires a [[PureFun]] instead of a normal [[scala.Function1]] since we need to
     * be careful not to mutate state of the modules in the [[Env#FutureUnlessShutdownT]], as this
@@ -324,7 +343,7 @@ trait ModuleContext[E <: Env[E], MessageT] extends NamedLogging with FutureConte
 
   def newModuleRef[NewModuleMessageT](moduleName: ModuleName)(
       moduleNameForMetrics: String = moduleName.name
-  ): E#ModuleRefT[NewModuleMessageT]
+  )(implicit traceContext: TraceContext): E#ModuleRefT[NewModuleMessageT]
 
   /** Spawns a new module. The `module` handler object must not be spawned more than once, lest it
     * potentially cause a violation of the actor model, as its state could be accessed concurrently.
@@ -332,7 +351,7 @@ trait ModuleContext[E <: Env[E], MessageT] extends NamedLogging with FutureConte
   def setModule[OtherModuleMessageT](
       moduleRef: E#ModuleRefT[OtherModuleMessageT],
       module: Module[E, OtherModuleMessageT],
-  ): Unit
+  )(implicit traceContext: TraceContext): Unit
 
   // Handler API, used by module implementations
 
@@ -342,13 +361,6 @@ trait ModuleContext[E <: Env[E], MessageT] extends NamedLogging with FutureConte
       traceContext: TraceContext,
       metricsContext: MetricsContext,
   ): CancellableEvent
-
-  def delayedEventNoTrace(delay: FiniteDuration, messageT: MessageT)(implicit
-      metricsContext: MetricsContext
-  ): CancellableEvent = delayedEvent(delay, messageT)(
-    traceContext = TraceContext.empty,
-    metricsContext = metricsContext,
-  )
 
   /** Similar to TraceContext.withNewTraceContext but can be deterministically simulated
     */
@@ -368,6 +380,13 @@ trait ModuleContext[E <: Env[E], MessageT] extends NamedLogging with FutureConte
 
   final override def pureFuture[X](x: X): E#FutureUnlessShutdownT[X] =
     futureContext.pureFuture(x)
+
+  final override def runAsync[X](
+      action: String,
+      compute: () => X,
+      orderingStage: Option[String] = None,
+  ): E#FutureUnlessShutdownT[X] =
+    futureContext.runAsync(action, compute, orderingStage)
 
   final override def mapFuture[X, Y](
       future: E#FutureUnlessShutdownT[X]
@@ -422,22 +441,22 @@ trait ModuleContext[E <: Env[E], MessageT] extends NamedLogging with FutureConte
       fun: Try[X] => Option[MessageT]
   )(implicit traceContext: TraceContext, metricsContext: MetricsContext): Unit
 
-  def blockingAwait[X](future: E#FutureUnlessShutdownT[X]): X
+  def blockingAwait[X](future: E#FutureUnlessShutdownT[X], duration: FiniteDuration)(implicit
+      traceContext: TraceContext
+  ): X
 
-  def blockingAwait[X](future: E#FutureUnlessShutdownT[X], duration: FiniteDuration): X
+  def become(module: Module[E, MessageT])(implicit traceContext: TraceContext): Unit
 
-  def become(module: Module[E, MessageT]): Unit
-
-  def stop(onStop: () => Unit = () => ()): Unit
+  def stop(onStop: () => Unit = () => ())(implicit traceContext: TraceContext): Unit
 
   // Aborting in Canton shouldn't kill the whole process, as it may contain several nodes,
   //  but rather only the module/sequencer.
 
-  def abort(): Nothing
+  def abort()(implicit traceContext: TraceContext): Nothing
 
-  def abort(msg: String): Nothing
+  def abort(msg: String)(implicit traceContext: TraceContext): Nothing
 
-  def abort(failure: Throwable): Nothing
+  def abort(failure: Throwable)(implicit traceContext: TraceContext): Nothing
 }
 
 /** An environment defines the concrete actor context, reference and timer times for a specific
@@ -475,7 +494,7 @@ trait ModuleSystem[E <: Env[E]] {
   def setModule[AcceptedMessageT](
       moduleRef: E#ModuleRefT[AcceptedMessageT],
       module: Module[E, AcceptedMessageT],
-  ): Unit
+  )(implicit traceContext: TraceContext): Unit
 }
 
 object Module {
@@ -494,6 +513,7 @@ object Module {
     final case class SetBehavior[E <: Env[E], AcceptedMessageT](
         module: Module[E, AcceptedMessageT],
         ready: Boolean,
+        traceContext: TraceContext,
     ) extends ModuleControl[E, AcceptedMessageT]
         with ControlMessage
 
@@ -524,6 +544,8 @@ object Module {
             P2PConnectionEventListener,
             ModuleRef[P2PMessageT],
         ) => P2PNetworkManagerT,
+    )(implicit
+        traceContext: TraceContext
     ): SystemInitializationResult[E, P2PNetworkManagerT, P2PMessageT, InputMessageT]
   }
 
@@ -539,7 +561,6 @@ object Module {
       inputModuleRef: ModuleRef[InputMessageT],
       p2pNetworkInModuleRef: ModuleRef[P2PMessageT],
       p2pNetworkOutAdminModuleRef: ModuleRef[P2PNetworkOut.Admin],
-      consensusAdminModuleRef: ModuleRef[Consensus.Admin],
       outputModuleRef: ModuleRef[Output.Message[E]],
       pruningModuleRef: ModuleRef[Pruning.Message],
       p2pNetworkManager: P2PNetworkManagerT,

@@ -7,11 +7,11 @@ import cats.Eval
 import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.ledger.participant.state.RepairUpdate
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors
@@ -31,6 +31,7 @@ import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, 
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.PekkoUtil.FutureQueue
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import org.slf4j.event.Level
 
@@ -101,10 +102,8 @@ private[repair] final class RepairServiceHelpers(
       persistentState <- EitherT.fromEither[FutureUnlessShutdown](
         lookUpSynchronizerPersistence(psid)
       )
-      synchronizerIndex <- EitherT
-        .right(
-          ledgerApiIndexer.value.ledgerApiStore.value.cleanSynchronizerIndex(synchronizerId)
-        )
+      synchronizerIndex = ledgerApiIndexer.value.ledgerApiStore
+        .cleanSynchronizerIndex(synchronizerId)
       topologyFactory <- syncPersistentStateLookup
         .topologyFactoryFor(psid)
         .toRight(s"No topology factory for synchronizer $psid")

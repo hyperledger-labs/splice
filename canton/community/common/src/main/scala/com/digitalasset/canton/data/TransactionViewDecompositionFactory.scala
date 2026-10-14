@@ -3,24 +3,91 @@
 
 package com.digitalasset.canton.data
 
-import cats.data.Chain
+import cats.data.{Chain, EitherT}
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
-import com.digitalasset.canton.LfPartyId
+import cats.syntax.traverse.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.TransactionViewDecomposition.{NewView, SameView}
+import com.digitalasset.canton.data.TransactionViewDecompositionFactory.RollbackState.firstChild
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LfTransactionUtil
+import com.digitalasset.canton.{LfPartyId, checked}
 import com.digitalasset.daml.lf.transaction.NodeId
 
 import scala.concurrent.ExecutionContext
 
 case object TransactionViewDecompositionFactory {
+
+  sealed trait TransactionViewLimitExceeded {
+    def message: String
+  }
+
+  /** @param subViewCount
+    *   number of subviews that we generated from a transaction
+    * @param limit
+    *   maximum number of subviews that a transaction may generate
+    */
+  final case class TransactionSubViewLimitExceeded(subViewCount: Int, limit: Int)
+      extends TransactionViewLimitExceeded {
+    val message: String = s"Number of subviews for a transaction exceeded $limit"
+  }
+
+  /** @param rootViewCount
+    *   number of root views that we generated from a transaction
+    * @param limit
+    *   maximum number of root views that a transaction may generate
+    */
+  final case class TransactionRootViewLimitExceeded(rootViewCount: Int, limit: Int)
+      extends TransactionViewLimitExceeded {
+    val message: String = s"Number of root views for a transaction exceeded $limit"
+  }
+
+  /** @param depth
+    *   the actual parse depth of the transaction view
+    * @param limit
+    *   the maximum allowed parse depth for a transaction view
+    */
+  final case class TransactionTreeDepthLimitExceeded(depth: Int, limit: Int)
+      extends TransactionViewLimitExceeded {
+    val message: String = s"The parse depth of the transaction view exceeded $limit"
+  }
+
+  object RollbackState {
+    private val firstChild: PositiveInt = PositiveInt.one
+    val empty: RollbackState = RollbackState(Vector.empty, firstChild)
+  }
+
+  final case class RollbackState(path: Vector[PositiveInt], nextChild: PositiveInt) {
+
+    def enterRollback: RollbackState = RollbackState(path :+ nextChild, firstChild)
+
+    def tryExitRollback: RollbackState = {
+      val lastChild =
+        path.lastOption.getOrElse(
+          throw new IllegalStateException("Attempt to exit rollback on empty rollback context")
+        )
+
+      RollbackState(
+        path.dropRight(1),
+        lastChild.increment.getOrElse(
+          // It would take Int.Max sibling rollback nodes to reach this which will likely hit another limit before that
+          // TODO(i26565): Make sure that transaction views limits cover rollback sibling width as well
+          throw new IllegalStateException(
+            "Attempt to exit rollback with a last child at Int.MaxValue"
+          )
+        ),
+      )
+    }
+
+    def inRollback: Boolean = path.nonEmpty
+  }
 
   /** Keeps track of the state of the transaction view tree.
     *
@@ -36,31 +103,31 @@ case object TransactionViewDecompositionFactory {
       views: Chain[V] = Chain.empty,
       informees: Set[LfPartyId] = Set.empty,
       quorums: Chain[Quorum] = Chain.empty,
-      rollbackContext: RollbackContext = RollbackContext.empty,
+      rollbackState: RollbackState,
   ) {
 
     def withViews(
         views: Chain[V],
         informees: Set[LfPartyId],
         quorums: Chain[Quorum],
-        rollbackContext: RollbackContext,
+        rollbackState: RollbackState,
     ): BuildState[V] =
       BuildState[V](
         this.views ++ views,
         this.informees ++ informees,
         this.quorums ++ quorums,
-        rollbackContext,
+        rollbackState,
       )
 
-    def withNewView(view: V, rollbackContext: RollbackContext): BuildState[V] =
+    def withNewView(view: V, rollbackContext: RollbackState): BuildState[V] =
       BuildState[V](this.views :+ view, this.informees, this.quorums, rollbackContext)
 
     def childState: BuildState[TransactionViewDecomposition] =
-      BuildState(Chain.empty, Set.empty, Chain.empty, rollbackContext)
+      BuildState(Chain.empty, Set.empty, Chain.empty, rollbackState)
 
-    def enterRollback(): BuildState[V] = copy(rollbackContext = rollbackContext.enterRollback)
+    def enterRollback(): BuildState[V] = copy(rollbackState = rollbackState.enterRollback)
 
-    def exitRollback(): BuildState[V] = copy(rollbackContext = rollbackContext.exitRollback)
+    def exitRollback(): BuildState[V] = copy(rollbackState = checked(rollbackState.tryExitRollback))
   }
 
   final private case class ActionNodeInfo(
@@ -75,6 +142,7 @@ case object TransactionViewDecompositionFactory {
   final private case class Builder(
       nodesM: Map[LfNodeId, LfNode],
       actionNodeInfoM: Map[LfNodeId, ActionNodeInfo],
+      factory: RollbackContextFactory,
   ) {
 
     private def node(nodeId: LfNodeId): LfNode = nodesM.getOrElse(
@@ -82,6 +150,7 @@ case object TransactionViewDecompositionFactory {
       throw new IllegalStateException(s"Did not find $nodeId in node map"),
     )
 
+    @SuppressWarnings(Array("org.wartremover.warts.PartialFunctionApply"))
     private def build(
         nodeId: LfNodeId,
         state: BuildState[NewView],
@@ -106,11 +175,9 @@ case object TransactionViewDecompositionFactory {
         info: ActionNodeInfo,
         state: BuildState[V],
     ): BuildState[V] = {
-
       val childState = info.children.foldLeft(state.childState) { (bs, nId) =>
         buildChildView(nId, info.participants, bs)
       }
-
       val newView = NewView(
         LfTransactionUtil.lightWeight(actionNode),
         /* We can use tryCreate here because at this point we only have one quorum
@@ -126,18 +193,18 @@ case object TransactionViewDecompositionFactory {
         info.seed,
         nodeId,
         childState.views.toList,
-        state.rollbackContext,
+        factory.fromRollbackState(state.rollbackState),
       )
 
-      state.withNewView(newView, childState.rollbackContext)
+      state.withNewView(newView, childState.rollbackState)
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.PartialFunctionApply"))
     private def buildChildView(
         nodeId: LfNodeId,
         currentParticipants: Set[ParticipantId],
         state: BuildState[TransactionViewDecomposition],
     ): BuildState[TransactionViewDecomposition] = {
-
       /* The recipients of a transaction node are all participants that
        * host a witness of the node. So we should look at the participant recipients of
        * a node to decide when a new view is needed. In particular, a change in the informees triggers a new view only if
@@ -155,7 +222,7 @@ case object TransactionViewDecompositionFactory {
             val sameView = SameView(
               LfTransactionUtil.lightWeight(actionNode),
               nodeId,
-              state.rollbackContext,
+              factory.fromRollbackState(state.rollbackState),
             )
             val childState = info.children.foldLeft(state.childState) { (bs, nId) =>
               buildChildView(nId, currentParticipants, bs)
@@ -166,10 +233,11 @@ case object TransactionViewDecompositionFactory {
                 sameView +: childState.views,
                 info.informees.keySet ++ childState.informees,
                 info.quorum +: childState.quorums,
-                childState.rollbackContext,
+                childState.rollbackState,
               )
           } else
             buildNewView(nodeId, actionNode, info, state)
+
         case rollbackNode: LfNodeRollback =>
           rollbackNode.children
             .foldLeft(state.enterRollback()) { (bs, nId) =>
@@ -180,15 +248,65 @@ case object TransactionViewDecompositionFactory {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.SizeIs"))
+  private def checkTransactionViewLimits(
+      views: Seq[NewView],
+      optLimitConfig: Option[TransactionViewLimitConfig],
+  ): Either[TransactionViewLimitExceeded, Seq[NewView]] =
+    // TODO (#35479): Inline Transaction View Limit Checking
+    optLimitConfig.fold[Either[TransactionViewLimitExceeded, Seq[NewView]]](Right(views)) {
+      limitConfig =>
+        def checkSubViewLimits(view: NewView): Either[TransactionViewLimitExceeded, NewView] =
+          if (view.viewCount > limitConfig.maxSubViews.value) {
+            Left(TransactionSubViewLimitExceeded(view.viewCount, limitConfig.maxSubViews.value))
+          } else {
+            Right(view)
+          }
+
+        if (views.length > limitConfig.maxRootViews.value) {
+          Left(TransactionRootViewLimitExceeded(views.length, limitConfig.maxRootViews.value))
+        } else {
+          views.traverse(checkSubViewLimits)
+        }
+    }
+
   def fromTransaction(
       topologySnapshot: TopologySnapshot,
       transaction: WellFormedTransaction[WithoutSuffixes],
       viewRbContext: RollbackContext,
       submittingAdminPartyO: Option[LfPartyId],
-  )(implicit ec: ExecutionContext, tc: TraceContext): FutureUnlessShutdown[Seq[NewView]] = {
+      factory: RollbackContextFactory,
+      limitConfig: Option[TransactionViewLimitConfig],
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): EitherT[FutureUnlessShutdown, TransactionViewLimitExceeded, Seq[NewView]] =
+    EitherT(
+      unsafeFromTransaction(
+        topologySnapshot,
+        transaction,
+        viewRbContext,
+        submittingAdminPartyO,
+        factory,
+      )
+        .map(checkTransactionViewLimits(_, limitConfig))
+    )
+
+  // This method is unsafe because it does not check the transaction view limits. Use `fromTransaction` instead.
+  private def unsafeFromTransaction(
+      topologySnapshot: TopologySnapshot,
+      transaction: WellFormedTransaction[WithoutSuffixes],
+      viewRbContext: RollbackContext,
+      submittingAdminPartyO: Option[LfPartyId],
+      factory: RollbackContextFactory,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): FutureUnlessShutdown[Seq[NewView]] = {
 
     val tx: LfVersionedTransaction = transaction.unwrap
     val rootNodes = tx.roots.toSeq
+    val rollbackState = factory.toRollbackState(viewRbContext)
 
     val policyMapF: Iterable[FutureUnlessShutdown[(NodeId, ActionNodeInfo)]] =
       tx.nodes.collect { case (nodeId, node: LfActionNode) =>
@@ -212,8 +330,11 @@ case object TransactionViewDecompositionFactory {
       }
 
     FutureUnlessShutdown.sequence(policyMapF).map(_.toMap).map { policyMap =>
-      Builder(tx.nodes, policyMap)
-        .builds(rootNodes, BuildState[NewView](rollbackContext = viewRbContext))
+      Builder(tx.nodes, policyMap, factory)
+        .builds(
+          rootNodes,
+          BuildState[NewView](rollbackState = rollbackState),
+        )
         .views
         .toList
     }

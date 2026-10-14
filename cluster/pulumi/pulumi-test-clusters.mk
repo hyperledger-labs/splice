@@ -1,29 +1,30 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: $(dir)/test.json
-$(dir)/test.json: $(dir $(dir)).build
+# dump-config writes every resource to its own file under test-output.
+# Type checking is skipped as it dominates memory usage and is already done by `sbt lint`
+.PHONY: $(dir)/test-output
+$(dir)/test-output: $(dir $(dir)).build
 	set -o pipefail \
 	&& cd $(@D); \
 	if [ -n "$$CI" ]; then \
 	    . "${SPLICE_ROOT}/cluster/deployment/mock/.envrc.vars"; \
-		npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+		DUMP_CONFIG_OUTPUT_DIR="$$PWD/$(@F)" TS_NODE_TRANSPILE_ONLY=true npm run --silent dump-config; \
 	else \
-		env -i PATH="$$PATH" HOME="$$HOME" SPLICE_ROOT="$$SPLICE_ROOT" GCP_CLUSTER_BASENAME="mock" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" DEPLOYMENT_DIR="$$DEPLOYMENT_DIR" PRIVATE_CONFIGS_PATH="$$PRIVATE_CONFIGS_PATH" PUBLIC_CONFIGS_PATH="$$PUBLIC_CONFIGS_PATH" npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+		env -i PATH="$$PATH" HOME="$$HOME" SPLICE_ROOT="$$SPLICE_ROOT" GCP_CLUSTER_BASENAME="mock" CN_PULUMI_LOAD_ENV_CONFIG_FILE="true" DEPLOYMENT_DIR="$$DEPLOYMENT_DIR" PRIVATE_CONFIGS_PATH="$$PRIVATE_CONFIGS_PATH" PUBLIC_CONFIGS_PATH="$$PUBLIC_CONFIGS_PATH" DUMP_CONFIG_OUTPUT_DIR="$$PWD/$(@F)" TS_NODE_TRANSPILE_ONLY=true npm run --silent dump-config; \
 	fi
 
-cluster/expected/$(notdir $(dir)):
-	mkdir -p $@
-
 .PHONY: $(dir)/update-expected
-$(dir)/update-expected: $(dir)/test.json | cluster/expected/$(notdir $(dir))
-	@cp -v $^ $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected.json
+$(dir)/update-expected: $(dir)/test-output
+	rm -rf $(EXPECTED_FILES_DIR)/$(notdir $(@D))
+	cp -r $^ $(EXPECTED_FILES_DIR)/$(notdir $(@D))
 
 .PHONY: $(dir)/test-config
-$(dir)/test-config: $(dir)/test.json | cluster/expected/$(notdir $(dir))
-	diff -u $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected.json $(@D)/test.json; \
+$(dir)/test-config: $(dir)/test-output
+	diff -ru $(EXPECTED_FILES_DIR)/$(notdir $(@D)) $^; \
 	EXIT=$$?; \
-	cp $(@D)/test.json $(EXPECTED_FILES_DIR)/$(notdir $(@D))/expected.json; \
+	rm -rf $(EXPECTED_FILES_DIR)/$(notdir $(@D)); \
+	cp -r $^ $(EXPECTED_FILES_DIR)/$(notdir $(@D)); \
 	exit $$EXIT
 
 .PHONY: $(dir)/lint

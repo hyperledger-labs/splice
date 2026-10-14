@@ -6,6 +6,7 @@ package com.digitalasset.canton.store.db
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.pruning.{PruningPhase, PruningStatus}
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.store.PrunableByTime
@@ -27,11 +28,14 @@ trait DbPrunableByTime[Idx] extends PrunableByTime {
   /** The table name to store the pruning timestamp in. The table must define the following fields:
     *   - [[partitionColumn]] primary key
     *   - `phase` stores the [[com.digitalasset.canton.pruning.PruningPhase]]
-    *   - `ts` stores the [[com.digitalasset.canton.data.CantonTimestamp]]
+    *   - `ts` stores the [[com.digitalasset.canton.data.CantonTimestamp]] of the latest attempted
+    *     pruning call
+    *   - `succeeded` stores the [[com.digitalasset.canton.data.CantonTimestamp]] of the completed
+    *     pruning call
     */
-  protected[this] def pruning_status_table: String
+  protected[this] def pruning_status_table: String & Singleton
 
-  protected[this] def partitionColumn: String
+  protected[this] def partitionColumn: String & Singleton
   protected[this] def partitionKey: Idx
 
   protected[this] implicit val ec: ExecutionContext
@@ -48,8 +52,8 @@ trait DbPrunableByTime[Idx] extends PrunableByTime {
     storage.query(query, functionFullName)
   }
 
-  protected[canton] def advancePruningTimestamp(phase: PruningPhase, timestamp: CantonTimestamp)(
-      implicit traceContext: TraceContext
+  protected def advancePruningTimestamp(phase: PruningPhase, timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] = {
 
     val query = (storage.profile, phase) match {

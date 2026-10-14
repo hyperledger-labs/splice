@@ -7,14 +7,13 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.parallel.*
-import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{BatchAggregatorConfig, ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
@@ -51,6 +50,7 @@ import com.digitalasset.canton.topology.store.TopologyStoreId.{
 }
 import com.digitalasset.canton.topology.store.ValidatedTopologyTransaction.GenericValidatedTopologyTransaction
 import com.digitalasset.canton.topology.store.{
+  HasTopologyStoreId,
   TopologyStore,
   TopologyStoreId,
   ValidatedTopologyTransaction,
@@ -69,11 +69,13 @@ import com.digitalasset.canton.topology.transaction.checks.{
   RequiredTopologyMappingChecks,
   TopologyMappingChecks,
 }
+import com.digitalasset.canton.topology.util.SerialUtils.EnhancedPositiveInt
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{EitherTUtil, MonadUtil, SimpleExecutionQueue}
 import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
 import com.digitalasset.canton.{LfPackageId, config}
+import com.digitalasset.nonempty.NonEmpty
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.unused
@@ -123,7 +125,12 @@ class SynchronizerTopologyManager(
 
     def makeChecks(lookup: TopologyStateLookup): TopologyMappingChecks = {
       val required =
-        RequiredTopologyMappingChecks(Some(staticSynchronizerParameters), lookup, loggerFactory)
+        RequiredTopologyMappingChecks(
+          Some(staticSynchronizerParameters),
+          staticSynchronizerParameters.protocolVersion,
+          lookup,
+          loggerFactory,
+        )
 
       if (!disableOptionalTopologyChecks)
         new TopologyMappingChecks.All(
@@ -345,9 +352,12 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends TopologyManagerStatus
+    with HasTopologyStoreId[StoreID]
     with NamedLogging
     with FlagCloseable
     with HasCloseContext {
+
+  override def storeId: StoreID = store.storeId
 
   /** The timestamp that will be used for validating the topology transactions before submitting
     * them for sequencing to a synchronizer or storing it in the local store.
@@ -623,18 +633,27 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
 
         case (Some((_, _, existingSerial, _)), None) =>
           // auto-select existing+1
-          EitherT.rightT(existingSerial.increment)
+          EitherT.fromEither(existingSerial.nextSerial)
         case (Some((_, _, existingSerial, _)), Some(proposed)) =>
           // check that the proposed serial matches existing+1
-          val next = existingSerial.increment
-          EitherT.cond[FutureUnlessShutdown](
-            next == proposed,
-            next,
-            TopologyManagerError.SerialMismatch
-              .Failure(actual = Some(proposed), expected = Some(next)),
-          )
+          for {
+            next <- EitherT.fromEither(existingSerial.nextSerial(errorLoggingContext))
+            _ <- EitherT.cond[FutureUnlessShutdown](
+              next == proposed,
+              next,
+              TopologyManagerError.SerialMismatch
+                .Failure(actual = Some(proposed), expected = Some(next)): TopologyManagerError,
+            )
+          } yield next
       }): EitherT[FutureUnlessShutdown, TopologyManagerError, PositiveInt]
-    } yield TopologyTransaction(op, theSerial, mapping, protocolVersion)
+      transaction <- EitherT.fromEither[FutureUnlessShutdown](
+        TopologyTransaction
+          .create(op, theSerial, mapping, protocolVersion)
+          .leftMap[TopologyManagerError](
+            TopologyManagerError.InternalError.Unexpected(_)
+          )
+      )
+    } yield transaction
   }
 
   private def signTransaction[Op <: TopologyChangeOp, M <: TopologyMapping](
@@ -1084,7 +1103,7 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
     EitherT.fromEither(store.storeId.forSynchronizer match {
       case Some(psid) =>
         Either.cond(
-          upgradeAnnouncement.successorSynchronizerId >= psid,
+          upgradeAnnouncement.successorSynchronizerId >= psid.opaque,
           (),
           InvalidSynchronizerSuccessor.Reject.conflictWithCurrentPsid(
             successorSynchronizerId = upgradeAnnouncement.successorSynchronizerId,
@@ -1216,6 +1235,12 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
 }
 
 object TopologyManager {
+
+  /** Helper type to make the type `TopologyManager` easier to pass as a type constructor (.i.e.:
+    * `F[+_ <: * TopologyStoreId]`).
+    */
+  type Aux[+StoreId <: TopologyStoreId] = TopologyManager[StoreId, ? <: BaseCrypto]
+
   sealed trait Version {
     def validation: ProtocolVersionValidation
     def serialization: ProtocolVersion

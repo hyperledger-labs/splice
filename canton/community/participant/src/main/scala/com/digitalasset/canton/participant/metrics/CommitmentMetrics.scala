@@ -5,7 +5,8 @@ package com.digitalasset.canton.participant.metrics
 
 import cats.Eval
 import com.daml.metrics.api.HistogramInventory.Item
-import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory, Meter, Timer}
+import com.daml.metrics.api.MetricHandle.{Counter, Gauge, LabeledMetricsFactory, Meter, Timer}
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.api.{
   HistogramInventory,
   MetricInfo,
@@ -13,7 +14,10 @@ import com.daml.metrics.api.{
   MetricQualification,
   MetricsContext,
 }
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.participant.metrics.CommitmentMetrics.CommitmentMatchingGauges
 import com.digitalasset.canton.topology.ParticipantId
+import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.concurrent.TrieMap
 
@@ -33,6 +37,99 @@ class CommitmentHistograms(parent: MetricName)(implicit inventory: HistogramInve
         |The operator should consider asking the synchronizer operator to increase the reconciliation interval
         |if the increase in commitment computation is expected, or otherwise investigate the cause.""",
     qualification = MetricQualification.Debug,
+  )
+}
+
+class RunningDigestProcessorMetrics private[metrics] (
+    parent: MetricName,
+    metricsFactory: LabeledMetricsFactory,
+)(implicit context: MetricsContext) {
+  private val prefix = parent :+ "running-digest-processor"
+
+  val latestAcsUpdate: Gauge[Long] = metricsFactory.gauge(
+    MetricInfo(
+      prefix :+ "latest-acs-update-record-time",
+      summary = "Record time of the latest event that was emitted by the internal index service.",
+      description =
+        "Record time of the latest event that was emitted by the internal index service.",
+      qualification = MetricQualification.Debug,
+    ),
+    CantonTimestamp.MinValue.toMicros,
+  )
+
+  val latestCheckpointedRecordTime: Gauge[Long] = metricsFactory.gauge(
+    MetricInfo(
+      prefix :+ "latest-checkpointed-record-time",
+      summary =
+        "Record time of the latest event that went through the checkpointing stage in the running digest processor.",
+      description =
+        "Record time of the latest event that went through the checkpointing stage in the running digest processor.",
+      qualification = MetricQualification.Debug,
+    ),
+    CantonTimestamp.MinValue.toMicros,
+  )
+
+  val latestClassifiedRecordTime: Gauge[Long] = metricsFactory.gauge(
+    MetricInfo(
+      prefix :+ "latest-classified-record-time",
+      summary =
+        "Record time of the latest event that went through the classification stage in the running digest processor.",
+      description =
+        "Record time of the latest event that went through the classification stage in the running digest processor.",
+      qualification = MetricQualification.Debug,
+    ),
+    CantonTimestamp.MinValue.toMicros,
+  )
+  val latestAccumulatedRecordTime: Gauge[Long] = metricsFactory.gauge(
+    MetricInfo(
+      prefix :+ "latest-accumulated-record-time",
+      summary =
+        "Record time of the latest event that went through the digest accumulation stage in the running digest processor.",
+      description =
+        "Record time of the latest event that went through the digest accumulation stage in the running digest processor.",
+      qualification = MetricQualification.Debug,
+    ),
+    CantonTimestamp.MinValue.toMicros,
+  )
+
+  val loadedDigests: Counter = metricsFactory.counter(
+    MetricInfo(
+      prefix :+ "loaded-digests",
+      summary =
+        "Counts the number of digests that the running digest processor keeps in memory in the accumulator.",
+      description =
+        "Measures the memory consumption of the running digest processor. Each digest takes 2kB of raw data plus overhead for the data structures.",
+      qualification = MetricQualification.Debug,
+    )
+  )
+
+  val localPartyChangeCounterparties: Gauge[Int] = metricsFactory.gauge[Int](
+    MetricInfo(
+      prefix :+ "local-party-change-counterparties",
+      summary =
+        "Counts the number of counterparties that have been identified for sharing contracts with a local party hosting change",
+      description = """This metric measures progress in the number of counterparties when the running digest processor
+          |ingests a local party hosting change. This metric is reset to 0 at the start of processing each local party hosting change.
+          |""".stripMargin,
+      qualification = MetricQualification.Debug,
+    ),
+    0,
+  )
+
+  val localPartyChangeContractChanges: Gauge[Int] = metricsFactory.gauge[Int](
+    MetricInfo(
+      prefix :+ "local-party-change-contract-changes",
+      summary =
+        "Counts the number of contract changes that have been identified for a local party hosting change.",
+      description =
+        """This metric measures the progress in the number of identified contract changes when the running digest processor
+          |ingests a local party hosting change. This metric is reset to 0 at the start of processing each local party hosting change.
+          |Since the same contract of the local party may be processed multiple times (for different counterparties),
+          |this metric may exceed the number of contracts of the local party.
+          |""".stripMargin,
+      qualification = MetricQualification.Debug,
+    ),
+    0,
   )
 }
 
@@ -187,6 +284,55 @@ class CommitmentMetrics private[metrics] (
     0L,
   )
 
+  val checkpointWatermark: Gauge[Long] = metricsFactory.gauge(
+    MetricInfo(
+      prefix :+ "checkpoint-watermark",
+      summary = "Record time of the latest checkpoint that has been persisted",
+      description =
+        """Measures up to how far the participant has produced and persisted ACS digests from the ACS and topology changes.
+          |If this metric falls significantly behind the ledger end's record time for the given synchronizer,
+          |digest processing is likely overloaded.""".stripMargin,
+      qualification = MetricQualification.Debug,
+    ),
+    CantonTimestamp.MinValue.toMicros,
+  )
+
+  val tickWatermark: Gauge[Long] = metricsFactory.gauge(
+    MetricInfo(
+      prefix :+ "tick-watermark",
+      summary =
+        "Record time of the latest (reconciliation or affirmation) tick for which ACS digests have been persisted",
+      description =
+        "The record time of the latest tick for which ACS digests have been computed and persisted.",
+      qualification = MetricQualification.Debug,
+    ),
+    CantonTimestamp.MinValue.toMicros,
+  )
+
+  val receivedWatermark: Gauge[Long] = metricsFactory.gauge(
+    MetricInfo(
+      prefix :+ "received-watermark",
+      summary = "Sequencing time of the latest received incoming ACS commitment",
+      description = "The sequencing time of the latest received incoming ACS commitment.",
+      qualification = MetricQualification.Debug,
+    ),
+    CantonTimestamp.MinValue.toMicros,
+  )
+
+  val matchingWatermark: Gauge[Long] = metricsFactory.gauge(
+    MetricInfo(
+      prefix :+ "matching-watermark",
+      summary = "The sequencing time of the latest processed incoming ACS commitment",
+      description = """The sequencing time of the latest processed incoming ACS commitment.
+          |If this watermark falls behind the `tick-watermark` and the `received-watermark`,
+          |then the matching cannot keep up.""".stripMargin,
+      qualification = MetricQualification.Debug,
+    ),
+    CantonTimestamp.MinValue.toMicros,
+  )
+
+  val runningDigestProcessor = new RunningDigestProcessorMetrics(prefix, metricsFactory)
+
   val lastLocallyCompleted: Gauge[Long] = metricsFactory.gauge(
     MetricInfo(
       prefix :+ "last-locally-completed",
@@ -196,7 +342,7 @@ class CommitmentMetrics private[metrics] (
         """Timestamp of the latest locally completed ACS commitment interval. Crash recovery will start reingesting from this timestamp on or from the latest checkpointed ACS commitment interval on, whichever is later.""",
       qualification = MetricQualification.Latency,
     ),
-    0L,
+    CantonTimestamp.MinValue.toMicros,
   )
 
   val lastLocallyCheckpointed: Gauge[Long] = metricsFactory.gauge(
@@ -208,7 +354,7 @@ class CommitmentMetrics private[metrics] (
         """Timestamp of the latest checkpointed ACS commitment in microseconds. Crash recovery will start reingesting from this timestamp on or from the latest locally completed ACS commitment interval on, whichever is later.""",
       qualification = MetricQualification.Latency,
     ),
-    0L,
+    CantonTimestamp.MinValue.toMicros,
   )
 
   val activeStakeholderGroups: Gauge[Long] = metricsFactory.gauge(
@@ -223,4 +369,275 @@ class CommitmentMetrics private[metrics] (
     0L,
   )
 
+  val sender: CommitmentSenderMetrics = new CommitmentSenderMetrics(prefix, metricsFactory)
+
+  val bufferDigestPipelineSize: Gauge[Long] = metricsFactory.gauge(
+    MetricInfo(
+      prefix :+ "buffer-digest-pipeline-size",
+      summary = "Measures the size of the buffers in the digest processor pipeline",
+      description =
+        """This value changes only when the buffer size is reconfigured as part of a participant node restart.
+          |It helps to visualize in dashboards when buffers are full.""".stripMargin,
+      qualification = MetricQualification.Debug,
+    ),
+    0L,
+  )
+
+  val bufferDigestPipelineCheckpointing: Counter = metricsFactory.counter(
+    MetricInfo(
+      prefix :+ "buffer-digest-pipeline-1-checkpointing",
+      summary = "Measures the buffer usage in the digest processor pipeline before checkpointing",
+      description = """If this value is at the buffer size (see `buffer-digest-pipeline-size`),
+          |then the checkpointing stage backpressures towards the indexer.""".stripMargin,
+      qualification = MetricQualification.Debug,
+    )
+  )
+
+  val bufferDigestPipelineBeforeClassification: Counter = metricsFactory.counter(
+    MetricInfo(
+      prefix :+ "buffer-digest-pipeline-2-classification",
+      summary = "Measures the buffer usage in the digest processor pipeline before classification",
+      description = """If this value is at the buffer size (see `buffer-digest-pipeline-size`),
+          |then the classification stage backpressures towards the checkpointing stage.""".stripMargin,
+      qualification = MetricQualification.Debug,
+    )
+  )
+
+  val bufferDigestPipelineBeforeAccumulation: Counter = metricsFactory.counter(
+    MetricInfo(
+      prefix :+ "buffer-digest-pipeline-3-accumulation",
+      summary = "Measures the buffer usage in the digest processor pipeline before accumulation",
+      description = """If this value is at the buffer size (see `buffer-digest-pipeline-size`),
+          |then the accumulation stage (in particular the `ensurePresent` substage)
+          |backpressures towards the classification stage.""".stripMargin,
+      qualification = MetricQualification.Debug,
+    )
+  )
+
+  val bufferDigestPipelineBeforeComputeDigestsChanges: Counter = metricsFactory.counter(
+    MetricInfo(
+      prefix :+ "buffer-digest-pipeline-3.1-compute-digest-changes",
+      summary =
+        "Measures the buffer usage in the digest processor's accumulator pipeline before computing the digest changes",
+      description = """If this value is at the buffer size (see `buffer-digest-pipeline-size`),
+           |then the computation stage backpressures towards the `ensurePresent` stage.""".stripMargin,
+      qualification = MetricQualification.Debug,
+    )
+  )
+
+  val bufferDigestPipelineBeforeJoinLoading: Counter = metricsFactory.counter(
+    MetricInfo(
+      prefix :+ "buffer-digest-pipeline-3.2-ompute-digest-join-loading",
+      summary =
+        "Measures the buffer usage in the digest processor's accumulator pipeline before joining the loading futures",
+      description = """If this value is at the buffer size (see `buffer-digest-pipeline-size`),
+           |then the join loading stage backpressures towards the computation stage.""".stripMargin,
+      qualification = MetricQualification.Debug,
+    )
+  )
+
+  val bufferDigestPipelineBeforeAggregation: Counter = metricsFactory.counter(
+    MetricInfo(
+      prefix :+ "buffer-digest-pipeline-3.3-aggregate",
+      summary =
+        "Measures the buffer usage in the digest processor's accumulator pipeline before aggregating the digest changes",
+      description = """If this value is at the buffer size (see `buffer-digest-pipeline-size`),
+           |then the aggregation stage backpressures towards the join loading stage.""".stripMargin,
+      qualification = MetricQualification.Debug,
+    )
+  )
+
+  val bufferDigestPipelineBeforePersistence: Counter = metricsFactory.counter(
+    MetricInfo(
+      prefix :+ "buffer-digest-pipeline-3.4-persist-changes",
+      summary =
+        "Measures the buffer usage in the digest processor pipeline before persisting the digest changes",
+      description = """If this value is at the buffer size (see `buffer-digest-pipeline-size`),
+           |then the persistence stage triggers conflation in the aggregation state.""".stripMargin,
+      qualification = MetricQualification.Debug,
+    )
+  )
+
+  val bufferDigestPipelineBeforeOutstanding: Counter = metricsFactory.counter(
+    MetricInfo(
+      prefix :+ "buffer-digest-pipeline-4-persist-outstanding",
+      summary =
+        "Measures the buffer usage in the digest processor pipeline before persisting outstanding periods",
+      description = """If this value is at the buffer size (see `buffer-digest-pipeline-size`),
+           |then the persisting outstanding period stage backpressures towards the accumulator stage.""".stripMargin,
+      qualification = MetricQualification.Debug,
+    )
+  )
+
+  val reinitializeTombstones: Gauge[Int] = metricsFactory.gauge[Int](
+    MetricInfo(
+      prefix :+ "reinitialize-tombstones",
+      summary = "Counts the number of tombstones that have been written",
+      description =
+        """This metric measures progress in the number of persisted tombstones during the digest processor reinitialization.
+          |This metric is reset to 0 at the start of reinitialization.
+          |""".stripMargin,
+      qualification = MetricQualification.Debug,
+    ),
+    0,
+  )
+
+  val reinitializeParties: Gauge[Int] = metricsFactory.gauge[Int](
+    MetricInfo(
+      prefix :+ "reinitialize-parties",
+      summary =
+        "Counts the number of parties that have been identified as part of reinitializing the digests.",
+      description =
+        """This metric measures progress in the number of counterparties during the digest processor reinitialization.
+          |This metric is reset to 0 at the start of reinitialization.
+          |""".stripMargin,
+      qualification = MetricQualification.Debug,
+    ),
+    0,
+  )
+
+  val reinitializeContractChanges: Gauge[Int] = metricsFactory.gauge[Int](
+    MetricInfo(
+      prefix :+ "reinitialize-contract-changes",
+      summary =
+        "Counts the number of contract changes that have been identified as part of reinitializing the digests.",
+      description =
+        """This metric measures the progress in the number of identified contract changes upon reinitializing the digests.
+          |This metric is reset to 0 at the start of reinitialization.
+          |Since the same contract may be processed multiple times (for different counterparties),
+          |this metric may exceed the number of active contracts.
+          |""".stripMargin,
+      qualification = MetricQualification.Debug,
+    ),
+    0,
+  )
+
+  val digestProcessorHealth: Gauge[Int] = metricsFactory.gauge[Int](
+    MetricInfo(
+      prefix :+ "digest-processor-health",
+      summary =
+        "Health of a digest processor (0: not-intialized, 1: starting, 2: started, 3: stopping, 4: stopped, 5: failed)",
+      description = """Health of a digest processor.""".stripMargin,
+      qualification = MetricQualification.Errors,
+    ),
+    CommitmentMetrics.HealthValues.NotInitialized,
+  )
+
+  val matcherHealth: Gauge[Int] = metricsFactory.gauge[Int](
+    MetricInfo(
+      prefix :+ "matcher-health",
+      // the matcher currently doesn't make use of some of the states, but I'd like to keep the health states consistent,
+      // so that we can change the behavior of initialization or shutdown without breaking metric dashboards and alerting.
+      summary =
+        "Health of the commitment matcher (0: not-intialized, 1: starting, 2: started, 3: stopping, 4: stopped, 5: failed)",
+      description = """Health of the commitment matcher.""".stripMargin,
+      qualification = MetricQualification.Errors,
+    ),
+    CommitmentMetrics.HealthValues.NotInitialized,
+  )
+
+  val tickSignallerHealth: Gauge[Int] = metricsFactory.gauge[Int](
+    MetricInfo(
+      prefix :+ "tick-signaller-health",
+      // the tick signaller currently doesn't make use of some of the states, but I'd like to keep the health states consistent,
+      // so that we can change the behavior of initialization or shutdown without breaking metric dashboards and alerting.
+      summary =
+        "Health of the tick signaller (0: not-intialized, 1: starting, 2: started, 3: stopping, 4: stopped, 5: failed)",
+      description = """Health of the tick signaller.""".stripMargin,
+      qualification = MetricQualification.Errors,
+    ),
+    CommitmentMetrics.HealthValues.NotInitialized,
+  )
+
+  // TODO(i28571): Factor this pattern into a helper class
+  // Gauges don't support metrics context per update. So instead create a map with a gauge per context.
+  @VisibleForTesting
+  private[canton] val commitmentMatchingStatusPerParticipant
+      : TrieMap[MetricsContext, Eval[CommitmentMatchingGauges]] =
+    TrieMap.empty
+  private def createCommitmentMatchingGauges(mc: MetricsContext): CommitmentMatchingGauges = {
+    val statusGauge = metricsFactory.gauge[Int](
+      MetricInfo(
+        prefix :+ "latest-matching-status",
+        summary =
+          "The matching status of the latest matched period (0: not-determined, 1: mismatched, 2: unexpected, 3: matched)",
+        description = """The status of the latest matched period.""".stripMargin,
+        qualification = MetricQualification.Debug,
+      ),
+      CommitmentMetrics.MatchingStatusValues.NotDetermined,
+    )(context.merge(mc))
+
+    val periodEndGauge = metricsFactory.gauge[Long](
+      MetricInfo(
+        prefix :+ "latest-matching-status-period-end",
+        summary =
+          "The end timestamp of the period corresponding to the latest-matching-status metric.",
+        description =
+          "The end timestamp of the period corresponding to the latest-matching-status metric.",
+        qualification = MetricQualification.Debug,
+      ),
+      CantonTimestamp.MinValue.toMicros,
+    )(context.merge(mc))
+
+    CommitmentMatchingGauges(statusGauge, periodEndGauge)
+  }
+  def commitmentMatchingStatus(mc: MetricsContext): Gauge[Int] =
+    // Two concurrent calls with the same context may cause getOrElseUpdate to evaluate the new value expression twice,
+    // even though only one of the results will be stored in the map.
+    // Eval.later ensures that we actually create only one instance of the gauge in such a case by delaying the creation
+    // until the getOrElseUpdate call has finished.
+    commitmentMatchingStatusPerParticipant
+      .getOrElseUpdate(mc, Eval.later(createCommitmentMatchingGauges(mc)))
+      .value
+      .status
+
+  def commitmentMatchingStatusPeriodEnd(mc: MetricsContext): Gauge[Long] =
+    // Two concurrent calls with the same context may cause getOrElseUpdate to evaluate the new value expression twice,
+    // even though only one of the results will be stored in the map.
+    // Eval.later ensures that we actually create only one instance of the gauge in such a case by delaying the creation
+    // until the getOrElseUpdate call has finished.
+    commitmentMatchingStatusPerParticipant
+      .getOrElseUpdate(mc, Eval.later(createCommitmentMatchingGauges(mc)))
+      .value
+      .periodEnd
+
+  def removeAllMatchingStatusMetrics(): Unit =
+    commitmentMatchingStatusPerParticipant.keys.foreach { k =>
+      commitmentMatchingStatusPerParticipant.remove(k).map(_.value).foreach {
+        case CommitmentMatchingGauges(status, timestamp) =>
+          status.close()
+          timestamp.close()
+      }
+    }
+}
+
+object CommitmentMetrics {
+  object HealthValues {
+    val NotInitialized = 0
+    val Starting = 1
+    val Started = 2
+    val Stopping = 3
+    val Stopped = 4
+    val Failed = 5
+  }
+
+  private[canton] final case class CommitmentMatchingGauges(
+      status: Gauge[Int],
+      periodEnd: Gauge[Long],
+  )
+
+  object MatchingStatusValues {
+    val NotDetermined = 0
+    val Mismatched = 1
+    val Unexpected = 2
+    val Matched = 3
+  }
+
+  def noopMetrics(): CommitmentMetrics = {
+    val histogramInventory = new HistogramInventory
+    new CommitmentMetrics(
+      new CommitmentHistograms(MetricName(""))(histogramInventory),
+      new NoOpMetricsFactory,
+    )(MetricsContext.Empty)
+  }
 }

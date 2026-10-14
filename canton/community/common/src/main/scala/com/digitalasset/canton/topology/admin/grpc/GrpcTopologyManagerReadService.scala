@@ -4,18 +4,18 @@
 package com.digitalasset.canton.topology.admin.grpc
 
 import cats.data.EitherT
-import cats.implicits.catsSyntaxEitherId
-import cats.syntax.bifunctor.*
+import cats.syntax.either.*
 import cats.syntax.foldable.*
+import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.{mapErrNewEUS, wrapErrUS}
@@ -39,8 +39,16 @@ import com.digitalasset.canton.topology.store.{
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.{EitherTUtil, GrpcStreamingUtils, MonadUtil, OptionUtil}
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
+import com.digitalasset.canton.validation.{ProtoUnvalidatedString, ProtoValidation}
+import com.digitalasset.canton.version.{
+  ProtocolVersion,
+  ProtocolVersionValidation,
+  ReleaseVersion,
+  RepresentativeProtocolVersion,
+}
 import com.digitalasset.canton.{ProtoDeserializationError, topology}
+import com.digitalasset.nonempty.NonEmpty
 import com.google.protobuf.ByteString
 import com.google.protobuf.timestamp.Timestamp
 import io.grpc.stub.StreamObserver
@@ -59,6 +67,7 @@ final case class BaseQuery(
     ops: Option[TopologyChangeOp],
     filterSigningKey: String,
     protocolVersion: Option[ProtocolVersion],
+    clientVersion: Option[ReleaseVersion],
 ) {
   def toProtoV1: adminProto.BaseQuery =
     adminProto.BaseQuery(
@@ -68,17 +77,19 @@ final case class BaseQuery(
       timeQuery.toProtoV30,
       filterSigningKey,
       protocolVersion.map(_.toProtoPrimitive),
+      clientVersion.map(_.toProtoPrimitive),
     )
 }
 
 object BaseQuery {
   def apply(
-      store: TopologyStoreId,
+      store: grpc.TopologyStoreId,
       proposals: Boolean,
       timeQuery: TimeQuery,
       ops: Option[TopologyChangeOp],
       filterSigningKey: String,
       protocolVersion: Option[ProtocolVersion],
+      clientVersion: Option[ReleaseVersion] = Some(ReleaseVersion.current),
   ): BaseQuery =
     BaseQuery(
       Some(store),
@@ -87,19 +98,29 @@ object BaseQuery {
       ops,
       filterSigningKey,
       protocolVersion,
+      clientVersion,
     )
 
   def fromProto(value: Option[adminProto.BaseQuery]): ParsingResult[BaseQuery] =
     for {
       baseQuery <- ProtoConverter.required("base_query", value)
       proposals = baseQuery.proposals
-      filterSignedKey = baseQuery.filterSignedKey
+      filterSignedKey <- ProtoValidation.validate(
+        baseQuery.filterSignedKey,
+        "filter_signed_key",
+        ProtocolVersionValidation.AlwaysValidation,
+      )
       timeQuery <- TimeQuery.fromProto(baseQuery.timeQuery, "time_query")
       operationOp <- TopologyChangeOp.fromProtoV30(baseQuery.operation)
       protocolVersion <- baseQuery.protocolVersion.traverse(ProtocolVersion.fromProtoPrimitive(_))
       store <- baseQuery.store.traverse(
         grpc.TopologyStoreId.fromProtoV30(_, "store")
       )
+      clientVersion <- ProtoValidation.validateThen(
+        baseQuery.clientVersion,
+        "client_version",
+        ProtocolVersionValidation.AlwaysValidation,
+      )(ReleaseVersion.fromProtoPrimitive)
     } yield BaseQuery(
       store,
       proposals,
@@ -107,12 +128,15 @@ object BaseQuery {
       operationOp,
       filterSignedKey,
       protocolVersion,
+      clientVersion,
     )
 }
 
 class GrpcTopologyManagerReadService(
     member: Member,
-    stores: => Seq[topology.store.TopologyStore[topology.store.TopologyStoreId]],
+    stores: => Seq[
+      TopologyStoreInitializationStatus[topology.store.TopologyStoreId, TopologyStore]
+    ],
     topologyClientLookup: PhysicalSynchronizerId => Option[SynchronizerTopologyClient],
     timeTrackerLookup: PhysicalSynchronizerId => Option[SynchronizerTimeTracker],
     physicalSynchronizerIdLookup: PsidLookup,
@@ -123,7 +147,7 @@ class GrpcTopologyManagerReadService(
     with NamedLogging {
 
   private case class TransactionSearchResult(
-      store: TopologyStoreId,
+      store: grpc.TopologyStoreId,
       sequenced: SequencedTime,
       validFrom: EffectiveTime,
       validUntil: Option[EffectiveTime],
@@ -131,31 +155,16 @@ class GrpcTopologyManagerReadService(
       transactionHash: ByteString,
       serial: PositiveInt,
       signedBy: NonEmpty[Set[Fingerprint]],
+      representativeProtocolVersion: RepresentativeProtocolVersion[TopologyTransaction.type],
   )
 
   private def collectStores(
       storeO: Option[grpc.TopologyStoreId]
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, RpcError, Seq[
     topology.store.TopologyStore[topology.store.TopologyStoreId]
-  ]] =
-    storeO match {
-      case Some(store) =>
-        EitherT.rightT(
-          activePsidFor(store).toOption.toList.flatMap(targetStoreId =>
-            stores.filter(_.storeId == targetStoreId)
-          )
-        )
-      case None => EitherT.rightT(stores)
-    }
-
-  private def activePsidFor(
-      grpcTopologyStoreId: grpc.TopologyStoreId
-  )(implicit
-      traceContext: TraceContext
-  ): Either[RpcError, topology.store.TopologyStoreId] =
-    grpcTopologyStoreId
-      .toInternal(physicalSynchronizerIdLookup)
-      .leftMap(TopologyManagerError.InvalidSynchronizer.Failure(_))
+  ]] = EitherT.fromEither(
+    GrpcTopologyServiceUtil.collectActiveStores(storeO.toList, stores, physicalSynchronizerIdLookup)
+  )
 
   private def collectSynchronizerStore(
       storeO: Option[grpc.TopologyStoreId]
@@ -164,50 +173,30 @@ class GrpcTopologyManagerReadService(
   ): EitherT[FutureUnlessShutdown, RpcError, topology.store.TopologyStore[
     topology.store.TopologyStoreId.SynchronizerStore
   ]] = {
-    val synchronizerStores =
-      storeO match {
-        case Some(store) =>
-          activePsidFor(store).flatMap { targetStoreInternal =>
-            val synchronizerStores = stores
-              .flatMap(
-                topology.store.TopologyStoreId
-                  .select[topology.store.TopologyStoreId.SynchronizerStore]
-              )
-              .filter(store => store.storeId == targetStoreInternal)
-            synchronizerStores match {
-              case Nil =>
-                TopologyManagerError.TopologyStoreUnknown
-                  .Failure(targetStoreInternal)
-                  .asLeft
-              case Seq(synchronizerStore) => synchronizerStore.asRight
-              case multiple =>
-                TopologyManagerError.InvalidSynchronizer
-                  .MultipleSynchronizerStoresFound(multiple.map(_.storeId))
-                  .asLeft
-            }
-          }
+    // get all known synchronizer stores
+    val synchronizerStoresWithStatus = stores.mapFilter(
+      topology.store.TopologyStoreId
+        .select[
+          topology.store.TopologyStoreId.SynchronizerStore,
+          TopologyStoreInitializationStatus.Aux,
+        ]
+    )
 
-        case None =>
-          val synchronizerStores = stores
-            .flatMap(
-              topology.store.TopologyStoreId
-                .select[topology.store.TopologyStoreId.SynchronizerStore]
-            )
-            .map(store => store.storeId.psid -> store)
-            .toMap
-          val allKnownLogical = synchronizerStores.keySet.map(_.logical)
-          val allKnownActivePhysical =
-            allKnownLogical.flatMap(physicalSynchronizerIdLookup.activePsidFor)
-          val activePhysicalStores = allKnownActivePhysical.flatMap(synchronizerStores.get)
-          activePhysicalStores.toSeq match {
-            case Seq(synchronizerStore) => synchronizerStore.asRight
-            case Seq() =>
-              TopologyManagerError.TopologyStoreUnknown.NoSynchronizerStoreAvailable().asLeft
-            case multiple =>
-              TopologyManagerError.InvalidSynchronizer
-                .MultipleSynchronizerStoresFound(multiple.map(_.storeId))
-                .asLeft
-          }
+    val synchronizerStores = GrpcTopologyServiceUtil
+      .collectActiveStores(
+        storeO.toList,
+        synchronizerStoresWithStatus,
+        physicalSynchronizerIdLookup,
+      )
+      .flatMap {
+        case Seq(synchronizerStore) => synchronizerStore.asRight
+        case Seq() =>
+          TopologyManagerError.TopologyStoreUnknown.NoSynchronizerStoreAvailable().asLeft
+        case multiple =>
+          TopologyManagerError.TopologyStoreUnknown
+            .MultipleSynchronizerStoresFound(multiple.map(_.storeId))
+            .asLeft
+
       }
 
     EitherT.fromEither[FutureUnlessShutdown](synchronizerStores)
@@ -223,7 +212,7 @@ class GrpcTopologyManagerReadService(
       operation = context.operation.toProto,
       transactionHash = context.transactionHash,
       serial = context.serial.unwrap,
-      signedByFingerprints = context.signedBy.map(_.unwrap).toSeq,
+      signedByFingerprints = context.signedBy.map(_.unwrap.toProtoUnvalidated).toSeq,
     )
 
   // to avoid race conditions, we want to use the approximateTimestamp of the topology client.
@@ -238,7 +227,28 @@ class GrpcTopologyManagerReadService(
       None
   }
 
+  private def readFilter(field: String, value: ProtoUnvalidatedString)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, RpcError, String] =
+    wrapErrUS(
+      ProtoValidation.validate(value, field, ProtocolVersionValidation.AlwaysValidation)
+    )
+
   private def collectFromStoresByFilterString(
+      baseQueryProto: Option[adminProto.BaseQuery],
+      typ: TopologyMapping.Code,
+      filterStringP: ProtoUnvalidatedString,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, RpcError, Seq[
+    (TransactionSearchResult, TopologyMapping)
+  ]] =
+    for {
+      filterString <- readFilter("filter_string", filterStringP)
+      res <- collectFromStoresByValidatedFilterString(baseQueryProto, typ, filterString)
+    } yield res
+
+  private def collectFromStoresByValidatedFilterString(
       baseQueryProto: Option[adminProto.BaseQuery],
       typ: TopologyMapping.Code,
       filterString: String,
@@ -296,7 +306,7 @@ class GrpcTopologyManagerReadService(
             )
             .map { tx =>
               val result = TransactionSearchResult(
-                TopologyStoreId.fromInternal(storeId),
+                grpc.TopologyStoreId.fromInternal(storeId),
                 tx.sequenced,
                 tx.validFrom,
                 tx.validUntil,
@@ -304,6 +314,7 @@ class GrpcTopologyManagerReadService(
                 tx.hash.hash.getCryptographicEvidence,
                 tx.serial,
                 tx.transaction.signatures.map(_.authorizingLongTermKey),
+                tx.transaction.transaction.representativeProtocolVersion,
               )
               (result, tx.mapping)
             }
@@ -329,28 +340,53 @@ class GrpcTopologyManagerReadService(
   ): Future[adminProto.ListNamespaceDelegationResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val ret = for {
-      res <- collectFromStores(
+      filterNamespace <- readFilter("filter_namespace", request.filterNamespace)
+      filterTargetKeyFingerprint <- readFilter(
+        "filter_target_key_fingerprint",
+        request.filterTargetKeyFingerprint,
+      )
+      transactions <- collectFromStores(
         request.baseQuery,
         NamespaceDelegation.code,
         idFilter = None,
-        namespaceFilter = Some(request.filterNamespace),
+        namespaceFilter = Some(filterNamespace),
       )
-    } yield {
-      val results = res
+
+      resultsE = transactions
         .collect {
           case (result, x: NamespaceDelegation)
-              if request.filterTargetKeyFingerprint.isEmpty || x.target.fingerprint.unwrap == request.filterTargetKeyFingerprint =>
+              if filterTargetKeyFingerprint.isEmpty || x.target.fingerprint.unwrap == filterTargetKeyFingerprint =>
             (result, x)
         }
-        .map { case (context, elem) =>
-          new adminProto.ListNamespaceDelegationResponse.Result(
-            context = Some(createBaseResult(context)),
-            item = Some(elem.toProto),
-          )
-        }
+        .traverse { case (context, elem) =>
+          val protoVersion =
+            TopologyTransaction.protoVersionFor(context.representativeProtocolVersion).v
 
-      adminProto.ListNamespaceDelegationResponse(results = results)
-    }
+          val itemE = if (protoVersion == 30) {
+            elem.toProtoNamespaceDelegationV30.map(
+              ListNamespaceDelegationResponse.Result.Item.V30(_)
+            )
+          } else {
+            s"Not supported".asLeft
+          }
+
+          itemE
+            .leftMap[RpcError](err =>
+              TopologyManagerError.InternalError
+                .Unexpected(
+                  s"Cannot serialize namespace delegations using proto version $protoVersion: $err"
+                )
+            )
+            .map(item =>
+              adminProto.ListNamespaceDelegationResponse.Result(
+                context = Some(createBaseResult(context)),
+                item = item,
+              )
+            )
+        }
+      results <- EitherT.fromEither[FutureUnlessShutdown](resultsE)
+    } yield adminProto.ListNamespaceDelegationResponse(results = results)
+
     CantonGrpcUtil.mapErrNewEUS(ret)
   }
 
@@ -359,11 +395,12 @@ class GrpcTopologyManagerReadService(
   ): Future[adminProto.ListDecentralizedNamespaceDefinitionResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val ret = for {
+      filterNamespace <- readFilter("filter_namespace", request.filterNamespace)
       res <- collectFromStores(
         request.baseQuery,
         DecentralizedNamespaceDefinition.code,
         idFilter = None,
-        namespaceFilter = Some(request.filterNamespace),
+        namespaceFilter = Some(filterNamespace),
       )
     } yield {
       val results = res
@@ -385,28 +422,47 @@ class GrpcTopologyManagerReadService(
   ): Future[adminProto.ListOwnerToKeyMappingResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val ret = for {
-      res <- collectFromStoresByFilterString(
+      filterKeyOwnerUid <- readFilter("filter_key_owner_uid", request.filterKeyOwnerUid)
+      filterKeyOwnerType <- readFilter("filter_key_owner_type", request.filterKeyOwnerType)
+      transactions <- collectFromStoresByValidatedFilterString(
         request.baseQuery,
         OwnerToKeyMapping.code,
-        request.filterKeyOwnerUid,
+        filterKeyOwnerUid,
       )
-    } yield {
-      val results = res
+      resultsE = transactions
         .collect {
           // topology store indexes by uid, so need to filter out the members of the wrong type
           case (result, x: OwnerToKeyMapping)
-              if x.member.filterString.startsWith(request.filterKeyOwnerUid) &&
-                (request.filterKeyOwnerType.isEmpty || request.filterKeyOwnerType == x.member.code.threeLetterId.unwrap) =>
+              if x.member.filterString.startsWith(filterKeyOwnerUid) &&
+                (filterKeyOwnerType.isEmpty || filterKeyOwnerType == x.member.code.threeLetterId.unwrap) =>
             (result, x)
         }
-        .map { case (context, elem) =>
-          new adminProto.ListOwnerToKeyMappingResponse.Result(
-            context = Some(createBaseResult(context)),
-            item = Some(elem.toProto),
-          )
+        .traverse { case (context, elem) =>
+          val protoVersion =
+            TopologyTransaction.protoVersionFor(context.representativeProtocolVersion).v
+
+          val itemE = if (protoVersion == 30) {
+            elem.toProtoOwnerToKeyMappingV30.map(ListOwnerToKeyMappingResponse.Result.Item.V30(_))
+          } else {
+            s"Not supported".asLeft
+          }
+
+          itemE
+            .leftMap[RpcError](err =>
+              TopologyManagerError.InternalError
+                .Unexpected(
+                  s"Cannot serialize owner to key mappings using proto version $protoVersion: $err"
+                )
+            )
+            .map(item =>
+              adminProto.ListOwnerToKeyMappingResponse.Result(
+                context = Some(createBaseResult(context)),
+                item = item,
+              )
+            )
         }
-      adminProto.ListOwnerToKeyMappingResponse(results = results)
-    }
+      results <- EitherT.fromEither[FutureUnlessShutdown](resultsE)
+    } yield adminProto.ListOwnerToKeyMappingResponse(results = results)
     CantonGrpcUtil.mapErrNewEUS(ret)
   }
 
@@ -415,22 +471,40 @@ class GrpcTopologyManagerReadService(
   ): Future[ListPartyToKeyMappingResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val ret = for {
-      res <- collectFromStoresByFilterString(
+      transactions <- collectFromStoresByFilterString(
         request.baseQuery,
         PartyToKeyMapping.code,
         request.filterParty,
       )
-    } yield {
-      val results = res
+      resultsE = transactions
         .collect { case (result, x: PartyToKeyMapping) => (result, x) }
-        .map { case (context, elem) =>
-          new adminProto.ListPartyToKeyMappingResponse.Result(
-            context = Some(createBaseResult(context)),
-            item = Some(elem.toProto),
-          )
+        .traverse { case (context, elem) =>
+          val protoVersion =
+            TopologyTransaction.protoVersionFor(context.representativeProtocolVersion).v
+
+          val itemE = if (protoVersion == 30) {
+            elem.toProtoPartyToKeyMappingV30.map(ListPartyToKeyMappingResponse.Result.Item.V30(_))
+          } else {
+            s"Not supported".asLeft
+          }
+
+          itemE
+            .leftMap[RpcError](err =>
+              TopologyManagerError.InternalError
+                .Unexpected(
+                  s"Cannot serialize party to key mappings using proto version $protoVersion: $err"
+                )
+            )
+            .map(item =>
+              adminProto.ListPartyToKeyMappingResponse.Result(
+                context = Some(createBaseResult(context)),
+                item = item,
+              )
+            )
         }
-      adminProto.ListPartyToKeyMappingResponse(results = results)
-    }
+      results <- EitherT.fromEither[FutureUnlessShutdown](resultsE)
+    } yield adminProto.ListPartyToKeyMappingResponse(results = results)
+
     CantonGrpcUtil.mapErrNewEUS(ret)
   }
 
@@ -538,35 +612,52 @@ class GrpcTopologyManagerReadService(
       request: adminProto.ListPartyToParticipantRequest
   ): Future[adminProto.ListPartyToParticipantResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+
     val ret = for {
-      res <- collectFromStoresByFilterString(
+      filterParty <- readFilter("filter_party", request.filterParty)
+      filterParticipant <- readFilter("filter_participant", request.filterParticipant)
+      partyPredicate = (x: PartyToParticipant) => x.partyId.toProtoPrimitive.startsWith(filterParty)
+      participantPredicate = (x: PartyToParticipant) =>
+        filterParticipant.isEmpty || x.participantIds.exists(
+          _.toProtoPrimitive.contains(filterParticipant)
+        )
+      transactions <- collectFromStoresByValidatedFilterString(
         request.baseQuery,
         PartyToParticipant.code,
-        request.filterParty,
+        filterParty,
       )
-    } yield {
-      def partyPredicate(x: PartyToParticipant) =
-        x.partyId.toProtoPrimitive.startsWith(request.filterParty)
-
-      def participantPredicate(x: PartyToParticipant) =
-        request.filterParticipant.isEmpty || x.participantIds.exists(
-          _.toProtoPrimitive.contains(request.filterParticipant)
-        )
-
-      val results = res
+      resultsE = transactions
         .collect {
           case (result, x: PartyToParticipant) if partyPredicate(x) && participantPredicate(x) =>
             (result, x)
         }
-        .map { case (context, elem) =>
-          new adminProto.ListPartyToParticipantResponse.Result(
-            context = Some(createBaseResult(context)),
-            item = Some(elem.toProto),
-          )
-        }
+        .traverse { case (context, elem) =>
+          val protoVersion =
+            TopologyTransaction.protoVersionFor(context.representativeProtocolVersion).v
 
-      adminProto.ListPartyToParticipantResponse(results = results)
-    }
+          val itemE = if (protoVersion == 30) {
+            elem.toProtoPartyToParticipantV30.map(ListPartyToParticipantResponse.Result.Item.V30(_))
+          } else {
+            s"Not supported".asLeft
+          }
+
+          itemE
+            .leftMap[RpcError](err =>
+              TopologyManagerError.InternalError
+                .Unexpected(
+                  s"Cannot serialize party to participant mappings using proto version $protoVersion: $err"
+                )
+            )
+            .map(item =>
+              adminProto.ListPartyToParticipantResponse.Result(
+                context = Some(createBaseResult(context)),
+                item = item,
+              )
+            )
+        }
+      results <- EitherT.fromEither[FutureUnlessShutdown](resultsE)
+    } yield adminProto.ListPartyToParticipantResponse(results = results)
+
     CantonGrpcUtil.mapErrNewEUS(ret)
   }
 
@@ -674,7 +765,7 @@ class GrpcTopologyManagerReadService(
       request: adminProto.ListAvailableStoresRequest
   ): Future[adminProto.ListAvailableStoresResponse] = Future.successful(
     adminProto.ListAvailableStoresResponse(storeIds =
-      stores.map(s => TopologyStoreId.fromInternal(s.storeId).toProtoV30)
+      stores.map(s => grpc.TopologyStoreId.fromInternal(s.storeId).toProtoV30)
     )
   )
 
@@ -684,7 +775,12 @@ class GrpcTopologyManagerReadService(
     val res = for {
       baseQuery <- wrapErrUS(BaseQuery.fromProto(request.baseQuery))
       excludeTopologyMappings <- wrapErrUS(
-        request.excludeMappings.traverse(TopologyMapping.Code.fromString)
+        ProtoValidation.validateThen(
+          request.excludeMappings,
+          "exclude_mappings",
+          ProtocolVersionValidation.AlwaysValidation,
+          ProtoValidation.MaxCollectionSize,
+        )((code, _) => TopologyMapping.Code.fromString(code))
       )
       types = TopologyMapping.Code.all.diff(excludeTopologyMappings)
       storedTopologyTransactions <- listAllStoredTopologyTransactions(
@@ -705,7 +801,12 @@ class GrpcTopologyManagerReadService(
     val res = for {
       baseQuery <- wrapErrUS(BaseQuery.fromProto(request.baseQuery))
       includeTopologyMappings <- wrapErrUS(
-        request.includeMappings.traverse(TopologyMapping.Code.fromString)
+        ProtoValidation.validateThen(
+          request.includeMappings,
+          "include_mappings",
+          ProtocolVersionValidation.AlwaysValidation,
+          ProtoValidation.MaxCollectionSize,
+        )((code, _) => TopologyMapping.Code.fromString(code))
       )
       types =
         if (includeTopologyMappings.isEmpty) TopologyMapping.Code.all
@@ -730,7 +831,7 @@ class GrpcTopologyManagerReadService(
       (out: OutputStream) => getTopologySnapshot(request, out),
       responseObserver,
       byteString => ExportTopologySnapshotResponse(byteString),
-      processingTimeout.unbounded.duration,
+      processingTimeout.adminStreamOpenBound.duration,
     )
   }
 
@@ -742,7 +843,12 @@ class GrpcTopologyManagerReadService(
     val res = for {
       baseQuery <- wrapErrUS(BaseQuery.fromProto(request.baseQuery))
       excludeTopologyMappings <- wrapErrUS(
-        request.excludeMappings.traverse(TopologyMapping.Code.fromString)
+        ProtoValidation.validateThen(
+          request.excludeMappings,
+          "exclude_mappings",
+          ProtocolVersionValidation.AlwaysValidation,
+          ProtoValidation.MaxCollectionSize,
+        )((code, _) => TopologyMapping.Code.fromString(code))
       )
       types = TopologyMapping.Code.all.diff(excludeTopologyMappings)
       storedTopologyTransactions <- listAllStoredTopologyTransactions(
@@ -767,7 +873,7 @@ class GrpcTopologyManagerReadService(
       (out: OutputStream) => getTopologySnapshotV2(request, out),
       responseObserver,
       byteString => ExportTopologySnapshotV2Response(byteString),
-      processingTimeout.unbounded.duration,
+      processingTimeout.adminStreamOpenBound.duration,
     )
   }
 
@@ -779,7 +885,12 @@ class GrpcTopologyManagerReadService(
     val res = for {
       baseQuery <- wrapErrUS(BaseQuery.fromProto(request.baseQuery))
       excludeTopologyMappings <- wrapErrUS(
-        request.excludeMappings.traverse(TopologyMapping.Code.fromString)
+        ProtoValidation.validateThen(
+          request.excludeMappings,
+          "exclude_mappings",
+          ProtocolVersionValidation.AlwaysValidation,
+          ProtoValidation.MaxCollectionSize,
+        )((code, _) => TopologyMapping.Code.fromString(code))
       )
       types = TopologyMapping.Code.all.diff(excludeTopologyMappings)
       storedTopologyTransactions <- listAllStoredTopologyTransactions(
@@ -808,11 +919,12 @@ class GrpcTopologyManagerReadService(
   private def listAllStoredTopologyTransactions(
       baseQuery: BaseQuery,
       topologyMappings: Seq[TopologyMapping.Code],
-      filterNamespace: String,
+      filterNamespaceP: ProtoUnvalidatedString,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, RpcError, GenericStoredTopologyTransactions] =
     for {
+      filterNamespace <- readFilter("filter_namespace", filterNamespaceP)
       stores <- collectStores(baseQuery.store)
       results <- EitherT.right(
         stores.parTraverse { store =>
@@ -854,7 +966,7 @@ class GrpcTopologyManagerReadService(
       (out: OutputStream) => getGenesisState(request.synchronizerStore, request.timestamp, out),
       responseObserver,
       byteString => GenesisStateResponse(byteString),
-      processingTimeout.unbounded.duration,
+      processingTimeout.adminStreamOpenBound.duration,
     )
   }
 
@@ -879,7 +991,7 @@ class GrpcTopologyManagerReadService(
       (out: OutputStream) => getGenesisStateV2(request.synchronizerStore, request.timestamp, out),
       responseObserver,
       byteString => GenesisStateV2Response(byteString),
-      processingTimeout.unbounded.duration,
+      processingTimeout.adminStreamOpenBound.duration,
     )
   }
 
@@ -965,7 +1077,7 @@ class GrpcTopologyManagerReadService(
         getLogicalUpgradeState(request.synchronizerStore, request.timestamp, out),
       responseObserver,
       byteString => SequencerLsuStateResponse(byteString),
-      processingTimeout.unbounded.duration,
+      processingTimeout.adminStreamOpenBound.duration,
     )
   }
 
@@ -1154,6 +1266,10 @@ class GrpcTopologyManagerReadService(
   ): Future[ListLsuSequencerConnectionSuccessorResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val ret = for {
+      filterSuccessor <- readFilter(
+        "filter_successor_physical_synchronizer_id",
+        request.filterSuccessorPhysicalSynchronizerId,
+      )
       res <- collectFromStoresByFilterString(
         request.baseQuery,
         LsuSequencerConnectionSuccessor.code,
@@ -1161,7 +1277,7 @@ class GrpcTopologyManagerReadService(
       )
     } yield {
       val filterSuccessorPhysicalSynchronizerId =
-        OptionUtil.emptyStringAsNone(request.filterSuccessorPhysicalSynchronizerId)
+        OptionUtil.emptyStringAsNone(filterSuccessor)
       def successorPsidPredicate(mapping: LsuSequencerConnectionSuccessor) =
         filterSuccessorPhysicalSynchronizerId.fold(true)(
           _.startsWith(mapping.successorPsid.toProtoPrimitive)

@@ -23,20 +23,18 @@ class CnConfig {
       this.configuration.pulumiProjectConfig.default,
       this.configuration.pulumiProjectConfig[pulumiProjectName]
     );
-    console.error(
-      'Loaded cluster configuration',
-      util.inspect(this.configuration, {
+    void pulumi.log.debug(
+      `Loaded cluster configuration ${util.inspect(this.configuration, {
         depth: null,
         maxStringLength: null,
-      })
+      })}`
     );
-    console.error(
+    void pulumi.log.debug(
       // see dump-config-common: `CONFIG_PROJECT_NAME` is used for a fix when dumping the generated resources
-      `Loaded project ${pulumiProjectName} configuration`,
-      util.inspect(this.pulumiProjectConfig, {
+      `Loaded project ${pulumiProjectName} configuration ${util.inspect(this.pulumiProjectConfig, {
         depth: null,
         maxStringLength: null,
-      })
+      })}`
     );
   }
 }

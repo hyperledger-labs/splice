@@ -1,0 +1,205 @@
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package com.digitalasset.canton.tea.projection
+
+import com.digitalasset.base.error.utils.ErrorDetails
+import com.digitalasset.canton.config.{PositiveFiniteDuration, ProcessingTimeout}
+import com.digitalasset.canton.ledger.error.CommonErrors
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.platform.apiserver.services.metrics.TrafficEnforcementMetrics
+import com.digitalasset.canton.platform.config.TrafficEnforcementServerConfig.ProjectionConfig
+import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
+import com.digitalasset.canton.tea.projection.db.{TeaDbProjectionFactory, TeaDbTrafficStore}
+import com.digitalasset.canton.tea.projection.memory.{
+  TeaMemoryProjectionFactory,
+  TeaMemoryTrafficStore,
+}
+import com.digitalasset.canton.tracing.Spanning.SpanWrapper
+import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.typed.{ActorSystem, Behavior}
+import org.apache.pekko.projection.scaladsl.SourceProvider
+import org.apache.pekko.projection.{
+  HandlerRecoveryStrategy,
+  ProjectionBehavior,
+  ProjectionId,
+  StatusObserver,
+}
+import org.apache.pekko.stream.AbruptStreamTerminationException
+import org.apache.pekko.stream.scaladsl.Source
+
+import scala.concurrent.{ExecutionContext, Future}
+
+/** Shared storage backing all TEA ingestion projections.
+  *
+  * Single function that builds a projection from a stream source and handler The trait abstracts
+  * over the in-memory and DB implementations
+  */
+trait TeaProjectionFactory extends Spanning { this: NamedLogging =>
+
+  import TeaProjectionFactory.*
+
+  protected val metrics: TrafficEnforcementMetrics
+
+  protected def setApplyDeltaSpanAttributes(
+      span: SpanWrapper,
+      projectionEvent: ProjectionEvent,
+      eventSource: EventSource,
+  ): Unit = {
+    span.setAttribute(AccountIdAttribute, projectionEvent.account.unwrap)
+    span.setAttribute(DeltaAttribute, projectionEvent.event.deltaEvent.delta.toString)
+    span.setAttribute(EventSourceAttribute, eventSource.toString)
+    span.setAttribute(OffsetAttribute, projectionEvent.event.offset.toString)
+  }
+
+  /** Build a projection behavior for a single ingestion stream, reusing the shared storage. */
+  def projection(
+      projectionId: ProjectionId,
+      grpcSourceFactory: Option[Long] => Source[Traced[ProjectionEvent], ?],
+  ): Behavior[ProjectionBehavior.Command]
+
+  /** Test-only hook called after each event right after the projection has committed it. Default
+    * no-op so production behavior is unaffected.
+    */
+  protected val onEventCommitted: () => Unit = () => ()
+
+  // Logging observer to get insights into the lifecycle of the projection
+  protected val loggingObserver: StatusObserver[Traced[ProjectionEvent]] =
+    new StatusObserver[Traced[ProjectionEvent]] {
+      override def started(projectionId: ProjectionId): Unit =
+        logger.info(s"Starting projection for projectionId $projectionId")(TraceContext.empty)
+      override def failed(projectionId: ProjectionId, cause: Throwable): Unit = cause match {
+        // Only happens when the actor system is already going away, so there is nothing to restart.
+        case _: AbruptStreamTerminationException =>
+          logger.info(
+            s"Projection $projectionId was torn down together with its actor system and will not be restarted.",
+            cause,
+          )(TraceContext.empty)
+        // The ledger API goes away before us on node shutdown, so this is routine rather than a fault.
+        case _ if ErrorDetails.matches(cause, CommonErrors.ServiceNotRunning) =>
+          logger.info(
+            s"Projection $projectionId lost its event source because the ledger API is not running. It will be restarted with backoff.",
+            cause,
+          )(TraceContext.empty)
+        case _ =>
+          logger.warn(
+            s"Projection $projectionId failed and will be restarted with backoff. Debit ingestion is degraded until it recovers.",
+            cause,
+          )(TraceContext.empty)
+      }
+      override def stopped(projectionId: ProjectionId): Unit =
+        logger.info(s"Stopped projection for projectionId $projectionId")(TraceContext.empty)
+      override def beforeProcess(
+          projectionId: ProjectionId,
+          envelope: Traced[ProjectionEvent],
+      ): Unit =
+        logger.trace(
+          s"Ready to process event for projectionId $projectionId, account ${envelope.value.account.unwrap}, offset ${envelope.value.event.offset}"
+        )(envelope.traceContext)
+      override def afterProcess(
+          projectionId: ProjectionId,
+          envelope: Traced[ProjectionEvent],
+      ): Unit = {
+        onEventCommitted()
+        metrics.projectionTimestamp.updateValue(
+          envelope.value.event.deltaEvent.timestamp.toEpochMilli
+        )
+        logger.trace(
+          s"Processed event for projectionId $projectionId, account ${envelope.value.account.unwrap}, offset ${envelope.value.event.offset}"
+        )(envelope.traceContext)
+      }
+      override def offsetProgress(
+          projectionId: ProjectionId,
+          env: Traced[ProjectionEvent],
+      ): Unit = {
+        metrics.projectionOffset.updateValue(env.value.event.offset)
+        logger.info(s"Stored offset ${env.value.event.offset} for projectionId $projectionId")(
+          env.traceContext
+        )
+      }
+
+      override def error(
+          projectionId: ProjectionId,
+          env: Traced[ProjectionEvent],
+          cause: Throwable,
+          recoveryStrategy: HandlerRecoveryStrategy,
+      ): Unit =
+        logger.warn(
+          s"Error during envelope processing for projectionId $projectionId, account ${env.value.account.unwrap}, offset ${env.value.event.offset}, recovery strategy $recoveryStrategy",
+          cause,
+        )(env.traceContext)
+    }
+
+  /** Create a projection source provider from a source of ProjectionEvent
+    * @param grpcSourceFactory
+    *   the grpcSourceFactory: takes an optional offset (Long) and returns a source pulling events
+    *   from this offset. The offset provided will be the last one stored (so processed). This
+    *   matches with the LAPI "beginExclusive" semantics: the stream will start at the following
+    *   offset.
+    */
+  protected def createSourceProvider(
+      logger: TracedLogger,
+      projectionId: ProjectionId,
+      grpcSourceFactory: Option[Long] => Source[Traced[ProjectionEvent], ?],
+  )(implicit ec: ExecutionContext): SourceProvider[Long, Traced[ProjectionEvent]] =
+    new SourceProvider[Long, Traced[ProjectionEvent]] {
+      override def source(
+          offsetProvider: () => Future[Option[Long]]
+      ): Future[Source[Traced[ProjectionEvent], NotUsed]] =
+        offsetProvider().map { maybeOffset =>
+          logger.info(s"Starting ingestion stream for $projectionId with offset $maybeOffset")(
+            TraceContext.empty
+          )
+          grpcSourceFactory(maybeOffset).mapMaterializedValue(_ => NotUsed)
+        }
+      override def extractOffset(record: Traced[ProjectionEvent]): Long = record.value.event.offset
+      override def extractCreationTime(record: Traced[ProjectionEvent]): Long =
+        record.value.event.deltaEvent.timestamp.toEpochMilli
+    }
+}
+
+object TeaProjectionFactory {
+
+  private[projection] val ApplyDeltaSpanName = "TeaProjectionHandler.applyDelta"
+  private[projection] val AccountIdAttribute = "account_id"
+  private[projection] val DeltaAttribute = "delta"
+  private[projection] val EventSourceAttribute = "event_source"
+  private[projection] val OffsetAttribute = "offset"
+
+  /** Open the shared storage once, based on the configured storage backend. */
+  def create(
+      storage: Storage,
+      eventSource: EventSource,
+      config: ProjectionConfig,
+      loggerFactory: NamedLoggerFactory,
+      timeouts: ProcessingTimeout,
+      databaseQueryTimeout: PositiveFiniteDuration,
+      metrics: TrafficEnforcementMetrics,
+      onEventCommitted: () => Unit = () => (),
+  )(implicit system: ActorSystem[?], tracer: Tracer): (TeaProjectionFactory, TeaTrafficStore) = {
+    import system.executionContext
+
+    storage match {
+      case db: DbStorage =>
+        val store = new TeaDbTrafficStore(db, loggerFactory, timeouts, databaseQueryTimeout)
+        val projection: TeaProjectionFactory =
+          new TeaDbProjectionFactory(
+            db,
+            loggerFactory,
+            store,
+            eventSource,
+            config,
+            metrics,
+            onEventCommitted,
+          )
+        (projection, store)
+      case _: MemoryStorage =>
+        val store = new TeaMemoryTrafficStore(loggerFactory)
+        val projection: TeaProjectionFactory =
+          new TeaMemoryProjectionFactory(loggerFactory, store, metrics, onEventCommitted)
+        (projection, store)
+    }
+  }
+}

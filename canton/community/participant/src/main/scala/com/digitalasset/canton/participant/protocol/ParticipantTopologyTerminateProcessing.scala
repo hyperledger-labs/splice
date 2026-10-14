@@ -5,6 +5,7 @@ package com.digitalasset.canton.participant.protocol
 
 import cats.data.EitherT
 import cats.implicits.toTraverseOps
+import cats.syntax.foldable.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.{
   CantonTimestamp,
@@ -13,31 +14,41 @@ import com.digitalasset.canton.data.{
   SynchronizerSuccessor,
 }
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.ledger.participant.state.Update
+import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent.{
   Added,
   Onboarding,
   Revoked,
 }
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.TopologyEvent.PartyToParticipantAuthorization
+import com.digitalasset.canton.ledger.participant.state.{SynchronizerUpdate, Update}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.admin.party.OnboardingClearanceScheduler
+import com.digitalasset.canton.participant.admin.party.{
+  OnboardingClearanceScheduler,
+  PartyReplicationTriggers,
+}
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
-import com.digitalasset.canton.participant.protocol.ParticipantTopologyTerminateProcessing.EventInfo
+import com.digitalasset.canton.participant.protocol.ParticipantTopologyTerminateProcessing.{
+  EventInfo,
+  relevantMappingsForEffectiveStateChanges,
+}
 import com.digitalasset.canton.participant.protocol.party.OnboardingClearanceOperation
 import com.digitalasset.canton.participant.protocol.party.OnboardingClearanceOperation.PendingOnboardingClearanceStore
+import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore
 import com.digitalasset.canton.participant.synchronizer.PendingLsuOperation
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.TopologyStore.EffectiveStateChange
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.TopologyMapping
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ConfiguredPhysicalSynchronizerId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{SequencerCounter, topology}
+import com.digitalasset.canton.{LfPartyId, SequencerCounter, topology}
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.concurrent.ExecutionContext
 
@@ -50,6 +61,20 @@ object ParticipantTopologyTerminateProcessing {
       clearingOnboardingLocallyHostedParty: Boolean,
       abortingOnboardingLocallyHostedParty: Boolean,
   )
+
+  def relevantMappingsForEffectiveStateChanges(pv: ProtocolVersion): Seq[TopologyMapping.Code] =
+    if (pv >= ProtocolVersion.acsCommitmentRedesign)
+      Seq(
+        TopologyMapping.Code.PartyToParticipant,
+        TopologyMapping.Code.SynchronizerTrustCertificate,
+        TopologyMapping.Code.SynchronizerParametersState,
+      )
+    else
+      Seq(
+        TopologyMapping.Code.PartyToParticipant,
+        TopologyMapping.Code.SynchronizerTrustCertificate,
+      )
+
 }
 
 class ParticipantTopologyTerminateProcessing(
@@ -60,14 +85,20 @@ class ParticipantTopologyTerminateProcessing(
     pauseSynchronizerIndexingDuringPartyReplication: Boolean,
     synchronizerPredecessor: Option[SynchronizerPredecessor],
     pendingLsuOperationsStore: PendingLsuOperation.Store,
+    synchronizerConnectionConfigStore: SynchronizerConnectionConfigStore,
     pendingOnboardingClearanceStore: PendingOnboardingClearanceStore,
     onboardingClearanceScheduler: OnboardingClearanceScheduler,
+    partyReplicationTriggersO: Option[PartyReplicationTriggers],
     metrics: ParticipantMetrics,
     override protected val loggerFactory: NamedLoggerFactory,
 ) extends topology.processing.TerminateProcessing
     with NamedLogging {
 
   private val psid = store.storeId.psid
+
+  private val mappingsForEffectiveStateChanges = relevantMappingsForEffectiveStateChanges(
+    store.protocolVersion
+  )
 
   override def terminate(
       sc: SequencerCounter,
@@ -86,12 +117,7 @@ class ParticipantTopologyTerminateProcessing(
         effectiveStateChanges <- store.findEffectiveStateChanges(
           fromEffectiveInclusive = effectiveTime.value,
           onlyAtEffective = true,
-          filterTypes = Some(
-            Seq(
-              TopologyMapping.Code.PartyToParticipant,
-              TopologyMapping.Code.SynchronizerTrustCertificate,
-            )
-          ),
+          filterTypes = Some(mappingsForEffectiveStateChanges),
         )
         _ = if (effectiveStateChanges.sizeIs > 1)
           logger.error(
@@ -272,11 +298,30 @@ class ParticipantTopologyTerminateProcessing(
 
     metrics.resetLsuStatus(successor.psid)
 
-    pendingLsuOperationsStore.delete(
-      psid,
-      PendingLsuOperation.operationKey,
-      PendingLsuOperation.operationName,
-    )
+    for {
+      _ <- pendingLsuOperationsStore.delete(
+        psid,
+        PendingLsuOperation.operationKey,
+        PendingLsuOperation.operationName,
+      )
+      validPsidO = successor.psid.parseAsPhysical.toOption
+      successorConnectionO = validPsidO.flatMap(validPsid =>
+        synchronizerConnectionConfigStore.get(validPsid).toOption
+      )
+      _ <- successorConnectionO.traverse_(connection =>
+        synchronizerConnectionConfigStore
+          .setStatus(
+            alias = connection.config.synchronizerAlias,
+            configuredPsid = ConfiguredPhysicalSynchronizerId(validPsidO),
+            status = SynchronizerConnectionConfigStore.Inactive,
+          )
+          .valueOr(err =>
+            ErrorUtil.invalidState(
+              s"Failed to set cancelled LSU synchronizer connection config status to Inactive for ${successor.psid}: $err"
+            )
+          )
+      )
+    } yield ()
   }
 
   private def scheduleEvent(
@@ -284,12 +329,36 @@ class ParticipantTopologyTerminateProcessing(
       sequencedTime: SequencedTime,
       sc: SequencerCounter,
       eventInfo: EventInfo,
-  )(implicit traceContext: TraceContext): UnlessShutdown[Unit] =
+  )(implicit traceContext: TraceContext): UnlessShutdown[Unit] = {
+    val flushPartyReplicationPublications =
+      partyReplicationTriggersO match {
+        case Some(partyReplicationTriggers)
+            if eventInfo.clearingOnboardingLocallyHostedParty && !pauseSynchronizerIndexingDuringPartyReplication =>
+          val onboardingParties = NonEmpty
+            .from(eventInfo.event.events.collect[LfPartyId] {
+              case PartyToParticipantAuthorization(party, _, AuthorizationEvent.Added(_)) => party
+            })
+            .getOrElse(ErrorUtil.invalidState("Expect at least one added party"))
+          logger.info(
+            s"Flushing activation changes before clearing onboarding flag at $sequencedTime with $effectiveTime on behalf of $onboardingParties with $eventInfo"
+          )
+          partyReplicationTriggers.flushContractActivationChangesToIndexer(
+            onboardingParties,
+            store.storeId.psid.logical,
+            effectiveTime,
+          )(_)
+
+        case Some(_) | None =>
+          (_: SynchronizerUpdate => FutureUnlessShutdown[Unit]) => FutureUnlessShutdown.unit
+      }
+
     (for {
       _ <- EitherT(
         recordOrderPublisher.scheduleFloatingEventPublication(
           timestamp = effectiveTime.value,
           eventFactory = _ => Some(eventInfo.event),
+          onScheduled = () => FutureUnlessShutdown.unit,
+          publishBefore = flushPartyReplicationPublications,
         )
       )
       _ <- EitherT(
@@ -313,6 +382,7 @@ class ParticipantTopologyTerminateProcessing(
           s"Cannot schedule topology event as record time is already at $invalidTime (publication with sequencer counter: $sc, sequenced time: $sequencedTime, effective time: $effectiveTime)"
         )
     }
+  }
 
   /** Scheduling missing events at synchronizer initialization.
     *
@@ -349,12 +419,7 @@ class ParticipantTopologyTerminateProcessing(
       outstandingEffectiveChanges <- store.findEffectiveStateChanges(
         fromEffectiveInclusive = initialRecordTime,
         onlyAtEffective = false,
-        filterTypes = Some(
-          Seq(
-            TopologyMapping.Code.PartyToParticipant,
-            TopologyMapping.Code.SynchronizerTrustCertificate,
-          )
-        ),
+        filterTypes = Some(mappingsForEffectiveStateChanges),
       )
       eventFromEffectiveChangeWithInitializationTraceContext =
         (effectiveChange: EffectiveStateChange) =>
@@ -391,7 +456,7 @@ class ParticipantTopologyTerminateProcessing(
       ) { case (event, sequencedTime) =>
         traceContextForSequencedEvent(sequencedTime).map {
           case Some(sourceEventTraceContext) =>
-            event.copy()(traceContext = sourceEventTraceContext) -> sequencedTime
+            event.copy(traceContext = sourceEventTraceContext) -> sequencedTime
 
           case None =>
             logger.warn(
@@ -468,6 +533,7 @@ class ParticipantTopologyTerminateProcessing(
             onboardingLocalParty,
             clearingOnboardingLocalParty,
             revokingLocalParty,
+            genericTopologyEvents,
           ) =>
         EventInfo(
           Update.TopologyTransactionEffective(
@@ -475,6 +541,8 @@ class ParticipantTopologyTerminateProcessing(
             events = events,
             synchronizerId = psid.logical,
             effectiveTime = effectiveStateChange.effectiveTime.value,
+            genericTopologyEvents = genericTopologyEvents,
+            traceContext = traceContext,
           ),
           onboardingLocallyHostedParty = onboardingLocalParty,
           clearingOnboardingLocallyHostedParty = clearingOnboardingLocalParty,

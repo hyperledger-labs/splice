@@ -11,7 +11,7 @@ export * from './voteRequests';
 
 export const medianPriceVotes = (votedPrices: BigNumber[]): BigNumber | undefined => {
   if (votedPrices && votedPrices.length > 0) {
-    const sorted = [...votedPrices].sort((a, b) => {
+    const sorted = votedPrices.toSorted((a, b) => {
       return a.isEqualTo(b) ? 0 : a.isLessThan(b) ? -1 : 1;
     });
     const length = sorted.length;

@@ -5,7 +5,6 @@ package com.digitalasset.canton.crypto
 
 import cats.Order
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.CantonRequireTypes.{
   LengthLimitedStringWrapper,
@@ -20,18 +19,23 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.topology.UniqueIdentifier
+import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
+import com.digitalasset.canton.validation.ProtoValidation
 import com.digitalasset.canton.version.{
-  HasVersionedMessageCompanion,
-  HasVersionedWrapper,
+  HasVersionedMessageCompanionE,
+  HasVersionedWrapperE,
   ProtoVersion,
   ProtocolVersion,
+  ProtocolVersionValidation,
 }
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import io.circe.Encoder
 import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
+import org.bouncycastle.jcajce.spec.MLDSAParameterSpec
 import slick.jdbc.{GetResult, SetParameter}
 
 import scala.annotation.nowarn
@@ -74,10 +78,16 @@ object Fingerprint {
 
   /** create fingerprint from a human readable string */
   def fromProtoPrimitive(str: String): ParsingResult[Fingerprint] =
+    fromProtoPrimitive(str, field = None)
+
+  def fromProtoPrimitive(str: String, field: String): ParsingResult[Fingerprint] =
+    fromProtoPrimitive(str, Some(field))
+
+  private def fromProtoPrimitive(str: String, field: Option[String]): ParsingResult[Fingerprint] =
     UniqueIdentifier
       .verifyValidString(str) // verify that we can represent the string as part of the UID.
-      .leftMap(ProtoDeserializationError.StringConversionError.apply(_))
-      .flatMap(String68.fromProtoPrimitive(_, "Fingerprint"))
+      .leftMap(ProtoDeserializationError.StringConversionError.apply(_, field))
+      .flatMap(String68.fromProtoPrimitive(_, field))
       .map(Fingerprint(_))
 
   private[crypto] def create(
@@ -124,7 +134,7 @@ trait CryptoKeyPairKey extends CryptoKey {
 }
 
 trait CryptoKeyPair[+PK <: PublicKey, +SK <: PrivateKey]
-    extends HasVersionedWrapper[CryptoKeyPair[PublicKey, PrivateKey]]
+    extends HasVersionedWrapperE[CryptoKeyPair[PublicKey, PrivateKey]]
     with Product
     with Serializable {
 
@@ -141,12 +151,13 @@ trait CryptoKeyPair[+PK <: PublicKey, +SK <: PrivateKey]
   // The keypair is identified by the public key's id
   def id: Fingerprint = publicKey.id
 
-  protected def toProtoCryptoKeyPairPairV30: v30.CryptoKeyPair.Pair
+  protected def toProtoCryptoKeyPairPairV30: Either[String, v30.CryptoKeyPair.Pair]
 
-  def toProtoCryptoKeyPairV30: v30.CryptoKeyPair = v30.CryptoKeyPair(toProtoCryptoKeyPairPairV30)
+  def toProtoCryptoKeyPairV30: Either[String, v30.CryptoKeyPair] =
+    toProtoCryptoKeyPairPairV30.map(v30.CryptoKeyPair.apply)
 }
 
-object CryptoKeyPair extends HasVersionedMessageCompanion[CryptoKeyPair[PublicKey, PrivateKey]] {
+object CryptoKeyPair extends HasVersionedMessageCompanionE[CryptoKeyPair[PublicKey, PrivateKey]] {
 
   override def name: String = "crypto key pair"
 
@@ -184,7 +195,14 @@ object CryptoKeyPair extends HasVersionedMessageCompanion[CryptoKeyPair[PublicKe
 trait PublicKey extends CryptoKeyPairKey {
   type K <: PublicKey
 
-  def toByteString(version: ProtocolVersion): ByteString
+  // We need a different method to unify the encryption and signing public keys, since in a few places they are
+  // serialized as just `PublicKey`. Before serialization could fail, it was mapping on either `SigningPublicKey`
+  // or `EncryptionPublicKey`'s `toByteString`, but now they have a different signature since one can fail and not the other.
+  // TODO(i33934): We could also decide to keep them unified by having `EncryptionPublicKey`'s serialization also possibly fail.
+  def toByteStringE(version: ProtocolVersion): Either[String, ByteString]
+
+  def toByteArrayE(version: ProtocolVersion): Either[String, Array[Byte]] =
+    toByteStringE(version).map(_.toByteArray)
 
   def fingerprint: Fingerprint = id
 
@@ -214,14 +232,18 @@ trait PublicKey extends CryptoKeyPairKey {
 
   override def isPublicKey: Boolean = true
 
-  protected def toProtoPublicKeyKeyV30: v30.PublicKey.Key
+  protected def toProtoPublicKeyKeyV30: Either[String, v30.PublicKey.Key]
+  protected def toProtoPublicKeyKeyV31: Either[String, v31.PublicKey.Key]
 
   /** With the v30.PublicKey message we model the class hierarchy of public keys in protobuf. Each
     * child class that implements this trait can be serialized with `toProto` to their corresponding
     * protobuf message. With the following method, it can be serialized to this trait's protobuf
     * message.
     */
-  def toProtoPublicKeyV30: v30.PublicKey = v30.PublicKey(key = toProtoPublicKeyKeyV30)
+  def toProtoPublicKeyV30: Either[String, v30.PublicKey] =
+    toProtoPublicKeyKeyV30.map(v30.PublicKey.apply)
+  def toProtoPublicKeyV31: Either[String, v31.PublicKey] =
+    toProtoPublicKeyKeyV31.map(v31.PublicKey.apply)
 }
 
 object PublicKey {
@@ -238,6 +260,15 @@ object PublicKey {
         EncryptionPublicKey.fromProtoV30(encPubKeyP)
       case v30.PublicKey.Key.SigningPublicKey(signPubKeyP) =>
         SigningPublicKey.fromProtoV30(signPubKeyP)
+    }
+
+  def fromProtoPublicKeyV31(publicKeyP: v31.PublicKey): ParsingResult[PublicKey] =
+    publicKeyP.key match {
+      case v31.PublicKey.Key.Empty => Left(ProtoDeserializationError.FieldNotSet("key"))
+      case v31.PublicKey.Key.EncryptionPublicKey(encPubKeyP) =>
+        EncryptionPublicKey.fromProtoV30(encPubKeyP)
+      case v31.PublicKey.Key.SigningPublicKey(signPubKeyP) =>
+        SigningPublicKey.fromProtoV31(signPubKeyP)
     }
 
 }
@@ -259,7 +290,7 @@ object KeyName extends LengthLimitedStringWrapperCompanion[String300, KeyName] {
 trait PublicKeyWithName
     extends Product
     with Serializable
-    with HasVersionedWrapper[PublicKeyWithName] {
+    with HasVersionedWrapperE[PublicKeyWithName] {
   type PK <: PublicKey
   def publicKey: PK
   def name: Option[KeyName]
@@ -269,16 +300,25 @@ trait PublicKeyWithName
   override protected def companionObj: PublicKeyWithName.type =
     PublicKeyWithName
 
-  def toProtoV30: v30.PublicKeyWithName =
-    v30.PublicKeyWithName(
-      publicKey = Some(
-        publicKey.toProtoPublicKeyV30
-      ),
-      name = name.map(_.unwrap).getOrElse(""),
+  def toProtoV30: Either[String, v30.PublicKeyWithName] =
+    publicKey.toProtoPublicKeyV30.map(proto =>
+      v30.PublicKeyWithName(
+        publicKey = Some(proto),
+        name = name.map(_.unwrap).getOrElse("").toProtoUnvalidated,
+      )
     )
+
+  def toProtoV31: Either[String, v31.PublicKeyWithName] =
+    publicKey.toProtoPublicKeyV31.map(proto =>
+      v31.PublicKeyWithName(
+        publicKey = Some(proto),
+        name = name.map(_.unwrap).getOrElse("").toProtoUnvalidated,
+      )
+    )
+
 }
 
-object PublicKeyWithName extends HasVersionedMessageCompanion[PublicKeyWithName] {
+object PublicKeyWithName extends HasVersionedMessageCompanionE[PublicKeyWithName] {
 
   override def name: String = "PublicKeyWithName"
 
@@ -297,7 +337,28 @@ object PublicKeyWithName extends HasVersionedMessageCompanion[PublicKeyWithName]
         "public_key",
         key.publicKey,
       )
-      name <- KeyName.fromProtoPrimitive(key.name)
+      // TODO(#34479): validate the crypto key name once the negotiated pvv is threaded here.
+      name <- ProtoValidation
+        .validate(key.name, "name", ProtocolVersionValidation.NoValidation)
+        .flatMap(KeyName.fromProtoPrimitive)
+    } yield {
+      (publicKey: @unchecked) match {
+        case k: SigningPublicKey => SigningPublicKeyWithName(k, name.emptyStringAsNone)
+        case k: EncryptionPublicKey => EncryptionPublicKeyWithName(k, name.emptyStringAsNone)
+      }
+    }
+
+  def fromProto31(key: v31.PublicKeyWithName): ParsingResult[PublicKeyWithName] =
+    for {
+      publicKey <- ProtoConverter.parseRequired(
+        PublicKey.fromProtoPublicKeyV31,
+        "public_key",
+        key.publicKey,
+      )
+      // TODO(#34479): validate the crypto key name once the negotiated pvv is threaded here.
+      name <- ProtoValidation
+        .validate(key.name, "name", ProtocolVersionValidation.NoValidation)
+        .flatMap(KeyName.fromProtoPrimitive)
     } yield {
       (publicKey: @unchecked) match {
         case k: SigningPublicKey => SigningPublicKeyWithName(k, name.emptyStringAsNone)
@@ -308,16 +369,23 @@ object PublicKeyWithName extends HasVersionedMessageCompanion[PublicKeyWithName]
 
 // The private key id must match the corresponding public key's one
 trait PrivateKey extends CryptoKeyPairKey {
-  type K <: PrivateKey & HasVersionedWrapper[K]
+  type K <: PrivateKey
+
+  // We need a different method to unify the encryption and signing private keys, since in a few places they are
+  // serialized as just `PrivateKey`. Before serialization could fail, it was mapping on either `SigningPrivateKey`
+  // or `EncryptionPrivateKey`'s `toByteString`, but now they have a different signature since one can fail and not the other.
+  // TODO(i33934): We could also decide to keep them unified by having `EncryptionPrivateKey`'s serialization also possibly fail.
+  def toByteStringE(version: ProtocolVersion): Either[String, ByteString]
 
   def purpose: KeyPurpose
 
   override def isPublicKey: Boolean = false
 
-  protected def toProtoPrivateKeyKeyV30: v30.PrivateKey.Key
+  protected def toProtoPrivateKeyKeyV30: Either[String, v30.PrivateKey.Key]
 
   /** Same representation of the class hierarchy in protobuf messages, see [[PublicKey]]. */
-  def toProtoPrivateKey: v30.PrivateKey = v30.PrivateKey(key = toProtoPrivateKeyKeyV30)
+  def toProtoPrivateKey: Either[String, v30.PrivateKey] =
+    toProtoPrivateKeyKeyV30.map(v30.PrivateKey.apply)
 }
 
 object PrivateKey {
@@ -340,6 +408,11 @@ trait EcKeySpec {
 
   /** Standard JCA curve name (e.g., "secp256r1") used for key generation and validation. */
   def jcaCurveName: String
+}
+
+trait MlDsaKeySpec {
+
+  def jcaParameterSpec: MLDSAParameterSpec
 }
 
 sealed trait CryptoKeyFormat extends Product with Serializable with PrettyPrinting {
@@ -441,8 +514,8 @@ object CryptoKeyFormat {
   }
 
   def fromProtoEnum(
-      field: String,
       formatP: v30.CryptoKeyFormat,
+      field: String,
   ): ParsingResult[CryptoKeyFormat] =
     formatP match {
       case v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_UNSPECIFIED =>
@@ -498,8 +571,8 @@ object KeyPurpose {
   }
 
   def fromProtoEnum(
-      field: String,
       purposeP: v30.KeyPurpose,
+      field: String,
   ): ParsingResult[KeyPurpose] =
     purposeP match {
       case v30.KeyPurpose.KEY_PURPOSE_UNSPECIFIED =>

@@ -3,11 +3,11 @@
 
 package com.digitalasset.canton.participant.admin.grpc
 
+import cats.Eval
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.topology_transaction.TopologyTransaction as LapiTopologyTransaction
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError.OtherError
 import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.admin.participant.v30.*
@@ -15,6 +15,7 @@ import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.participant.state.InternalIndexService
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.{GrpcErrors, mapErrNewEUS}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
@@ -33,7 +34,7 @@ import com.digitalasset.canton.participant.store.SyncPersistentState
 import com.digitalasset.canton.participant.sync.CantonSyncService
 import com.digitalasset.canton.participant.topology.TopologyLookup
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SynchronizerOffset
-import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
+import com.digitalasset.canton.platform.store.backend.LedgerEnd
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -45,24 +46,22 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyMapping,
 }
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
-import com.digitalasset.canton.util.EitherUtil.*
-import com.digitalasset.canton.util.Thereafter.syntax.*
+import com.digitalasset.canton.util.EitherUtil.RichEither
 import com.digitalasset.canton.util.{EitherTUtil, GrpcStreamingUtils, OptionUtil, retry}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.google.protobuf.ByteString
+import com.digitalasset.nonempty.NonEmpty
 import com.google.protobuf.duration.Duration
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Sink
 
-import java.io.{ByteArrayOutputStream, OutputStream}
+import java.io.OutputStream
 import java.util.UUID
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import java.util.zip.GZIPOutputStream
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 /** grpc service to allow modifying party hosting on participants
   */
@@ -70,6 +69,7 @@ class GrpcPartyManagementService(
     participantId: ParticipantId,
     partyReplicatorO: Option[PartyReplicator],
     sync: CantonSyncService,
+    internalIndexService: Eval[InternalIndexService],
     topologyLookup: TopologyLookup,
     parameters: ParticipantNodeParameters,
     protected val loggerFactory: NamedLoggerFactory,
@@ -112,89 +112,41 @@ class GrpcPartyManagementService(
   ): StreamObserver[AddPartyWithAcsAsyncRequest] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
 
-    // TODO(#30362): This buffer will contain the whole ACS snapshot - switch it to the streaming approach
-    val outputStream = new ByteArrayOutputStream()
-    val arguments = new AtomicReference[Option[PartyReplicationArguments]](None)
-    // for extracting the arguments on the first request
-    val isFirst = new AtomicBoolean(true)
-
-    new StreamObserver[AddPartyWithAcsAsyncRequest] {
-
-      override def onNext(request: AddPartyWithAcsAsyncRequest): Unit = {
-        val processedNext = if (isFirst.getAndSet(false)) {
-          for {
-            argsP <- ProtoConverter
-              .required("arguments", request.arguments)
-              .leftMap(err => s"Arguments must be set on the first request: $err")
-            args <- verifyArguments(argsP)
-          } yield {
-            arguments.set(Some(args))
-            outputStream.write(request.acsSnapshot.toByteArray)
-          }
-        } else {
-          for {
-            _ <- Either.cond(
-              request.arguments.isEmpty,
-              (),
-              s"Arguments must not be set on any request other that the first request: ${request.arguments}",
-            )
-          } yield {
-            outputStream.write(request.acsSnapshot.toByteArray)
-          }
-        }
-
-        processedNext.valueOr(errorMessage =>
-          // On failure: Signal the error, that is throw an exception.
-          // Observer's top-level onError will handle cleanup.
-          responseObserver.onError(new IllegalArgumentException(errorMessage))
+    GrpcStreamingUtils.streamGzippedChunksFromClient[
+      AddPartyWithAcsAsyncRequest,
+      AddPartyWithAcsAsyncResponse,
+      PartyReplicationArguments,
+      ActiveContract,
+    ](
+      responseObserver,
+      Failure(
+        new IllegalArgumentException(
+          "The request stream must contain at least one message with the required AddPartyArguments."
         )
-      }
+      ),
+      getGzippedBytes = _.acsSnapshot,
+      parseMessage = ActiveContract.parseDelimitedFromTrusted,
+    )(contextFromFirstRequest =
+      firstRequest =>
+        (for {
+          argsP <- ProtoConverter
+            .required("arguments", firstRequest.arguments)
+            .leftMap(err => s"Arguments must be set on the first request: $err")
+          args <- verifyArguments(argsP)
+        } yield args)
+          .leftMap(err => new IllegalArgumentException(err))
+          .toTry
+    ) { case (args, source) =>
+      val resultET = for {
+        partyReplicator <- EitherT.fromEither[FutureUnlessShutdown](
+          ensureOnlinePartyReplicationEnabled()
+        )
+        requestId <- partyReplicator
+          .addPartyWithAcsAsync(args, source)
+          .leftMap(toStatusRuntimeException(Status.FAILED_PRECONDITION))
+      } yield AddPartyWithAcsAsyncResponse(requestId.toHexString)
 
-      override def onError(t: Throwable): Unit =
-        try {
-          outputStream.close()
-        } finally {
-          responseObserver.onError(t)
-        }
-
-      override def onCompleted(): Unit = {
-        // Synchronously try to get the snapshot and start the import
-        val result = for {
-          args <- EitherT.fromEither[Future](
-            arguments
-              .get()
-              .toRight(toStatusRuntimeException(Status.INVALID_ARGUMENT)("Arguments not set"))
-          )
-          partyReplicator <- EitherT.fromEither[Future](
-            ensureOnlinePartyReplicationEnabled()
-          )
-          acsByteString <- EitherT.fromEither[Future](
-            Try(ByteString.copyFrom(outputStream.toByteArray)).toEither.leftMap(t =>
-              toStatusRuntimeException(Status.FAILED_PRECONDITION)(t.getMessage)
-            )
-          )
-          activeContracts <- EitherT.fromEither[Future](
-            ActiveContract
-              .loadAcsSnapshot(acsByteString)
-              .leftMap(toStatusRuntimeException(Status.INVALID_ARGUMENT))
-          )
-          requestId <- partyReplicator
-            .addPartyWithAcsAsync(args, activeContracts.iterator)
-            .leftMap(toStatusRuntimeException(Status.FAILED_PRECONDITION))
-            .onShutdown(Left(GrpcErrors.AbortedDueToShutdown.Error().asGrpcError))
-        } yield requestId
-
-        result
-          .thereafter(_ => outputStream.close())
-          .value
-          .onComplete {
-            case Failure(exception) => responseObserver.onError(exception)
-            case Success(Left(exception)) => responseObserver.onError(exception)
-            case Success(Right(requestId)) =>
-              responseObserver.onNext(AddPartyWithAcsAsyncResponse(requestId.toHexString))
-              responseObserver.onCompleted()
-          }
-      }
+      EitherTUtil.toFutureUnlessShutdown(resultET)
     }
   }
 
@@ -231,13 +183,6 @@ class GrpcPartyManagementService(
       participantPermission,
     )
 
-  private def convert[T](
-      rawId: String,
-      field: String,
-      wrap: UniqueIdentifier => T,
-  ): Either[String, T] =
-    UniqueIdentifier.fromProtoPrimitive(rawId, field).bimap(_.toString, wrap)
-
   override def getAddPartyStatus(
       request: v30.GetAddPartyStatusRequest
   ): Future[v30.GetAddPartyStatusResponse] =
@@ -259,6 +204,13 @@ class GrpcPartyManagementService(
         .fromInternal(status)
     } yield v30.GetAddPartyStatusResponse(Some(apiStatus.toProtoV30))).toFuture(identity)
 
+  private def convert[T](
+      rawId: String,
+      field: String,
+      wrap: UniqueIdentifier => T,
+  ): Either[String, T] =
+    UniqueIdentifier.fromProtoPrimitive(rawId, field).bimap(_.toString, wrap)
+
   private def toStatusRuntimeException(status: Status)(err: String): StatusRuntimeException =
     status.withDescription(err).asRuntimeException()
 
@@ -279,7 +231,7 @@ class GrpcPartyManagementService(
       (out: OutputStream) => processExportPartyAcsRequest(request, new GZIPOutputStream(out)),
       responseObserver,
       byteString => v30.ExportPartyAcsResponse(byteString),
-      parameters.processingTimeouts.unbounded.duration,
+      parameters.processingTimeouts.adminStreamOpenBound.duration,
       chunkSizeO = None,
     )
   }
@@ -309,11 +261,6 @@ class GrpcPartyManagementService(
         waitForActivationTimeout,
       ) = validRequest
 
-      indexService <- EitherT.fromOption[FutureUnlessShutdown](
-        sync.internalIndexService,
-        PartyManagementServiceError.InvalidState.Error("Unavailable internal index service"),
-      )
-
       targetParticipant <- EitherT.fromEither[FutureUnlessShutdown](
         UniqueIdentifier
           .fromProtoPrimitive(request.targetParticipantUid, "target_participant_uid")
@@ -323,7 +270,7 @@ class GrpcPartyManagementService(
 
       topologyTx <-
         findSinglePartyActivationTopologyTransaction(
-          indexService,
+          internalIndexService.value,
           party,
           beginOffsetExclusive,
           synchronizerId,
@@ -376,7 +323,7 @@ class GrpcPartyManagementService(
 
       _ <- ParticipantCommon
         .writeAcsSnapshot(
-          indexService,
+          internalIndexService.value,
           Set(party),
           atOffset = activationOffset,
           out,
@@ -650,7 +597,7 @@ class GrpcPartyManagementService(
 
         } yield ImportPartyAcsResponse()
 
-        EitherTUtil.toFutureUnlessShutdown(resultET.leftMap(_.asGrpcError))
+        EitherTUtil.toFutureUnlessShutdown(resultET.leftMap(_.toGrpcError))
     }
   }
 
@@ -899,15 +846,8 @@ class GrpcPartyManagementService(
         ): PartyManagementServiceError,
       )
 
-      indexService <- EitherT.fromOption[FutureUnlessShutdown](
-        sync.internalIndexService,
-        PartyManagementServiceError.InvalidState.Error(
-          "Unavailable internal index service"
-        ): PartyManagementServiceError,
-      )
-
       activationTimestamp <- validateTopologyStateForClearance(
-        indexService,
+        internalIndexService.value,
         connectedSynchronizer,
         party,
         synchronizerId,

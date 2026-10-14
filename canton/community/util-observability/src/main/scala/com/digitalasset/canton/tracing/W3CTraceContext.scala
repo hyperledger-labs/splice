@@ -39,20 +39,22 @@ final case class W3CTraceContext(parent: String, state: Option[String] = None)
 }
 
 object W3CTraceContext {
+
+  // values match W3CTraceContextPropagator.TRACE_PARENT / TRACE_STATE
+  val TraceparentHeader: HeaderName = HeaderName("traceparent")
+  val TracestateHeader: HeaderName = HeaderName("tracestate")
+
   // https://www.w3.org/TR/trace-context/
   private val propagator = W3CTraceContextPropagator.getInstance()
-  // values match W3CTraceContextPropagator.TRACE_PARENT / TRACE_STATE
-  private val TraceparentHeader = HeaderName("traceparent")
-  private val TracestateHeader = HeaderName("tracestate")
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   def fromOpenTelemetryContext(context: OpenTelemetryContext): Option[W3CTraceContext] = {
     var builder = new W3CTraceContextBuilder
-    val setter: TextMapSetter[W3CTraceContextBuilder] = (carrier, key, value) =>
+    val setter: TextMapSetter[W3CTraceContextBuilder] = (_, key, value) =>
       builder = HeaderName(key) match {
-        case TraceparentHeader => carrier.copy(parent = Some(value))
-        case TracestateHeader => carrier.copy(state = Some(value))
-        case _ => carrier
+        case TraceparentHeader => builder.copy(parent = Some(value))
+        case TracestateHeader => builder.copy(state = Some(value))
+        case _ => builder
       }
     propagator.inject(context, builder, setter)
     builder.build

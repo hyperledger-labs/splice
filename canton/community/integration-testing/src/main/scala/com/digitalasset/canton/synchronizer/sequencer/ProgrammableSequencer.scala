@@ -18,19 +18,21 @@ import com.digitalasset.canton.integration.{
   ConfigTransforms,
   TestConsoleEnvironment,
 }
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
+  HasCloseContext,
   PromiseUnlessShutdown,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.protocol.messages.{
   ConfirmationResponses,
   SignedProtocolMessage,
   TypedSignedProtocolMessageContent,
 }
+import com.digitalasset.canton.protocol.{StaticSynchronizerParameters, SynchronizerLimits}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.scheduler.PruningScheduler
 import com.digitalasset.canton.sequencer.admin.v30.TrafficSummary
@@ -91,7 +93,8 @@ class ProgrammableSequencer(
 )(implicit ec: ExecutionContext)
     extends Sequencer
     with NamedLogging
-    with FlagCloseable {
+    with FlagCloseable
+    with HasCloseContext {
   import ProgrammableSequencer.QueuedSubmission
 
   override protected val timeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing
@@ -212,6 +215,9 @@ class ProgrammableSequencer(
       }
     )
 
+  override def applyPostProcessingLockForTesting(continueAfter: Future[Unit]): Unit =
+    baseSequencer.applyPostProcessingLockForTesting(continueAfter)
+
   override def isRegistered(member: Member)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean] =
@@ -273,7 +279,13 @@ class ProgrammableSequencer(
       }
 
       FutureUtil.doNotAwait(
-        clock.scheduleAt(run, at).unwrap,
+        clock
+          .scheduleAtCancelledOnShutdown(
+            run,
+            s"${getClass.getName}: sending submission request",
+            at,
+          )
+          .unwrap,
         s"Programmable sequencer scheduled for message ID ${submission.messageId} at $at",
       )
       EitherT(promise.futureUS)
@@ -577,6 +589,7 @@ object ProgrammableSequencer {
             .flatMap(
               _.toOpenEnvelope(
                 participant.crypto.pureCrypto,
+                SynchronizerLimits.defaultFor(BaseTest.testedProtocolVersion),
                 BaseTest.testedProtocolVersion,
               ).value.protocolMessage match {
                 case SignedProtocolMessage(
@@ -670,8 +683,6 @@ object ProgrammableSequencer {
               Some(createAndStoreProgrammableSequencer(instanceName))
             )
             // same as above, minimize the reordering that can happen
-            .focus(_.config.maxRequestsInBatch)
-            .replace(1)
             .focus(_.config.minRequestsInBatch)
             .replace(1)
       }

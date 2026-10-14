@@ -192,6 +192,32 @@ abstract class ScanStoreTest
       }
     }
 
+    "listFeaturedAppRightsByProvider" should {
+
+      "return the FeaturedAppRights of the wanted provider in creation order, up to the limit" in {
+        val wanted = (1 to 3).map(_ => featuredAppRight(userParty(1)))
+        val unwanted = featuredAppRight(userParty(2))
+        for {
+          store <- mkStore()
+          _ <- MonadUtil.sequentialTraverse(wanted :+ unwanted)(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          all <- store.listFeaturedAppRightsByProvider(userParty(1), HardLimit.tryCreate(3))
+          page <- store.listFeaturedAppRightsByProvider(userParty(1), PageLimit.tryCreate(2))
+          hard <- loggerFactory.assertLogs(
+            store.listFeaturedAppRightsByProvider(userParty(1), HardLimit.tryCreate(2)),
+            _.warningMessage should include(
+              "Size of the result exceeded the limit in listFeaturedAppRightsByProvider"
+            ).and(include("Result size: 3. Limit: 2")),
+          )
+        } yield {
+          all.map(_.contract) shouldBe wanted
+          page.map(_.contract) shouldBe wanted.take(2)
+          hard.map(_.contract) shouldBe wanted.take(2)
+        }
+      }
+    }
+
     "lookupTransferPreapprovalByParty" should {
       "return the TransferPreapproval contract signed by the specified party if available" in {
         val wanted = transferPreapproval(userParty(1), providerParty(1), time(0), time(1))
@@ -1816,10 +1842,14 @@ class DbScanStoreTest
         result <- store.getValidatorLicenseByValidator(
           Vector(alice, bob)
         )
+        withDuplicates <- store.getValidatorLicenseByValidator(
+          Vector(alice, bob, alice, alice)
+        )
       } yield {
         result should contain(aliceValidatorLicense)
         result should contain(bobValidatorLicense)
         result should not contain charlesValidatorLicense
+        withDuplicates should contain theSameElementsAs result
       }
     }
   }

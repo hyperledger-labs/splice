@@ -1,0 +1,65 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "cluster-ingress-validator1",
+    "namespace": "validator1",
+    "timeout": 600,
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "cluster": {
+        "dnsName": "mock.global.canton.network.digitalasset.com",
+        "fixedTokens": false,
+        "hostname": "mock.global.canton.network.digitalasset.com",
+        "name": "cn-mocknet",
+        "svNamespace": "validator1"
+      },
+      "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+      "ingress": {
+        "decentralizedSynchronizer": {},
+        "splitwell": true,
+        "walletGateway": true
+      },
+      "spliceDomainNames": {
+        "nameServiceDomain": "cns"
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ],
+      "withSvIngress": false
+    },
+    "version": "0.3.20"
+  },
+  "name": "validator1-cluster-ingress-validator1",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

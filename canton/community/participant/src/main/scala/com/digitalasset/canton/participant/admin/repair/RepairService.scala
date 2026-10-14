@@ -9,7 +9,6 @@ import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -23,6 +22,7 @@ import com.digitalasset.canton.ledger.participant.state.{
   TransactionMeta,
   Update,
 }
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
@@ -53,6 +53,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.AllExceptionRetryPolicy
 import com.digitalasset.daml.lf.CantonOnly
 import com.digitalasset.daml.lf.data.ImmArray
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
@@ -140,10 +141,9 @@ final class RepairService(
     *   ID of the synchronizer to add contracts to. The synchronizer needs to be configured, but
     *   disconnected to prevent race conditions.
     * @param contracts
-    *   Contracts to add. Relevant pieces of each contract: create-arguments (LfThinContractInst),
-    *   template-id (LfThinContractInst), contractId, ledgerCreateTime, salt (to be added to
-    *   SerializableContract), and witnesses, SerializableContract.metadata is only validated, but
-    *   otherwise ignored as stakeholder and signatories can be recomputed from contracts.
+    *   Contracts to add. Relevant pieces of each contract: create-arguments, template-id,
+    *   contractId, ledgerCreateTime, salt, and witnesses, metadata is only validated, but otherwise
+    *   ignored as stakeholder and signatories can be recomputed from contracts.
     * @param contractImportMode
     *   Whether contract IDs should be validated.
     * @param packageMetadataSnapshot
@@ -218,17 +218,10 @@ final class RepairService(
                 contractStore.value.lookupManyUncached(contractIds),
                 "Unable to lookup contracts in contract store",
               )
-              .map(_.flatten)
 
-          storedContracts <- EitherT.fromEither[FutureUnlessShutdown](
-            contractInstances
-              .traverse { contract =>
-                SerializableContract
-                  .fromLfFatContractInst(contract.inst)
-                  .map(c => c.contractId -> c)
-              }
-              .map(_.toMap)
-          )
+          storedContracts = contractInstances.flatten.map { contract =>
+            contract.contractId -> contract
+          }.toMap
 
           toc = repair.tryExactlyOneTimeOfRepair.toToc
 
@@ -289,7 +282,7 @@ final class RepairService(
                         storedContract,
                       )
                         .map { case PurgeOperations(missingPurge, missingAssignment, upstream) =>
-                          // Extract only the SerializableContract from upstream, discard the reassignment counter
+                          // Extract only the contract from upstream, discard the reassignment counter
                           val contracts = upstream.map(_._1).toList
                           (contracts, missingPurge.toList, missingAssignment.toList)
                         }
@@ -542,9 +535,8 @@ final class RepairService(
         ledgerApiIndexer.value
           .ensureNoProcessingForSynchronizer(psid.logical)
       )
-      synchronizerIndex <- EitherT.right(
-        ledgerApiIndexer.value.ledgerApiStore.value.cleanSynchronizerIndex(psid.logical)
-      )
+      synchronizerIndex = ledgerApiIndexer.value.ledgerApiStore
+        .cleanSynchronizerIndex(psid.logical)
 
       startingPoints <- EitherT.right(
         SyncEphemeralStateFactory.startingPoints(
@@ -593,7 +585,7 @@ final class RepairService(
   private def computePurgeOperations(toc: TimeOfChange, ignoreAlreadyPurged: Boolean)(
       cid: LfContractId,
       acsStatus: Option[ActiveContractStore.Status],
-      storedContractO: Option[SerializableContract],
+      storedContractO: Option[GenContractInstance],
   )(implicit
       traceContext: TraceContext
   ): Either[String, PurgeOperations] = {
@@ -610,7 +602,7 @@ final class RepairService(
       case None => ignoreOrError("unknown contract")
       case Some(ActiveContractStore.Active(reassignmentCounter)) =>
         for {
-          _contract <- Either
+          _ <- Either
             .fromOption(
               storedContractO,
               show"Active contract $cid not found in contract store",
@@ -647,10 +639,10 @@ final class RepairService(
     }
   }
 
-  private def toArchive(c: SerializableContract): LfNodeExercises = LfNodeExercises(
+  private def toArchive(c: GenContractInstance): LfNodeExercises = LfNodeExercises(
     targetCoid = c.contractId,
-    templateId = c.rawContractInstance.contractInstance.unversioned.template,
-    packageName = c.rawContractInstance.contractInstance.unversioned.packageName,
+    templateId = c.templateId,
+    packageName = c.inst.packageName,
     interfaceId = None,
     choiceId = LfChoiceName.assertFromString("Archive"),
     consuming = true,
@@ -664,11 +656,12 @@ final class RepairService(
     exerciseResult = Some(LfValue.ValueUnit),
     keyOpt = c.metadata.maybeKeyWithMaintainers,
     byKey = false,
-    version = c.rawContractInstance.contractInstance.version,
+    externalCallResults = ImmArray.empty,
+    version = c.inst.version,
   )
 
   private def writeContractsPurgedEvent(
-      contracts: Seq[SerializableContract],
+      contracts: Seq[GenContractInstance],
       updateId: UpdateId,
       repair: RepairRequest,
       repairIndexer: FutureQueue[RepairUpdate],
@@ -700,13 +693,14 @@ final class RepairService(
       recordTime = repair.timestamp,
       // no need to pass the contract infos since no create nodes are involved
       contractInfos = Map.empty,
+      traceContext = traceContext,
     )
     // not waiting for Update.persisted, since CommitRepair anyway will be waited for at the end
     repairIndexer.offer(update).map(_ => ())
   }
 
   private def publishUnassignedEvent(
-      contracts: Seq[(SerializableContract, ReassignmentCounter)],
+      contracts: Seq[(GenContractInstance, ReassignmentCounter)],
       repair: RepairRequest,
       repairIndexer: FutureQueue[RepairUpdate],
   )(implicit traceContext: TraceContext): Future[Unit] = {
@@ -726,8 +720,8 @@ final class RepairService(
       .map { case ((c, reassignmentCounter), nodeId) =>
         Reassignment.Unassign(
           contractId = c.contractId,
-          templateId = c.rawContractInstance.contractInstance.unversioned.template,
-          packageName = c.rawContractInstance.contractInstance.unversioned.packageName,
+          templateId = c.templateId,
+          packageName = c.inst.packageName,
           stakeholders = c.metadata.stakeholders,
           assignmentExclusivity = None,
           reassignmentCounter = reassignmentCounter.unwrap,
@@ -753,6 +747,7 @@ final class RepairService(
           repairCounter = repair.tryExactlyOneRepairCounter,
           recordTime = repair.timestamp,
           synchronizerId = repair.synchronizer.psid.logical,
+          traceContext = traceContext,
         )
       }
       .fold(Future.unit)(repairIndexer.offer(_).map(_ => ()))
@@ -763,23 +758,24 @@ final class RepairService(
       synchronizerId: SynchronizerId,
       timestamp: CantonTimestamp,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = {
-    def check(): FutureUnlessShutdown[Either[String, Unit]] =
-      ledgerApiIndexer.value.ledgerApiStore.value
-        .cleanSynchronizerIndex(synchronizerId)
-        .map(SyncEphemeralStateFactory.lastSequencerTimestamp)
-        .map { lastSequencerTimestamp =>
-          if (lastSequencerTimestamp >= timestamp) {
-            logger.debug(
-              s"Clean sequencer index reached $lastSequencerTimestamp, clearing $timestamp"
-            )
-            Either.unit
-          } else {
-            val errMsg =
-              s"Clean sequencer index is still at $lastSequencerTimestamp which is not yet $timestamp"
-            logger.debug(errMsg)
-            Left(errMsg)
-          }
-        }
+    def check(): Either[String, Unit] = {
+      val lastSequencerTimestamp = SyncEphemeralStateFactory.lastSequencerTimestamp(
+        ledgerApiIndexer.value.ledgerApiStore
+          .cleanSynchronizerIndex(synchronizerId)
+      )
+      if (lastSequencerTimestamp >= timestamp) {
+        logger.debug(
+          s"Clean sequencer index reached $lastSequencerTimestamp, clearing $timestamp"
+        )
+        Either.unit
+      } else {
+        val errMsg =
+          s"Clean sequencer index is still at $lastSequencerTimestamp which is not yet $timestamp"
+        logger.debug(errMsg)
+        Left(errMsg)
+      }
+    }
+
     EitherT(
       retry
         .Pause(
@@ -790,7 +786,7 @@ final class RepairService(
           s"awaiting clean-head for=$synchronizerId at ts=$timestamp",
         )
         .unlessShutdown(
-          check(),
+          FutureUnlessShutdown.pure(check()),
           AllExceptionRetryPolicy,
         )
     )
@@ -814,7 +810,7 @@ private object RepairService {
   final case class PurgeOperations(
       purge: Option[MissingPurge],
       assign: Option[MissingAssignment],
-      upstream: Option[(SerializableContract, ReassignmentCounter)],
+      upstream: Option[(GenContractInstance, ReassignmentCounter)],
   )
 
   private object PurgeOperations {

@@ -6,17 +6,18 @@ package com.digitalasset.canton.participant.protocol
 import cats.data.{EitherT, Nested}
 import cats.syntax.either.*
 import cats.syntax.foldable.*
-import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.crypto.{
+  DecryptionError,
   Signature,
+  SyncCryptoError,
   SynchronizerCryptoClient,
   SynchronizerSnapshotSyncCryptoApi,
 }
@@ -24,6 +25,7 @@ import com.digitalasset.canton.data.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.TransactionError
 import com.digitalasset.canton.ledger.participant.state.SequencedEventUpdate
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   PromiseUnlessShutdownFactory,
@@ -36,6 +38,7 @@ import com.digitalasset.canton.participant.protocol.EngineController.EngineAbort
 import com.digitalasset.canton.participant.protocol.Phase37Synchronizer.RequestOutcome
 import com.digitalasset.canton.participant.protocol.ProcessingSteps.{
   CleanReplayData,
+  DecryptedViewData,
   DecryptedViews,
   PendingRequestData,
   ReplayDataOr,
@@ -76,6 +79,7 @@ import com.digitalasset.canton.util.EitherUtil.RichEither
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter, checked}
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 
 import java.util.UUID
@@ -139,9 +143,8 @@ abstract class ProtocolProcessor[
 
   def participantId: ParticipantId
 
-  private val recipientsValidator
-      : RecipientsValidator[(WithRecipients[steps.DecryptedView], Option[Signature])] =
-    new RecipientsValidator(_._1.unwrap, _._1.recipients, loggerFactory)
+  private val recipientsValidator: RecipientsValidator[DecryptedViewData[steps.DecryptedView]] =
+    new RecipientsValidator(_.view.unwrap, _.view.recipients, loggerFactory)
 
   private[this] def withKind(message: String): String = s"${steps.requestKind}: $message"
 
@@ -257,7 +260,8 @@ abstract class ProtocolProcessor[
               if (mod < 0) mod + mediatorCount else mod
             }
             val chosen = checked(allActiveMediatorGroups(chosenIndex)).index
-            logger.debug(s"Chose the mediator group $chosen")
+            if (mediatorCount > 1)
+              logger.debug(s"Chose the mediator group $chosen")
             Right(MediatorGroupRecipient(chosen))
           }
       }
@@ -458,9 +462,9 @@ abstract class ProtocolProcessor[
   )(
       trafficCost: Long,
       traceContext: TraceContext,
-  ): FutureUnlessShutdown[Unit] =
+  ): EitherT[FutureUnlessShutdown, RpcError, Unit] =
     // TODO(#33681): Remove default implementation
-    FutureUnlessShutdown.unit
+    EitherT.rightT(())
 
   /** Submit the batch to the sequencer. Also registers `submissionParam` as pending submission.
     */
@@ -1021,6 +1025,7 @@ abstract class ProtocolProcessor[
             uncheckedDecryptedViews <- steps.decryptViews(
               viewMessages,
               snapshot,
+              crypto.ips.getSynchronizerLimits,
               ephemeral.sessionKeyStore.convertStore,
             )
           } yield Option((snapshot, uncheckedDecryptedViews, synchronizerParameters))
@@ -1054,24 +1059,44 @@ abstract class ProtocolProcessor[
       logger.warn(s"Request $rc: Decryption error: $decryptionError")
     }
 
-    val decryptionErrors = rawDecryptionErrors.map(ViewMessageError(_))
+    // Hide internal decryption details to prevent leaking sensitive information to callers
+    val decryptionErrors = rawDecryptionErrors.map {
+      case EncryptedViewMessageError.SymmetricDecryptError(DecryptionError.FailedToDecrypt(_)) =>
+        ViewMessageError(
+          EncryptedViewMessageError.SymmetricDecryptError(
+            DecryptionError.FailedToDecrypt("Symmetric decryption failed")
+          )
+        )
+      case EncryptedViewMessageError.SyncCryptoDecryptError(
+            SyncCryptoError.SyncCryptoDecryptionError(DecryptionError.FailedToDecrypt(_))
+          ) =>
+        ViewMessageError(
+          EncryptedViewMessageError.SyncCryptoDecryptError(
+            SyncCryptoError.SyncCryptoDecryptionError(
+              DecryptionError.FailedToDecrypt("Asymmetric decryption failed")
+            )
+          )
+        )
+      case other =>
+        ViewMessageError(other)
+    }
 
     val (viewsWithCorrectRootHash, viewsWithWrongRootHash) =
-      decryptedViewsWithSignatures.partition { case (view, _) =>
-        view.unwrap.rootHash == correctRootHash
-      }
+      decryptedViewsWithSignatures.partition(decryptedView =>
+        decryptedView.view.unwrap.rootHash == correctRootHash
+      )
 
     val incorrectRootHashes: Seq[MalformedPayload] =
-      viewsWithWrongRootHash.map { case (viewTree, _) =>
-        ProtocolProcessor.WrongRootHash(viewTree.unwrap, correctRootHash)
-      }
+      viewsWithWrongRootHash.map(decryptedView =>
+        ProtocolProcessor.WrongRootHash(decryptedView.view.unwrap, correctRootHash)
+      )
 
     incorrectRootHashes.foreach { incorrectRootHash =>
       logger.warn(s"Request $rc: Found malformed payload: $incorrectRootHash")
     }
 
     val submitterMetadataO = steps.getSubmitterInformation(
-      viewsWithCorrectRootHash.map { case (view, _) => view.unwrap }
+      viewsWithCorrectRootHash.map(decryptedView => decryptedView.view.unwrap)
     )
 
     val submissionTopologyTimestamp = rootHashMessage.submissionTopologyTimestamp
@@ -1459,7 +1484,7 @@ abstract class ProtocolProcessor[
 
   override def processResult(
       counter: SequencerCounter,
-      event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
+      event: WithOpeningErrors[SignedContent[Deliver[Batch[DefaultOpenEnvelope]]]],
   )(implicit traceContext: TraceContext): HandlerResult = {
     val content = event.event.content
     val ts = content.timestamp
@@ -1491,7 +1516,7 @@ abstract class ProtocolProcessor[
 
   @VisibleForTesting
   private[protocol] def processResultInternal1(
-      event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
+      event: WithOpeningErrors[SignedContent[Deliver[Batch[DefaultOpenEnvelope]]]],
       result: SignedProtocolMessage[ConfirmationResultMessage],
       requestId: RequestId,
       resultTs: CantonTimestamp,
@@ -1591,7 +1616,7 @@ abstract class ProtocolProcessor[
     * confirmation result. The inner `EitherT` corresponds to the subsequent async stage.
     */
   private[this] def processResultInternal2(
-      event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
+      event: WithOpeningErrors[SignedContent[Deliver[Batch[DefaultOpenEnvelope]]]],
       result: SignedProtocolMessage[ConfirmationResultMessage],
       requestId: RequestId,
       resultTs: CantonTimestamp,
@@ -1716,7 +1741,7 @@ abstract class ProtocolProcessor[
   // Assigning the internal contract ids to the contracts requires that all the contracts are
   // already persisted in the contract store.
   private[this] def processResultInternal3(
-      event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
+      event: WithOpeningErrors[SignedContent[Deliver[Batch[DefaultOpenEnvelope]]]],
       verdict: Verdict,
       requestId: RequestId,
       resultTs: CantonTimestamp,

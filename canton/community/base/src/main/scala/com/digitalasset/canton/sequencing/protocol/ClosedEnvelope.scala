@@ -4,15 +4,16 @@
 package com.digitalasset.canton.sequencing.protocol
 
 import cats.data.EitherT
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.protocol.SynchronizerLimits
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.*
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import monocle.Optional
@@ -25,6 +26,7 @@ trait ClosedEnvelope extends Envelope[ByteString] {
 
   def toOpenEnvelope(
       hashOps: HashOps,
+      synchronizerLimits: SynchronizerLimits,
       protocolVersion: ProtocolVersion,
   ): ParsingResult[DefaultOpenEnvelope]
 
@@ -35,6 +37,12 @@ trait ClosedEnvelope extends Envelope[ByteString] {
 
   @VisibleForTesting
   def withRecipients(newRecipients: Recipients): ClosedEnvelope
+
+  /** Returns this envelope bound to the given budget for its deferred decompression.
+    */
+  private[protocol] def withDecompressionBudget(
+      decompressionBudget: DecompressionBudget
+  ): ClosedEnvelope
 }
 
 object ClosedEnvelope {

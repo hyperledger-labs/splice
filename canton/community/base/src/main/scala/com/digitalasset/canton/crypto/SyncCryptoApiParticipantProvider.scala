@@ -5,9 +5,7 @@ package com.digitalasset.canton.crypto
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.concurrent.{FutureSupervisor, HasFutureSupervision}
 import com.digitalasset.canton.config.{CacheConfig, CryptoConfig, ProcessingTimeout}
@@ -17,6 +15,7 @@ import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOv
 import com.digitalasset.canton.crypto.verifier.SyncCryptoVerifier
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.CryptoMetrics
@@ -34,6 +33,7 @@ import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.version.HasToByteString
+import com.digitalasset.nonempty.NonEmpty
 import com.google.protobuf.ByteString
 import org.slf4j.event.Level
 
@@ -133,8 +133,8 @@ class SyncCryptoApiParticipantProvider(
     }
 
   override def close(): Unit = {
-    val instances: Seq[AutoCloseable] = synchronizerCryptoClientCache.values.toSeq :+ ips
-    LifeCycle.close(instances*)(logger)
+    val instances = synchronizerCryptoClientCache.values.toSeq :+ ips
+    LifeCycle.close(instances)(logger)
   }
 
 }
@@ -576,6 +576,14 @@ class SynchronizerSnapshotSyncCryptoApi(
         usage,
       )
     } yield ()
+
+  override def verifyPartyJwtSignature(
+      bytes: ByteString,
+      signer: PartyId,
+      signature: SignatureWithoutSigner,
+      usage: NonEmpty[Set[SigningKeyUsage]],
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SignatureCheckError, Unit] =
+    syncCryptoVerifier.verifyPartyJwtSignature(ipsSnapshot, bytes, signer, signature, usage)
 
   override def decrypt[M](encryptedMessage: AsymmetricEncrypted[M])(
       deserialize: ByteString => Either[DeserializationError, M]

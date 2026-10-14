@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.participant.protocol
 
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent.{
   Added,
@@ -14,6 +13,7 @@ import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransacti
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.TopologyEvent.PartyToParticipantAuthorization
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.{
   AuthorizationLevel,
+  GenericTopologyEvent,
   TopologyEvent,
 }
 import com.digitalasset.canton.protocol.UpdateId
@@ -89,17 +89,44 @@ private[protocol] object TopologyTransactionDiff {
         !after.contains(partyId -> participantId)
     }
 
-    NonEmpty
-      .from(allEvents)
-      .map(
-        TopologyTransactionDiff(
-          _,
-          updateId(psid, oldRelevantState, currentRelevantState),
-          onboardingLocalParty = onboarding.exists(_.participant == localParticipantId.toLf),
-          clearingOnboardingLocalParty = clearingOnboardingLocalParty,
-          abortingOnboardingLocalParty = abortingOnboardingLocalParty,
+    val changedSynchronizerParam =
+      if (psid.protocolVersion >= ProtocolVersion.acsCommitmentRedesign) {
+        extractSynchronizerParameterStateChanges(
+          oldRelevantState = oldRelevantState,
+          currentRelevantState = currentRelevantState,
         )
+      } else None
+
+    Option.when(allEvents.nonEmpty || changedSynchronizerParam.nonEmpty) {
+      TopologyTransactionDiff(
+        allEvents,
+        updateId(psid, oldRelevantState, currentRelevantState),
+        onboardingLocalParty = onboarding.exists(_.participant == localParticipantId.toLf),
+        clearingOnboardingLocalParty = clearingOnboardingLocalParty,
+        abortingOnboardingLocalParty = abortingOnboardingLocalParty,
+        genericTopologyEvents = changedSynchronizerParam.toList,
       )
+    }
+  }
+
+  private def extractSynchronizerParameterStateChanges(
+      oldRelevantState: PositiveSignedTopologyTransactions,
+      currentRelevantState: PositiveSignedTopologyTransactions,
+  ): Option[GenericTopologyEvent.SynchronizerParametersState] = {
+    val beforeSynchronizerParams = oldRelevantState.view
+      .maxByOption(_.serial)
+      .flatMap(_.transaction.selectMapping[SynchronizerParametersState])
+    val afterSynchronizerParams = currentRelevantState.view
+      .maxByOption(_.serial)
+      .flatMap(_.transaction.selectMapping[SynchronizerParametersState])
+    // this way of checking doesn't work in the general case for all mappings, because store.findEffectiveStateChanges doesn't return
+    // topology transactions with operation=REMOVE. For synchronizer parameters we know that they will (or rather should) never be removed,
+    // because that would pretty much render the synchronizer in a broken state.
+    if (beforeSynchronizerParams.map(_.mapping) != afterSynchronizerParams.map(_.mapping))
+      afterSynchronizerParams.map(
+        GenericTopologyEvent.SynchronizerParametersState.fromTopologyTransaction
+      )
+    else None
   }
 
   private[protocol] def updateId(
@@ -179,9 +206,10 @@ private[protocol] object TopologyTransactionDiff {
 }
 
 private[protocol] final case class TopologyTransactionDiff(
-    topologyEvents: NonEmpty[Set[TopologyEvent]],
+    topologyEvents: Set[TopologyEvent],
     updateId: UpdateId,
     onboardingLocalParty: Boolean,
     clearingOnboardingLocalParty: Boolean,
     abortingOnboardingLocalParty: Boolean,
+    genericTopologyEvents: Seq[GenericTopologyEvent],
 )

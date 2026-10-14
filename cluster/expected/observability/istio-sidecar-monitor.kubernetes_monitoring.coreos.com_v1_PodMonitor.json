@@ -1,0 +1,130 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "monitoring.coreos.com/v1",
+    "kind": "PodMonitor",
+    "metadata": {
+      "labels": {
+        "monitoring": "istio-proxies",
+        "release": "prometheus-grafana-monitoring"
+      },
+      "name": "istio-sidecar-monitor",
+      "namespace": "observability"
+    },
+    "spec": {
+      "jobLabel": "app",
+      "namespaceSelector": {
+        "matchNames": [
+          "sv-1",
+          "sv-2",
+          "sv-3",
+          "sv-4",
+          "sv-5",
+          "sv-6",
+          "sv-7",
+          "sv-8",
+          "sv-9",
+          "sv-10",
+          "sv-11",
+          "sv-12",
+          "sv-13",
+          "sv-14",
+          "sv-15",
+          "sv-16",
+          "sv",
+          "sv-da-1",
+          "splitwell",
+          "validator1",
+          "validator"
+        ]
+      },
+      "podMetricsEndpoints": [
+        {
+          "honorLabels": true,
+          "metricRelabelings": [
+            {
+              "action": "keep",
+              "regex": "(istio_.*|envoy_.*http_local_rate_limit_.*)",
+              "sourceLabels": [
+                "__name__"
+              ]
+            },
+            {
+              "action": "replace",
+              "regex": "envoy_http_local_rate_limiter_(.+)_http_local_rate_limit_.+",
+              "replacement": "$1",
+              "sourceLabels": [
+                "__name__"
+              ],
+              "targetLabel": "limiter"
+            },
+            {
+              "action": "replace",
+              "regex": "envoy_http_local_rate_limiter_.+_http_local_rate_limit_(.+)",
+              "replacement": "envoy_http_local_rate_limit_$1",
+              "sourceLabels": [
+                "__name__"
+              ],
+              "targetLabel": "__name__"
+            },
+            {
+              "action": "labeldrop",
+              "regex": "instance"
+            }
+          ],
+          "path": "/stats/prometheus",
+          "port": "http-envoy-prom",
+          "relabelings": [
+            {
+              "action": "keep",
+              "regex": "istio-proxy",
+              "sourceLabels": [
+                "__meta_kubernetes_pod_container_name"
+              ]
+            },
+            {
+              "action": "replace",
+              "regex": "(\\d+);(([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4})",
+              "replacement": "[$2]:$1",
+              "sourceLabels": [
+                "__meta_kubernetes_pod_annotation_prometheus_io_port",
+                "__meta_kubernetes_pod_ip"
+              ],
+              "targetLabel": "__address__"
+            },
+            {
+              "action": "replace",
+              "regex": "(\\d+);((([0-9]+?)(\\.|$)){4})",
+              "replacement": "$2:$1",
+              "sourceLabels": [
+                "__meta_kubernetes_pod_annotation_prometheus_io_port",
+                "__meta_kubernetes_pod_ip"
+              ],
+              "targetLabel": "__address__"
+            },
+            {
+              "action": "labeldrop",
+              "regex": "__meta_kubernetes_pod_label_(.+)"
+            },
+            {
+              "action": "replace",
+              "sourceLabels": [
+                "__meta_kubernetes_namespace"
+              ],
+              "targetLabel": "namespace"
+            }
+          ]
+        }
+      ],
+      "selector": {
+        "matchLabels": {
+          "security.istio.io/tlsMode": "istio"
+        }
+      }
+    }
+  },
+  "name": "istio-sidecar-monitor",
+  "provider": "",
+  "type": "kubernetes:monitoring.coreos.com/v1:PodMonitor"
+}

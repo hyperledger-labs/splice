@@ -24,33 +24,33 @@ import com.digitalasset.canton.error.TransactionRoutingError.TopologyErrors
 import com.digitalasset.canton.ledger.api.refinements.ApiTypes.WorkflowId
 import com.digitalasset.canton.ledger.client.{LedgerClient, LedgerClientUtils}
 import com.digitalasset.canton.ledger.error.groups.{CommandExecutionErrors, RequestValidationErrors}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   HasCloseContext,
   LifeCycle,
   PromiseUnlessShutdownFactory,
+  UnlessShutdown,
 }
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.admin.PingService.{
-  AdditionalRetryOnKnownRaceConditions,
-  SyncServiceHandle,
-}
+import com.digitalasset.canton.participant.admin.PingService.AdditionalRetryOnKnownRaceConditions
 import com.digitalasset.canton.participant.admin.workflows.java.canton.internal as M
 import com.digitalasset.canton.participant.ledger.api.client.{
   CommandResult,
   CommandSubmitterWithRetry,
   LedgerConnection,
 }
+import com.digitalasset.canton.participant.sync.CantonSyncService.SyncServiceHandle
 import com.digitalasset.canton.serialization.ProtoConverter
+import com.digitalasset.canton.time.Clock.ClockHandle
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
 import com.digitalasset.canton.util.{FutureUtil, LoggerUtil}
 import com.google.rpc.status.Status
 import io.opentelemetry.api.trace.Tracer
-import scalaz.Tag
 
 import java.time.{Duration, Instant}
 import java.util.UUID
@@ -103,11 +103,12 @@ class PingService(
     with NamedLogging
     with Spanning {
 
-  override protected def isActive: Boolean = syncService.isActive
+  override protected def isActive: Boolean = syncService.isActive()
   // Execute vacuuming task when (re)connecting to a new synchronizer
-  syncService.subscribeToConnections(_.withTraceContext { implicit traceContext => synchronizerId =>
-    logger.debug(s"Received connection notification from $synchronizerId")
-    vacuumStaleContracts(synchronizerId)
+  private val connectionListenerHandle = syncService.subscribeToConnections(_.withTraceContext {
+    implicit traceContext => synchronizerId =>
+      logger.debug(s"Received connection notification from $synchronizerId")
+      vacuumStaleContracts(synchronizerId)
   })
 
   private def userId = "PingService"
@@ -116,7 +117,12 @@ class PingService(
     // Note that we can not time out pings nicely here on shutdown as the admin
     // server is closed first, which means that our ping requests will never
     // return proper on shutdown abort
-    LifeCycle.close(retrySubmitter, connection)(logger)
+    LifeCycle.close(
+      () => cancelRequests(),
+      connectionListenerHandle,
+      retrySubmitter,
+      connection,
+    )(logger)
 
   private val retrySubmitter = new CommandSubmitterWithRetry(
     connection.commandService,
@@ -153,7 +159,7 @@ class PingService(
     val commandId = s"$id-$action-${UUID.randomUUID()}"
     retrySubmitter.submitCommands(
       Commands(
-        workflowId = workflowId.map(Tag.unwrap).getOrElse(""),
+        workflowId = workflowId.map(_.unwrap).getOrElse(""),
         userId = userId,
         commandId = commandId,
         commands = cmds.map(LedgerClientUtils.javaCodegenToScalaProto),
@@ -176,11 +182,6 @@ class PingService(
 }
 
 object PingService {
-
-  trait SyncServiceHandle {
-    def isActive: Boolean
-    def subscribeToConnections(subscriber: Traced[SynchronizerId] => Unit): Unit
-  }
 
   private val DefaultRetryableDelay = 1.second
   private val AdditionalRetryOnKnownRaceConditions = Seq(
@@ -216,7 +217,7 @@ object PingService {
 
   private[admin] trait Impl {
 
-    this: AdminWorkflowService & NamedLogging & FlagCloseable & PromiseUnlessShutdownFactory & Spanning =>
+    this: AdminWorkflowService & NamedLogging & FlagCloseable & HasCloseContext & PromiseUnlessShutdownFactory & Spanning =>
 
     protected def adminPartyId: PartyId
     protected def maxLevelSupported: NonNegativeInt
@@ -359,11 +360,12 @@ object PingService {
         FutureUtil.doNotAwait(
           clock
             .scheduleAfter(
-              _ => {
+              action = _ => {
                 // slowly remove contracts from acs such that we would detect duplicate responses
                 archived.foreach(contract => acs.remove(contract.contractId.contractId).discard)
               },
-              CleanupPingsTime.duration,
+              taskName = s"${getClass.getName}: removed archived",
+              delta = CleanupPingsTime.duration,
             )
             .onShutdown(()),
           "remove acs",
@@ -425,11 +427,12 @@ object PingService {
       }
       FutureUtil.doNotAwait(
         clock
-          .scheduleAt(
+          .scheduleAtCancelledOnShutdown(
             _ => {
               // vacuum created contracts
               created.foreach(_.vacuum())
             },
+            s"${getClass.getName}: processing created contracts",
             cleanup.plus(CleanupPingsTime.duration),
           )
           .onShutdown(()),
@@ -570,7 +573,20 @@ object PingService {
     private[admin] type PingId = String
     private[admin] type ContractIdS = String
 
-    private val requests: TrieMap[PingId, PingRequest] = new TrieMap()
+    private val requests: TrieMap[PingId, (PingRequest, ClockHandle[Unit])] = new TrieMap()
+    private def getRequest(id: PingId): Option[PingRequest] = requests.get(id).map(_._1)
+    private def removeRequest(id: PingId): Option[PingRequest] =
+      requests.remove(id).map { case (request, handle) =>
+        handle.cancel(UnlessShutdown.unit)
+        request
+      }
+    def cancelRequests(): Unit =
+      requests.values.foreach { case (request, handle) =>
+        handle.cancel(UnlessShutdown.unit)
+        request.promise.trySuccess {
+          PingService.Failure("Aborting ping due to service closure")
+        }.discard
+      }
 
     /** Send a ping to the target party, return round-trip time or a timeout
       *
@@ -611,28 +627,21 @@ object PingService {
           synchronizerId = synchronizerId,
           workflowId = workflowId,
         )
-        requests.putIfAbsent(id, request) match {
+
+        val (_, cancelHandle) =
+          clock.scheduleAfterCancellable(
+            action = request.pingTimedout,
+            taskName = s"${getClass.getName}: ping timeout",
+            delta = timeout.duration,
+          )
+
+        requests.putIfAbsent(id, (request, cancelHandle)) match {
           case None =>
-            // schedule ping timeout in case we don't receive any response
-            FutureUtil.doNotAwait(
-              clock
-                .scheduleAfter(request.pingTimedout, timeout.duration)
-                .onShutdown {
-                  // normally, the admin server is shutdown before the ping services
-                  // this is to avoid that any new command arrives while we are shutting down.
-                  // unfortunately, this means we can't expire the ping requests nicely.
-                  // there is a trick though: the clock is also shutdown before the admin server,
-                  // so if we just react on the shutdown event there, we can terminate the pings
-                  request.promise.trySuccess {
-                    PingService.Failure("Aborting ping due to shutdown")
-                  }.discard
-                  ()
-                },
-              "cleaning up the request",
-            )
             request.submit()
             request.promise.future
-          case Some(_) => reject(s"Duplicate ping request $id")
+          case Some(_) =>
+            cancelHandle.cancel(UnlessShutdown.unit)
+            reject(s"Duplicate ping request $id")
         }
       }
     }
@@ -689,7 +698,7 @@ object PingService {
 
       def pingTimedout(now: CantonTimestamp): Unit =
         // no need to schedule vacuuming here, as this is scheduled as part of the create event
-        requests.remove(id).foreach { _ =>
+        removeRequest(id).foreach { _ =>
           if (promise.isCompleted) {
             if (!isClosing) {
               logger.error(
@@ -709,14 +718,13 @@ object PingService {
         }
 
       private def recordFailure(error: String): Unit =
-        requests
-          .remove(id)
+        removeRequest(id)
           .foreach(_.promise.trySuccess(Failure(error)))
 
       override protected def pretty: Pretty[PingRequest] = prettyOfClass(
         param("id", _.id.singleQuoted),
         paramIfNonEmpty("synchronizerId", _.synchronizerId),
-        paramIfNonEmpty("workflowId", _.workflowId.map(Tag.unwrap(_).singleQuoted)),
+        paramIfNonEmpty("workflowId", _.workflowId.map(_.unwrap.singleQuoted)),
         param("target", _.targetParties),
         param("timeout", _.timeout),
         paramIfNonEmpty("validators", _.validators),
@@ -771,8 +779,7 @@ object PingService {
               s"Ping submission ${this} failed unexpectedly with an exception",
               exception,
             )
-            requests
-              .remove(id)
+            removeRequest(id)
               .foreach(
                 _.promise
                   .trySuccess(Failure("Internal error due to exception"))
@@ -791,7 +798,7 @@ object PingService {
     ): ContractWithExpiry = {
 
       // determine expiry (take timeout if this our own, otherwise use the parameter)
-      val timeout = requests.get(ping.data.id) match {
+      val timeout = getRequest(ping.data.id) match {
         case Some(ping) =>
           ping.observed()
           ping.timeout
@@ -854,7 +861,7 @@ object PingService {
 
         override protected def prettyData: String = bong.data.id
 
-        requests.get(bong.data.id).foreach(_.observed())
+        getRequest(bong.data.id).foreach(_.observed())
 
         override def respond(): Unit =
           if (bong.data.initiator == adminPartyId.toProtoPrimitive && !activeSubmission.get()) {
@@ -880,7 +887,7 @@ object PingService {
       }
 
     private def completedPing(id: PingId, responder: String): Unit =
-      requests.remove(id) match {
+      removeRequest(id) match {
         case Some(request) => request.receivedResponse(responder)
         case None => // can happen if we e.g. restarted and lost a pending ping
       }

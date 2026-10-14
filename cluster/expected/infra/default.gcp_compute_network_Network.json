@@ -1,0 +1,8 @@
+{
+  "custom": true,
+  "id": "projects/da-cn-devnet/global/networks/default",
+  "inputs": {},
+  "name": "default",
+  "provider": "",
+  "type": "gcp:compute/network:Network"
+}
