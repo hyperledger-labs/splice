@@ -19,10 +19,11 @@
 
       - `/v0/admin/sv/voterequest`: `vote_request_contract_ids`
 
-    - Joining SVs now download the DSO party ACS from their sponsor as a file instead of receiving it in memory.
-      This supports large snapshots.
-      The new `/v0/onboard/sv/party-migration/prepare` and `/v0/onboard/sv/download/{id}` endpoints are annotated
-      with `x-external-audience: svs`, so SVs restricting SV app ingress must expose them.
+    - Joining SVs now download the DSO party ACS and sequencer onboarding snapshots from their sponsor
+      as files instead of receiving them in memory. This supports large snapshots.
+      The new `/v0/onboard/sv/party-migration/prepare`, `/v0/onboard/sv/sequencer/prepare` and
+      `/v0/onboard/sv/download/{id}` endpoints are annotated with `x-external-audience: svs`,
+      so SVs restricting SV app ingress must expose them.
       The joining SV and its sponsor must both run this version or later.
       Both SVs store the snapshots in `canton.sv-apps.sv.onboarding-snapshots.directory`, which defaults to a
       temporary directory and should point to a volume with enough free space.
