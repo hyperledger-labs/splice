@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import cats.instances.future.*
+import cats.syntax.foldable.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -41,12 +43,8 @@ class BulkStorageCommitFromStaging[T](
     else
       objects
         .grouped(HttpRequestLimits.MaxRequestArrayItems)
-        .foldLeft(Future.successful(true)) { (agreedSoFar, batch) =>
-          agreedSoFar.flatMap(agreed =>
-            if (agreed) checkBftForBatch(requiredCatchupTimestamp, batch)
-            else Future.successful(false)
-          )
-        }
+        .toList
+        .forallM(batch => checkBftForBatch(requiredCatchupTimestamp, batch))
 
   private def checkBftForBatch(
       requiredCatchupTimestamp: CantonTimestamp,
