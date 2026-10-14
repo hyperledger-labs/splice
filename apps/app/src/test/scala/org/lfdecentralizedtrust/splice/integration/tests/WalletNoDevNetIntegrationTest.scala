@@ -68,11 +68,18 @@ class WalletNoDevNetIntegrationTest
             .withPausedTrigger[ExpireIssuingMiningRoundTrigger]
         )(config)
       )
+      // Faucet trigger: pause on ALL validators
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
-          _.withPausedTrigger[TopupMemberTrafficTrigger]
-            .withPausedTrigger[ReceiveFaucetCouponTrigger]
+          _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
+      )
+      // Top-up trigger: pause only on validators that actually have it (not the SV's validator)
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs { case (name, c) =>
+          if (name.startsWith("sv")) c
+          else c.copy(automation = c.automation.withPausedTrigger[TopupMemberTrafficTrigger])
+        }(config)
       )
       // Read the traffic balance fresh on every command.
       .withTrafficBalanceCacheDisabled
