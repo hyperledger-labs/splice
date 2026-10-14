@@ -588,8 +588,6 @@ function auth0ForDSyncNamespace(
   clusterBasename: string,
   namespace: string,
   provider: auth0.Provider,
-  ingressName: string,
-  dnsNames: string[]
 ): pulumi.Output<Auth0NamespaceConfig> {
   const id = namespace.replace(/-/g, '');
   const aud = ledgerApiAudience(
@@ -620,17 +618,25 @@ function auth0ForDSyncNamespace(
   });
 }
 
-function dsyncAuth0(clusterBasename: string, dnsNames: string[]) {
-  if (infraConfig.supportDsync) {
-    const provider = new auth0.Provider('dsync', {
-      domain: 'canton-network-dsync-test.us.auth0.com',
-      clientId: config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_ID'),
-      clientSecret: config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_SECRET'),
-    });
-    for (let i = 1; i <= 4; i++) {
-      auth0ForDSyncNamespace(clusterBasename, `dsync-op-${i}`, provider, `dsync-op-${i}`, dnsNames);
-    }
+function dsyncAuth0(clusterBasename: string): pulumi.Output<NamespacedAuth0Configs> {
+  if (!infraConfig.supportDsync) {
+    return pulumi.output({} as NamespacedAuth0Configs);
   }
+  const provider = new auth0.Provider('dsync', {
+    domain: 'canton-network-dsync-test.us.auth0.com',
+    clientId: config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_ID'),
+    clientSecret: config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_SECRET'),
+  });
+  const configs = [1, 2, 3, 4].map(i =>
+    auth0ForDSyncNamespace(clusterBasename, `dsync-op-${i}`, provider)
+  );
+  return pulumi.all(configs).apply(cfgs => {
+    const namespacedConfig: NamespacedAuth0Configs = {};
+    cfgs.forEach((cfg, i) => {
+      namespacedConfig[`dsync-op-${i + 1}`] = cfg;
+    });
+    return namespacedConfig;
+  });
 }
 
 function svRunbookAuth0(
@@ -826,18 +832,16 @@ export function configureAuth0(
       'auth0-fixed-token-cache-sv-test'
     );
     const validatorRunbookAuth0Cfg = validatorRunbookAuth0(clusterBasename, dnsNames);
-    const dsyncAuth0Cfg = dsyncAuth0(clusterBasename, dnsNames);
+    const dsyncAuth0Cfg = dsyncAuth0(clusterBasename);
 
-    return spliceAuth0Cfg.apply(splice => {
-      return svRunbookAuth0Cfg.apply(sv => {
-        return validatorRunbookAuth0Cfg.apply(validator => {
-          return {
-            cantonNetwork: splice,
-            svRunbook: sv,
-            validatorRunbook: validator,
-          };
-        });
+    return pulumi.all([spliceAuth0Cfg, svRunbookAuth0Cfg, validatorRunbookAuth0Cfg, dsyncAuth0Cfg]).apply(
+      ([splice, sv, validator, dsync]) => {
+        return {
+          cantonNetwork: splice,
+          svRunbook: sv,
+          validatorRunbook: validator,
+          dsync: dsync,
+        };
       });
-    });
   }
 }
