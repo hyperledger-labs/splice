@@ -745,8 +745,8 @@ final case class UnavailablePartiesBackoffParameters(
 
 final case class SvOnboardingSnapshotsConfig(
     directory: Option[Path] = None,
-    retention: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(24),
-    parallelism: Int = 1,
-    queueSize: Int = 16,
+    retention: PositiveFiniteDuration = PositiveFiniteDuration.ofHours(24),
+    parallelism: PositiveInt = PositiveInt.one,
+    queueSize: PositiveInt = PositiveInt.tryCreate(16),
     preparationTimeout: PositiveFiniteDuration = PositiveFiniteDuration.ofMinutes(40),
 )

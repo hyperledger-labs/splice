@@ -71,8 +71,8 @@ class SvOnboardingSnapshotService(
   private val queueTerminated: Promise[Done] = Promise()
   private val queue: BoundedSourceQueue[QueuedExport] =
     Source
-      .queue[QueuedExport](config.queueSize)
-      .mapAsyncUnordered(config.parallelism)(runExport)
+      .queue[QueuedExport](config.queueSize.value)
+      .mapAsyncUnordered(config.parallelism.value)(runExport)
       .toMat(Sink.onComplete { result =>
         queueTerminated
           .tryComplete(
@@ -131,7 +131,7 @@ class SvOnboardingSnapshotService(
                 Failure(
                   Status.UNAVAILABLE
                     .withDescription(
-                      s"Too many onboarding snapshot exports queued (max ${config.queueSize})"
+                      s"Too many onboarding snapshot exports queued (max ${config.queueSize.value})"
                     )
                     .asRuntimeException()
                 )

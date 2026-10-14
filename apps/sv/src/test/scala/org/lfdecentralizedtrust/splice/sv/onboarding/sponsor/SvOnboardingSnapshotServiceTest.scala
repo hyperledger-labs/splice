@@ -6,7 +6,8 @@ package org.lfdecentralizedtrust.splice.sv.onboarding.sponsor
 import better.files.File
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.PositiveFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{SequencerId, UniqueIdentifier}
@@ -174,7 +175,7 @@ class SvOnboardingSnapshotServiceTest
     }
 
     "run at most `parallelism` exports and reject them when the queue is full" in withService(
-      SvOnboardingSnapshotsConfig(parallelism = 2, queueSize = 1)
+      SvOnboardingSnapshotsConfig(parallelism = PositiveInt.two, queueSize = PositiveInt.one)
     ) { (service, _, _) =>
       final class Export(name: String) {
         val started = Promise[Unit]()
@@ -211,7 +212,7 @@ class SvOnboardingSnapshotServiceTest
     }
 
     "remove snapshots after the retention period from the cleanup trigger" in withService(
-      SvOnboardingSnapshotsConfig(retention = NonNegativeFiniteDuration.ofHours(24))
+      SvOnboardingSnapshotsConfig(retention = PositiveFiniteDuration.ofHours(24))
     ) { (service, clock, retryProvider) =>
       val trigger = new SvOnboardingSnapshotCleanupTrigger(
         TriggerContext(

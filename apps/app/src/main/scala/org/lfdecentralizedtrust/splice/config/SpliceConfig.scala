@@ -706,25 +706,7 @@ object SpliceConfig {
         : ConfigReader[UnavailablePartiesBackoffParameters] =
       deriveReader[UnavailablePartiesBackoffParameters]
     implicit val svOnboardingSnapshotsConfigReader: ConfigReader[SvOnboardingSnapshotsConfig] =
-      deriveReader[SvOnboardingSnapshotsConfig].emap { conf =>
-        for {
-          _ <- Either.cond(
-            conf.parallelism > 0,
-            (),
-            ConfigValidationFailed("onboarding-snapshots.parallelism must be positive"),
-          )
-          _ <- Either.cond(
-            conf.queueSize > 0,
-            (),
-            ConfigValidationFailed("onboarding-snapshots.queue-size must be positive"),
-          )
-          _ <- Either.cond(
-            conf.retention.duration > Duration.Zero,
-            (),
-            ConfigValidationFailed("onboarding-snapshots.retention must be positive"),
-          )
-        } yield conf
-      }
+      deriveReader[SvOnboardingSnapshotsConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         def checkFoundDsoConfig(check: (SvAppBackendConfig, FoundDso) => Boolean) =

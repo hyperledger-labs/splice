@@ -434,28 +434,4 @@ class SpliceConfigTest extends AsyncWordSpec with BaseTest {
       sharingConfigOf(loaded) shouldBe a[RewardSharingConfig.BuiltIn]
     }
   }
-
-  "SV onboarding snapshots config" should {
-    Seq(
-      ("parallelism", "0", "must be positive"),
-      ("parallelism", "-1", "must be positive"),
-      ("queue-size", "0", "must be positive"),
-      ("queue-size", "-1", "must be positive"),
-      ("retention", "0s", "must be positive"),
-      ("preparation-timeout", "0s", "not positive"),
-    ).foreach { case (field, value, expectedError) =>
-      s"reject $field = $value" in {
-        val overwrite = ConfigFactory.parseString(
-          s"canton.sv-apps.sv1.onboarding-snapshots.$field = $value"
-        )
-        val error = SpliceConfig
-          .loadAndValidate(CantonConfig.mergeConfigs(config, Seq(overwrite)))
-          .left
-          .value
-          .toString
-        error should include(s"onboarding-snapshots.$field")
-        error should include(expectedError)
-      }
-    }
-  }
 }
