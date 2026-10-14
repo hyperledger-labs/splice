@@ -595,9 +595,6 @@ function auth0ForDSyncNamespace(
     provider,
     true // We create the audience also for non-prod clusters, as we did not create it manually and don't want to (as opposed to other tenants where we're still using hand-created legacy stuff).
   );
-  aud.apply(audValue => {
-    console.log(`audience for dSync operator app: ${audValue}`);
-  });
   const opApp = newM2MApp(
     `${namespace.replace(/-/g, '')}DsyncOpApp`,
     `${namespace.replace(/-/g, '').toUpperCase()} dSync Operator`,
