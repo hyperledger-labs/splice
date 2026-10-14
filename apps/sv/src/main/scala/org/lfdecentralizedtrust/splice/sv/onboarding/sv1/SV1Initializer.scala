@@ -518,15 +518,9 @@ class SV1Initializer(
                     TopologyStoreId.Authorized,
                   )
                   mediatorIdentity <- synchronizerNode.mediatorAdminConnection
-                    .getOrGenerateIdentityTransactions(
-                      mediatorId,
-                      synchronizerNode.config.protocolVersion,
-                    )
+                    .generateOnboardingTopologyTransactions(synchronizerNode.config.protocolVersion)
                   sequencerIdentity <- synchronizerNode.sequencerAdminConnection
-                    .getOrGenerateIdentityTransactions(
-                      sequencerId,
-                      synchronizerNode.config.protocolVersion,
-                    )
+                    .generateOnboardingTopologyTransactions(synchronizerNode.config.protocolVersion)
                 } yield participantIdentity ++ mediatorIdentity ++ sequencerIdentity,
                 participantAdminConnection.proposeInitialDomainParameters(
                   synchronizerId,

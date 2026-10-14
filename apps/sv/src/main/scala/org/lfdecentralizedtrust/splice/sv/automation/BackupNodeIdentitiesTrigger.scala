@@ -45,7 +45,14 @@ final class BackupNodeIdentitiesTrigger(
     if (taskCompleted.get()) {
       Future.successful(Seq.empty)
     } else {
-      Future.successful(Seq(()))
+      // Sequencer/mediator keys only exist once they're onboarded, so dumping earlier would miss them.
+      for {
+        node <- synchronizerNodeService.activeSynchronizerNode()
+        sequencerInitialized <- node.sequencerAdminConnection.isNodeInitialized()
+        mediatorInitialized <- node.mediatorAdminConnection.isNodeInitialized()
+      } yield
+        if (sequencerInitialized && mediatorInitialized) Seq(())
+        else Seq.empty
     }
   protected def completeTask(task: Unit)(implicit tc: TraceContext): Future[TaskOutcome] = {
     val now = context.clock.now.toInstant
