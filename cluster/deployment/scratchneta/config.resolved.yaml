@@ -464,7 +464,6 @@ svs:
         requests:
           cpu: '1'
           memory: '2Gi'
-      trafficBasedOnboarding: true
     validatorApp:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
@@ -1674,7 +1673,6 @@ svs:
         requests:
           cpu: '1'
           memory: '2Gi'
-      trafficBasedOnboarding: true
     validatorApp:
       auth0:
         clientId: 'fBFpzZSRuufk9ueV2pSEkOXNYXuQtVmY'
