@@ -2,10 +2,18 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
+import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvStreamClient
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.{HttpMethods, HttpRequest, ResponseEntity, StatusCodes}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.util.ByteString
 
 class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with WalletTestUtil {
 
@@ -46,6 +54,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
       clue("Starting DSO app and SV1 app") {
         startAllSync((sv1Nodes ++ sv3Nodes)*)
       }
+      val sponsor = sponsorClient()
 
       val dsoParty = sv1Backend.getDsoInfo().dsoParty
       val dsoPartyStr: String = dsoParty.toProtoPrimitive
@@ -73,6 +82,19 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
             "Candidate party is not an sv and no `SvOnboardingConfirmed` for the candidate party is found."
           ),
         )
+        inside(
+          sponsor
+            .onboardSvPartyMigrationPrepare(
+              definitions.OnboardSvPartyMigrationAuthorizeRequest(randomParty.toProtoPrimitive)
+            )
+            .value
+            .futureValue
+        ) { case Left(Right(response)) =>
+          response.status shouldBe StatusCodes.NotFound
+          new String(bytesOf(response.entity)) should include(
+            "Candidate party is not an sv and no `SvOnboardingConfirmed` for the candidate party is found."
+          )
+        }
       }
 
       clue(
@@ -197,11 +219,42 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
         }
       }
 
+      clue("SV1 answers unknown onboarding paths with 404") {
+        implicit val actorSystem: ActorSystem = env.actorSystem
+        val response = Http()
+          .singleRequest(
+            HttpRequest(
+              HttpMethods.POST,
+              s"${sv1Backend.httpClientConfig.url}/api/sv/v0/onboard/sv/unknown",
+            )
+          )
+          .futureValue
+        response.status shouldBe StatusCodes.NotFound
+        new String(bytesOf(response.entity)) should include("could not be found")
+      }
+
       clue("sv3 can restart") {
         sv3Backend.stop()
         sv3Backend.startSync()
       }
   }
+
+  private def sponsorClient()(implicit env: SpliceTestConsoleEnvironment): SvStreamClient = {
+    implicit val actorSystem: ActorSystem = env.actorSystem
+    registerHttpConnectionPoolsCleanup(env)
+    SvStreamClient.httpClient(Http().singleRequest(_), sv1Backend.httpClientConfig.url.toString)(
+      env.executionContext,
+      Materializer(actorSystem),
+    )
+  }
+
+  private def bytesOf(entity: ResponseEntity)(implicit
+      env: SpliceTestConsoleEnvironment
+  ): Array[Byte] =
+    entity.dataBytes
+      .runFold(ByteString.empty)(_ ++ _)(Materializer(env.actorSystem))
+      .futureValue
+      .toArray
 
   private def getAmulets(
       participant: ParticipantClientReference,
