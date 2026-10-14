@@ -99,7 +99,7 @@ class LocalNetFrontendIntegrationTest
       withFrontEnd("frontend") { implicit webDriver =>
         actAndCheck(
           "Open the Scan UI",
-          go to "scan.localhost:4000",
+          go to "http://scan.localhost:4000",
         )(
           "Open rounds should be listed",
           _ => findAll(className("open-mining-round-row")) should have length 2,

@@ -1,4 +1,6 @@
 org.lfdecentralizedtrust.splice.admin.api.HttpRequestLoggerTest
+org.lfdecentralizedtrust.splice.admin.api.client.ApiClientRequestLoggerTest
+org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandlerBftCallFailedTest
 org.lfdecentralizedtrust.splice.auth.AuthTokenManagerTest
 org.lfdecentralizedtrust.splice.auth.SignatureVerifierTest
 org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTriggerTest
@@ -10,6 +12,7 @@ org.lfdecentralizedtrust.splice.config.ThresholdsTest
 org.lfdecentralizedtrust.splice.environment.ActiveContractsRestartTest
 org.lfdecentralizedtrust.splice.environment.CommandCircuitBreakerTest
 org.lfdecentralizedtrust.splice.environment.CommandIdDedupTest
+org.lfdecentralizedtrust.splice.environment.RetryProviderBftCallFailedTest
 org.lfdecentralizedtrust.splice.environment.TopologyAwarePackageVersionSupportTest
 org.lfdecentralizedtrust.splice.http.HttpRateLimiterTest
 org.lfdecentralizedtrust.splice.http.InvalidResponseContentTest
@@ -22,6 +25,7 @@ org.lfdecentralizedtrust.splice.scan.admin.http.GeneratedScanRouteDropNullsTest
 org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodingsTest
 org.lfdecentralizedtrust.splice.scan.admin.http.UpdateHistoryOmitNullStringComplianceTest
 org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerTest
+org.lfdecentralizedtrust.splice.scan.automation.ScanHistoryStartTriggerTest
 org.lfdecentralizedtrust.splice.scan.automation.ScanVerdictIngestionServiceTest
 org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigTest
 org.lfdecentralizedtrust.splice.scan.config.TokenStandardConfigTest
@@ -31,8 +35,13 @@ org.lfdecentralizedtrust.splice.scan.store.DbAppActivityRecordStoreTest
 org.lfdecentralizedtrust.splice.scan.store.DbScanAppRewardsStoreTest
 org.lfdecentralizedtrust.splice.scan.store.QueryAcsSnapshotPaginationTokenTest
 org.lfdecentralizedtrust.splice.scan.store.ScanEventStoreTest
+org.lfdecentralizedtrust.splice.scan.store.bulk.BulkObjectsAvailabilityTest
 org.lfdecentralizedtrust.splice.scan.store.bulk.ZstdTest
+org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.BftBulkObjectListingTest
+org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.KvBackfillingProgressTest
 org.lfdecentralizedtrust.splice.scan.store.db.CheckMetaVersionsTest
+org.lfdecentralizedtrust.splice.scan.store.historystart.HistoryReadinessTest
+org.lfdecentralizedtrust.splice.scan.store.historystart.ScanHistoryStartTest
 org.lfdecentralizedtrust.splice.store.DbUnavailablePartiesStoreTest
 org.lfdecentralizedtrust.splice.store.DomainTimeStoreTest
 org.lfdecentralizedtrust.splice.store.InMemorySynchronizerStoreTest

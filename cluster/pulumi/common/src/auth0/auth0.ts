@@ -253,7 +253,7 @@ export class Auth0Fetch implements Auth0Client {
        * lifetime or extend the length of the tokens issued by Auth0
        * (configured in the configuration of the ledger-api API in auth0).
        */
-      console.error(
+      await pulumi.log.error(
         `Auth0 access token issued with expiry (${expires_in}) too short to meet REQUIRED_TOKEN_LIFETIME (${REQUIRED_TOKEN_LIFETIME})`
       );
       process.exit(1);

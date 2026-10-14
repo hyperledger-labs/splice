@@ -15,7 +15,7 @@ class ScanStorageConfigTest
       def mkConfig(periodHours: Int) = ScanStorageConfig(
         dbAcsSnapshotPeriodHours = periodHours,
         bulkAcsSnapshotPeriodHours = 4,
-        bulkDbReadChunkSize = 1,
+        bulkZstdBlockSize = 0L,
         bulkZstdFrameSize = 0L,
         bulkMaxFileSize = 0L,
         zstdCompressionLevel = 0,
@@ -39,6 +39,18 @@ class ScanStorageConfigTest
         val next = cantonTimestamp("2007-12-04T00:00:00.00Z")
         config.computeDbSnapshotTimeAfter(prev) shouldBe next
       }
+    }
+
+    "find the segment folder of an object key and parse it back to the segment" in {
+      val config = ScanStorageConfigs.scanStorageConfigV1
+      val from = cantonTimestamp("2007-12-03T00:00:00.00Z")
+      val to = cantonTimestamp("2007-12-04T00:00:00.00Z")
+      val folder = config.getSegmentFolder(from, Some(to))
+      val key = s"$folder/${ScanStorageConfig.Encoding.ProtobufJson.storageKey("updates", 3)}"
+
+      config.getSegmentFolderOfObjectKey(key) shouldBe folder
+      config.getStartAndEndTimestampsForFolder(config.getSegmentFolderOfObjectKey(key)) shouldBe
+        Right((from, to))
     }
   }
 

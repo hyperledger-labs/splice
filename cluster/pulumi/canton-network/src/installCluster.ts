@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
   config,
@@ -19,12 +20,12 @@ import { installDocs } from './docs';
 
 /// Toplevel Chart Installs
 
-console.error(`Launching with isDevNet: ${isDevNet}`);
+void pulumi.log.info(`Launching with isDevNet: ${isDevNet}`);
 
 const enableChaosMesh = config.envFlag('ENABLE_CHAOS_MESH');
 
 export async function installCluster(auth0Client: Auth0Client): Promise<void> {
-  console.error(
+  await pulumi.log.info(
     activeVersion.type === 'local'
       ? 'Using locally built charts by default'
       : `Using charts from the container registry by default, version ${activeVersion.version}`

@@ -65,7 +65,7 @@ jobs:
           cmd: "bundle"
 
       - name: Smoke test bundle
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: |
             set -euo pipefail

@@ -50,13 +50,21 @@ runs:
         load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).daml }}
         splice_root: ${{ inputs.splice_root }}
 
+    # The reports are used to split tests across runners, so only store times of
+    # passing suites from non-PR runs: a failing PR run would otherwise overwrite
+    # them with near-zero times and skew the split for every later run.
     - name: Collect test reports
+      if: ${{ github.event_name == 'push' || github.event_name == 'schedule' }}
       shell: bash
       run: |
         sudo mkdir -p /cache/test-reports
         sudo chown $(whoami):$(whoami) "/cache/test-reports"
-        for subproject in `find ${{ inputs.splice_root }} -path "*/target/test-reports" | sed -e 's/^\.\///' -e 's/\/target\/test-reports$//'`
+        for report in $(find ${{ inputs.splice_root }} -path "*/target/test-reports/TEST-*.xml")
         do
-          # `|| true` to avoid failing if there are no test reports
-          cp -v "$subproject"/target/test-reports/TEST-*.xml /cache/test-reports/ || true
+          header=$(grep -m1 -oE '<testsuite [^>]*>' "$report" || true)
+          if [[ "$header" == *' failures="0"'* && "$header" == *' errors="0"'* && "$header" != *' tests="0"'* ]]; then
+            cp -v "$report" /cache/test-reports/
+          else
+            echo "Not caching $report: ${header:-no testsuite header}"
+          fi
         done

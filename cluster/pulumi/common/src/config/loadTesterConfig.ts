@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import { clusterYamlConfig } from '@canton-network/splice-pulumi-common/src/config/config';
 import util from 'node:util';
 import { z } from 'zod';
@@ -34,10 +35,9 @@ export const LoadTesterConfigSchema = z.object({
 
 export const loadTesterConfig = LoadTesterConfigSchema.parse(clusterYamlConfig).loadTester;
 
-console.error(
-  'Loaded load tester configuration',
-  util.inspect(loadTesterConfig, {
+void pulumi.log.debug(
+  `Loaded load tester configuration ${util.inspect(loadTesterConfig, {
     depth: null,
     maxStringLength: null,
-  })
+  })}`
 );

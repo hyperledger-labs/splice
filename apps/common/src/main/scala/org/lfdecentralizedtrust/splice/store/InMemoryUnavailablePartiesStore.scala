@@ -32,9 +32,6 @@ class InMemoryUnavailablePartiesStore(initialParties: Set[PartyId])
   ): Future[Seq[PartyId]] =
     Future.successful(toRemove.distinct.filter(parties.remove))
 
-  override def removePartiesUpToStoreId(storeId: Long)(implicit tc: TraceContext): Future[Int] =
-    Future.successful(0)
-
   override def listParties()(implicit tc: TraceContext): Future[Seq[PartyId]] =
     Future.successful(parties.asScala.toSeq)
 }

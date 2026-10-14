@@ -273,46 +273,19 @@ class DbUnavailablePartiesStoreTest
         }
       }
 
-      "remove parties regardless of which store recorded them" in {
+      "not delete parties from other stores" in {
         for {
           store1 <- mkStore(storeDescriptor)
           store2 <- mkStore(storeDescriptor2)
           _ <- store1.addPartiesAt(Seq(userParty(1)), atSeconds(0))
-          deleted <- store2.removeParties(Seq(userParty(1)))
-          parties <- store1.listPartiesAt(atSeconds(0))
+          _ <- store2.addPartiesAt(Seq(userParty(1)), atSeconds(0))
+          deleted <- store1.removeParties(Seq(userParty(1)))
+          parties1 <- store1.listPartiesAt(atSeconds(0))
+          parties2 <- store2.listPartiesAt(atSeconds(0))
         } yield {
           deleted should contain theSameElementsAs Seq(userParty(1))
-          parties shouldBe empty
-        }
-      }
-    }
-
-    "removePartiesUpToStoreId" should {
-
-      "remove every party recorded at or below the given store id" in {
-        for {
-          store <- mkStore()
-          _ <- store.addPartiesAt(Seq(userParty(1), userParty(2)), atSeconds(0))
-          deleted <- store.removePartiesUpToStoreId(store.storeId.toLong)
-          parties <- store.listPartiesAt(atSeconds(0))
-        } yield {
-          deleted shouldBe 2
-          parties shouldBe empty
-        }
-      }
-
-      "leave parties recorded by a later store id in place" in {
-        for {
-          store1 <- mkStore(storeDescriptor)
-          store2 <- mkStore(storeDescriptor2)
-          _ = store1.storeId should be < store2.storeId
-          _ <- store1.addPartiesAt(Seq(userParty(1)), atSeconds(0))
-          _ <- store2.addPartiesAt(Seq(userParty(2)), atSeconds(0))
-          deleted <- store1.removePartiesUpToStoreId(store1.storeId.toLong)
-          remaining <- store2.listPartiesAt(atSeconds(0))
-        } yield {
-          deleted shouldBe 1
-          remaining should contain theSameElementsAs Seq(userParty(2))
+          parties1 shouldBe empty
+          parties2 should contain theSameElementsAs Seq(userParty(1))
         }
       }
     }
@@ -330,17 +303,16 @@ class DbUnavailablePartiesStoreTest
         }
       }
 
-      "return entries recorded by any store" in {
+      "not return parties from other stores" in {
         for {
           store1 <- mkStore(storeDescriptor)
           store2 <- mkStore(storeDescriptor2)
           _ <- store1.addPartiesAt(Seq(userParty(1)), atSeconds(0))
-          _ <- store2.addPartiesAt(Seq(userParty(2)), atSeconds(0))
           parties1 <- store1.listPartiesAt(atSeconds(0))
           parties2 <- store2.listPartiesAt(atSeconds(0))
         } yield {
-          parties1 should contain theSameElementsAs Seq(userParty(1), userParty(2))
-          parties2 should contain theSameElementsAs Seq(userParty(1), userParty(2))
+          parties1 should contain theSameElementsAs Seq(userParty(1))
+          parties2 shouldBe empty
         }
       }
     }

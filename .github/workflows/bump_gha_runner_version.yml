@@ -31,7 +31,7 @@ jobs:
           target: default
 
       - name: Check for the latest version and create a PR to splice
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"

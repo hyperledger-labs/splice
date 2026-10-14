@@ -43,7 +43,7 @@ runs:
   using: 'composite'
   steps:
     - name: Execute SBT command"
-      uses: ./.github/actions/nix/run_bash_command_in_nix
+      uses: ./.github/actions/nix/run
       with:
         additional_nix_args: "--keep GITHUB_ACTION_PATH ${{ inputs.additional_nix_args }}"
         cmd: |

@@ -28,7 +28,11 @@ import org.lfdecentralizedtrust.splice.environment.{RetryFor, RetryProvider, Spl
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AnsEntry,
+  BulkObjectsAvailability,
+  BulkStorageBucket,
+  DamlValueEncoding,
   GetBulkObjectChecksumsResponse,
+  GetBulkObjectsProgressResponse,
   GetRewardAccountingActivityTotalsResponse,
   GetRewardAccountingBatchResponse,
   GetRewardAccountingRootHashResponse,
@@ -44,10 +48,12 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.{
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoScan
-import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.scan.config.{ScanAppClientConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkObjectKind
 import org.lfdecentralizedtrust.splice.store.{DsoRulesStore, VoteResultsFilters}
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BulkStorageObjects
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{
   ChoiceContextWithDisclosures,
@@ -87,6 +93,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.HoldingsSummaryRequest.RecordTimeMatch
 import org.lfdecentralizedtrust.splice.metrics.ScanConnectionMetrics
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.{
+  BftOutcome,
+  DataAvailabilityResponse,
+}
 import org.lfdecentralizedtrust.tokenstandard.{
   allocation,
   allocationinstruction,
@@ -802,7 +812,7 @@ class BftScanConnection(
     * (`Unavailable`), reusing cached Ok responses from phase 1.
     * Undetermined and CannotProvide responses are transformed to
     * failures so they never form a consensus. Consensus failures
-    * propagate as `HttpErrorWithHttpCode(BadGateway)` — same
+    * propagate as `BftCallFailed.Disagreement` — same
     * convention as `getMigrationInfo`.
     */
   override def getRewardAccountingActivityTotals(roundNumber: Long)(implicit
@@ -843,7 +853,7 @@ class BftScanConnection(
     * (`Unavailable`), reusing cached Ok responses from phase 1.
     * Undetermined and CannotProvide responses are transformed to
     * failures so they never form a consensus. Consensus failures
-    * propagate as `HttpErrorWithHttpCode(BadGateway)` — same
+    * propagate as `BftCallFailed.Disagreement` — same
     * convention as `getMigrationInfo`.
     */
   override def getRewardAccountingRootHash(roundNumber: Long)(implicit
@@ -911,7 +921,7 @@ class BftScanConnection(
       disagreementLogLevel = Level.WARN,
       // "Not enough scans" here means the probe didn't gather enough cached
       // responses to satisfy BFT quorum — benign during bootstrap or transient
-      // peer unavailability. The caller sees HTTP 502 and retries.
+      // peer unavailability. The caller sees BftCallFailed.NotEnoughScans and retries.
       notEnoughScansLogLevel = Level.INFO,
     )
   }
@@ -941,12 +951,128 @@ class BftScanConnection(
 
   override def getBulkObjectChecksums(
       requiredCatchupTimestamp: CantonTimestamp,
+      kind: BulkObjectKind,
       objectKeys: Seq[String],
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[GetBulkObjectChecksumsResponse] =
-    bftCall(
-      _.getBulkObjectChecksums(requiredCatchupTimestamp, objectKeys),
-      "getBulkObjectChecksums",
+    getBulkObjectChecksumsOutcome(requiredCatchupTimestamp, kind, objectKeys)
+      .flatMap(_.toFuture)
+      .map(_._1)
+
+  def getBulkObjectChecksumsOutcome(
+      requiredCatchupTimestamp: CantonTimestamp,
+      kind: BulkObjectKind,
+      objectKeys: Seq[String],
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[BftOutcome[GetBulkObjectChecksumsResponse]] =
+    BftCallExecutor.bftCallForEventualConsistencyEndpoints(
+      scanList.scanConnections,
+      connectionMetrics,
+      retryProvider,
+      logger,
+      hasData = _.getBulkObjectsProgress(requiredCatchupTimestamp, BulkStorageBucket.Staging, kind)
+        .map(BftScanConnection.dataAvailability),
+      getData = _.getBulkObjectChecksums(requiredCatchupTimestamp, kind, objectKeys),
+      endpoint = "getBulkObjectChecksums",
+      callConfig = BftCallConfig.default(scanList.scanConnections),
+    )
+
+  override def listBulkAcsSnapshotObjects(
+      atOrBeforeRecordTime: CantonTimestamp,
+      damlValueEncoding: Option[DamlValueEncoding],
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[BulkStorageObjects.SnapshotObjects]] =
+    bftCallOnScansCommittedUpTo(
+      atOrBeforeRecordTime,
+      BulkObjectKind.Snapshots,
+      "listBulkAcsSnapshotObjects",
+    )(
+      _.listBulkAcsSnapshotObjects(atOrBeforeRecordTime, damlValueEncoding)
+    ).flatMap(_.toFuture).map(_._1)
+
+  override def listBulkUpdateHistoryObjects(
+      startRecordTime: CantonTimestamp,
+      endRecordTime: CantonTimestamp,
+      pageSize: Int,
+      nextPageToken: Option[String],
+      damlValueEncoding: Option[DamlValueEncoding],
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[BulkStorageObjects.UpdateObjectsPage] =
+    bftCallOnScansCommittedUpTo(
+      endRecordTime,
+      BulkObjectKind.Updates,
+      "listBulkUpdateHistoryObjects",
+    )(
+      _.listBulkUpdateHistoryObjects(
+        startRecordTime,
+        endRecordTime,
+        pageSize,
+        nextPageToken,
+        damlValueEncoding,
+      )
+    ).flatMap(_.toFuture).map(_._1)
+
+  def listBulkAcsSnapshotObjectsWithPeers(
+      atOrBeforeRecordTime: CantonTimestamp,
+      encoding: ScanStorageConfig.Encoding,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[BftOutcome[Option[BulkStorageObjects.SnapshotObjects]]] =
+    bftCallOnScansCommittedUpTo(
+      atOrBeforeRecordTime,
+      BulkObjectKind.Snapshots,
+      "listBulkAcsSnapshotObjects",
+    )(
+      _.listBulkAcsSnapshotObjects(atOrBeforeRecordTime, Some(encoding.damlValueEncoding))
+    )
+
+  def listBulkUpdateHistoryObjectsWithPeers(
+      startRecordTime: CantonTimestamp,
+      endRecordTime: CantonTimestamp,
+      pageSize: Int,
+      availableAt: CantonTimestamp,
+      encoding: ScanStorageConfig.Encoding,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[BftOutcome[BulkStorageObjects.UpdateObjectsPage]] =
+    bftCallOnScansCommittedUpTo(
+      availableAt,
+      BulkObjectKind.Updates,
+      "listBulkUpdateHistoryObjects",
+    )(
+      _.listBulkUpdateHistoryObjects(
+        startRecordTime,
+        endRecordTime,
+        pageSize,
+        None,
+        Some(encoding.damlValueEncoding),
+      )
+    )
+
+  private def bftCallOnScansCommittedUpTo[T](
+      availableAt: CantonTimestamp,
+      kind: BulkObjectKind,
+      endpoint: String,
+  )(
+      call: SingleScanConnection => Future[T]
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[BftOutcome[T]] =
+    BftCallExecutor.bftCallForEventualConsistencyEndpoints(
+      scanList.scanConnections,
+      connectionMetrics,
+      retryProvider,
+      logger,
+      hasData = _.getBulkObjectsProgress(availableAt, BulkStorageBucket.Committed, kind)
+        .map(BftScanConnection.dataAvailability),
+      getData = call,
+      endpoint = endpoint,
+      callConfig = BftCallConfig.default(scanList.scanConnections),
       consensusFailureLogLevel = Level.DEBUG,
+      disagreementLogLevel = Level.INFO,
+      notEnoughScansLogLevel = Level.DEBUG,
     )
 
   private def bftCall[T](
@@ -979,21 +1105,22 @@ class BftScanConnection(
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[(T, List[Uri])] = {
-    BftCallExecutor.bftCallWithScanUris(
-      scanList.scanConnections,
-      connectionMetrics,
-      retryProvider,
-      logger,
-      call,
-      endpoint,
-      callConfig,
-      consensusFailureLogLevel,
-      disagreementLogLevel,
-      notEnoughScansLogLevel,
-      shortenResponsesForLog,
-    )
-  }
+  ): Future[(T, List[Uri])] =
+    BftCallExecutor
+      .bftCallWithScanUris(
+        scanList.scanConnections,
+        connectionMetrics,
+        retryProvider,
+        logger,
+        call,
+        endpoint,
+        callConfig,
+        consensusFailureLogLevel,
+        disagreementLogLevel,
+        notEnoughScansLogLevel,
+        shortenResponsesForLog,
+      )
+      .flatMap(_.toFuture)
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     refreshAction.map(r => SyncCloseable("refresh_scan_list", r.close())).toList ++
@@ -1004,6 +1131,13 @@ class BftScanConnection(
 }
 
 object BftScanConnection {
+
+  def dataAvailability(response: GetBulkObjectsProgressResponse): DataAvailabilityResponse =
+    response.availability match {
+      case BulkObjectsAvailability.members.Available => DataAvailabilityResponse.Available
+      case BulkObjectsAvailability.members.Processing => DataAvailabilityResponse.NotYet
+      case BulkObjectsAvailability.members.Backfilling => DataAvailabilityResponse.Never
+    }
 
   /** Configuration for a BFT call.
     * Normally a BFT call requires f+1 agreeing responses from 2f+1 requests,

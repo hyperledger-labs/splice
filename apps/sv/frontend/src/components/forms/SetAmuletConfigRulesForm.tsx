@@ -330,6 +330,7 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
               form={form}
               title="Amulet switch-over times"
               effectiveDate={form.state.values.common.effectiveDate.effectiveDate}
+              currentEntries={defaultValues.switchOverTimes.entries}
             />
 
             <JsonDiffAccordion variant="form">{jsonDiffContent}</JsonDiffAccordion>

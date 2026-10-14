@@ -6,6 +6,7 @@
     "alias": "sequencer-pg",
     "cloudSqlConfig": {
       "databaseVersion": "POSTGRES_18",
+      "enableAutoBackups": true,
       "enabled": true,
       "enterprisePlus": false,
       "flags": {

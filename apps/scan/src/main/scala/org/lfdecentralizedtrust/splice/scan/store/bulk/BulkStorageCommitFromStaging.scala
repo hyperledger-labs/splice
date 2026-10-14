@@ -7,9 +7,8 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
-import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
-import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.BftOutcome
 import org.lfdecentralizedtrust.splice.scan.config.BulkStorageConfig
 import org.lfdecentralizedtrust.splice.scan.util.PeerBftScanConnection
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection
@@ -22,6 +21,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class BulkStorageCommitFromStaging[T](
     stagingS3Connection: S3BucketConnection,
     committedS3Connection: S3BucketConnection,
+    kind: BulkObjectKind,
     getObjects: T => Future[Seq[ObjectKeyAndChecksum]],
     getRequiredCatchupTimestamp: T => CantonTimestamp,
     appConfig: BulkStorageConfig,
@@ -38,35 +38,28 @@ class BulkStorageCommitFromStaging[T](
       objects: Seq[ObjectKeyAndChecksum],
   ): Future[Boolean] = {
     logger.debug(
-      s"Checking BFT agreement for objects: ${objects.map(_.key).mkString(", ")}"
+      s"Checking BFT agreement for objects: ${objects.map(_.key).mkString(", ")} (requires catchup to $requiredCatchupTimestamp)"
     )
     if (appConfig.bftCheckEnabled) {
       for {
         connection <- scanConnection.connection
-        bft <- connection
-          .getBulkObjectChecksums(requiredCatchupTimestamp, objects.map(_.key))
-          .map(Some(_))
-          .recoverWith { case ex @ HttpErrorWithHttpCode(code, _) =>
-            if (code == StatusCodes.BadGateway) {
-              logger.debug(
-                s"Consensus on checksums for objects ${objects.map(_.key).mkString(", ")} not reached. Assuming that this is because not all peers have processed the objects yet."
-              )
-              Future.successful(None)
-            } else {
-              throw ex
-            }
-          }
+        outcome <- connection.getBulkObjectChecksumsOutcome(
+          requiredCatchupTimestamp,
+          kind,
+          objects.map(_.key),
+        )
       } yield {
-        bft match {
-          case Some(bftChecksums) =>
+        outcome match {
+          case BftOutcome.Agreed(bftChecksums, _) =>
+            // Consensus achieved from peers, comparing the consensus checksums to mine.
             val consensusChecksums = bftChecksums.checksums.filter(_.value.isDefined)
             logger.debug(
               s"Consensus achieved on ${consensusChecksums.length} out of ${objects.length} objects"
             )
 
             if (consensusChecksums.length < objects.length) {
-              logger.debug(
-                s"Not all objects are known to the BFT peers yet. Will retry after delay."
+              logger.error(
+                s"Not all objects are known to the BFT peers, despite them indicating that they have caught up to the required timestamp. This indicates that different peers have different data, and must be investigated."
               )
               false
             } else {
@@ -133,7 +126,21 @@ class BulkStorageCommitFromStaging[T](
                 true
               }
             }
-          case None =>
+          case _: BftOutcome.NotYetAvailable =>
+            logger.debug("Not enough scans have the data yet, will retry after delay")
+            false
+          case _: BftOutcome.NeverAvailable =>
+            logger.info(
+              s"No peer will ever hold objects ${objects.map(_.key).mkString(", ")}, committing them on this Scan's own checksums"
+            )
+            true
+          case disagreement: BftOutcome.Disagreement[?] =>
+            logger.error(
+              s"Could not reach consensus on checksums for objects. This indicates that different peers have different data, and must be investigated. ${disagreement.message}"
+            )
+            false
+          case notEnough: BftOutcome.NotEnoughScans =>
+            logger.debug(s"${notEnough.message} Will retry after delay")
             false
         }
       }
@@ -251,6 +258,7 @@ object BulkStorageCommitFromStaging {
   def apply[T](
       stagingS3Connection: S3BucketConnection,
       committedS3Connection: S3BucketConnection,
+      kind: BulkObjectKind,
       getStagingObjects: T => Future[Seq[ObjectKeyAndChecksum]],
       getRequiredCatchupTimestamp: T => CantonTimestamp,
       appConfig: BulkStorageConfig,
@@ -264,6 +272,7 @@ object BulkStorageCommitFromStaging {
     new BulkStorageCommitFromStaging[T](
       stagingS3Connection,
       committedS3Connection,
+      kind,
       getStagingObjects,
       getRequiredCatchupTimestamp,
       appConfig,

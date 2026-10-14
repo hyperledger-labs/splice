@@ -76,9 +76,12 @@ function start_frontend() {
 
   local log_file="${LOG_DIR}/npm-${app}-${user}.out"
 
+  # MIMALLOC_PURGE_DELAY=0: rolldown >= 1.2.7 (vite 8.3.1) links mimalloc 3.5, which no longer returns 
+  # freed memory to the OS once its worker threads go idle, so every dev server keeps ~600MiB of 
+  # dead memory resident. Purging immediately restores the old footprint at a negligible performance cost.
   tmux_cmd "${app}-${user}" "${frontend_dir}" \
     "trap \"rm -f ${config_file}\" EXIT && \
-    BROWSER=none PORT=$port JSON_API_URL=$JSON_API_URL \
+    BROWSER=none PORT=$port JSON_API_URL=$JSON_API_URL MIMALLOC_PURGE_DELAY=0 \
     VITE_DISABLE_QUERY_DEVTOOLS=${VITE_DISABLE_QUERY_DEVTOOLS:-false} \
     VITE_SPLICE_CONFIG=\"\$(cat $config_file)\" \
     npm start 2>&1 | tee -a $log_file"

@@ -1,9 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import * as glob from 'glob';
 import { config as dotenvConfig } from '@dotenvx/dotenvx';
 
 import Dict = NodeJS.Dict;
+
+// Values of env vars whose name matches this are never logged
+const sensitiveEnvNamePattern = /SECRET|PASSWORD|TOKEN|CREDENTIAL|KEY/i;
 
 export class SpliceConfigContext {
   readonly deploymentFolderPath = requiredValue(
@@ -65,7 +69,7 @@ export class SpliceEnvConfig {
       const envrcs = [`${process.env.SPLICE_ROOT}/.envrc.vars`].concat(
         glob.sync(`${process.env.SPLICE_ROOT}/.envrc.vars.*`)
       );
-      console.error(`Loading environment variables from ${envrcs.join(', ')}`);
+      void pulumi.log.debug(`Loading environment variables from ${envrcs.join(', ')}`);
       const result = dotenvConfig({ path: envrcs, quiet: true });
       if (result.error) {
         throw new Error(`Failed to load base config ${result.error}`);
@@ -90,7 +94,9 @@ export class SpliceEnvConfig {
 
   optionalEnv(name: string): string | undefined {
     const value = this.env[name];
-    console.error(`Read option env ${name} with value ${value}`);
+    const loggedValue =
+      value !== undefined && sensitiveEnvNamePattern.test(name) ? '<redacted>' : value;
+    void pulumi.log.debug(`Read optional env ${name} with value ${loggedValue}`);
     return value;
   }
 
@@ -98,7 +104,7 @@ export class SpliceEnvConfig {
     const varVal = this.env[flagName];
     const flag = this.extracted(defaultFlag, varVal, flagName);
 
-    console.error(`Environment Flag ${flagName} = ${flag} (${varVal})`);
+    void pulumi.log.debug(`Environment flag ${flagName} = ${flag} (${varVal})`);
 
     return flag;
   }
@@ -114,10 +120,7 @@ export class SpliceEnvConfig {
       } else if (val === 'f' || val === 'false' || val === 'n' || val === 'no' || val === '0') {
         flag = false;
       } else {
-        console.error(
-          `FATAL: Flag environment variable ${flagName} has unexpected value: ${varVal}.`
-        );
-        process.exit(1);
+        throw new Error(`Flag environment variable ${flagName} has unexpected value: ${varVal}`);
       }
     }
     return flag;
@@ -126,14 +129,11 @@ export class SpliceEnvConfig {
 
 function requiredValue(value: string | undefined, name: string, msg: string): string {
   if (!value) {
-    console.error(
-      `FATAL: Environment variable ${name} is undefined. Shutting down.` +
-        (msg != '' ? `(should define: ${msg})` : '')
+    throw new Error(
+      `Environment variable ${name} is undefined` + (msg != '' ? ` (should define: ${msg})` : '')
     );
-    process.exit(1);
-  } else {
-    return value;
   }
+  return value;
 }
 
 export const spliceEnvConfig = new SpliceEnvConfig();

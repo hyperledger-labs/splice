@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.FlowShape
 import org.apache.pekko.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
-import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 
 /** Uploads every chunk of a bulk storage dump once per [[ScanStorageConfig.Encoding]].
@@ -24,8 +23,8 @@ object MultiEncodingBulkStorageFlow {
   private lazy val numEncodings = encodings.length
 
   def apply[A](
-      encode: (A, ScanStorageConfig.Encoding) => ByteString,
-      uploadFlow: ScanStorageConfig.Encoding => Flow[ByteString, String, ?],
+      encode: (A, ScanStorageConfig.Encoding) => String,
+      uploadFlow: ScanStorageConfig.Encoding => Flow[String, String, ?],
       incObjects: ScanStorageConfig.Encoding => Unit,
   ): Flow[A, String, NotUsed] = {
     Flow.fromGraph(GraphDSL.create() { implicit b =>

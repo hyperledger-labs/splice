@@ -1,78 +1,121 @@
-{{ define "slack_title" }}
-  {{ $hasCritical := false }}{{ $hasWarning := false }}{{ $hasInfo := false }}{{ $hasOthers := false }}
+{{/* Slack treats "<...>" as links/mentions and "&" as entity start: unescaped values can swallow the rest of the message */}}
+{{ define "__slack_escape" -}}
+  {{- . | reReplaceAll "&" "&amp;" | reReplaceAll "<" "&lt;" | reReplaceAll ">" "&gt;" -}}
+{{- end }}
+
+{{/* Percent-encode characters that would terminate a Slack <url|text> link early */}}
+{{ define "__slack_url" -}}
+  {{- . | reReplaceAll " " "%20" | reReplaceAll "\"" "%22" | reReplaceAll "<" "%3C" | reReplaceAll ">" "%3E" | reReplaceAll "\\|" "%7C" -}}
+{{- end }}
+
+{{ define "__slack_severity_emoji" -}}
+  {{- if eq . "critical" -}}🔥
+  {{- else if eq . "warning" -}}⚠️
+  {{- else if eq . "info" -}}ℹ️
+  {{- else -}}🔔
+  {{- end -}}
+{{- end }}
+
+{{ define "__slack_severity_name" -}}
+  {{- if eq . "critical" -}}Critical
+  {{- else if eq . "warning" -}}Warning
+  {{- else if eq . "info" -}}Info
+  {{- else -}}Other
+  {{- end -}}
+{{- end }}
+
+{{/* Single line, e.g. "[mainnet] 🔥 2 firing · ✅ 1 resolved | Some alert" */}}
+{{ define "slack_title" -}}
+  {{- $highest := "" -}}
   {{- range .Alerts.Firing -}}
-    {{- if eq .Annotations.severity "critical" -}}
-      {{- $hasCritical = true -}}
-    {{- else if eq .Annotations.severity "warning" -}}
-      {{- $hasWarning = true -}}
-    {{- else if eq .Annotations.severity "info" -}}
-      {{- $hasInfo = true -}}
-    {{- else -}}
-      {{- $hasOthers = true -}}
+    {{- $s := or .Labels.severity .Annotations.severity | trimSpace -}}
+    {{- if eq $s "critical" -}}
+      {{- $highest = "critical" -}}
+    {{- else if and (eq $s "warning") (ne $highest "critical") -}}
+      {{- $highest = "warning" -}}
+    {{- else if and (eq $s "info") (eq $highest "") -}}
+      {{- $highest = "info" -}}
     {{- end -}}
   {{- end -}}
+  [$CLUSTER_BASENAME]
+  {{- if gt (len .Alerts.Firing) 0 }} {{ template "__slack_severity_emoji" $highest }} {{ len .Alerts.Firing }} firing{{ end -}}
+  {{- if and (gt (len .Alerts.Firing) 0) (gt (len .Alerts.Resolved) 0) }} ·{{ end -}}
+  {{- if gt (len .Alerts.Resolved) 0 }} ✅ {{ len .Alerts.Resolved }} resolved{{ end -}}
+  {{- with .CommonLabels.alertname }} | {{ . }}{{ end -}}
+{{- end }}
 
-  $CLUSTER_BASENAME
-  {{ if gt (len .Alerts.Firing) 0 }}
-    {{- if $hasCritical }}
-    🔥 {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing
-    {{- else if $hasWarning }}
-    ⚠️ {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing
-    {{- else }}
-    :information_source: {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing
-    {{- end }}
-  {{ end }}
-  {{ if gt (len .Alerts.Resolved) 0 }} ✅ {{ len .Alerts.Resolved }} alert(s) resolved {{ end }}
-{{ end }}
-
-{{ define "slack_message" }}
-  {{ $hasCritical := false }}{{ $hasWarning := false }}{{ $hasInfo := false }}{{ $hasOthers := false }}
-  {{- range .Alerts.Firing -}}
-    {{- if eq .Annotations.severity "critical" -}}
-      {{- $hasCritical = true -}}
-    {{- else if eq .Annotations.severity "warning" -}}
-      {{- $hasWarning = true -}}
-    {{- else if eq .Annotations.severity "info" -}}
-      {{- $hasInfo = true -}}
-    {{- else -}}
-      {{- $hasOthers = true -}}
+{{/* Firing alerts grouped by severity (critical, warning, info, other), followed by resolved alerts */}}
+{{ define "slack_message" -}}
+  {{- $firing := .Alerts.Firing -}}
+  {{- $first := true -}}
+  {{- range $sev := stringSlice "critical" "warning" "info" "" -}}
+    {{- $header := false -}}
+    {{- range $firing -}}
+      {{- $s := or .Labels.severity .Annotations.severity | trimSpace -}}
+      {{- $match := eq $s $sev -}}
+      {{- if eq $sev "" -}}
+        {{- $match = and (ne $s "critical") (ne $s "warning") (ne $s "info") -}}
+      {{- end -}}
+      {{- if $match -}}
+        {{- if not $header -}}
+          {{- if not $first }}{{ "\n" }}{{ end -}}
+          {{- template "__slack_severity_emoji" $sev }} *{{ template "__slack_severity_name" $sev }}*{{ "\n" -}}
+          {{- $header = true -}}
+          {{- $first = false -}}
+        {{- end -}}
+        {{- template "slack_alert_firing" . -}}
+      {{- end -}}
     {{- end -}}
   {{- end -}}
-  {{ if $hasCritical }} 🔥Critical alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity "critical" -}} {{ template "slack_alert_firing" .}} {{ end }} {{ end }} {{ end }}
-  {{ if $hasWarning }} ⚠️Warning alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity "warning" -}} {{ template "slack_alert_firing" .}} {{ end }} {{ end }} {{ end }}
-  {{ if $hasInfo }} :information_source:Info alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity "info" -}} {{ template "slack_alert_firing" .}} {{ end }} {{ end }} {{ end }}
-  {{ if $hasOthers }} Other alerts {{ range .Alerts.Firing }} {{- if and (and (ne .Annotations.severity "info")  (ne .Annotations.severity "warning")) (ne .Annotations.severity "critical") -}} {{ template "slack_alert_firing" . }} {{ end }} {{ end }} {{ end }}
-  {{ if gt (len .Alerts.Resolved) 0 }} ✅Resolved Alerts {{ range .Alerts.Resolved }} {{ template "slack_alert_resolved" .}} {{ end }} {{ end }}
-{{ end }}
+  {{- if gt (len .Alerts.Resolved) 0 -}}
+    {{- if not $first }}{{ "\n" }}{{ end -}}
+    ✅ *Resolved*{{ "\n" -}}
+    {{- range .Alerts.Resolved -}}
+      {{- template "slack_alert_resolved" . -}}
+    {{- end -}}
+  {{- end -}}
+{{- end }}
 
-{{ define "slack_alert_firing" }}
-  *{{ .Labels.alertname }}*
-  {{ .Annotations.summary }}
-  {{ if .Annotations.description }}{{ .Annotations.description }}{{ end -}}
-  {{ if .Labels.service }}{{ .Labels.service }}{{- end }}
-  {{ template "slack_gcloud_log_link" . }}
-{{ end }}
+{{ define "slack_alert_firing" -}}
+  • *{{ template "__slack_escape" .Labels.alertname }}*{{ with .Annotations.summary }}: {{ template "__slack_escape" . }}{{ end }}{{ "\n" -}}
+  {{- with .Annotations.description }}{{ "    " }}{{ template "__slack_escape" . }}{{ "\n" }}{{ end -}}
+  {{- template "__slack_alert_labels" . -}}
+  {{ "    " }}Firing since {{ .StartsAt.UTC.Format "2006-01-02 15:04:05 UTC" -}}
+  {{- template "__slack_alert_links" . }} · {{ template "slack_gcloud_log_link" . }}{{ "\n" -}}
+{{- end }}
 
-{{ define "slack_alert_resolved" }}
-  *{{ .Labels.alertname }}*
-  {{ if .Annotations.severity }}{{ .Annotations.severity }}{{ end -}}
-  {{ .Annotations.summary }}
-  {{ if .Annotations.description }}{{ .Annotations.description }}{{ end -}}
-{{ end }}
+{{ define "slack_alert_resolved" -}}
+  {{- $s := or .Labels.severity .Annotations.severity | trimSpace -}}
+  • *{{ template "__slack_escape" .Labels.alertname }}*{{ with .Annotations.summary }}: {{ template "__slack_escape" . }}{{ end }}{{ "\n" -}}
+  {{- template "__slack_alert_labels" . -}}
+  {{ "    " }}{{ if $s }}Was {{ template "__slack_escape" $s }} · {{ end -}}
+  Resolved at {{ .EndsAt.UTC.Format "2006-01-02 15:04:05 UTC" }} after {{ (.EndsAt.Sub .StartsAt).Round 1000000000 -}}
+  {{- template "__slack_alert_links" . }}{{ "\n" -}}
+{{- end }}
 
-{{ define "slack_gcloud_log_link" }}<https://console.cloud.google.com/logs/query;startTime={{ (.StartsAt.Add -600000000000).UTC.Format "2006-01-02T15:04:05Z"  }};endTime={{ (.StartsAt.Add 600000000000).UTC.Format "2006-01-02T15:04:05Z"  }};query=resource.labels.cluster_name%3D%22cn-$CLUSTER_BASENAMEnet%22%0A{{ .Labels.gcloud_filter }}?project=$GCP_PROJECT|cloud logs>{{ end }}
+{{/* Labels identifying the alert instance, excluding those that are redundant or purely technical (scrape target metadata is covered by job, namespace and pod) */}}
+{{ define "__slack_alert_labels" -}}
+  {{- $labels := .Labels.Remove (stringSlice "alertname" "gcloud_filter" "priority" "team" "severity" "container" "endpoint" "instance" "node_name" "node_type" "otel_scope_name" "otel_scope_version" "prometheus" "service") -}}
+  {{- if gt (len $labels) 0 -}}
+    {{ "    " }}{{ range $i, $p := $labels.SortedPairs }}{{ if $i }} {{ end }}`{{ $p.Name }}={{ template "__slack_escape" (reReplaceAll "`" "'" $p.Value) }}`{{ end }}{{ "\n" -}}
+  {{- end -}}
+{{- end }}
+
+{{ define "__slack_alert_links" -}}
+  {{- with .GeneratorURL }} · <{{ template "__slack_url" . }}|Source>{{ end -}}
+  {{- with .Annotations.runbook_url }} · <{{ template "__slack_url" . }}|Runbook>{{ end -}}
+{{- end }}
+
+{{ define "slack_gcloud_log_link" }}<https://console.cloud.google.com/logs/query;startTime={{ (.StartsAt.Add -600000000000).UTC.Format "2006-01-02T15:04:05Z"  }};endTime={{ (.StartsAt.Add 600000000000).UTC.Format "2006-01-02T15:04:05Z"  }};query=resource.labels.cluster_name%3D%22cn-$CLUSTER_BASENAMEnet%22%0A{{ with .Labels.namespace }}resource.labels.namespace_name%3D%22{{ template "__slack_url" . }}%22%0A{{ end }}{{ template "__slack_url" .Labels.gcloud_filter }}?project=$GCP_PROJECT|Logs>{{ end }}
 
 {{ define "slack_color" -}}
-  {{ $hasCritical := false }}{{ $hasWarning := false }}{{ $hasInfo := false }}{{ $hasOthers := false }}
+  {{ $hasCritical := false }}{{ $hasWarning := false }}
   {{- range .Alerts.Firing -}}
-    {{- if eq .Annotations.severity "critical" -}}
+    {{- $s := or .Labels.severity .Annotations.severity | trimSpace -}}
+    {{- if eq $s "critical" -}}
       {{- $hasCritical = true -}}
-    {{- else if eq .Annotations.severity "warning" -}}
+    {{- else if eq $s "warning" -}}
       {{- $hasWarning = true -}}
-    {{- else if eq .Annotations.severity "info" -}}
-      {{- $hasInfo = true -}}
-    {{- else -}}
-      {{- $hasOthers = true -}}
     {{- end -}}
   {{- end -}}
   {{ if eq .Status "firing" -}}

@@ -186,6 +186,17 @@ abstract class SvAppReference(
     latestVoteRequest.payload.trackingCid.toScala.getOrElse(latestVoteRequest.contractId)
   }
 
+  @Help.Summary("List vote requests by their trackingCids")
+  def listVoteRequestsByTrackingCid(
+      trackingCids: Seq[VoteRequest.ContractId]
+  ): Seq[Contract[VoteRequest.ContractId, VoteRequest]] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvOperatorAppClient.ListVoteRequestsByTrackingCid(trackingCids)
+      )
+    }
+  }
+
   @Help.Summary("Lookup vote request")
   def lookupVoteRequest(
       trackingCid: VoteRequest.ContractId

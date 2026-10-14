@@ -30,17 +30,18 @@ interface SwitchOverCapableFormData {
 }
 
 const SWITCH_OVER_RULES =
-  'Each key must be unique and non-empty. Each switch-over time must be at least 1 day after the ' +
-  "Effective Date, unless 'Allow non-future-dated switch-over times' is enabled or the proposal " +
-  'takes effect at threshold.';
+  'Each key must be unique and non-empty. Each new or changed switch-over time must be at least ' +
+  "1 day after the Effective Date, unless 'Allow non-future-dated switch-over times' is enabled " +
+  'or the proposal takes effect at threshold.';
 
 export const SwitchOverTimesField = withForm({
   defaultValues: {} as SwitchOverCapableFormData, // type carrier only
   props: {
     effectiveDate: undefined as string | undefined,
     title: '',
+    currentEntries: [] as SwitchOverEntry[],
   },
-  render: ({ form, effectiveDate, title }) => {
+  render: ({ form, effectiveDate, title, currentEntries }) => {
     const allowNonFutureDated = form.state.values.switchOverTimes.allowNonFutureDated;
     const rowFloor = allowNonFutureDated ? null : dayjs(effectiveDate).add(1, 'day');
     const defaultNewTime = () => dayjs(effectiveDate).add(1, 'day').format(dateTimeFormatISO);
@@ -69,7 +70,8 @@ export const SwitchOverTimesField = withForm({
               validateSwitchOverTimes(
                 form.state.values.switchOverTimes.entries,
                 form.state.values.switchOverTimes.allowNonFutureDated,
-                form.state.values.common.effectiveDate.effectiveDate
+                form.state.values.common.effectiveDate.effectiveDate,
+                currentEntries
               ),
             onChangeListenTo: ['common.effectiveDate', 'switchOverTimes.allowNonFutureDated'],
           }}
@@ -135,7 +137,8 @@ export const SwitchOverTimesField = withForm({
             validateSwitchOverTimes(
               state.values.switchOverTimes.entries,
               state.values.switchOverTimes.allowNonFutureDated,
-              state.values.common.effectiveDate.effectiveDate
+              state.values.common.effectiveDate.effectiveDate,
+              currentEntries
             )
           }
         >

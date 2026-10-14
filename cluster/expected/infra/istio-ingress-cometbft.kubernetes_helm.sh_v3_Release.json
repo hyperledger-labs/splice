@@ -265,7 +265,7 @@
         }
       ]
     },
-    "version": "1.29.2"
+    "version": "1.30.5"
   },
   "name": "istio-ingress-cometbft",
   "provider": "",

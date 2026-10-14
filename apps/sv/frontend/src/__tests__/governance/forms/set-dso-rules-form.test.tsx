@@ -10,6 +10,7 @@ import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, test } from 'vitest';
+import { dsoInfo } from '@canton-network/splice-common-test-handlers';
 import App from '../../../App';
 import { SetDsoConfigRulesForm } from '../../../components/forms/SetDsoConfigRulesForm';
 import {
@@ -1022,5 +1023,82 @@ describe('Next Scheduled Synchronizer Upgrade submission', () => {
     });
     expect(requestBody).toContain('"migrationId":"12345"');
     expect(requestBody).not.toContain(upgradeTimeIfTreatedAsLocal);
+  });
+});
+
+describe('Values unchanged from the current config', () => {
+  const pastTime = (days: number) =>
+    dayjs()
+      .utc()
+      .subtract(days, 'day')
+      .startOf('minute')
+      .format(nextScheduledSynchronizerUpgradeFormat);
+
+  const renderWithConfig = (configOverrides: Record<string, unknown>) => {
+    const contract = dsoInfo.dso_rules.contract;
+    server.use(
+      http.get(`${svUrl}/v1/dso`, () =>
+        HttpResponse.json({
+          ...dsoInfo,
+          dso_rules: {
+            ...dsoInfo.dso_rules,
+            contract: {
+              ...contract,
+              payload: {
+                ...contract.payload,
+                config: { ...contract.payload.config, ...configOverrides },
+              },
+            },
+          },
+        })
+      )
+    );
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+  };
+
+  const fillSummaryAndUrl = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(screen.getByTestId('set-dso-config-rules-summary'), 'Summary of the proposal');
+    await user.type(screen.getByTestId('set-dso-config-rules-url'), 'https://example.com');
+  };
+
+  test('a stale logical synchronizer upgrade does not block a proposal effective at threshold', async () => {
+    const user = userEvent.setup();
+    const staleFreezeTime = pastTime(30);
+    renderWithConfig({
+      nextScheduledLogicalSynchronizerUpgrade: {
+        topologyFreezeTime: staleFreezeTime,
+        upgradeTime: pastTime(29),
+        newPhysicalSynchronizerSerial: '1',
+        newPhysicalSynchronizerProtocolVersion: '34',
+      },
+    });
+    await screen.findByDisplayValue(staleFreezeTime);
+
+    await fillSummaryAndUrl(user);
+    await user.click(screen.getByTestId('effective-at-threshold-radio'));
+
+    await waitFor(() => expect(screen.getByTestId('submit-button')).not.toBeDisabled());
+    expect(
+      screen.queryByText('Topology Freeze Time must be at least 1 hour after the Effective Date')
+    ).not.toBeInTheDocument();
+  });
+
+  test('a stale switch-over time does not block a proposal with a new effective date', async () => {
+    const user = userEvent.setup();
+    const staleKey = 'no-featured-app-choice-context';
+    renderWithConfig({ svOperationsSwitchOverTimes: { [staleKey]: pastTime(20) } });
+    await screen.findByDisplayValue(staleKey);
+
+    await fillSummaryAndUrl(user);
+    fireEvent.change(screen.getByTestId('set-dso-config-rules-effective-date-field'), {
+      target: { value: dayjs().add(10, 'day').format(dateTimeFormatISO) },
+    });
+
+    await waitFor(() => expect(screen.getByTestId('submit-button')).not.toBeDisabled());
+    expect(screen.queryByTestId('switchover-error')).not.toBeInTheDocument();
   });
 });

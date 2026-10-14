@@ -101,9 +101,9 @@ templates:
         {{- template "__slack_alert_links" . }}{{ "\n" -}}
       {{- end }}
 
-      {{/* Labels identifying the alert instance, excluding those that are redundant or purely technical */}}
+      {{/* Labels identifying the alert instance, excluding those that are redundant or purely technical (scrape target metadata is covered by job, namespace and pod) */}}
       {{ define "__slack_alert_labels" -}}
-        {{- $labels := .Labels.Remove (stringSlice "alertname" "grafana_folder" "gcloud_filter" "priority" "team" "severity") -}}
+        {{- $labels := .Labels.Remove (stringSlice "alertname" "grafana_folder" "gcloud_filter" "gcloud_filter_skip_cluster" "priority" "team" "severity" "container" "endpoint" "instance" "node_name" "node_type" "otel_scope_name" "otel_scope_version" "prometheus" "service") -}}
         {{- if gt (len $labels) 0 -}}
           {{ "    " }}{{ range $i, $p := $labels.SortedPairs }}{{ if $i }} {{ end }}`{{ $p.Name }}={{ template "__slack_escape" (reReplaceAll "`" "'" $p.Value) }}`{{ end }}{{ "\n" -}}
         {{- end -}}

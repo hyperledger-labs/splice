@@ -16,5 +16,8 @@
     "@types/node": "^26.1.0",
     "esbuild": "^0.28.1",
     "typescript": "^6.0.3"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }

@@ -24,7 +24,7 @@ import scala.util.matching.Regex
 case class ScanStorageConfig(
     dbAcsSnapshotPeriodHours: Int, // Period between two consecutive acs snapshots to be computed and stored in the DB
     bulkAcsSnapshotPeriodHours: Int, // Period between two consecutive acs snapshots to be dumped to bulk storage (currently must be <=24 hr, and a multiple of dbAcsSnapshotPeriodHours)
-    bulkDbReadChunkSize: Int, // Chunk size to read from the DB for copying to bulk storage
+    bulkZstdBlockSize: Long, // Size of each zstd block (amount of uncompressed data accumulated before passing to zstd for compression). Blocks are accumulated in memory before being compressed, so this should be kept small enough to avoid OOMs. However, too small block sizes will result in poorer compression ratios.
     bulkZstdFrameSize: Long, // Size of each zstd frame. In prod, must be >= 5 MB as each frame is written as a part in multi-part upload, which are enforced by most s3 implementations to be >= 5MB each
     bulkMaxFileSize: Long, // Max file size (estimated, may end up being slightly bigger) for bulk storage objects
     zstdCompressionLevel: Int,
@@ -115,6 +115,9 @@ case class ScanStorageConfig(
     s"$segmentStartTimestamp~$endTimestamp"
   }
 
+  def getSegmentFolderOfObjectKey(objectKey: String): String =
+    objectKey.takeWhile(_ != '/')
+
   def getStartAndEndTimestampsForFolder(
       folder: String
   ): Either[String, (CantonTimestamp, CantonTimestamp)] = {
@@ -156,6 +159,12 @@ object ScanStorageConfig {
         extends Encoding("protobuf_json", definitions.DamlValueEncoding.ProtobufJson)
 
     lazy val all: NonEmptyList[Encoding] = NonEmptyList.of[Encoding](CompactJson, ProtobufJson)
+
+    def fromDamlValueEncoding(damlValueEncoding: definitions.DamlValueEncoding): Encoding =
+      damlValueEncoding match {
+        case definitions.DamlValueEncoding.members.CompactJson => CompactJson
+        case definitions.DamlValueEncoding.members.ProtobufJson => ProtobufJson
+      }
   }
 }
 
@@ -163,7 +172,7 @@ object ScanStorageConfigs {
   val scanStorageConfigV1 = ScanStorageConfig(
     dbAcsSnapshotPeriodHours = 3,
     bulkAcsSnapshotPeriodHours = 24,
-    bulkDbReadChunkSize = 1000,
+    bulkZstdBlockSize = 1L * 1024 * 1024,
     bulkZstdFrameSize = 12L * 1024 * 1024,
     bulkMaxFileSize = 128L * 1024 * 1024,
     zstdCompressionLevel = 3,
