@@ -8,10 +8,12 @@ import com.daml.metrics.api.testing.{InMemoryMetricsFactory, MetricValues}
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import org.apache.pekko.http.scaladsl.model.{StatusCodes, Uri}
 import org.apache.pekko.stream.StreamTcpException
-import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.environment.BaseAppConnection
 import org.lfdecentralizedtrust.splice.metrics.ScanConnectionMetrics
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.DataAvailabilityResponse
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.{
+  BftOutcome,
+  DataAvailabilityResponse,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.DataAvailabilityResponse.{
   Available,
   Never,
@@ -42,6 +44,8 @@ class BftCallExecutorTest
   class Target(val idx: Int) extends HasUrl {
     val url = Uri(s"https://$idx.example.com")
   }
+  private def url(idx: Int): Uri = new Target(idx).url
+
   class Mocks[T](results: Seq[Future[T]]) {
     def connections(): Seq[Target] = results.indices.map(new Target(_))
     def call(i: Target): Future[T] = results(i.idx)
@@ -99,7 +103,7 @@ class BftCallExecutorTest
       BftCallExecutor
         .executeCall(mocks.call, mocks.connections(), nTargetSuccess = 1, logger)
         .failed
-        .futureValue shouldBe a[BftCallExecutor.ConsensusNotReached]
+        .futureValue shouldBe a[BftCallExecutor.ConsensusNotReached[?]]
 
     }
   }
@@ -217,7 +221,7 @@ class BftCallExecutorTest
   }
 
   "BftCallExecutor.findScansWithAvailableData" should {
-    "throw a 503 when available + not-enough may be enough" in {
+    "report not yet available when available + not-yet may be enough" in {
       val mocks = new Mocks[DataAvailabilityResponse](
         Seq(
           Future.successful(Available: DataAvailabilityResponse),
@@ -226,19 +230,20 @@ class BftCallExecutorTest
         )
       )
 
-      val failure = BftCallExecutor
+      BftCallExecutor
         .findScansWithAvailableData(mocks.connections(), logger, mocks.call, 2)
-        .failed
-        .futureValue
-      inside(failure) { case HttpErrorWithHttpCode(code, msg) =>
-        code shouldBe StatusCodes.ServiceUnavailable
-        msg should include(
-          "1 scans have data, 1 have responded with 'not yet', 0 are unreachable. Together that's at least the required 2, so final result is 'not yet'"
+        .futureValue shouldBe Left(
+        BftOutcome.NotYetAvailable(
+          Seq(url(0)),
+          Seq(url(1)),
+          Seq(url(2)),
+          unreachable = 0,
+          required = 2,
         )
-      }
+      )
     }
 
-    "throw a 503 when available + not-available is not enough, but not-available is not empty" in {
+    "report not yet available when available + not-yet is not enough, but not-yet is not empty" in {
       val mocks = new Mocks[DataAvailabilityResponse](
         Seq(
           Future.successful(Available: DataAvailabilityResponse),
@@ -247,16 +252,17 @@ class BftCallExecutorTest
         )
       )
 
-      val failure = BftCallExecutor
+      BftCallExecutor
         .findScansWithAvailableData(mocks.connections(), logger, mocks.call, 3)
-        .failed
-        .futureValue
-      inside(failure) { case HttpErrorWithHttpCode(code, msg) =>
-        code shouldBe StatusCodes.ServiceUnavailable
-        msg should include(
-          "Not enough scans will ever have the data, but some indicated that they will, just not yet, or are unreachable."
+        .futureValue shouldBe Left(
+        BftOutcome.NotYetAvailable(
+          Seq(url(0)),
+          Seq(url(1)),
+          Seq(url(2)),
+          unreachable = 0,
+          required = 3,
         )
-      }
+      )
     }
 
     "return the available scans when all others will never have the data" in {
@@ -268,14 +274,13 @@ class BftCallExecutorTest
         )
       )
 
-      val ret = BftCallExecutor
+      BftCallExecutor
         .findScansWithAvailableData(mocks.connections(), logger, mocks.call, 3)
         .futureValue
-      ret should have size 1
-      ret.head.idx shouldBe 0
+        .map(_.map(_.idx)) shouldBe Right(Seq(0))
     }
 
-    "fail with NoScanWillHaveData when all scans will never have the data" in {
+    "report never available when all scans will never have the data" in {
       val mocks = new Mocks[DataAvailabilityResponse](
         Seq(
           Future.successful(Never: DataAvailabilityResponse),
@@ -284,15 +289,16 @@ class BftCallExecutorTest
         )
       )
 
-      val failure = BftCallExecutor
-        .findScansWithAvailableData(mocks.connections(), logger, mocks.call, 3)
-        .failed
-        .futureValue
-      failure shouldBe a[BftCallExecutor.NoScanWillHaveData]
-      failure.getMessage should include("All scans have responded with 'never'.")
+      inside(
+        BftCallExecutor
+          .findScansWithAvailableData(mocks.connections(), logger, mocks.call, 3)
+          .futureValue
+      ) { case Left(BftOutcome.NeverAvailable(never)) =>
+        never should contain theSameElementsAs Seq(url(0), url(1), url(2))
+      }
     }
 
-    "throw a 503 when every reachable scan will never have the data but a scan is unreachable" in {
+    "report not yet available when every reachable scan will never have the data but a scan is unreachable" in {
       val mocks = new Mocks[DataAvailabilityResponse](
         Seq(
           Future.successful(Never: DataAvailabilityResponse),
@@ -301,13 +307,13 @@ class BftCallExecutorTest
         )
       )
 
-      val failure = BftCallExecutor
-        .findScansWithAvailableData(mocks.connections(), logger, mocks.call, 3, unreachable = 1)
-        .failed
-        .futureValue
-      inside(failure) { case HttpErrorWithHttpCode(code, msg) =>
-        code shouldBe StatusCodes.ServiceUnavailable
-        msg should include("1 are unreachable")
+      inside(
+        BftCallExecutor
+          .findScansWithAvailableData(mocks.connections(), logger, mocks.call, 3, unreachable = 1)
+          .futureValue
+      ) { case Left(notYet: BftOutcome.NotYetAvailable) =>
+        notYet.unreachable shouldBe 1
+        notYet.never should contain theSameElementsAs Seq(url(0), url(1), url(2))
       }
     }
 
@@ -322,11 +328,14 @@ class BftCallExecutorTest
         )
       )
 
-      val ret = BftCallExecutor
-        .findScansWithAvailableData(mocks.connections(), logger, mocks.call, 2)
-        .futureValue
-      ret should have size 2
-      ret.forall(r => r.idx >= 1 && r.idx <= 3) shouldBe true
+      inside(
+        BftCallExecutor
+          .findScansWithAvailableData(mocks.connections(), logger, mocks.call, 2)
+          .futureValue
+      ) { case Right(scans) =>
+        scans should have size 2
+        scans.forall(r => r.idx >= 1 && r.idx <= 3) shouldBe true
+      }
     }
 
     "treat all exceptions as not-yet" in {
@@ -338,15 +347,14 @@ class BftCallExecutorTest
         )
       )
 
-      val failure = BftCallExecutor
-        .findScansWithAvailableData(mocks.connections(), logger, mocks.call, 2)
-        .failed
-        .futureValue
-      inside(failure) { case HttpErrorWithHttpCode(code, msg) =>
-        code shouldBe StatusCodes.ServiceUnavailable
-        msg should include(
-          "1 scans have data, 2 have responded with 'not yet', 0 are unreachable. Together that's at least the required 2, so final result is 'not yet'"
-        )
+      inside(
+        BftCallExecutor
+          .findScansWithAvailableData(mocks.connections(), logger, mocks.call, 2)
+          .futureValue
+      ) { case Left(notYet: BftOutcome.NotYetAvailable) =>
+        notYet.available shouldBe Seq(url(2))
+        notYet.notYet should contain theSameElementsAs Seq(url(0), url(1))
+        notYet.never shouldBe empty
       }
     }
 
@@ -362,7 +370,7 @@ class BftCallExecutorTest
       BftCallExecutor
         .findScansWithAvailableData(mocks.connections(), logger, mocks.call, 1)
         .futureValue
-        .map(_.idx) shouldBe Seq(2)
+        .map(_.map(_.idx)) shouldBe Right(Seq(2))
 
     }
   }
