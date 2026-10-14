@@ -245,27 +245,34 @@ class SyncOperatorApp(
       } yield ()
 
   /** This app adjusts traffic control but never turns it on, which would strand members that have
-    * no traffic yet.
+    * no traffic yet. Waits, since the synchronizer's bootstrap may turn it on after the sequencer
+    * is up.
     */
   private def requireTrafficControl(
       sequencerAdminConnection: SequencerAdminConnection,
       synchronizerId: SynchronizerId,
   )(implicit traceContext: TraceContext): Future[Unit] =
-    sequencerAdminConnection
-      .getSynchronizerParametersState(synchronizerId)
-      .map(_.mapping.parameters.trafficControl)
-      .flatMap {
-        case Some(_) => Future.unit
-        case None =>
-          Future.failed(
-            Status.FAILED_PRECONDITION
-              .withDescription(
-                s"Synchronizer $synchronizerId does not run traffic control. Enable it on the " +
-                  "synchronizer before starting the sync operator."
-              )
-              .asRuntimeException()
-          )
-      }
+    retryProvider.waitUntil(
+      RetryFor.WaitingOnInitDependency,
+      "sync_operator_traffic_control",
+      s"synchronizer $synchronizerId runs traffic control",
+      sequencerAdminConnection
+        .getSynchronizerParametersState(synchronizerId)
+        .map(_.mapping.parameters.trafficControl)
+        .flatMap {
+          case Some(_) => Future.unit
+          case None =>
+            Future.failed(
+              Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"Synchronizer $synchronizerId does not run traffic control. Enable it on the " +
+                    "synchronizer before starting the sync operator."
+                )
+                .asRuntimeException()
+            )
+        },
+      logger,
+    )
 
   /** The synchronizer the configured sequencer serves. Waits while it is still initializing. */
   private def servedSynchronizerId(
