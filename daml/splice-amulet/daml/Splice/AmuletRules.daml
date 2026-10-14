@@ -1028,7 +1028,7 @@ template AmuletRules
           holdingFeesOpenRoundNumber = validatedRounds.oldestRound.round
           amuletPrice = validatedRounds.latestUsableRound.amuletPrice
           transferConfig = transferConfigToTransferConfigV2 validatedRounds.latestUsableRound.transferConfigUsd
-          trafficPrice = validatedRounds.latestUsableRound.trafficPrice
+          trafficPrice = Some (effectiveTrafficPrice config validatedRounds.latestUsableRound)
           supportedSynchronizerIds = Some (Set.toList config.decentralizedSynchronizer.requiredSynchronizers)
           minTrafficTopupAmount = Some config.decentralizedSynchronizer.fees.minTopupAmount
           rewardCalculationVersion = (.mintingVersion) <$> validatedRounds.latestUsableRound.rewardConfig
@@ -1789,9 +1789,13 @@ trafficPurchaseConfigFromConfigState state = do
   minTrafficTopupAmount <- state.minTrafficTopupAmount
   pure TrafficPurchaseConfig with ..
 
+effectiveTrafficPrice : AmuletConfig Unit.USD -> OpenMiningRound -> Decimal
+effectiveTrafficPrice configUsd round =
+  fromOptional configUsd.decentralizedSynchronizer.fees.extraTrafficPrice round.trafficPrice
+
 trafficPurchaseConfigFromAmuletConfig : AmuletConfig Unit.USD -> OpenMiningRound -> TrafficPurchaseConfig
 trafficPurchaseConfigFromAmuletConfig configUsd round = TrafficPurchaseConfig with
-    trafficPrice = fromOptional configUsd.decentralizedSynchronizer.fees.extraTrafficPrice round.trafficPrice
+    trafficPrice = effectiveTrafficPrice configUsd round
     supportedSynchronizerIds = Set.toList configUsd.decentralizedSynchronizer.requiredSynchronizers
     minTrafficTopupAmount = configUsd.decentralizedSynchronizer.fees.minTopupAmount
 
@@ -2468,7 +2472,7 @@ bootstrapExternalPartyConfigState AmuletRules{..} openMiningRoundTriple = do
         holdingFeesOpenRoundNumber = validatedRounds.oldestRound.round
         amuletPrice = validatedRounds.latestUsableRound.amuletPrice
         transferConfig = transferConfig
-        trafficPrice = validatedRounds.latestUsableRound.trafficPrice
+        trafficPrice = Some (effectiveTrafficPrice config validatedRounds.latestUsableRound)
         supportedSynchronizerIds = Some (Set.toList config.decentralizedSynchronizer.requiredSynchronizers)
         minTrafficTopupAmount = Some config.decentralizedSynchronizer.fees.minTopupAmount
         rewardCalculationVersion = (.mintingVersion) <$> validatedRounds.latestUsableRound.rewardConfig

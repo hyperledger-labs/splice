@@ -21,14 +21,12 @@ import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
 
 import Splice.Amulet (ValidatorRewardCoupon)
-import Splice.AmuletConfig (RewardConfig(..), RewardVersion(..))
 import Splice.AmuletTransferInstruction
 import Splice.Amulet.TokenApiUtils
 import Splice.DecentralizedSynchronizer (MemberTraffic(..))
 import Splice.ExternalPartyAmuletRules
 import Splice.TokenStandard.Utils qualified as TSU
 
-import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultAmuletConfig)
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
 import Splice.Testing.Registries.TestRegistries qualified as TestRegistries
 import Splice.Testing.TokenStandard.RegistryApiV2 qualified as V2
@@ -149,19 +147,9 @@ test_transferFactory_TransferV2_extraObservers = do
 -- Traffic purchase 
 ------------------------------------------------------------
 
-trafficRegistryConfig : AmuletRegistryV2.AmuletRegistryConfig
-trafficRegistryConfig = AmuletRegistryV2.defaultAmuletRegistryConfig with
-  amuletConfig = defaultAmuletConfig with
-    rewardConfig = Some RewardConfig with
-      mintingVersion = RewardVersion_FeaturedAppMarkers
-      dryRunVersion = None
-      batchSize = 100
-      rewardCouponTimeToLive = hours 36
-      appRewardCouponThreshold = 0.5
-
 test_transferFactory_TransferV2_trafficPurchase : Script ()
 test_transferFactory_TransferV2_trafficPurchase = do
-  env <- TestRegistries.initialize TestRegistries.defaultConfig with amulet = trafficRegistryConfig
+  env <- TestRegistries.initialize TestRegistries.defaultConfig
   let dso = env.amuletV2.dso
   let instrId = env.amuletV2.instrumentId
   registryV2 <- MultiRegistry.getRegistryApiV2 env.registries instrId.admin

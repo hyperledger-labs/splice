@@ -15,7 +15,6 @@ import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
 
 import Splice.Amulet (ValidatorRewardCoupon)
 import Splice.Amulet.TokenApiUtils (reasonMetaKey)
-import Splice.AmuletConfig (RewardConfig(..), RewardVersion(..))
 import Splice.DecentralizedSynchronizer (MemberTraffic(..))
 import Splice.ExternalPartyAmuletRules (trafficPurchaseReceiver)
 
@@ -51,16 +50,6 @@ defaultReason : Text
 defaultReason =
   "purchased traffic: 1000000 bytes for memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=0"
 
-trafficRegistryConfig : AmuletRegistry.AmuletRegistryConfig
-trafficRegistryConfig = AmuletRegistry.defaultAmuletRegistryConfig with
-  amuletConfig = defaultAmuletConfig with
-    rewardConfig = Some RewardConfig with
-      mintingVersion = RewardVersion_FeaturedAppMarkers
-      dryRunVersion = None
-      batchSize = 100
-      rewardCouponTimeToLive = hours 36
-      appRewardCouponThreshold = 0.5
-
 data TestSetup = TestSetup with
   registry : AmuletRegistry.AmuletRegistry
   alice : Party
@@ -86,7 +75,7 @@ setupTestWith registryConfig = do
   pure TestSetup with ..
 
 setupTest : Script TestSetup
-setupTest = setupTestWith trafficRegistryConfig
+setupTest = setupTestWith AmuletRegistry.defaultAmuletRegistryConfig
 
 memoTagMeta : Text -> Metadata
 memoTagMeta memoTag = Metadata with
@@ -194,10 +183,10 @@ test_trafficPurchase_rejectsAmountBelowMinTopup = script do
 
 rejectsNonPositiveTrafficPrice : Decimal -> Script ()
 rejectsNonPositiveTrafficPrice trafficPrice = script do
-  let config = trafficRegistryConfig with
-        amuletConfig = trafficRegistryConfig.amuletConfig with
-          decentralizedSynchronizer = trafficRegistryConfig.amuletConfig.decentralizedSynchronizer with
-            fees = trafficRegistryConfig.amuletConfig.decentralizedSynchronizer.fees with
+  let config = AmuletRegistry.defaultAmuletRegistryConfig with
+        amuletConfig = defaultAmuletConfig with
+          decentralizedSynchronizer = defaultAmuletConfig.decentralizedSynchronizer with
+            fees = defaultAmuletConfig.decentralizedSynchronizer.fees with
               extraTrafficPrice = trafficPrice
   setup@TestSetup{..} <- setupTestWith config
   buyTrafficMustFailWith
@@ -218,10 +207,3 @@ test_trafficPurchase_rejectsExpiredTransfer = script do
     (expectMessageContains "transfer.executeBefore")
     setup defaultTransfer with
       executeBefore = now `addRelTime` seconds (-1)
-
-test_trafficPurchase_rejectsConfigStateWithoutTrafficPrice : Script ()
-test_trafficPurchase_rejectsConfigStateWithoutTrafficPrice = script do
-  setup@TestSetup{..} <- setupTestWith AmuletRegistry.defaultAmuletRegistryConfig
-  buyTrafficMustFailWith
-    (expectMessageContains "carries no traffic purchase configuration")
-    setup defaultTransfer
