@@ -86,8 +86,8 @@ class SvOnboardingPartyToParticipantProposalTrigger(
             }
           } yield {
             // It is crucial to wait for a proposal from both the candidate and the sponsor.
-            // The proposal by the sponsor is only created through the onboard/sv/party-migration/authorize
-            // which the candidate calls after having disconnected from the domain.
+            // The proposal by the sponsor is only created through onboard/sv/party-migration/prepare
+            // or onboard/sv/party-migration/authorize, which the candidate calls after having disconnected from the domain.
             // Without this check, the transaction can become valid while the candidate is still connected
             // which then results in all kinds of errors because it does not have an ACS import.
             val proposalsSignedByCandidateAndSponsor =

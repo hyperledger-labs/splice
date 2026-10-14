@@ -68,8 +68,117 @@ paths:
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
 
+  /v0/onboard/sv/party-migration/prepare:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_public_stream
+      x-external-audience: svs
+      operationId: "onboardSvPartyMigrationPrepare"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeRequest"
+      responses:
+        "200":
+          description: |
+            The ID under which the ACS snapshot of the DSO party is exported in the background.
+            Download it from `/v0/onboard/sv/download/{id}`.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardSvSnapshotPrepareResponse"
+        "202":
+          description: |
+            DSO party authorization is not yet visible.
+            The state is `waiting_for_prerequisites`. No snapshot ID has been issued; retry this prepare request.
+          headers:
+            Retry-After:
+              description: Seconds to wait before polling again.
+              required: true
+              schema:
+                type: integer
+                format: int64
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardSvSnapshotPendingResponse"
+        "400":
+          description: system state not yet valid
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeErrorResponse"
+        "401":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
+        "503":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
+
+  /v0/onboard/sv/download/{id}:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_public_stream
+      x-external-audience: svs
+      operationId: "onboardSvDownload"
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The exported snapshot.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+                x-scala-type: org.apache.pekko.http.scaladsl.model.ResponseEntity
+        "202":
+          description: |
+            The snapshot is queued or being exported.
+            The state is `preparing`. Retry this download request with the same ID.
+          headers:
+            Retry-After:
+              description: Seconds to wait before polling again.
+              required: true
+              schema:
+                type: integer
+                format: int64
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardSvSnapshotPendingResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+        "503":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
+
 components:
   schemas:
+    OnboardSvSnapshotPendingResponse:
+      type: object
+      required:
+        - state
+      properties:
+        state:
+          type: string
+          description: |
+            Informational pending state: currently `waiting_for_prerequisites` on prepare, or `preparing` on download.
+            Clients must also wait on other state values in a 202 response.
+
+    OnboardSvSnapshotPrepareResponse:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+
     OnboardSvSequencerRequest:
       type: object
       required:

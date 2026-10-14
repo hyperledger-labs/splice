@@ -45,6 +45,7 @@ class SponsorDsoPartyHosting(
         domain,
         dsoParty,
         participantId,
+        waitForAuthorization = true,
       )
       authorizedAt <- EitherT.liftF(
         dsoPartyHosting.waitForDsoPartyToParticipantAuthorization(
@@ -60,10 +61,22 @@ class SponsorDsoPartyHosting(
       authorizedAt
     }
 
+  def ensureDsoPartyToParticipantProposalSigned(
+      domain: SynchronizerId,
+      participantId: ParticipantId,
+  )(implicit traceContext: TraceContext): EitherT[Future, DsoPartyMigrationFailure, Unit] =
+    proposePartyHostingAndEnsureAuthorized(
+      domain,
+      dsoParty,
+      participantId,
+      waitForAuthorization = false,
+    ).map(_ => ())
+
   private def proposePartyHostingAndEnsureAuthorized(
       synchronizerId: SynchronizerId,
       party: PartyId,
       newParticipant: ParticipantId,
+      waitForAuthorization: Boolean,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, DsoPartyMigrationFailure, TopologyResult[PartyToParticipant]] = {
@@ -78,6 +91,7 @@ class SponsorDsoPartyHosting(
               party,
               newParticipant,
               PositiveInt.tryCreate(proposal.base.serial.value - 1),
+              waitForAuthorization = waitForAuthorization,
             )
             .map(Right(_))
             .recover { case AuthorizedStateChanged(serial) =>
