@@ -96,15 +96,6 @@ class BulkStorage(
     loggerFactory,
   )
 
-  private val writersGate = new BulkStorageWritersGate(
-    readiness = historyReadiness,
-    currentMigrationId = currentMigrationId,
-    peerBackfillingEnabled = appConfig.backfilling.enabled,
-    peerBackfillingProgress = backfillingProgress,
-    pollingInterval = appConfig.updatesPollingInterval.underlying,
-    loggerFactory = loggerFactory,
-  )
-
   val acsStagingProgress = new AcsSnapshotBulkStoragePersistentProgress(
     acsStagingKvStoreKey,
     firstAcsSnapshotTimestampKvStoreKey,
@@ -137,6 +128,15 @@ class BulkStorage(
     acsStagingProgress,
     kvProvider,
     loggerFactory,
+  )
+
+  private val writersGate = new BulkStorageWritersGate(
+    readiness = historyReadiness,
+    currentMigrationId = currentMigrationId,
+    peerBackfillingEnabled = appConfig.backfilling.enabled,
+    peerBackfillingProgress = backfillingProgress,
+    pollingInterval = appConfig.updatesPollingInterval.underlying,
+    loggerFactory = loggerFactory,
   )
   val backfilling: Option[BulkStorageBackfilling] =
     Option.when(appConfig.backfilling.enabled) {
