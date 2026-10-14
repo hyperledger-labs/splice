@@ -9,17 +9,13 @@ This directory contains hard forks from that tree where we no longer wish to tra
 
 `app-base`::
   Splice additions to `canton/community/app-base`, such as access classes for console and
-  admin API client internals. sbt project `canton-fork-app-base`, which depends only on
-  `canton-community-app-base`.
+  admin API client internals.
 `base`::
   Splice additions to `canton/community/base`, such as access classes for config, crypto and
-  protocol internals. sbt project `canton-fork-base`, which depends only on
-  `canton-community-base`.
+  protocol internals.
 `common`::
   Splice additions to `canton/community/common`, such as access classes for topology admin
-  internals. sbt project `canton-fork-common`, which depends only on `canton-community-common`.
-`integration-testing`::
-  TODO
+  internals.
 
 ## Access classes
 
