@@ -1086,6 +1086,19 @@ class DbScanAppRewardsStoreTest
         ).and(include("Result size: 2. Limit: 1"))
       }
     }
+
+    "leaf batch with more allowances than maxChildBatches fails" in {
+      for {
+        // 4 parties / batchSize=2 -> 2 leaves of 2 allowances each
+        (store, batchHashes, _) <- setupAndComputeHashes(partyCount = 4, batchSize = 2)
+        leafHash = batchHashes.filter(_.batchLevel == 0).head.batchHash
+        failure <- store.lookupBatchByHash(roundNumber, leafHash, maxChildBatches = 1).failed
+      } yield {
+        failure.getMessage should include(
+          "Size of the result exceeded the limit in appRewards.lookupBatchByHash.allowances"
+        ).and(include("Result size: 2. Limit: 1"))
+      }
+    }
   }
 
   "deleteRewardAccountingDataForRound" should {

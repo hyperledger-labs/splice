@@ -549,6 +549,7 @@ class DbScanAppRewardsStore(
     * Returns BatchOfBatches (child hashes) for internal nodes,
     * or BatchOfMintingAllowances (party + amount) for leaf nodes.
     * Returns None if no batch with this hash exists for the round.
+    * Fails if the batch has more than `maxChildBatches` hashes or allowances.
     */
   def lookupBatchByHash(
       roundNumber: Long,
@@ -570,7 +571,7 @@ class DbScanAppRewardsStore(
           )
             .map(hashes => Some(DbScanAppRewardsStore.BatchOfBatches(hashes)))
         case Some((_, beginIncl, endExcl)) =>
-          getLeafAllowances(roundNumber, beginIncl, endExcl)
+          getLeafAllowances(roundNumber, beginIncl, endExcl, maxChildBatches)
             .map(allowances => Some(DbScanAppRewardsStore.BatchOfMintingAllowances(allowances)))
       })
     } yield result
@@ -629,9 +630,11 @@ class DbScanAppRewardsStore(
       roundNumber: Long,
       beginIncl: Int,
       endExcl: Int,
+      maxAllowances: Int,
   )(implicit tc: TraceContext): Future[Seq[DbScanAppRewardsStore.MintingAllowance]] = {
-    // The primary key admits at most one row per number in the range
-    val rangeSize = (endExcl - beginIncl).max(1)
+    // The primary key admits at most one row per number in the range, and a
+    // leaf's range spans at most batchSize numbers
+    val rangeSize = (endExcl - beginIncl).max(1).min(maxAllowances)
     val limit = HardLimit.tryCreate(rangeSize, rangeSize)
     val opName = "appRewards.lookupBatchByHash.allowances"
     for {
