@@ -21,6 +21,7 @@ images := \
 	wallet-web-ui \
 	validator-app \
 	splitwell-app \
+	sync-operator-app \
 	\
 	ans-web-ui \
 	splitwell-web-ui \

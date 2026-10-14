@@ -1,0 +1,215 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sync-operator-app
+  namespace: {{ .Release.Namespace }}
+  {{- $annotations := include "splice-util-lib.default-annotations" .Values }}
+  {{- if $annotations }}
+  annotations:
+    {{- $annotations | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "splice-util-lib.default-labels" (set . "app" "sync-operator-app") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sync-operator-app
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "splice-util-lib.default-labels" (set . "app" "sync-operator-app") | nindent 8 }}
+    spec:
+      {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
+      {{- if .Values.securityContexts }}
+      {{- with .Values.securityContexts.pod }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      containers:
+      - name: sync-operator-app
+        {{- if .Values.securityContexts }}
+        {{- with .Values.securityContexts.containers.syncOperator }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- end }}
+        image: {{ .Values.imageRepo }}/{{ .Values.imageName}}:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).sync_operator_app) }}
+        {{- with .Values.imagePullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: "{{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }} -Dlogback.configurationFile=/app/logback/logback.xml"
+        - name: SPLICE_APP_SYNC_OPERATOR_SCAN_URL
+          value: {{ .Values.scanAddress | quote }}
+        - name: SPLICE_APP_SYNC_OPERATOR_PARTICIPANT_ADDRESS
+          value: {{ .Values.participantAddress | quote }}
+        - name: SPLICE_APP_SYNC_OPERATOR_SEQUENCER_ADDRESS
+          value: {{ .Values.sequencerAddress | quote }}
+        {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "sync_operator" "keyName" "sync-operator" "fixedTokens" (.Values.cluster).fixedTokens "secretOverrides" (.Values.auth).secretOverrides) | indent 8}}
+        {{- with .Values.persistence }}
+        - name: ADDITIONAL_CONFIG_PERSISTENCE
+          value: |
+            canton.sync-operator-apps.sync-operator.storage {
+              config {
+                properties = {
+                  databaseName = "{{ .databaseName }}"
+                  currentSchema = "{{ .schema }}"
+                  serverName = "{{ .host }}"
+                  portNumber = {{ .port }}
+                  user = "{{ .user }}"
+                  password = ${SPLICE_APP_POSTGRES_PASSWORD}
+                }
+              }
+            }
+        - name: SPLICE_APP_POSTGRES_PASSWORD
+          {{- if (($.Values.persistence).secretOverrides).postgresPassword }}
+          value: {{ $.Values.persistence.secretOverrides.postgresPassword | quote }}
+          {{- else }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.persistence.secretName }}
+              key: postgresPassword
+          {{- end }}
+        {{- end }}
+        {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
+        {{- include "splice-util-lib.log-level" .Values | indent 8}}
+        ports:
+        - containerPort: 5016
+          name: sync-op-api
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /api/syncoperator/livez
+            port: 5016
+          initialDelaySeconds: {{ .Values.livenessProbeInitialDelaySeconds | default 60 }}
+          periodSeconds: 60
+          failureThreshold: 5
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/syncoperator/readyz
+            port: 5016
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 5
+          timeoutSeconds: 3
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+          - name: logback-config
+            # Must mount the whole configmap as a directory instead of shadowing /app/logback.xml with subPath as the latter
+            # would not receive configmap updates.
+            # see https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
+            mountPath: /app/logback
+        {{- if .Values.pvc }}
+          - name: sync-operator-volume
+            mountPath: /persistent-data
+        {{- end }}
+      initContainers:
+        - name: {{ .Release.Name }}-init
+          {{- if .Values.securityContexts }}
+          {{- with .Values.securityContexts.containers.persistence }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          image: {{ .Values.persistence.initImageName}}
+          env:
+            - name: PGPASSWORD
+              {{- if ((.Values.persistence).secretOverrides).postgresPassword }}
+              value: {{ .Values.persistence.secretOverrides.postgresPassword | quote }}
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.persistence.secretName }}
+              {{- end }}
+          command:
+            - 'bash'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.persistence.host }} -p {{ .Values.persistence.port }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.persistence.databaseName }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.persistence.databaseName }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.persistence.databaseName }}, last error: $errmsg";
+                sleep 2;
+              done
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: logback-config
+          configMap:
+            name: {{ .Release.Name }}-sync-operator-app-logback-config
+        {{- if .Values.pvc }}
+        - name: sync-operator-volume
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-sync-operator-pvc
+        {{- end }}
+{{- if .Values.pvc }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-sync-operator-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "splice-util-lib.default-labels" (set . "app" $.Release.Name) | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.pvc.size }}
+  storageClassName: {{ .Values.pvc.volumeStorageClass }}
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sync-operator-app
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "splice-util-lib.default-labels" (set . "app" "sync-operator-app") | nindent 4 }}
+spec:
+  selector:
+    app: sync-operator-app
+  ports:
+  - name: sync-op-api
+    port: 5016
+    protocol: TCP
+  - name: metrics
+    port: 10013
+    protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-sync-operator-app-logback-config
+  namespace: {{ .Release.Namespace }}
+data:
+  logback.xml: |
+{{ .Files.Get "files/logback.xml" | indent 4 }}

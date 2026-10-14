@@ -15,6 +15,7 @@ app_charts := \
 	splice-splitwell-app \
 	splice-splitwell-web-ui \
 	splice-sv-node \
+	splice-sync-operator \
 	splice-validator \
 	splice-info
 

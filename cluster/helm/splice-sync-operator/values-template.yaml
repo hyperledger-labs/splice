@@ -1,0 +1,63 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
+imageName: "sync-operator-app"
+defaultJvmOptions: -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.numThreads=8 -XX:ActiveProcessorCount=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data/heap-dump-CURRENT_DATE.hprof
+resources:
+  limits:
+    memory: 1536Mi
+  requests:
+    cpu: "0.2"
+    memory: 1536Mi
+
+metrics:
+  enable: false
+  release: prometheus-grafana-monitoring
+  interval: 30s
+
+persistence:
+  databaseName: cantonnet_sync_operator
+  schema: sync_operator
+  host: postgres
+  port: 5432
+  user: cnadmin
+  secretName: "postgres-secrets"
+  initImageName: "postgres:14"
+#  secretOverrides:
+#    postgresPassword: ""
+
+participantAddress: "participant"
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:
+
+# k8s tolerations for all deployed pods (optional)
+# tolerations:
+
+# should stakater reloader annotation be added (note: reloader needs to be installed separately)
+enableReloader: true
+
+#auth:
+#  secretOverrides:
+#    ledgerApiUser: ""
+#    audience: ""
+#    token: ""
+#    url: ""
+#    clientId: ""
+#    clientSecret: ""
+#    scope: ""
+
+securityContexts:
+  pod:
+    security_context_profile: pod_security_context
+    fsGroup: 1001
+    fsGroupChangePolicy: "OnRootMismatch"
+  containers:
+    syncOperator:
+      security_context_profile: app_security_context
+    persistence:
+      security_context_profile: persistent_security_context
