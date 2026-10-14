@@ -426,7 +426,7 @@ class BulkStorageCommitFromStagingTest
               any[ExecutionContext],
               any[TraceContext],
             )
-          ).thenAnswer { (_: CantonTimestamp, keys: Seq[String]) =>
+          ).thenAnswer { (_: CantonTimestamp, _: BulkObjectKind, keys: Seq[String]) =>
             largestRequest.accumulateAndGet(keys.size, math.max).discard
             responses(i).get() match {
               case Some((false, _)) =>
