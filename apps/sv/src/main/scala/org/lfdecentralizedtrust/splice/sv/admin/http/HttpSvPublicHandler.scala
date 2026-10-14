@@ -931,8 +931,6 @@ class HttpSvPublicHandler(
 
 object HttpSvPublicHandler {
 
-  private val snapshotRetryAfter = "5"
-
   private[http] def unavailableOnGrpcFailure[T](description: String, logger: TracedLogger)(
       check: Future[T]
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] =
@@ -966,9 +964,10 @@ object HttpSvPublicHandler {
         Future.successful(respond.BadRequest(proposalNotFoundResponse(partyToParticipantSerial)))
       case Right(None) =>
         Future.successful(
-          respond.Accepted(
-            definitions.OnboardSvSnapshotPendingResponse("waiting_for_prerequisites"),
-            snapshotRetryAfter,
+          respond.ServiceUnavailable(
+            definitions.ErrorResponse(
+              "The DSO party is not yet hosted on the candidate participant"
+            )
           )
         )
       case Right(Some(key)) =>
@@ -991,9 +990,8 @@ object HttpSvPublicHandler {
         snapshotService.lookup(id) match {
           case None => notFound
           case Some(SnapshotState.Exporting) =>
-            respond.Accepted(
-              definitions.OnboardSvSnapshotPendingResponse("preparing"),
-              snapshotRetryAfter,
+            respond.ServiceUnavailable(
+              definitions.ErrorResponse(s"Onboarding snapshot $id is still being exported")
             )
           case Some(SnapshotState.Failed(_)) =>
             respond.InternalServerError(

@@ -101,7 +101,7 @@ class JoiningNodeDsoPartyHosting(
                             } else {
                               Future.failed(proposalNotFound)
                             }
-                          case Right(preparation) => Future.successful(preparation)
+                          case Right(id) => Future.successful(id)
                         },
                       svConnection.downloadOnboardingSnapshot,
                     ),

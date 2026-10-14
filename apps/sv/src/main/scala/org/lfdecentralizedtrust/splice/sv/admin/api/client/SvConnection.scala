@@ -49,7 +49,7 @@ final class SvConnection private (
   ): Future[
     Either[
       HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound,
-      SvStreamClient.SnapshotPreparation,
+      String,
     ]
   ] =
     runHttpCmd(config.url, HttpSvPublicAppClient.OnboardSvPartyMigrationPrepare(candidateParty))

@@ -12,20 +12,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
-import org.apache.pekko.http.scaladsl.model.{
-  ContentTypes,
-  HttpEntity,
-  HttpRequest,
-  HttpResponse,
-  StatusCodes,
-}
-import org.apache.pekko.http.scaladsl.model.headers.RawHeader
-import org.apache.pekko.stream.scaladsl.Source
-import org.apache.pekko.{Done, NotUsed}
-import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvStreamClient
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient
-import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
+import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.server.Directives.provide
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
@@ -49,7 +36,6 @@ import org.slf4j.event.Level
 import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{Future, Promise}
-import scala.concurrent.duration.*
 
 class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with ScalatestRouteTest {
 
@@ -160,9 +146,8 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
         val queued = prepare("queued", writeSnapshot)
         Seq(exporting, queued).foreach { id =>
           download(id) ~> route ~> check {
-            status shouldBe StatusCodes.Accepted
-            header("Retry-After").map(_.value) shouldBe Some("5")
-            responseAs[String] should include("preparing")
+            status shouldBe StatusCodes.ServiceUnavailable
+            responseAs[String] should include("still being exported")
           }
         }
       } finally exported.trySuccess(()).discard
@@ -188,7 +173,7 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
       verifyNothingPrepared(service)
     }
 
-    "return 202 without exporting while the DSO party is not yet authorized" in {
+    "return 503 without exporting while the DSO party is not yet hosted" in {
       val service = mock[SvOnboardingSnapshotService]
       HttpSvPublicHandler
         .onboardSvPartyMigrationPrepareResponse(
@@ -197,107 +182,10 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
           (_, file) => writeSnapshot(file),
         )
         .futureValue shouldBe SvPublicStreamResource.OnboardSvPartyMigrationPrepareResponse
-        .Accepted(
-          definitions.OnboardSvSnapshotPendingResponse("waiting_for_prerequisites"),
-          "5",
+        .ServiceUnavailable(
+          definitions.ErrorResponse("The DSO party is not yet hosted on the candidate participant")
         )
       verifyNothingPrepared(service)
-    }
-  }
-
-  "snapshot polling protocol" should {
-
-    "serve pending prepare responses with Retry-After and without a snapshot id" in {
-      Seq(
-        ("party-migration", """{"candidate_party_id":"candidate::dummy"}""")
-      ).foreach { case (kind, body) =>
-        Post(
-          s"/api/sv/v0/onboard/sv/$kind/prepare",
-          HttpEntity(ContentTypes.`application/json`, body),
-        ) ~> route ~> check {
-          status shouldBe StatusCodes.Accepted
-          header("Retry-After").map(_.value) shouldBe Some("5")
-          val json = io.circe.parser.parse(responseAs[String]).value
-          json.hcursor.get[String]("state").value shouldBe "waiting_for_prerequisites"
-          json.hcursor.downField("id").succeeded shouldBe false
-        }
-      }
-    }
-
-    "pass 202 through the shared HTTP error layer and consume its entity on every endpoint" in {
-      implicit val httpClient: HttpClient = mock[HttpClient]
-      implicit val decoder: TemplateJsonDecoder = mock[TemplateJsonDecoder]
-      Seq("party-migration", "download").foreach { endpoint =>
-        val currentState = if (endpoint == "download") "preparing" else "waiting_for_prerequisites"
-        Seq(currentState, "queued_by_new_sponsor").foreach { state =>
-          Seq(
-            Some("7") -> 7.seconds,
-            None -> 5.seconds,
-            Some("invalid") -> 5.seconds,
-            Some("0") -> 5.seconds,
-            Some("-1") -> 5.seconds,
-            Some(Int.MaxValue.toString) -> Int.MaxValue.seconds,
-            Some((Int.MaxValue.toLong + 1).toString) -> Int.MaxValue.seconds,
-            Some(Long.MaxValue.toString) -> Int.MaxValue.seconds,
-          ).foreach { case (header, delay) =>
-            val consumed = Promise[Done]()
-            val body = s"""{"state":"$state"}"""
-            val source =
-              Source.single(org.apache.pekko.util.ByteString(body)).watchTermination() {
-                (_, done) =>
-                  consumed.completeWith(done).discard
-                  NotUsed
-              }
-            val response = HttpResponse(
-              StatusCodes.Accepted,
-              headers = header.toList.map(RawHeader("Retry-After", _)),
-              entity = HttpEntity(ContentTypes.`application/json`, source),
-            )
-            when(httpClient.executeRequest(any[String], any[String])(any[HttpRequest]))
-              .thenReturn(Future.successful(response))
-            endpoint match {
-              case "party-migration" =>
-                val command = HttpSvPublicAppClient.OnboardSvPartyMigrationPrepare(
-                  PartyId.tryFromProtoPrimitive("candidate::dummy")
-                )
-                val result = command
-                  .submitRequest(command.createClient("http://sponsor"), Nil)
-                  .value
-                  .futureValue
-                  .value
-                command.handleResponse(result) shouldBe Right(
-                  Right(SvStreamClient.SnapshotPreparation.Pending(state, delay))
-                )
-              case _ =>
-                val command = HttpSvPublicAppClient.OnboardSvDownload("id")
-                val result = command
-                  .submitRequest(command.createClient("http://sponsor"), Nil)
-                  .value
-                  .futureValue
-                  .value
-                command.handleResponse(result) shouldBe Right(
-                  SvStreamClient.OnboardSvDownloadResponse.Accepted(state, delay)
-                )
-            }
-            consumed.future.futureValue shouldBe Done
-          }
-        }
-      }
-    }
-
-    "reject a malformed 202 body without a pending state" in {
-      val client = SvStreamClient.httpClient(_ =>
-        Future.successful(
-          HttpResponse(
-            StatusCodes.Accepted,
-            entity =
-              HttpEntity(ContentTypes.`application/json`, """{"unexpected":"missing state"}"""),
-          )
-        )
-      )
-      inside(client.onboardSvDownload("id").value.futureValue) { case Left(Left(error)) =>
-        error.getMessage should include("state")
-      }
     }
   }
 

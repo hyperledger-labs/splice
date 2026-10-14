@@ -311,7 +311,7 @@ object HttpSvPublicAppClient {
         SvStreamClient.OnboardSvPartyMigrationPrepareResponse,
         Either[
           OnboardSvPartyMigrationAuthorizeProposalNotFound,
-          SvStreamClient.SnapshotPreparation,
+          String,
         ],
         SvStreamClient,
       ] {
@@ -358,9 +358,7 @@ object HttpSvPublicAppClient {
           )
         )
       case SvStreamClient.OnboardSvPartyMigrationPrepareResponse.OK(response) =>
-        Right(Right(SvStreamClient.SnapshotPreparation.Prepared(response.id)))
-      case SvStreamClient.OnboardSvPartyMigrationPrepareResponse.Accepted(state, retryAfter) =>
-        Right(Right(SvStreamClient.SnapshotPreparation.Pending(state, retryAfter)))
+        Right(Right(response.id))
     }
   }
 
