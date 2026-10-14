@@ -76,9 +76,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
               'update_history_unassignments'::regclass
             )""".as[String]
           _ <- DBIO.seq(
-            updateHistoryPartitions.map(partition =>
-              sqlu"""drop table if exists "#$partition""""
-            )*
+            updateHistoryPartitions.map(partition => sqlu"""drop table if exists "#$partition"""")*
           )
           _ <- sql"""TRUNCATE
                 active_parties,
