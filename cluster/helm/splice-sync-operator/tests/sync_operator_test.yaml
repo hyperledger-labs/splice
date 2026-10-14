@@ -1,0 +1,260 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: "Sync operator values"
+templates:
+  - sync-operator.yaml
+release:
+  # Set for testing labels
+  name: sync-operator
+chart:
+  # Override for testing labels
+  version: 0.1.1
+  appVersion: 0.1.0
+tests:
+  - it: "sets the scan, participant and sequencer addresses"
+    set:
+      scanAddress: "http://scan-app.sv-1:5012"
+      participantAddress: "mock-participant"
+      sequencerAddress: "mock-sequencer"
+      persistence.host: mock-pg-host
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      # Sanity check
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: sync-operator-app
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPLICE_APP_SYNC_OPERATOR_SCAN_URL
+            value: "http://scan-app.sv-1:5012"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPLICE_APP_SYNC_OPERATOR_PARTICIPANT_ADDRESS
+            value: "mock-participant"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPLICE_APP_SYNC_OPERATOR_SEQUENCER_ADDRESS
+            value: "mock-sequencer"
+
+  - it: "allows overriding sync operator image and initImage"
+    set:
+      imageRepo: "secure-registry.example.com"
+      imageName: "custom-sync-operator"
+      persistence.initImageName: "secure-registry.example.com/postgres:14-custom"
+      scanAddress: "dummy"
+      sequencerAddress: "dummy"
+      persistence.host: "dummy"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='sync-operator-app')].image
+          pattern: "^secure-registry\\.example\\.com/custom-sync-operator:"
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: "secure-registry.example.com/postgres:14-custom"
+
+  - it: "allows overriding sync operator database and auth0 secret env vars with raw strings and renders zero secretKeyRefs"
+    set:
+      scanAddress: "dummy"
+      sequencerAddress: "dummy"
+      persistence:
+        host: "dummy"
+        secretOverrides:
+          postgresPassword: "vault:kv/data/sync-operator/postgres-password"
+      auth:
+        secretOverrides:
+          ledgerApiUser: "vault:kv/data/sync-operator/auth-user"
+          audience: "vault:kv/data/sync-operator/auth-aud"
+          token: "vault:kv/data/sync-operator/auth-token"
+          url: "vault:kv/data/sync-operator/auth-url"
+          clientId: "vault:kv/data/sync-operator/auth-client-id"
+          clientSecret: "vault:kv/data/sync-operator/auth-client-secret"
+          scope: "vault:kv/data/sync-operator/auth-scope"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[?(@.name=='sync-operator-app')].env[?(@.valueFrom.secretKeyRef)]
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='sync-operator-app')].env[?(@.name=='SPLICE_APP_POSTGRES_PASSWORD')].value
+          pattern: "vault:kv/data/sync-operator/postgres-password"
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name=='sync-operator-init')].env[?(@.name=='PGPASSWORD')].value
+          pattern: "vault:kv/data/sync-operator/postgres-password"
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='sync-operator-app')].env[?(@.name=='SPLICE_APP_SYNC_OPERATOR_LEDGER_API_AUTH_USER_NAME')].value
+          pattern: "vault:kv/data/sync-operator/auth-user"
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='sync-operator-app')].env[?(@.name=='SPLICE_APP_SYNC_OPERATOR_LEDGER_API_AUTH_AUDIENCE')].value
+          pattern: "vault:kv/data/sync-operator/auth-aud"
+
+  - it: "injects custom serviceAccountName into Deployment when specified"
+    set:
+      serviceAccountName: "custom-sync-operator-sa"
+      scanAddress: "dummy"
+      sequencerAddress: "dummy"
+      persistence.host: "dummy"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: "custom-sync-operator-sa"
+
+  - it: "pvc creates volume and mount for heap dumps at /persistent-data"
+    set:
+      scanAddress: "dummy"
+      sequencerAddress: "dummy"
+      persistence.host: mock-pg-host
+      pvc:
+        size: "5Gi"
+        volumeStorageClass: "standard"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: sync-operator-volume
+            mountPath: /persistent-data
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: sync-operator-volume
+            persistentVolumeClaim:
+              claimName: sync-operator-sync-operator-pvc
+
+  - it: "pvc creates a PersistentVolumeClaim resource"
+    set:
+      scanAddress: "dummy"
+      sequencerAddress: "dummy"
+      persistence.host: mock-pg-host
+      pvc:
+        size: "5Gi"
+        volumeStorageClass: "standard"
+    documentSelector:
+      path: metadata.name
+      value: sync-operator-sync-operator-pvc
+    asserts:
+      - equal:
+          path: kind
+          value: PersistentVolumeClaim
+      - equal:
+          path: spec.resources.requests.storage
+          value: "5Gi"
+      - equal:
+          path: spec.storageClassName
+          value: "standard"
+      - equal:
+          path: metadata.annotations
+          value:
+            helm.sh/resource-policy: keep
+
+  - it: "pvc is not created by default"
+    set:
+      scanAddress: "dummy"
+      sequencerAddress: "dummy"
+      persistence.host: mock-pg-host
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: sync-operator-volume
+            mountPath: /persistent-data
+
+  - it: "sets default security contexts for pods and containers"
+    set:
+      scanAddress: "dummy"
+      sequencerAddress: "dummy"
+      persistence.host: mock-pg-host
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext
+          value:
+            fsGroup: 1001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+      - equal:
+          path: spec.template.spec.containers[0].securityContext
+          value:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            allowPrivilegeEscalation: false
+            privileged: false
+            capabilities:
+              drop:
+                - ALL
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext
+          value:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            allowPrivilegeEscalation: false
+            privileged: false
+            capabilities:
+              drop:
+                - ALL
+
+  - it: "allows overriding security contexts via values"
+    set:
+      scanAddress: "dummy"
+      sequencerAddress: "dummy"
+      persistence.host: mock-pg-host
+      securityContexts:
+        pod:
+          runAsNonRoot: true
+          seccompProfile:
+            type: Localhost
+            localhostProfile: profiles/hardened.json
+        containers:
+          syncOperator:
+            runAsUser: 5000
+            allowPrivilegeEscalation: true
+          persistence:
+            runAsUser: 6000
+            privileged: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext
+          value:
+            fsGroup: 1001
+            fsGroupChangePolicy: OnRootMismatch
+            runAsNonRoot: true
+            seccompProfile:
+              type: Localhost
+              localhostProfile: profiles/hardened.json
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsUser
+          value: 5000
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: true
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.runAsUser
+          value: 6000
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.privileged
+          value: true
