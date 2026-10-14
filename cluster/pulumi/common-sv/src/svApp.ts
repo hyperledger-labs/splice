@@ -112,6 +112,13 @@ export function valuesForSvApp(
     .concat(additionalPackagesToUnvetConfig)
     .concat([envoyClientIpHeaderEnvVar('canton.sv-apps.sv')]);
 
+  if (config.svApp?.trafficBasedOnboarding) {
+    additionalEnvVars.push({
+      name: 'ADDITIONAL_CONFIG_TRAFFIC_BASED_ONBOARDING',
+      value: `canton.sv-apps.sv.onboarding.initial-sv-operations-switch-over-times {\n  "no-featured-app-choice-context" = "0001-01-01T00:00:00Z"\n  "permissioned-synchronizer" = "0001-01-01T00:00:00Z"\n}`,
+    });
+  }
+
   const synchronizerValues: { synchronizers: object } = {
     synchronizers: {
       ...(config.skipInitialization !== undefined

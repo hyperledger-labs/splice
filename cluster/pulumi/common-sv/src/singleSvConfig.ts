@@ -87,6 +87,7 @@ const SvAppConfigSchema = z
     cometBftGovernanceKeyGcpSecret: z.string().optional(),
     // Map of package name -> list of versions to explicitly unvet
     additionalPackagesToUnvet: z.record(z.string(), z.array(z.string())).optional(),
+    trafficBasedOnboarding: z.boolean().optional(),
     resources: K8sResourceSchema,
   })
   .strict();
