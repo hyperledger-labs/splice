@@ -68,7 +68,6 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
 }
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
-import java.io.SequenceInputStream
 import java.nio.file.{Files, Path}
 import java.util.{Base64, Collections}
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
@@ -358,14 +357,13 @@ class SequencerAdminConnection(
     )
   }
 
-  def initializeFromOnboardingState(
-      onboardingState: Seq[ByteString]
-  )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
-    runCmd(
-      SequencerAdminCommands.InitializeFromOnboardingStateV2(
-        new SequenceInputStream(onboardingState.iterator.map(_.newInput()).asJavaEnumeration)
-      )
-    )
+  def initializeFromOnboardingStateFile(
+      file: Path
+  )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] = {
+    val inputStream = Files.newInputStream(file)
+    runCmd(SequencerAdminCommands.InitializeFromOnboardingStateV2(inputStream))
+      .andThen(_ => inputStream.close())
+  }
 
   def listSequencerTrafficControlState(filterMembers: Seq[Member] = Seq.empty)(implicit
       traceContext: TraceContext
