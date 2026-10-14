@@ -13,6 +13,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import io.grpc.Status.Code
 import io.opentelemetry.api.trace.Tracer
@@ -56,6 +57,7 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSe
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract}
 
 import java.nio.file.{Files, NoSuchFileException, Path}
+import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -853,7 +855,7 @@ object HttpSvPublicHandler {
   private[http] def onboardSvPartyMigrationPrepareResponse(
       snapshotService: SvOnboardingSnapshotService,
       prepared: Either[DsoPartyMigrationFailure, Option[SnapshotKey.Acs]],
-      exportSnapshot: (SnapshotKey.Acs, Path) => Future[Unit],
+      exportSnapshot: (SnapshotKey.Acs, Path) => Future[ByteString],
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -881,7 +883,7 @@ object HttpSvPublicHandler {
       snapshotService: SvOnboardingSnapshotService,
       key: SnapshotKey.SequencerOnboardingState,
       observed: Boolean,
-      exportSnapshot: Path => Future[Unit],
+      exportSnapshot: Path => Future[ByteString],
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -921,14 +923,15 @@ object HttpSvPublicHandler {
             respond.InternalServerError(
               definitions.ErrorResponse(s"Export of onboarding snapshot $id failed")
             )
-          case Some(SnapshotState.Ready(file)) =>
+          case Some(SnapshotState.Ready(file, sha256)) =>
             try
               respond.OK(
                 HttpEntity(
                   ContentTypes.`application/octet-stream`,
                   Files.size(file),
                   FileIO.fromPath(file),
-                )
+                ),
+                s"sha-256=:${Base64.getEncoder.encodeToString(sha256.toByteArray)}:",
               )
             catch { case _: NoSuchFileException => notFound }
         }

@@ -246,7 +246,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
           inside(
             sv1Backend.appState.svAutomation.onboardingSnapshotService
               .lookup(SvOnboardingSnapshotId(id))
-          ) { case Some(SnapshotState.Ready(file)) =>
+          ) { case Some(SnapshotState.Ready(file, _)) =>
             file
           }
         }

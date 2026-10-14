@@ -198,10 +198,10 @@ class SequencerAdminConnection(
   def getOnboardingStateToFile(
       sequencerIdOrTimestamp: Either[SequencerId, CantonTimestamp],
       file: Path,
-  )(implicit traceContext: TraceContext): Future[Unit] =
+  )(implicit traceContext: TraceContext): Future[ByteString] =
     Future {
       blocking {
-        new OutputFileStreamObserver[OnboardingStateV2Response](
+        Sha256FileStreamObserver[OnboardingStateV2Response](
           File(file),
           _.onboardingStateForSequencer,
         )

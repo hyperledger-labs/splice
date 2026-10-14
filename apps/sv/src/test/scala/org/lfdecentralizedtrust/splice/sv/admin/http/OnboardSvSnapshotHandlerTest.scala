@@ -12,8 +12,10 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{PartyId, SequencerId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
+import org.apache.pekko.http.scaladsl.model.headers.{ByteRange, Range}
 import org.apache.pekko.http.scaladsl.model.StatusCodes
-import org.apache.pekko.http.scaladsl.server.Directives.provide
+import org.apache.pekko.http.scaladsl.server.Directives.{provide, withRangeSupport}
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
@@ -36,6 +38,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.event.Level
 
 import java.nio.file.{Files, Path}
+import java.security.MessageDigest
 import java.time.Instant
 import scala.concurrent.{Future, Promise}
 
@@ -66,12 +69,15 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
   }
 
   private val route = Route.seal(
-    SvPublicStreamResource.routes(handler, _ => provide(traceContext))
+    SvPublicStreamResource.routes(
+      handler,
+      _ => withRangeSupport.tflatMap(_ => provide(traceContext)),
+    )
   )
 
   private val content = "0123456789".getBytes
 
-  private def prepare(name: String, exportTo: Path => Future[Unit]): SvOnboardingSnapshotId =
+  private def prepare(name: String, exportTo: Path => Future[ByteString]): SvOnboardingSnapshotId =
     snapshotService
       .prepare(
         SnapshotKey.Acs(
@@ -83,13 +89,13 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
       )
       .futureValue
 
-  private def writeSnapshot(file: Path): Future[Unit] = {
+  private def writeSnapshot(file: Path): Future[ByteString] = {
     Files.write(file, content)
-    Future.unit
+    Future.successful(ByteString.copyFrom(MessageDigest.getInstance("SHA-256").digest(content)))
   }
 
   private def verifyNothingPrepared(service: SvOnboardingSnapshotService) =
-    verify(service, never).prepare(any[SnapshotKey], any[Path => Future[Unit]])(
+    verify(service, never).prepare(any[SnapshotKey], any[Path => Future[ByteString]])(
       any[TraceContext]
     )
 
@@ -124,7 +130,7 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
         status shouldBe StatusCodes.NotFound
       }
 
-      val exported = Promise[Unit]()
+      val exported = Promise[ByteString]()
       try {
         val exporting = prepare(
           "exporting",
@@ -139,14 +145,18 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
             status shouldBe StatusCodes.ServiceUnavailable
             responseAs[String] should include("still being exported")
           }
+          download(id) ~> addHeader(Range(ByteRange.fromOffset(4))) ~> route ~> check {
+            status shouldBe StatusCodes.ServiceUnavailable
+            responseAs[String] should include("still being exported")
+          }
         }
-      } finally exported.trySuccess(()).discard
+      } finally exported.trySuccess(ByteString.EMPTY).discard
     }
 
     "return a generic error when a completed snapshot file is missing" in {
       val id = prepare("missing-file", writeSnapshot)
       val file = eventually() {
-        inside(snapshotService.lookup(id)) { case Some(SnapshotState.Ready(file)) => file }
+        inside(snapshotService.lookup(id)) { case Some(SnapshotState.Ready(file, _)) => file }
       }
       Files.delete(file)
       download(id) ~> route ~> check {

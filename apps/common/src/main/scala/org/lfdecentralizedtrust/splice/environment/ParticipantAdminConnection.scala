@@ -21,7 +21,6 @@ import com.digitalasset.canton.admin.participant.v30.{
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.grpc.OutputFileStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
   ContractImportMode,
@@ -181,7 +180,7 @@ class ParticipantAdminConnection(
       file: Path,
   )(implicit
       traceContext: TraceContext
-  ): Future[Unit] =
+  ): Future[ByteString] =
     for {
       // The current ExportPartyAcs requires us to pass an offset that is right before the topology tx
       // in which the participant started hosing `partyId`.
@@ -194,7 +193,7 @@ class ParticipantAdminConnection(
         show"Exporting ACS snapshot for party $party from domain $synchronizerId at offset $beforeActivationOffset"
       )
       observer <- Future(
-        blocking(new OutputFileStreamObserver[ExportPartyAcsResponse](File(file), _.chunk))
+        blocking(Sha256FileStreamObserver[ExportPartyAcsResponse](File(file), _.chunk))
       )
       _ <- runCmd(
         ParticipantAdminCommands.PartyManagement.ExportPartyAcs(

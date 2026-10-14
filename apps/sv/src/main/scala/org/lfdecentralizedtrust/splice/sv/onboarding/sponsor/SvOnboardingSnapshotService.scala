@@ -17,6 +17,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PartyId, SequencerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Mutex
+import com.google.protobuf.ByteString
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.parser.decode
@@ -34,7 +35,7 @@ import org.lfdecentralizedtrust.splice.util.Codec
 
 import java.nio.file.{Files, Path, StandardCopyOption}
 import java.time.Instant
-import java.util.UUID
+import java.util.{Base64, UUID}
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.{Failure, Success, Try}
@@ -103,7 +104,12 @@ class SvOnboardingSnapshotService(
               if (Files.notExists(file)) SnapshotState.Failed("Snapshot file is missing")
               else if (!Files.isRegularFile(file) || Files.size(file) != persisted.size)
                 SnapshotState.Failed("Snapshot file size has changed")
-              else SnapshotState.Ready(file)
+              else
+                persisted.sha256.fold[SnapshotState](
+                  SnapshotState.Failed("Snapshot has no SHA-256 digest")
+                )(sha256 =>
+                  SnapshotState.Ready(file, ByteString.copyFrom(Base64.getDecoder.decode(sha256)))
+                )
             Snapshot(
               persisted.key,
               CantonTimestamp.assertFromInstant(Instant.parse(persisted.createdAt)),
@@ -208,7 +214,7 @@ class SvOnboardingSnapshotService(
       case _: IllegalStateException => ()
     }
 
-  def prepare(key: SnapshotKey, exportTo: Path => Future[Unit])(implicit
+  def prepare(key: SnapshotKey, exportTo: Path => Future[ByteString])(implicit
       tc: TraceContext
   ): Future[SvOnboardingSnapshotId] = Future.fromTry(Try(blocking {
     mutex.exclusive {
@@ -276,12 +282,13 @@ class SvOnboardingSnapshotService(
           blocking {
             mutex.exclusive {
               jobs.get(queued.id).foreach { key =>
-                val published = result.flatMap { _ =>
+                val published = result.flatMap { sha256 =>
                   Try {
                     val metadata = PersistedSnapshot(
                       key,
                       clock.now.toInstant.toString,
                       Files.size(queued.file),
+                      Base64.getEncoder.encodeToString(sha256.toByteArray),
                     )
                     val temporary = queued.file.resolveSibling("metadata.tmp")
                     Files.writeString(temporary, metadata.asJson.noSpaces)
@@ -341,7 +348,7 @@ object SvOnboardingSnapshotService {
   sealed trait SnapshotState
   object SnapshotState {
     case object Exporting extends SnapshotState
-    final case class Ready(file: Path) extends SnapshotState
+    final case class Ready(file: Path, sha256: ByteString) extends SnapshotState
     final case class Failed(error: String) extends SnapshotState
   }
 
@@ -353,7 +360,7 @@ object SvOnboardingSnapshotService {
   private final case class QueuedExport(
       id: SvOnboardingSnapshotId,
       file: Path,
-      exportTo: Path => Future[Unit],
+      exportTo: Path => Future[ByteString],
       traceContext: TraceContext,
   )
 
@@ -364,6 +371,7 @@ object SvOnboardingSnapshotService {
       sequencerId: Option[String],
       createdAt: String,
       size: Long,
+      sha256: Option[String],
   ) {
     def key: SnapshotKey = {
       val synchronizer = SynchronizerId.tryFromString(synchronizerId)
@@ -384,26 +392,29 @@ object SvOnboardingSnapshotService {
     }
   }
   private object PersistedSnapshot {
-    def apply(key: SnapshotKey, createdAt: String, size: Long): PersistedSnapshot = key match {
-      case SnapshotKey.Acs(synchronizerId, party, activationTime) =>
-        PersistedSnapshot(
-          synchronizerId.toProtoPrimitive,
-          Some(party.toProtoPrimitive),
-          Some(activationTime.toString),
-          None,
-          createdAt,
-          size,
-        )
-      case SnapshotKey.SequencerOnboardingState(synchronizerId, sequencerId) =>
-        PersistedSnapshot(
-          synchronizerId.toProtoPrimitive,
-          None,
-          None,
-          Some(sequencerId.toProtoPrimitive),
-          createdAt,
-          size,
-        )
-    }
+    def apply(key: SnapshotKey, createdAt: String, size: Long, sha256: String): PersistedSnapshot =
+      key match {
+        case SnapshotKey.Acs(synchronizerId, party, activationTime) =>
+          PersistedSnapshot(
+            synchronizerId.toProtoPrimitive,
+            Some(party.toProtoPrimitive),
+            Some(activationTime.toString),
+            None,
+            createdAt,
+            size,
+            Some(sha256),
+          )
+        case SnapshotKey.SequencerOnboardingState(synchronizerId, sequencerId) =>
+          PersistedSnapshot(
+            synchronizerId.toProtoPrimitive,
+            None,
+            None,
+            Some(sequencerId.toProtoPrimitive),
+            createdAt,
+            size,
+            Some(sha256),
+          )
+      }
   }
   private implicit val encoder: Encoder[PersistedSnapshot] = deriveEncoder
   private implicit val decoder: Decoder[PersistedSnapshot] = deriveDecoder

@@ -560,6 +560,7 @@ class SvApp(
                 publicHandler,
                 operation =>
                   buildOperation("svPublic", operation)
+                    .tflatMap(_ => withRangeSupport)
                     .tflatMap(_ => provide(traceContext)),
               ),
               SvOperatorResource.routes(

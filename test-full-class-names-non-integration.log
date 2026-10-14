@@ -13,6 +13,7 @@ org.lfdecentralizedtrust.splice.environment.ActiveContractsRestartTest
 org.lfdecentralizedtrust.splice.environment.CommandCircuitBreakerTest
 org.lfdecentralizedtrust.splice.environment.CommandIdDedupTest
 org.lfdecentralizedtrust.splice.environment.RetryProviderBftCallFailedTest
+org.lfdecentralizedtrust.splice.environment.Sha256FileStreamObserverTest
 org.lfdecentralizedtrust.splice.environment.TopologyAwarePackageVersionSupportTest
 org.lfdecentralizedtrust.splice.http.HttpRateLimiterTest
 org.lfdecentralizedtrust.splice.http.InvalidResponseContentTest

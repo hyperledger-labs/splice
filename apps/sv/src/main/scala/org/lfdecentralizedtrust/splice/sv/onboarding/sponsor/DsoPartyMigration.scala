@@ -23,6 +23,7 @@ import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
+import com.google.protobuf.ByteString
 
 import io.grpc.StatusRuntimeException
 import java.nio.file.Path
@@ -67,7 +68,7 @@ class DsoPartyMigration(
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   def exportSnapshotToFile(key: SnapshotKey.Acs, targetParticipantId: ParticipantId, file: Path)(
       implicit tc: TraceContext
-  ): Future[Unit] = {
+  ): Future[ByteString] = {
 
     def submitDummyTransaction(): Future[Unit] =
       svStoreWithIngestion
