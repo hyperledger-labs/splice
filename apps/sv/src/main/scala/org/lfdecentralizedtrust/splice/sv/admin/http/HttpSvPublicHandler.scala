@@ -99,68 +99,80 @@ class HttpSvPublicHandler(
     withSpan(s"$workflowId.onboardValidator") { _ => _ =>
       Codec.decode(Codec.Party)(body.partyId) match {
         case Right(partyId) =>
-          val providedSecret = Secrets.decodeValidatorOnboardingSecret(body.secret, svParty)
-          if (providedSecret.sponsoringSv == svParty) {
-            svStore.lookupValidatorOnboardingBySecret(providedSecret.secret).flatMap {
-              case None =>
-                svStore.lookupUsedSecret(providedSecret.secret).flatMap {
-                  case Some(used) if used.payload.validator == body.partyId =>
-                    // This validator is already onboarded with the same secret - nothing to do
-                    Future.successful(r0.OnboardValidatorResponseOK)
-                  case Some(_) =>
-                    Future.failed(
-                      HttpErrorHandler
-                        .unauthorized("Secret has already been used for a different validator.")
-                    )
-                  case None => Future.failed(HttpErrorHandler.unauthorized("Unknown secret."))
-                }
-
-              case Some(vo) =>
-                val storedSecret =
-                  Secrets.decodeValidatorOnboardingSecret(vo.payload.candidateSecret, svParty)
-
-                if (storedSecret.partyHint.exists(_ != partyId.uid.identifier.str)) {
-                  Future.failed(
-                    HttpErrorHandler.badRequest(
-                      s"The onboarding secret entered does not match the secret issued for validatorPartyHint: ${storedSecret.partyHint
-                          .getOrElse("<missing>")}"
-                    )
-                  )
-                } else {
-                  // Check whether a validator license already exists for this party,
-                  // because when recovering from an ACS snapshot "used secret" information will get lost.
-                  dsoStore
-                    .lookupValidatorLicenseWithOffset(PartyId.tryFromProtoPrimitive(body.partyId))
-                    .flatMap {
-                      case QueryResult(_, Some(_)) =>
-                        // This validator is already onboarded - nothing to do
+          dsoStore.getDsoRules().flatMap { dsoRules =>
+            if (SwitchOverTimes.permissionedSynchronizerEnabled(clock, dsoRules.payload)) {
+              Future.failed(
+                HttpErrorHandler.badRequest(
+                  s"Endpoint is disabled: the network has migrated to traffic-based onboarding."
+                )
+              )
+            } else {
+              val providedSecret = Secrets.decodeValidatorOnboardingSecret(body.secret, svParty)
+              if (providedSecret.sponsoringSv == svParty) {
+                svStore.lookupValidatorOnboardingBySecret(providedSecret.secret).flatMap {
+                  case None =>
+                    svStore.lookupUsedSecret(providedSecret.secret).flatMap {
+                      case Some(used) if used.payload.validator == body.partyId =>
+                        // This validator is already onboarded with the same secret - nothing to do
                         Future.successful(r0.OnboardValidatorResponseOK)
-                      case QueryResult(_, None) =>
-                        for {
-                          // We retry here because this mutates the AmuletRules and rounds contracts,
-                          // which can lead to races.
-                          _ <- retryProvider.retryForClientCalls(
-                            "onboard_validator",
-                            "onboard validator via DsoRules",
-                            onboardValidator(
-                              partyId,
-                              Secrets.encodeValidatorOnboardingSecret(storedSecret),
-                              vo,
-                              body.version,
-                              body.contactPoint,
-                            ),
-                            logger,
-                          )
-                        } yield r0.OnboardValidatorResponseOK
+                      case Some(_) =>
+                        Future.failed(
+                          HttpErrorHandler
+                            .unauthorized("Secret has already been used for a different validator.")
+                        )
+                      case None => Future.failed(HttpErrorHandler.unauthorized("Unknown secret."))
+                    }
+
+                  case Some(vo) =>
+                    val storedSecret =
+                      Secrets.decodeValidatorOnboardingSecret(vo.payload.candidateSecret, svParty)
+
+                    if (storedSecret.partyHint.exists(_ != partyId.uid.identifier.str)) {
+                      Future.failed(
+                        HttpErrorHandler.badRequest(
+                          s"The onboarding secret entered does not match the secret issued for validatorPartyHint: ${storedSecret.partyHint
+                              .getOrElse("<missing>")}"
+                        )
+                      )
+                    } else {
+                      // Check whether a validator license already exists for this party,
+                      // because when recovering from an ACS snapshot "used secret" information will get lost.
+                      dsoStore
+                        .lookupValidatorLicenseWithOffset(
+                          PartyId.tryFromProtoPrimitive(body.partyId)
+                        )
+                        .flatMap {
+                          case QueryResult(_, Some(_)) =>
+                            // This validator is already onboarded - nothing to do
+                            Future.successful(r0.OnboardValidatorResponseOK)
+                          case QueryResult(_, None) =>
+                            for {
+                              // We retry here because this mutates the AmuletRules and rounds contracts,
+                              // which can lead to races.
+                              _ <- retryProvider.retryForClientCalls(
+                                "onboard_validator",
+                                "onboard validator via DsoRules",
+                                onboardValidator(
+                                  partyId,
+                                  Secrets.encodeValidatorOnboardingSecret(storedSecret),
+                                  vo,
+                                  body.version,
+                                  body.contactPoint,
+                                ),
+                                logger,
+                              )
+                            } yield r0.OnboardValidatorResponseOK
+                        }
                     }
                 }
+              } else {
+                Future.failed(
+                  HttpErrorHandler.badRequest(
+                    s"Secret is for SV ${providedSecret.sponsoringSv} but this SV is $svParty, validate your SV sponsor URL"
+                  )
+                )
+              }
             }
-          } else {
-            Future.failed(
-              HttpErrorHandler.badRequest(
-                s"Secret is for SV ${providedSecret.sponsoringSv} but this SV is $svParty, validate your SV sponsor URL"
-              )
-            )
           }
         case Left(error) =>
           Future.failed(HttpErrorHandler.badRequest(error))
