@@ -81,6 +81,32 @@ trait ProcessTestUtil { this: BaseTest =>
     })
   }
 
+  // As withCanton, with a script that Canton runs once its nodes have started, as start-canton.sh
+  // runs bootstrap-canton.sc.
+  protected def withBootstrappedCanton[A](
+      configs: Seq[File],
+      bootstrapScript: File,
+      logSuffix: String,
+  )(test: => A): A = {
+    Using.resource(
+      clue(s"Starting external Canton process $logSuffix with bootstrap script $bootstrapScript")(
+        startCantonInternal(
+          configs.flatMap(config => Seq("-c", config.toString)) ++
+            Seq("--bootstrap", bootstrapScript.toString),
+          logSuffix,
+        )
+      )
+    )(_ =>
+      clue(s"Using external Canton process $logSuffix") {
+        test
+      }
+    )((resource: Process) => {
+      clue(s"Destroying external Canton process $logSuffix") {
+        resource.destroyAndWait()
+      }
+    })
+  }
+
   protected def withBundledSplice[A](
       configs: Seq[File],
       logSuffix: String,
