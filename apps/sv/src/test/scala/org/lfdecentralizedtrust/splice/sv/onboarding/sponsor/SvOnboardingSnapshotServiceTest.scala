@@ -384,17 +384,20 @@ class SvOnboardingSnapshotServiceTest
       }
     }
 
-    "clear only its own exports directory on startup" in File.usingTemporaryDirectory() {
-      directory =>
+    "clear stale exports and downloads but nothing else on startup" in File
+      .usingTemporaryDirectory() { directory =>
         val staleExport = (directory / "exports" / "stale").createIfNotExists(createParents = true)
+        val staleDownload =
+          (directory / "downloads" / "acs" / "stale").createIfNotExists(createParents = true)
         val otherFile = (directory / "other").createIfNotExists()
         withService(SvOnboardingSnapshotsConfig(directory = Some(directory.path))) {
           (service, _, _) =>
             service.exportsDirectory shouldBe (directory / "exports").path
             staleExport.exists shouldBe false
+            staleDownload.exists shouldBe false
             otherFile.exists shouldBe true
         }
-    }
+      }
 
     "reject exports after shutdown" in withService() { (service, _, retryProvider) =>
       retryProvider.close()

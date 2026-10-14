@@ -45,6 +45,8 @@ class SvOnboardingSnapshotService(
 
   private[sponsor] val exportsDirectory: Path = config.directory match {
     case Some(directory) =>
+      val downloads = File(directory) / "downloads"
+      if (downloads.exists) downloads.delete()
       val exports = File(directory) / "exports"
       if (exports.exists) exports.delete()
       exports.createDirectories().path

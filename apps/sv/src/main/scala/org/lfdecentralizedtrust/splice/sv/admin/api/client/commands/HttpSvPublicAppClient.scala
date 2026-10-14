@@ -9,20 +9,21 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerSnapshot as Canto
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
 import com.google.protobuf.ByteString
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes, Uri}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,
   SvOnboardingRequest,
 }
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpCommand, HttpCommandException}
 import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_public as http}
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvStreamClient
 import org.lfdecentralizedtrust.splice.sv.http.SvHttpClient.BaseCommandPublic
 import org.lfdecentralizedtrust.splice.util.{Codec, TemplateJsonDecoder}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 object HttpSvPublicAppClient {
 
@@ -192,6 +193,22 @@ object HttpSvPublicAppClient {
       acsSnapshot: Seq[ByteString]
   )
 
+  case class OnboardingSnapshotsNotSupported(sponsor: Uri)
+      extends QuietNonRetryableException(
+        s"Sponsor SV $sponsor does not support onboarding snapshot downloads and must be upgraded before it can onboard new SVs"
+      )
+
+  def onboardingSnapshotsNotSupported(sponsor: Uri, checkActive: => Future[Unit])(implicit
+      ec: ExecutionContext
+  ): PartialFunction[Throwable, Future[Nothing]] = {
+    case error @ HttpCommandException(_, StatusCodes.NotFound, responseBody)
+        if responseBody.message.startsWith("The requested resource could not be found") =>
+      checkActive.transformWith {
+        case Success(_) => Future.failed(OnboardingSnapshotsNotSupported(sponsor))
+        case Failure(_) => Future.failed(error)
+      }
+  }
+
   case class OnboardSvPartyMigrationAuthorize(
       participantId: ParticipantId,
       candidate: PartyId,
@@ -285,6 +302,89 @@ object HttpSvPublicAppClient {
         Right(onboardingStateChunks.map(chunk => ByteString.copyFrom(chunk.asByteBuffer)))
       case SvStreamClient.OnboardSvSequencerResponse.BadRequest(response) =>
         Left(response.error)
+    }
+  }
+
+  case class OnboardSvPartyMigrationPrepare(
+      candidate: PartyId
+  ) extends HttpCommand[
+        SvStreamClient.OnboardSvPartyMigrationPrepareResponse,
+        Either[
+          OnboardSvPartyMigrationAuthorizeProposalNotFound,
+          SvStreamClient.SnapshotPreparation,
+        ],
+        SvStreamClient,
+      ] {
+    override val createGenClientFn = (fn, host, ec, mat) =>
+      SvStreamClient.httpClient(fn, host)(ec, mat)
+
+    override val nonErrorStatusCodes = Set(StatusCodes.BadRequest)
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], SvStreamClient.OnboardSvPartyMigrationPrepareResponse] =
+      client.onboardSvPartyMigrationPrepare(
+        body = definitions.OnboardSvPartyMigrationAuthorizeRequest(
+          candidate.toProtoPrimitive
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case SvStreamClient.OnboardSvPartyMigrationPrepareResponse.BadRequest(
+            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse.members
+              .AcceptedStateNotFoundErrorResponse(
+                response
+              )
+          ) =>
+        Left(response.acceptedStateNotFound.error)
+      case SvStreamClient.OnboardSvPartyMigrationPrepareResponse.BadRequest(
+            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse.members
+              .ProposalNotFoundErrorResponse(
+                response
+              )
+          ) =>
+        Right(
+          Left(
+            OnboardSvPartyMigrationAuthorizeProposalNotFound(
+              PositiveInt.tryCreate(response.proposalNotFound.partyToParticipantBaseSerial.intValue)
+            )
+          )
+        )
+      case SvStreamClient.OnboardSvPartyMigrationPrepareResponse.OK(response) =>
+        Right(Right(SvStreamClient.SnapshotPreparation.Prepared(response.id)))
+      case SvStreamClient.OnboardSvPartyMigrationPrepareResponse.Accepted(state, retryAfter) =>
+        Right(Right(SvStreamClient.SnapshotPreparation.Pending(state, retryAfter)))
+    }
+  }
+
+  case class OnboardSvDownload(
+      id: String
+  ) extends HttpCommand[
+        SvStreamClient.OnboardSvDownloadResponse,
+        SvStreamClient.OnboardSvDownloadResponse,
+        SvStreamClient,
+      ] {
+    override val createGenClientFn = (fn, host, ec, mat) =>
+      SvStreamClient.httpClient(fn, host)(ec, mat)
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], SvStreamClient.OnboardSvDownloadResponse] =
+      client.onboardSvDownload(id, headers = headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = { case response =>
+      Right(response)
     }
   }
 

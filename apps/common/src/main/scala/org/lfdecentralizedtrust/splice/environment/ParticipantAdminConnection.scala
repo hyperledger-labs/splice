@@ -69,7 +69,6 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologySnapshot,
 }
 
-import java.io.{InputStream, SequenceInputStream}
 import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
@@ -280,32 +279,13 @@ class ParticipantAdminConnection(
     )
   }
 
-  def importPartyAcs(acsChunks: Seq[ByteString], synchronizerId: SynchronizerId, partyId: PartyId)(
-      implicit tc: TraceContext
-  ): Future[Unit] =
-    importPartyAcsFrom(
-      () =>
-        new SequenceInputStream(
-          acsChunks.iterator.map(chunk => chunk.newInput(): InputStream).asJavaEnumeration
-        ),
-      synchronizerId,
-      partyId,
-    )
-
   def importPartyAcsFromFile(file: Path, synchronizerId: SynchronizerId, partyId: PartyId)(implicit
       tc: TraceContext
-  ): Future[Unit] =
-    importPartyAcsFrom(() => Files.newInputStream(file), synchronizerId, partyId)
-
-  private def importPartyAcsFrom(
-      openInputStream: () => InputStream,
-      synchronizerId: SynchronizerId,
-      partyId: PartyId,
-  )(implicit tc: TraceContext): Future[Unit] = {
+  ): Future[Unit] = {
     retryProvider.retryForClientCalls(
       "import_party_acs",
       "Imports the acs in the participant", {
-        val inputStream = openInputStream()
+        val inputStream = Files.newInputStream(file)
         runCmd(
           ParticipantAdminCommands.PartyManagement
             .ImportPartyAcs(

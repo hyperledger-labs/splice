@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.admin.api.client
 
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.Materializer
@@ -39,27 +39,21 @@ final class SvConnection private (
   ): Future[Unit] =
     runHttpCmd(config.url, HttpSvPublicAppClient.StartSvOnboarding(token))
 
-  /** Ask the sponsoring SV to authorize hosting the DSO party at the candidate participant and to prepare the ACS snapshot.
-    */
-  def authorizeDsoPartyHosting(
-      candidateParticipantId: ParticipantId,
-      candidateParty: PartyId,
+  def prepareDsoPartyHostingSnapshot(
+      candidateParty: PartyId
   )(implicit
       httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[Either[
-    HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound,
-    HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeResponse,
-  ]] =
-    runHttpCmd(
-      config.url,
-      HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorize(
-        candidateParticipantId,
-        candidateParty,
-      ),
-    )
+  ): Future[
+    Either[
+      HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound,
+      SvStreamClient.SnapshotPreparation,
+    ]
+  ] =
+    runHttpCmd(config.url, HttpSvPublicAppClient.OnboardSvPartyMigrationPrepare(candidateParty))
+      .recoverWith(HttpSvPublicAppClient.onboardingSnapshotsNotSupported(config.url, checkActive()))
 
   def onboardSvSequencer(
       sequencerId: SequencerId
@@ -75,6 +69,14 @@ final class SvConnection private (
         sequencerId
       ),
     )
+
+  def downloadOnboardingSnapshot(id: String)(implicit
+      httpClient: HttpClient,
+      templateDecoder: TemplateJsonDecoder,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[SvStreamClient.OnboardSvDownloadResponse] =
+    runHttpCmd(config.url, HttpSvPublicAppClient.OnboardSvDownload(id))
 
   def getMigrationId()(implicit
       httpClient: HttpClient,
