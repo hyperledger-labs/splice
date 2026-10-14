@@ -24,6 +24,8 @@ final case class RewardIssuanceParams(
     unclaimedAppRewardAmount: BigDecimal,
     issuancePerFeaturedAssetBurnCC: BigDecimal = BigDecimal(0),
     totalIssuanceForFeaturedAssetRewards: BigDecimal = BigDecimal(0),
+    issuancePerFeaturedAppBurnCC: BigDecimal = BigDecimal(0),
+    featuredAppMintingAllowanceCC: BigDecimal = BigDecimal(0),
 )
 
 /** Raw contract inputs for app reward CC computation.
@@ -99,6 +101,8 @@ final case class RewardComputationInputs(
       unclaimedAppRewardAmount = BigDecimal(if (unclaimed.compareTo(zero) < 0) zero else unclaimed),
       issuancePerFeaturedAssetBurnCC = BigDecimal(issuancePerFeaturedAssetBurnCC_num),
       totalIssuanceForFeaturedAssetRewards = BigDecimal(featuredAssetMintingAllowanceCC),
+      issuancePerFeaturedAppBurnCC = BigDecimal(issuancePerCoupon),
+      featuredAppMintingAllowanceCC = BigDecimal(featuredAppMintingAllowanceCC),
     )
   }
 
