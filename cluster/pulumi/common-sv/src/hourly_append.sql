@@ -28,8 +28,8 @@ BEGIN
 
 CREATE TABLE IF NOT EXISTS {{prod_logs}} (
     table_name STRING,
-    from_timestamp INT64,
-    to_timestamp INT64,    
+    from_timestamp TIMESTAMP,
+    to_timestamp TIMESTAMP,    
     record_count INT64,
     error_message STRING,
     logged_at TIMESTAMP,
@@ -119,8 +119,8 @@ SET records_processed = (SELECT COUNT(1) FROM temp_incremental);
         record_date
       ) VALUES (
         '{{tableName}}',
-        current_watermark_micros,
-        UNIX_MICROS(max_closed_timestamp),        
+        TIMESTAMP_MICROS(current_watermark_micros),
+        max_closed_timestamp,        
         records_processed,
         NULL,
         CURRENT_TIMESTAMP(),
@@ -141,8 +141,8 @@ SET records_processed = (SELECT COUNT(1) FROM temp_incremental);
       record_date
     ) VALUES (
       '{{tableName}}',
-      current_watermark_micros,
-      UNIX_MICROS(max_closed_timestamp),
+      TIMESTAMP_MICROS(current_watermark_micros),
+      max_closed_timestamp,
       0,
       NULL,
       CURRENT_TIMESTAMP(),
@@ -172,8 +172,8 @@ EXCEPTION WHEN ERROR THEN
       record_date
     ) VALUES (
       '{{tableName}}',
-      COALESCE(current_watermark_micros, 0),
-      COALESCE(UNIX_MICROS(max_closed_timestamp), 0),
+      TIMESTAMP_MICROS(COALESCE(current_watermark_micros, 0)),
+      COALESCE(max_closed_timestamp, TIMESTAMP_MICROS(0)),
       0,
       pipeline_error,
       CURRENT_TIMESTAMP(),
