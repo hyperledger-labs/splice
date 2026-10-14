@@ -137,4 +137,4 @@ create index updt_hist_unas_hi_mi_di_rt on update_history_unassignments (history
 create index updt_hist_unas_hi_mi_rt_di on update_history_unassignments (history_id, migration_id, record_time, domain_id);
 create unique index updt_hist_unas_hi_mi_ui_u on update_history_unassignments (history_id, migration_id, domain_id, update_id, record_time);
 
--- Initial partitions to be created by the same code
+-- Initial partitions to be created by the Scala code
