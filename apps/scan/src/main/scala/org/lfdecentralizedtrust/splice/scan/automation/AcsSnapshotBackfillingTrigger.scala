@@ -127,7 +127,7 @@ object AcsSnapshotBackfillingTrigger {
       AcsSnapshotTriggerBase
         .retrieveTaskForMigration(
           migrationId = migrationId,
-          isHistoryBackfilled = isHistoryBackfilled,
+          mayStart = isHistoryBackfilled,
           getIncrementalSnapshot = getIncrementalSnapshot,
           getLatestSnapshot = getLatestSnapshot,
           getMinRecordTime = getMinRecordTime,

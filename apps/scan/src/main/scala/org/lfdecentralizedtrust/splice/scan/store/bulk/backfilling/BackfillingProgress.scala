@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling
 
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
@@ -11,7 +12,6 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.{
   UpdateHistoryBulkStoragePersistentProgress,
   UpdatesSegment,
 }
-import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -29,9 +29,9 @@ trait BackfillingProgress {
   def readSnapshotsCursor(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Future[Option[TimestampWithMigrationId]]
+  ): Future[Option[CantonTimestamp]]
 
-  def persistSnapshotsCursor(ts: TimestampWithMigrationId)(implicit
+  def persistSnapshotsCursor(ts: CantonTimestamp)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ): Future[Unit]
@@ -66,10 +66,10 @@ class KvBackfillingProgress(
   override def readSnapshotsCursor(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Future[Option[TimestampWithMigrationId]] =
+  ): Future[Option[CantonTimestamp]] =
     snapshotsStaging.readLatestProcessedSnapshotTimestamp
 
-  override def persistSnapshotsCursor(ts: TimestampWithMigrationId)(implicit
+  override def persistSnapshotsCursor(ts: CantonTimestamp)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ): Future[Unit] = snapshotsStaging.persistLatestProcessedSnapshotTimestamp(ts)
@@ -90,5 +90,5 @@ class KvBackfillingProgress(
 }
 
 object KvBackfillingProgress {
-  val completeKvStoreKey = "bulk_storage_backfill_complete"
+  val completeKvStoreKey = "bulk_storage_backfill_complete_v2"
 }

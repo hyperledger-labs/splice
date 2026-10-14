@@ -46,6 +46,7 @@ import org.lfdecentralizedtrust.splice.store.{
   S3BucketConnection,
   StoreTestBase,
   TimestampWithMigrationId,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
@@ -233,6 +234,7 @@ class AcsSnapshotBulkStorageWriterFromDbTest
         bulkStorageTestConfig,
         appConfig,
         store.store,
+        store.updateHistory,
         s3BucketConnection,
         historyMetrics,
         loggerFactory,
@@ -329,7 +331,7 @@ class AcsSnapshotBulkStorageWriterFromDbTest
         clue("Initially, a single snapshot is dumped") {
           eventually(4.minutes) {
             val persistedTs1 = progress.readLatestProcessedSnapshotTimestamp.futureValue
-            persistedTs1 shouldBe Some(TimestampWithMigrationId(ts1, 0))
+            persistedTs1 shouldBe Some(ts1)
           }
           assertLatestSnapshotInMetrics(ts1)
           assertGetObjects(ts1, ts1, ScanStorageConfig.Encoding.CompactJson, 12)
@@ -360,7 +362,7 @@ class AcsSnapshotBulkStorageWriterFromDbTest
 
           eventually(4.minutes) {
             val persistedTs3 = progress.readLatestProcessedSnapshotTimestamp.futureValue
-            persistedTs3.value shouldBe TimestampWithMigrationId(ts3, 0)
+            persistedTs3.value shouldBe ts3
           }
           assertLatestSnapshotInMetrics(ts3)
           assertGetObjects(ts3, ts3, ScanStorageConfig.Encoding.CompactJson, 12)
@@ -383,13 +385,108 @@ class AcsSnapshotBulkStorageWriterFromDbTest
 
       }
     }
+
+    "resume from a persisted record time in the lowest migration with updates after it" in {
+      val persisted = CantonTimestamp.tryFromInstant(Instant.parse("2026-01-02T00:00:00Z"))
+      val updateHistory = mock[UpdateHistory]
+      when(updateHistory.getLowestMigrationForRecordTime(eqTo(persisted))(any[TraceContext]))
+        .thenReturn(Future.successful(Some(1L)))
+      when(updateHistory.domainMigrationId).thenReturn(2L)
+      writerFromDb(mock[AcsSnapshotStore], updateHistory)
+        .positionAt(persisted)
+        .map(position =>
+          withClue("the lowest migration with updates after the persisted record time is 1: ") {
+            position shouldBe TimestampWithMigrationId(persisted, 1L)
+          }
+        )
+    }
+
+    "resume in the current migration when no update follows the persisted record time" in {
+      val persisted = CantonTimestamp.tryFromInstant(Instant.parse("2026-01-02T00:00:00Z"))
+      val updateHistory = mock[UpdateHistory]
+      when(updateHistory.getLowestMigrationForRecordTime(eqTo(persisted))(any[TraceContext]))
+        .thenReturn(Future.successful(None))
+      when(updateHistory.domainMigrationId).thenReturn(2L)
+      writerFromDb(mock[AcsSnapshotStore], updateHistory)
+        .positionAt(persisted)
+        .map(position =>
+          withClue("no update follows the persisted record time, the current migration is 2: ") {
+            position shouldBe TimestampWithMigrationId(persisted, 2L)
+          }
+        )
+    }
+
+    "walk to the next snapshot with the migration of its row, across a migration boundary" in {
+      val lastInOldMigration =
+        TimestampWithMigrationId(
+          CantonTimestamp.tryFromInstant(Instant.parse("2026-01-02T00:00:00Z")),
+          0L,
+        )
+      val firstInNewMigration = lastInOldMigration.timestamp.plus(java.time.Duration.ofDays(1))
+      val store = mock[AcsSnapshotStore]
+      when(store.lookupSnapshotAfter(anyLong, any[CantonTimestamp])(any[TraceContext]))
+        .thenReturn(Future.successful(None))
+      when(
+        store.lookupSnapshotAfter(eqTo(0L), eqTo(lastInOldMigration.timestamp))(any[TraceContext])
+      ).thenReturn(Future.successful(Some(snapshotRow(firstInNewMigration, migrationId = 1L))))
+      val updateHistory = mock[UpdateHistory]
+      when(updateHistory.getLowestMigrationForRecordTime(any[CantonTimestamp])(any[TraceContext]))
+        .thenReturn(
+          Future.failed(
+            new IllegalStateException(
+              "the walk looked the migration up again instead of using the migration of the snapshot row"
+            )
+          )
+        )
+      writerFromDb(store, updateHistory)
+        .getNextSnapshotAfter(lastInOldMigration)
+        .map(next =>
+          withClue(
+            s"the store returns the snapshot at $firstInNewMigration of migration 1 after $lastInOldMigration: "
+          ) {
+            next shouldBe Some(TimestampWithMigrationId(firstInNewMigration, 1L))
+          }
+        )
+    }
   }
+
+  private def writerFromDb(store: AcsSnapshotStore, updateHistory: UpdateHistory) =
+    new AcsSnapshotBulkStorageWriterFromDb(
+      bulkStorageTestConfig,
+      appConfig,
+      store,
+      updateHistory,
+      mock[S3BucketConnection],
+      new HistoryMetrics(NoOpMetricsFactory)(MetricsContext.Empty),
+      loggerFactory,
+    )
+
+  private def snapshotRow(recordTime: CantonTimestamp, migrationId: Long) =
+    AcsSnapshotStore.LegacyAcsSnapshot(
+      snapshotRecordTime = recordTime,
+      migrationId = migrationId,
+      0L,
+      0L,
+      0L,
+      None,
+      None,
+      indexesCreated = true,
+    )
 
   class MockAcsSnapshotStore(val initialSnapshotTimestamp: CantonTimestamp) {
     private var snapshots = Seq(initialSnapshotTimestamp)
     val store = mockAcsSnapshotStore(acsSnapshotSize)
+    val updateHistory = mockUpdateHistory()
 
     def addSnapshot(timestamp: CantonTimestamp) = { snapshots = snapshots :+ timestamp }
+
+    private def mockUpdateHistory(): UpdateHistory = {
+      val updateHistory = mock[UpdateHistory]
+      when(
+        updateHistory.getLowestMigrationForRecordTime(any[CantonTimestamp])(any[TraceContext])
+      ).thenReturn(Future.successful(Some(0L)))
+      updateHistory
+    }
 
     def mockAcsSnapshotStore(snapshotSize: Int): AcsSnapshotStore = {
       val store = mock[AcsSnapshotStore]
@@ -412,7 +509,13 @@ class AcsSnapshotBulkStorageWriterFromDbTest
             _: Seq[PartyId],
             _: Seq[PackageQualifiedName],
         ) =>
-          if (snapshots.contains(timestamp)) {
+          if (migration != 0L) {
+            Future.failed(
+              new RuntimeException(
+                s"Snapshot at $timestamp queried in migration $migration, but the store holds all snapshots in migration 0"
+              )
+            )
+          } else if (snapshots.contains(timestamp)) {
             Future {
               val afterAsLong = after match {
                 case Some(
