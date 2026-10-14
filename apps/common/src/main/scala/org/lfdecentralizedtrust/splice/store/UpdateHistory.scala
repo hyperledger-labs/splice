@@ -445,16 +445,17 @@ class UpdateHistory(
       if (windowStart == CantonTimestamp.MinValue) "import_updates"
       else windowStart.toMicros.toString
     storage.query(
+      // if not exists allows any trigger calling this to recover from half-way crashes
       DBIO.seq(
-        sql"create table update_history_transactions_#$tableSuffix partition of update_history_transactions for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
+        sql"create table if not exists update_history_transactions_#$tableSuffix partition of update_history_transactions for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
           .as[Unit],
-        sql"create table update_history_creates_#$tableSuffix partition of update_history_creates for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
+        sql"create table if not exists update_history_creates_#$tableSuffix partition of update_history_creates for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
           .as[Unit],
-        sql"create table update_history_exercises_#$tableSuffix partition of update_history_exercises for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
+        sql"create table if not exists update_history_exercises_#$tableSuffix partition of update_history_exercises for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
           .as[Unit],
-        sql"create table update_history_assignments_#$tableSuffix partition of update_history_assignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
+        sql"create table if not exists update_history_assignments_#$tableSuffix partition of update_history_assignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
           .as[Unit],
-        sql"create table update_history_unassignments_#$tableSuffix partition of update_history_unassignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
+        sql"create table if not exists update_history_unassignments_#$tableSuffix partition of update_history_unassignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
           .as[Unit],
       ),
       "createPartitions",
