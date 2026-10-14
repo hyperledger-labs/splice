@@ -37,7 +37,6 @@ scanApp:
   bulkStorage:
     enabled: true
 svApp:
-  trafficBasedOnboarding: false
   additionalPackagesToUnvet:
     splice-wallet-payments: [ "0.1.15", "0.1.16" ]
     splice-amulet: [ "0.1.15" ]
