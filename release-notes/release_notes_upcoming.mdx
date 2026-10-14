@@ -19,10 +19,11 @@
 
       - `/v0/admin/sv/voterequest`: `vote_request_contract_ids`
 
-    - Joining SVs now download the DSO party ACS from their sponsor as a file instead of receiving it in memory,
-      so onboarding works with large snapshots. The joining SV and its sponsor must both run this version or later.
-      SVs that restrict SV app ingress must allow other SVs to reach the new `/v0/onboard/sv/party-migration/prepare`
-      and `/v0/onboard/sv/download/{id}` endpoints.
+    - Joining SVs now download the DSO party ACS and the sequencer onboarding state from their sponsor as files
+      instead of keeping them in the SV app's memory.
+      The joining SV and its sponsor must both run this version or later.
+      SVs that restrict SV app ingress must allow other SVs to reach the new `/v0/onboard/sv/party-migration/prepare`,
+      `/v0/onboard/sv/sequencer/prepare` and `/v0/onboard/sv/download/{id}` endpoints.
 
   - Deployment
 
