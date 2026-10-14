@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.sv.admin.api.client
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.ByteString
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.{HttpAppConnection, RetryProvider}
@@ -55,20 +54,16 @@ final class SvConnection private (
     runHttpCmd(config.url, HttpSvPublicAppClient.OnboardSvPartyMigrationPrepare(candidateParty))
       .recoverWith(HttpSvPublicAppClient.onboardingSnapshotsNotSupported(config.url, checkActive()))
 
-  def onboardSvSequencer(
+  def prepareSequencerOnboardingSnapshot(
       sequencerId: SequencerId
   )(implicit
       httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[Seq[ByteString]] =
-    runHttpCmd(
-      config.url,
-      HttpSvPublicAppClient.OnboardSvSequencer(
-        sequencerId
-      ),
-    )
+  ): Future[String] =
+    runHttpCmd(config.url, HttpSvPublicAppClient.OnboardSvSequencerPrepare(sequencerId))
+      .recoverWith(HttpSvPublicAppClient.onboardingSnapshotsNotSupported(config.url, checkActive()))
 
   def downloadOnboardingSnapshot(id: String)(implicit
       httpClient: HttpClient,

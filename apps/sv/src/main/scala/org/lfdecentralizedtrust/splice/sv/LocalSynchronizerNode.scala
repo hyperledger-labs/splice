@@ -32,9 +32,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Status
-import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import TopologyAdminConnection.TopologySnapshot
@@ -42,7 +40,11 @@ import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
-import org.lfdecentralizedtrust.splice.sv.config.SvSynchronizerNodeConfig
+import org.lfdecentralizedtrust.splice.sv.config.{
+  SvOnboardingSnapshotsConfig,
+  SvSynchronizerNodeConfig,
+}
+import org.lfdecentralizedtrust.splice.sv.onboarding.joining.SvOnboardingSnapshotDownload
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import java.time.Instant
@@ -408,6 +410,7 @@ class LocalSynchronizerNode(
     */
   def onboardLocalSequencerIfRequired(
       svConnection: => Future[SvConnection],
+      onboardingSnapshotsConfig: SvOnboardingSnapshotsConfig,
       preInit: () => Future[Unit],
   )(implicit traceContext: TraceContext): Future[PhysicalSynchronizerId] =
     retryProvider
@@ -422,36 +425,31 @@ class LocalSynchronizerNode(
         case Left(NodeStatus.NotInitialized(_, _, _)) =>
           logger.info("Onboarding sequencer")
           svConnection
-            .flatMap(svConnection => preInit().flatMap(_ => onboardLocalSequencer(svConnection)))
+            .flatMap(svConnection =>
+              preInit().flatMap(_ => onboardLocalSequencer(svConnection, onboardingSnapshotsConfig))
+            )
         case Right(NodeStatus.Success(s)) =>
           logger.info("Sequencer is already onboarded")
           Future.successful(s.synchronizerId)
       }
 
   private def onboardLocalSequencer(
-      svConnection: SvConnection
+      svConnection: SvConnection,
+      onboardingSnapshotsConfig: SvOnboardingSnapshotsConfig,
   )(implicit traceContext: TraceContext): Future[PhysicalSynchronizerId] = {
-    for {
+    val snapshotDownload =
+      SvOnboardingSnapshotDownload(onboardingSnapshotsConfig, "sequencer", retryProvider)
+    (for {
       sequencerId <- sequencerAdminConnection.getSequencerId
       _ = logger.info(s"Onboarding sequencer $sequencerId through sponsoring SV")
       onboardingState <- retryProvider.retry(
-        RetryFor.WaitingOnInitDependency,
+        RetryFor.WaitingOnInitDependencyLong,
         "onboarding_sequencer",
-        "Onbarding sequencer through sponsoring SV",
-        svConnection.onboardSvSequencer(sequencerId).recover {
-          // TODO(DACH-NY/canton-network-node#13410) - remove once canton returns a retryable error
-          case HttpCommandException(_, StatusCodes.BadRequest, responseBody)
-              if responseBody.message.contains("SNAPSHOT_NOT_FOUND") =>
-            throw Status.NOT_FOUND
-              .withDescription(responseBody.message)
-              .asRuntimeException()
-          case HttpCommandException(_, StatusCodes.BadRequest, responseBody)
-              if responseBody.message.contains("BLOCK_NOT_FOUND") =>
-            // ensure the request is retried as the sequencer will eventually finish processing the block
-            throw Status.NOT_FOUND
-              .withDescription(responseBody.message)
-              .asRuntimeException()
-        },
+        "Onboarding sequencer through sponsoring SV",
+        snapshotDownload.prepareAndDownload(
+          svConnection.prepareSequencerOnboardingSnapshot(sequencerId),
+          svConnection.downloadOnboardingSnapshot,
+        ),
         logger,
       )
       _ = logger.info(s"Onboarded sequencer $sequencerId")
@@ -465,7 +463,7 @@ class LocalSynchronizerNode(
         sequencerAdminConnection.getStatus.flatMap {
           case NodeStatus.NotInitialized(_, _, _) =>
             for {
-              _ <- sequencerAdminConnection.initializeFromOnboardingState(
+              _ <- sequencerAdminConnection.initializeFromOnboardingStateFile(
                 onboardingState
               )
               status <- sequencerAdminConnection.getStatus
@@ -486,7 +484,7 @@ class LocalSynchronizerNode(
         },
         logger,
       )
-    } yield synchronizerId
+    } yield synchronizerId).andThen(_ => snapshotDownload.delete())
   }
 
   def ensureMediatorSequencerRequestAmplification()(implicit
