@@ -44,7 +44,7 @@ import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
-import com.digitalasset.canton.topology.NodeIdentity
+import com.digitalasset.canton.topology.{NodeIdentity, SynchronizerId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.VettedPackage
 
@@ -288,7 +288,8 @@ class ParticipantClientReference(
   // TODO(DACH-NY/canton-network-node#5141) Consider removing this once Canton no longer explodes
   // when uploading the same DAR twice.
   def upload_dar_unless_exists(
-      path: String
+      path: String,
+      vetOnlyOn: Option[SynchronizerId] = None,
   ): String = {
     val dar = DarParser.assertReadArchiveFromFile(new File(path))
     val hash = dar.main.getHash
@@ -296,7 +297,9 @@ class ParticipantClientReference(
     if (!pkgs.map(_.packageId).contains(hash)) {
       discard[String](this.dars.upload(path, vetAllPackages = false))
     }
-    val connected = this.synchronizers.list_connected()
+    val connected = this.synchronizers
+      .list_connected()
+      .filter(sync => vetOnlyOn.forall(_ == sync.synchronizerId))
     if (connected.isEmpty) {
       logger.error(s"Trying to vet $path on ${this.id} but not connected to any synchronizer")
     }
