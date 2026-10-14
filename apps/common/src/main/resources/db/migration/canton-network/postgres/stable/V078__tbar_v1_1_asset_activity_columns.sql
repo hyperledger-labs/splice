@@ -20,3 +20,15 @@ alter table app_activity_party_totals
 alter table app_activity_round_totals
     -- Round-wide asset activity bytes. Mirrors total_round_app_activity_weight.
     add column total_round_asset_activity_weight bigint not null default 0;
+
+alter table app_reward_round_totals
+    -- Total CC allocated for app rewards this round (incl thresholded).
+    -- = featuredAppMintingAllowanceCC per CIP-104.
+    add column total_app_reward                     decimal(38,10) not null default 0,
+    -- Total CC allocated for asset rewards this round (incl thresholded).
+    -- = featuredAssetMintingAllowanceCC per CIP-104.
+    add column total_asset_reward                   decimal(38,10) not null default 0,
+    -- CC-minted-per-CC-burned ratio for featured app activity.
+    add column issuance_per_featured_app_activity   decimal(38,10) not null default 0,
+    -- CC-minted-per-CC-burned ratio for featured asset activity.
+    add column issuance_per_featured_asset_activity decimal(38,10) not null default 0;
