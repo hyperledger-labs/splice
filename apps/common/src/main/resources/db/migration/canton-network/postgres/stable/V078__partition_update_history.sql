@@ -132,7 +132,6 @@ create index updt_hist_crea_hi_mi_rt on update_history_creates (history_id, migr
 create index updt_hist_crea_hi_tidmn_tiden_pn_rid on update_history_creates (history_id, template_id_module_name,
                                                                              template_id_entity_name, package_name,
                                                                              row_id);
-create unique index updt_hist_crea_unique on update_history_creates (update_row_id, event_id, migration_id, record_time);
 create index updt_hist_crea_hi_mi_ci_import_updates on update_history_creates (history_id, migration_id, contract_id)
     where record_time = -62135596800000000;
 
