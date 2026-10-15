@@ -270,7 +270,12 @@ function _assert_lock() {
         approver=""
         # Check for GHA
         if env-bool GITHUB_ACTIONS; then
-            approver="${GITHUB_ACTOR:-}"
+            # TRIGGERING_ACTOR is exported by the deploy workflow from its approver input
+            if [ -n "${TRIGGERING_ACTOR:-}" ]; then
+                approver="${TRIGGERING_ACTOR:-}"
+            else # fallback to GITHUB_ACTOR if TRIGGERING_ACTOR is not set
+                approver="${GITHUB_ACTOR:-empty}"
+            fi
         fi
 
         # Check for CCI
@@ -1474,6 +1479,15 @@ subcommand_whitelist[lockholder]="Print the current lockholder, if any, for the 
 
 function subcmd_lockholder() {
     _current_lockholder
+}
+
+###
+
+subcommand_whitelist[validate_lock]="Validate that the cluster lock is held by you (or, on CI, by the workflow approver)."
+
+function subcmd_validate_lock() {
+    _assert_lock
+    _info "Cluster lock validated."
 }
 
 ###

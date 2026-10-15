@@ -9,7 +9,11 @@ on:
       sha:
         type: string
         required: true
-      scratchnet:
+      cluster:
+        type: string
+        required: false
+        default: ''
+      approver:
         type: string
         required: false
         default: ''
@@ -51,8 +55,11 @@ jobs:
         run: |
           set -euo pipefail
           url="${{ secrets.CLUSTER_TEST_INVOKER_URL }}?workflow=${{ inputs.workflow }}&splice-git-ref=${{ inputs.sha }}"
-          if [ -n "${{ inputs.scratchnet }}" ]; then
-            url="$url&scratchnet=${{ inputs.scratchnet }}"
+          if [ -n "${{ inputs.cluster }}" ]; then
+            url="$url&cluster=${{ inputs.cluster }}"
+          fi
+          if [ -n "${{ inputs.approver }}" ]; then
+            url="$url&approver=${{ inputs.approver }}"
           fi
           if ! result=$(curl -sSL -X POST --fail-with-body \
             --retry 3 --retry-delay 10 --retry-max-time 60 \
