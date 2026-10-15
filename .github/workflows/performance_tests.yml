@@ -70,12 +70,12 @@ jobs:
               -c 'CREATE DATABASE splice_apps' || (echo "Connection to DB failed" && exit 1)
 
             echo "Downloading updates from mainnet for performance tests"
-            gcloud storage cp "gs://mainnet-history-dumps/mainnetupdates.json" /tmp/mainnetupdates.json
-            ls -lah /tmp/mainnetupdates.json
-          cmd: '"apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t DbSvDsoStore -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json" "apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t DbScanStore -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json" "apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t UpdateHistory -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/mainnetupdates.json"'
+            gcloud storage cp "gs://mainnet-history-dumps/devnetupdates_2026-09-02T09:00:00.json" /tmp/devnetupdates_2026-09-02T09:00:00.json
+            ls -lah /tmp/devnetupdates_2026-09-02T09:00:00.json
+          cmd: '"apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t DbSvDsoStore -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/devnetupdates_2026-09-02T09:00:00.json" "apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t DbScanStore -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/devnetupdates_2026-09-02T09:00:00.json" "apps-app / Test / runMain org.lfdecentralizedtrust.splice.performance.SplicePerf run -t UpdateHistory -c ./apps/app/src/test/resources/performance/tests.conf -d /tmp/devnetupdates_2026-09-02T09:00:00.json"'
 
       - name: Push ingestion metrics to Prometheus Pushgateway
-        if: ${{ success() }}
+        if: ${{ false }}
         run: |
           python3 scripts/performance/push_store_ingestion_perf_metrics.py
 
@@ -120,11 +120,12 @@ jobs:
 
   read_performance_tests:
     needs: ingestion_performance_tests
+    if: false
     runs-on: self-hosted-k8s-medium
     container:
       image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
     name: Read Performance Tests
-    if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
+    #if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     steps:
       - name: Check out repository code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

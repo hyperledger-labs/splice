@@ -6,8 +6,11 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
-import org.lfdecentralizedtrust.splice.environment.ledger.api.TreeUpdateOrOffsetCheckpoint
-import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
+  TransactionTreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
+}
+import org.lfdecentralizedtrust.splice.store.{IngestedEvents, TreeUpdateWithMigrationId}
 
 import cats.data.NonEmptyList
 import io.circe.Json
@@ -16,13 +19,30 @@ import scala.concurrent.{ExecutionContext, Future}
 
 final case class StoreIngestionPerfMetrics(
     totalItems: Long,
+    totalEvents: Long,
     totalBatches: Long,
     totalTimeNs: BigDecimal,
     processCpuTimeNs: BigDecimal,
     peakHeapBytes: BigDecimal,
 ) {
+  // an "item" is a top-level update (transaction)
+  def totalUpdates: Long = totalItems
+
   def avgItemTimeNs: BigDecimal =
     if (totalItems > 0) totalTimeNs / totalItems else BigDecimal(0)
+
+  def avgEventTimeNs: BigDecimal =
+    if (totalEvents > 0) totalTimeNs / totalEvents else BigDecimal(0)
+
+  /** updates ingested per second */
+  def updatesPerSec: BigDecimal =
+    if (totalTimeNs > 0) BigDecimal(totalItems) * BigDecimal(1000000000L) / totalTimeNs
+    else BigDecimal(0)
+
+  /** events ingested per second */
+  def eventsPerSec: BigDecimal =
+    if (totalTimeNs > 0) BigDecimal(totalEvents) * BigDecimal(1000000000L) / totalTimeNs
+    else BigDecimal(0)
 
   /** Ratio of process CPU time to wall-clock time.
     * Some thresholds we can use for rough classification:
@@ -79,9 +99,18 @@ abstract class StoreIngestionPerformanceTest(
   ): Future[StoreIngestionPerfMetrics] = {
     var totalTimeNs = BigDecimal(0)
     var totalItems = 0L
+    var totalEvents = 0L
     var totalBatches = 0L
     var totalCpuNs = BigDecimal(0)
     var maxHeapBytes = BigDecimal(0)
+
+    // count events in a single update
+    def eventsCount(u: TreeUpdateOrOffsetCheckpoint.Update): Int = u.update match {
+      case TransactionTreeUpdate(tree) =>
+        val counts = IngestedEvents.eventCount(Seq(tree))
+        (counts.numCreatedEvents + counts.numExercisedEvents).toInt
+      case _ => 0
+    }
 
     Source
       .fromIterator(() => txs.iterator)
@@ -96,6 +125,7 @@ abstract class StoreIngestionPerformanceTest(
       .zipWithIndex
       .runWith(Sink.foreachAsync(parallelism = 1) { case (batch, index) =>
         logger.info(s"Ingesting batch $index of ${batch.length} elements")
+        val batchEventCount = batch.iterator.map(eventsCount).sum
         val wallBefore = System.nanoTime()
         val cpuBefore = getProcessCpuTimeNs
         store.ingestionSink
@@ -110,10 +140,12 @@ abstract class StoreIngestionPerformanceTest(
             val heapNow = getHeapUsedBytes
             maxHeapBytes = maxHeapBytes.max(heapNow)
             totalItems += batch.length
+            totalEvents += batchEventCount
             totalBatches += 1
             val avg = totalTimeNs / totalItems
+            val avgEvent = if (totalEvents > 0) totalTimeNs / totalEvents else BigDecimal(0)
             val msg =
-              f"Ingested batch $index (${batch.length} elements) in $duration ns, average per-item time: $avg%.2f ns over $totalItems records, total time: $totalTimeNs ns"
+              f"Ingested batch $index (${batch.length} updates, $batchEventCount events) in $duration ns, average per-update time: $avg%.2f ns, average per-event time: $avgEvent%.2f ns over $totalItems updates ($totalEvents events), total time: $totalTimeNs ns"
             logger.info(msg)
             println(s"${this.getClass.getName}: $msg")
           }
@@ -125,6 +157,7 @@ abstract class StoreIngestionPerformanceTest(
 
         StoreIngestionPerfMetrics(
           totalItems = totalItems,
+          totalEvents = totalEvents,
           totalBatches = totalBatches,
           totalTimeNs = totalTimeNs,
           processCpuTimeNs = totalCpuNs,
@@ -150,10 +183,36 @@ abstract class StoreIngestionPerformanceTest(
     val metricsJson = Json.arr(
       metric(
         "avg_item_time_ns",
-        "Average nanoseconds per ingested item",
+        "Average nanoseconds per ingested item (update)",
         metrics.avgItemTimeNs,
       ),
-      metric("total_items", "Total number of items ingested", BigDecimal(metrics.totalItems)),
+      metric(
+        "avg_event_time_ns",
+        "Average nanoseconds per ingested event",
+        metrics.avgEventTimeNs,
+      ),
+      // equal to `total_updates`, for backwards-compatibility with existing Grafana dashboards
+      metric("total_items", "Total number of items (updates) ingested", BigDecimal(metrics.totalItems)),
+      metric(
+        "total_updates",
+        "Total number of updates (transactions) ingested",
+        BigDecimal(metrics.totalUpdates),
+      ),
+      metric(
+        "total_events",
+        "Total number of created + exercised/archived events across all ingested updates ",
+        BigDecimal(metrics.totalEvents),
+      ),
+      metric(
+        "update_rate_per_sec",
+        "Ingested updates per second",
+        metrics.updatesPerSec,
+      ),
+      metric(
+        "event_rate_per_sec",
+        "Ingested events per second",
+        metrics.eventsPerSec,
+      ),
       metric("total_time_ns", "Total ingestion time in nanoseconds", metrics.totalTimeNs),
       metric(
         "total_batches",

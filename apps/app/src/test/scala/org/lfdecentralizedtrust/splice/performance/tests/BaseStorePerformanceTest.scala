@@ -151,7 +151,8 @@ abstract class BaseStorePerformanceTest(
   /** Load and parse all transactions in memory so that reading doesn't bottleneck. */
   protected def loadTxsFromDump(): Seq[TreeUpdateWithMigrationId] = {
     val dump = (for {
-      json <- io.circe.parser.parse(Files.readString(updateHistoryDumpPath))
+      // streaming to fix: java.lang.OutOfMemoryError: Required array size too large
+      json <- io.circe.jawn.parseFile(updateHistoryDumpPath.toFile)
       decoded <- UpdateHistoryResponseV2.decodeUpdateHistoryResponseV2.decodeJson(json)
     } yield decoded)
       .getOrElse(
