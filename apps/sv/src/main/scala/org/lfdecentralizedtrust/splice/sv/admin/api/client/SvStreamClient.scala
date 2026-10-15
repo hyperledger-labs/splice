@@ -33,15 +33,6 @@ object SvStreamClient {
   )(implicit ec: ExecutionContext, mat: Materializer): SvStreamClient =
     new SvStreamClient(host = host)(httpClient = httpClient, ec = ec, mat = mat)
 
-  sealed abstract class OnboardSvPartyMigrationAuthorizeResponse
-  object OnboardSvPartyMigrationAuthorizeResponse {
-
-    case class OK(value: Seq[ByteString]) extends OnboardSvPartyMigrationAuthorizeResponse
-    case class BadRequest(value: definitions.OnboardSvPartyMigrationAuthorizeErrorResponse)
-        extends OnboardSvPartyMigrationAuthorizeResponse
-    case class Unauthorized(value: ErrorResponse) extends OnboardSvPartyMigrationAuthorizeResponse
-  }
-
   sealed abstract class OnboardSvSequencerResponse
   object OnboardSvSequencerResponse {
     case class OK(value: Seq[ByteString]) extends OnboardSvSequencerResponse
@@ -69,7 +60,6 @@ class SvStreamClient(host: String = "https://example.com")(implicit
 ) {
   import SvStreamClient.{
     OnboardSvDownloadResponse,
-    OnboardSvPartyMigrationAuthorizeResponse,
     OnboardSvPartyMigrationPrepareResponse,
     OnboardSvSequencerResponse,
   }
@@ -133,51 +123,6 @@ class SvStreamClient(host: String = "https://example.com")(implicit
             .Decoder[ErrorResponse]
             .decodeJson(json)
             .fold(FastFuture.failed, FastFuture.successful)
-    )
-  }
-
-  def onboardSvPartyMigrationAuthorize(
-      body: definitions.OnboardSvPartyMigrationAuthorizeRequest,
-      headers: List[HttpHeader] = Nil,
-  ): EitherT[Future, Either[Throwable, HttpResponse], OnboardSvPartyMigrationAuthorizeResponse] = {
-    val allHeaders = headers ++ scala.collection.immutable.Seq[Option[HttpHeader]]().flatten
-    makeRequest(
-      HttpMethods.POST,
-      host + basePath + "/v0/onboard/sv/party-migration/authorize",
-      allHeaders,
-      body,
-      HttpProtocols.`HTTP/1.1`,
-    ).flatMap(req =>
-      EitherT(
-        httpClient(req)
-          .flatMap(resp =>
-            resp.status match {
-              case StatusCodes.OK =>
-                resp.entity.dataBytes
-                  .runWith(Sink.seq)
-                  .map(chunks =>
-                    Right(OnboardSvPartyMigrationAuthorizeResponse.OK(chunks)): Either[Either[
-                      Throwable,
-                      HttpResponse,
-                    ], OnboardSvPartyMigrationAuthorizeResponse]
-                  )
-              case StatusCodes.BadRequest =>
-                Unmarshal(resp.entity)
-                  .to[definitions.OnboardSvPartyMigrationAuthorizeErrorResponse](
-                    jsonDecoder,
-                    implicitly,
-                    implicitly,
-                  )
-                  .map(x => Right(OnboardSvPartyMigrationAuthorizeResponse.BadRequest(x)))
-              case StatusCodes.Unauthorized =>
-                Unmarshal(resp.entity)
-                  .to[ErrorResponse](errorResponseDecoder, implicitly, implicitly)
-                  .map(x => Right(OnboardSvPartyMigrationAuthorizeResponse.Unauthorized(x)))
-              case _ => FastFuture.successful(Left(Right(resp)))
-            }
-          )
-          .recover({ case e: Throwable => Left(Left(e)) })
-      )
     )
   }
 

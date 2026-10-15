@@ -8,39 +8,6 @@ servers:
   - url: https://example.com/api/sv
 paths:
 
-  /v0/onboard/sv/party-migration/authorize:
-    post:
-      tags: [sv]
-      x-jvm-package: sv_public_stream
-      x-external-audience: svs
-      operationId: "onboardSvPartyMigrationAuthorize"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeRequest"
-      responses:
-        "200":
-          description: |
-            The ACS snapshot of the DSO party, in the binary format expected by the
-            participant's `ImportPartyAcs` endpoint. This is returned as a binary stream
-            rather than as JSON as snapshots can exceed the 2GB limit of a JSON string.
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-                x-scala-type: org.apache.pekko.http.scaladsl.model.ResponseEntity
-        "400":
-          description: system state not yet valid
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeErrorResponse"
-        "401":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
-
   /v0/onboard/sv/sequencer:
     post:
       tags: [sv]

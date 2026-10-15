@@ -73,15 +73,6 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
         "DSO party hosting authorization request with party which is not confirmed will be rejected by sponsor SV"
       ) {
         val randomParty = allocateRandomSvParty("random")
-        assertThrowsAndLogsCommandFailures(
-          sv1Backend.onboardSvPartyMigrationAuthorize(
-            sv3Backend.participantClient.id,
-            randomParty,
-          ),
-          _.errorMessage should include(
-            "Candidate party is not an sv and no `SvOnboardingConfirmed` for the candidate party is found."
-          ),
-        )
         inside(
           sponsor
             .onboardSvPartyMigrationPrepare(

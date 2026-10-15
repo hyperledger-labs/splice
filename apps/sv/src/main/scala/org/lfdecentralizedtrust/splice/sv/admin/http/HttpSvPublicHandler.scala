@@ -446,29 +446,6 @@ class HttpSvPublicHandler(
     *
     * Protection: Endpoint is protected by IP allowlisting
     */
-  override def onboardSvPartyMigrationAuthorize(
-      respond: rStream.OnboardSvPartyMigrationAuthorizeResponse.type
-  )(
-      body: definitions.OnboardSvPartyMigrationAuthorizeRequest
-  )(
-      extracted: TraceContext
-  ): Future[rStream.OnboardSvPartyMigrationAuthorizeResponse] = {
-    implicit val traceContext: TraceContext = extracted
-    withSpan(s"$workflowId.onboardSvPartyMigrationAuthorize") { _ => _ =>
-      Codec
-        .decode(Codec.Party)(body.candidatePartyId)
-        .fold(
-          errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
-          candidateParty =>
-            candidateParticipant(candidateParty).flatMap(authorizeParticipantForHostingDsoParty),
-        )
-    }
-  }
-
-  /** Intended use: Used by other SV operators
-    *
-    * Protection: Endpoint is protected by IP allowlisting
-    */
   override def onboardSvPartyMigrationPrepare(
       respond: rStream.OnboardSvPartyMigrationPrepareResponse.type
   )(
@@ -524,32 +501,6 @@ class HttpSvPublicHandler(
           )
         else Future.unit
     } yield ParticipantId.tryFromProtoPrimitive(candidateParticipantId.payload.svParticipantId)
-  }
-
-  private def authorizeParticipantForHostingDsoParty(
-      participantId: ParticipantId
-  )(implicit tc: TraceContext): Future[rStream.OnboardSvPartyMigrationAuthorizeResponse] = {
-    dsoPartyMigration
-      .authorizeParticipantForHostingDsoParty(participantId)
-      .fold(
-        {
-          case DsoPartyHosting
-                .RequiredProposalNotFound(
-                  partyToParticipantSerial
-                ) =>
-            rStream.OnboardSvPartyMigrationAuthorizeResponseBadRequest(
-              HttpSvPublicHandler.proposalNotFoundResponse(partyToParticipantSerial)
-            )
-        },
-        { acsChunks =>
-          rStream.OnboardSvPartyMigrationAuthorizeResponseOK(
-            HttpEntity(
-              ContentTypes.`application/octet-stream`,
-              Source(acsChunks.map(chunk => PekkoByteString(chunk.asReadOnlyByteBuffer()))),
-            )
-          )
-        },
-      )
   }
 
   /** Intended use: Used by other SV operators

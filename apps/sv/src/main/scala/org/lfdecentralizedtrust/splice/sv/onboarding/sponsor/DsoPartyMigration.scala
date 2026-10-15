@@ -14,22 +14,18 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import com.digitalasset.canton.participant.admin.party.PartyManagementServiceError
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
-import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting.DsoPartyMigrationFailure
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.SvOnboardingSnapshotService.SnapshotKey
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import com.google.protobuf.ByteString
-import io.grpc.Status
 
 import io.grpc.StatusRuntimeException
 import java.nio.file.Path
-import java.time.Instant
 import scala.annotation.unused
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -39,7 +35,6 @@ class DsoPartyMigration(
     participantAdminConnection: ParticipantAdminConnection,
     @unused ledgerClient: SpliceLedgerClient,
     retryProvider: RetryProvider,
-    dsoPartyHosting: DsoPartyHosting,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor
@@ -51,57 +46,8 @@ class DsoPartyMigration(
   private val partyHosting = new SponsorDsoPartyHosting(
     participantAdminConnection,
     dsoParty,
-    dsoPartyHosting,
     loggerFactory,
   )
-
-  def authorizeParticipantForHostingDsoParty(
-      participantId: ParticipantId
-  )(implicit tc: TraceContext): EitherT[Future, DsoPartyMigrationFailure, Seq[ByteString]] = {
-    logger.info(s"Sponsor SV authorizing DSO party to participant $participantId")
-    for {
-      dsoRules <- EitherT.liftF(dsoStore.getDsoRules())
-      // this will wait until the PartyToParticipant state change completed
-      _ <- partyHosting
-        .authorizeDsoPartyToParticipant(
-          dsoRules.domain,
-          participantId,
-        )
-      activationTx <- EitherT.liftF(
-        participantAdminConnection
-          .getDsoPartyToParticipantTransaction(
-            dsoRules.domain,
-            participantId,
-            dsoParty,
-          )
-          .getOrElseF(
-            Future.failed(
-              Status.NOT_FOUND
-                .withDescription(
-                  s"Transaction where the participant $participantId was activated not found."
-                )
-                .asRuntimeException()
-            )
-          )
-      )
-      activationTime = activationTx.base.validFrom
-      _ = logger.info(
-        s"DSO party was authorized on $participantId, downloading snapshot at time $activationTime."
-      )
-      acsBytes <- EitherT.liftF(
-        exportSnapshotFromTime(activationTime, dsoRules.domain)(
-          participantAdminConnection.exportPartyAcs(
-            dsoParty,
-            synchronizerId = dsoRules.domain,
-            targetParticipantId = participantId,
-            activationTime = activationTime,
-          )
-        )
-      )
-    } yield {
-      acsBytes
-    }
-  }
 
   def prepareParticipantForHostingDsoParty(
       participantId: ParticipantId
@@ -120,24 +66,10 @@ class DsoPartyMigration(
       SnapshotKey.Acs(dsoRules.domain, participantId, dsoParty, tx.base.validFrom)
     )
 
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
   def exportSnapshotToFile(key: SnapshotKey.Acs, file: Path)(implicit
       tc: TraceContext
-  ): Future[Unit] =
-    exportSnapshotFromTime(key.activationTime, key.synchronizerId)(
-      participantAdminConnection.exportPartyAcsToFile(
-        key.party,
-        key.synchronizerId,
-        key.targetParticipantId,
-        key.activationTime,
-        file,
-      )
-    )
-
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private def exportSnapshotFromTime[T](
-      activationTime: Instant,
-      decentralizedSynchronizer: SynchronizerId,
-  )(exportSnapshot: => Future[T])(implicit tc: TraceContext): Future[T] = {
+  ): Future[Unit] = {
 
     def submitDummyTransaction(): Future[Unit] =
       svStoreWithIngestion
@@ -150,7 +82,7 @@ class DsoPartyMigration(
           new ExternalPartyAmuletRules(svParty.toProtoPrimitive).createAnd
             .exerciseArchive(),
         )
-        .withSynchronizerId(decentralizedSynchronizer)
+        .withSynchronizerId(key.synchronizerId)
         .noDedup
         .yieldUnit()
 
@@ -159,8 +91,15 @@ class DsoPartyMigration(
         retryProvider.retry(
           RetryFor.ClientCalls,
           "download_acs_snapshot",
-          show"Download ACS snapshot for DSO at $activationTime",
-          exportSnapshot
+          show"Download ACS snapshot for DSO at ${key.activationTime}",
+          participantAdminConnection
+            .exportPartyAcsToFile(
+              key.party,
+              key.synchronizerId,
+              key.targetParticipantId,
+              key.activationTime,
+              file,
+            )
             .recoverWith { case ex: StatusRuntimeException =>
               val errorDetails = ErrorDetails.from(ex: StatusRuntimeException)
               for {
@@ -170,7 +109,7 @@ class DsoPartyMigration(
                         metadata,
                       ) =>
                     logger.info(
-                      s"Requested record time $activationTime is not yet clean: $metadata, submitting dummy transaction"
+                      s"Requested record time ${key.activationTime} is not yet clean: $metadata, submitting dummy transaction"
                     )
                     submitDummyTransaction()
                   case _ => Future.unit

@@ -23,7 +23,7 @@
       This supports large snapshots.
       The new `/v0/onboard/sv/party-migration/prepare` and `/v0/onboard/sv/download/{id}` endpoints are annotated
       with `x-external-audience: svs`, so SVs restricting SV app ingress must expose them.
-      Sponsoring SVs must upgrade to this version before they can onboard SVs that run it.
+      The joining SV and its sponsor must both run this version or later.
       Both SVs store the snapshots in `canton.sv-apps.sv.onboarding-snapshots.directory`, which defaults to a
       temporary directory and should point to a volume with enough free space.
 
@@ -39,7 +39,7 @@
 
     - Breaking API Changes:
 
-      - SV app: joining SVs on this version need a sponsor on this version or later.
+      - SV app: `/v0/onboard/sv/party-migration/authorize` removed. The joining SV and its sponsor must both run this version or later.
         SVs restricting SV app ingress must expose the new onboarding endpoints.
 
 ## Upcoming for next minor release (template):
