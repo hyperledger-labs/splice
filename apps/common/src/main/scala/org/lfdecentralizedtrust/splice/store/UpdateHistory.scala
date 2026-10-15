@@ -732,6 +732,15 @@ class UpdateHistory(
       packageNameInterned,
     )
 
+  private def internInterfaceId(interfaceId: Identifier)(implicit
+      tc: TraceContext
+  ): Future[InternedIdentifier] =
+    for {
+      packageId <- internedStringStore.getOrIntern(interfaceId.getPackageId)
+      moduleName <- internedStringStore.getOrIntern(interfaceId.getModuleName)
+      entityName <- internedStringStore.getOrIntern(interfaceId.getEntityName)
+    } yield InternedIdentifier(packageId, moduleName, entityName)
+
   private def insertExerciseEventRow(
       updateId: String,
       event: ExercisedEvent,
@@ -758,12 +767,10 @@ class UpdateHistory(
     val exerciseResult =
       String256M.tryCreate(ProtobufCodec.serializeValue(event.getExerciseResult))
     val safeActingParties = event.getActingParties.asScala.toSeq.map(lengthLimited)
-    val interfaceIdModuleName =
-      event.getInterfaceId.toScala.map(i => lengthLimited(i.getModuleName))
-    val interfaceIdEntityName =
-      event.getInterfaceId.toScala.map(i => lengthLimited(i.getEntityName))
-    val interfaceIdPackageId =
-      event.getInterfaceId.toScala.map(i => lengthLimited(i.getPackageId))
+    val interfaceId = event.getInterfaceId.toScala
+    val interfaceIdModuleName = interfaceId.map(i => lengthLimited(i.getModuleName))
+    val interfaceIdEntityName = interfaceId.map(i => lengthLimited(i.getEntityName))
+    val interfaceIdPackageId = interfaceId.map(i => lengthLimited(i.getPackageId))
     val recordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
     val safeUpdateId = lengthLimited(tree.getUpdateId)
     val safeDomainId = lengthLimited(tree.getSynchronizerId)
@@ -771,6 +778,9 @@ class UpdateHistory(
     for {
       interned <- DBIO.from(internEventStrings(templateId, event.getPackageName))
       choiceInterned <- DBIO.from(internedStringStore.getOrIntern(event.getChoice))
+      interfaceIdInterned <- DBIO.sequenceOption(
+        interfaceId.map(id => DBIO.from(internInterfaceId(id)))
+      )
       result <- sqlu"""
       insert into update_history_exercises(
         history_id, event_id, update_row_id,
@@ -782,7 +792,8 @@ class UpdateHistory(
         interface_id_package_id, interface_id_module_name, interface_id_entity_name,
         record_time, update_id, domain_id, migration_id,
         template_id_package_id_interned, template_id_module_name_interned, template_id_entity_name_interned,
-        package_name_interned, choice_interned
+        package_name_interned, choice_interned,
+        interface_id_package_id_interned, interface_id_module_name_interned, interface_id_entity_name_interned
       )
       values (
         $historyId, $safeEventId, $updateRowId,
@@ -794,7 +805,10 @@ class UpdateHistory(
         $interfaceIdPackageId, $interfaceIdModuleName, $interfaceIdEntityName,
         $recordTime, $safeUpdateId, $safeDomainId, $migrationId,
         ${interned.templateIdPackageId}, ${interned.templateIdModuleName}, ${interned.templateIdEntityName},
-        ${interned.packageName}, $choiceInterned
+        ${interned.packageName}, $choiceInterned,
+        ${interfaceIdInterned.map(_.packageId)}, ${interfaceIdInterned.map(
+          _.moduleName
+        )}, ${interfaceIdInterned.map(_.entityName)}
       )
     """
     } yield result
@@ -2458,6 +2472,12 @@ object UpdateHistory {
   final case class UpdateHistoryResponse(
       update: TreeUpdate,
       synchronizerId: SynchronizerId,
+  )
+
+  private final case class InternedIdentifier(
+      packageId: InternedStringStore.InternedId,
+      moduleName: InternedStringStore.InternedId,
+      entityName: InternedStringStore.InternedId,
   )
 
   private final case class InternedEventStrings(

@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.{
   CreatedEvent,
   DamlRecord,
   ExercisedEvent,
+  Identifier,
   Int64,
   OffsetCheckpoint,
   Value,
@@ -239,6 +240,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         implicit val store = mkStore()
         val c = appRewardCoupon(1, party1, contractId = cid1)
         val templateId = c.identifier
+        val interfaceId = new Identifier("interfacePackageId", "Interface.Module", "Interface")
         val expectedTemplateStrings = Seq(
           "template_id_package_id" -> templateId.getPackageId,
           "template_id_module_name" -> templateId.getModuleName,
@@ -248,7 +250,12 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         val expectedStrings = Seq(
           "update_history_creates" -> expectedTemplateStrings,
           "update_history_assignments" -> expectedTemplateStrings,
-          "update_history_exercises" -> (expectedTemplateStrings :+ ("choice" -> "Archive")),
+          "update_history_exercises" -> (expectedTemplateStrings ++ Seq(
+            "choice" -> "Archive",
+            "interface_id_package_id" -> interfaceId.getPackageId,
+            "interface_id_module_name" -> interfaceId.getModuleName,
+            "interface_id_entity_name" -> interfaceId.getEntityName,
+          )),
         ).flatMap { case (table, columns) =>
           columns.map { case (column, value) => (table, column, value) }
         }
@@ -259,7 +266,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           _ <- domain2.assign(c -> domain1, reassignmentId1, 1, time(3))
           _ <- domain2.exercise(
             c,
-            None,
+            Some(interfaceId),
             "Archive",
             com.daml.ledger.javaapi.data.Unit.getInstance(),
             com.daml.ledger.javaapi.data.Unit.getInstance(),

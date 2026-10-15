@@ -163,6 +163,9 @@ create table update_history_exercises
     template_id_entity_name_interned bigint                   not null,
     package_name_interned            bigint                   not null,
     choice_interned                  bigint                   not null,
+    interface_id_package_id_interned bigint,
+    interface_id_module_name_interned bigint,
+    interface_id_entity_name_interned bigint,
     primary key (row_id, record_time)
 )
     partition by range (record_time);
