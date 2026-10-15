@@ -52,7 +52,10 @@ alter index updt_hist_unas_hi_mi_di_rt rename to updt_hist_unas_hi_mi_di_rt_lega
 alter index updt_hist_unas_hi_mi_rt_di rename to updt_hist_unas_hi_mi_rt_di_legacy;
 alter index updt_hist_unas_hi_mi_ui_u rename to updt_hist_unas_hi_mi_ui_u_legacy;
 
--- this pointed to the old table
+-- This FK followed the rename of update_history_transactions, so it would otherwise pin
+-- update_history_backfilling to update_history_transactions_legacy forever.
+-- It cannot be recreated against the new table, which has no unique constraint on
+-- (history_id, migration_id, domain_id, update_id) without record_time.
 alter table update_history_backfilling
     drop constraint update_history_backfilling_history_id_joining_migration_id_fkey;
 
