@@ -382,6 +382,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -457,6 +459,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -535,6 +539,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -610,6 +616,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -685,6 +693,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -760,6 +770,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -835,6 +847,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -910,6 +924,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -985,6 +1001,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -1060,6 +1078,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -1135,6 +1155,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -1210,6 +1232,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -1285,6 +1309,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -1360,6 +1386,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -1435,6 +1463,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -1510,6 +1540,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -1585,6 +1617,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       resources:
         limits:
           cpu: '3'
@@ -1664,6 +1698,8 @@ svs:
       additionalEnvVars:
         - name: 'ADDITIONAL_CONFIG_CANTONBFT_EXPONENTIAL_BLACKLISTING'
           value: "canton.sv-apps.sv.canton-bft-sequencing-parameters.blacklist-leader-selection-policy-config{\n  how-long-to-blacklist {\n    type=linear\n    maximum-epoch-blacklisted=62\n  }\n  how-many-can-we-blacklist=num-faults-tolerated\n}\n"
+        - name: 'ADDITIONAL_CONFIG_PROTOCOL_VERSION'
+          value: "canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36\n"
       auth0:
         clientId: 'bxjt0vzLyRG2rk2fapXfOzH5lzK4mrl7'
       resources:

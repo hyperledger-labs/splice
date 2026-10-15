@@ -10,6 +10,10 @@ svApp:
     requests:
       cpu: "1"
       memory: 2Gi
+  additionalEnvVars: !append
+    - name: ADDITIONAL_CONFIG_PROTOCOL_VERSION
+      value: |
+        canton.sv-apps.sv.local-synchronizer-nodes.current.protocol-version = 36
 
 scanApp:
   resources:
