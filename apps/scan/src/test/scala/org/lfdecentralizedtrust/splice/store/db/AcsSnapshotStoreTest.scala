@@ -1358,7 +1358,6 @@ trait AcsSnapshotStoreTest
       // Default to backfilling being always complete, to avoid unnecessary complexity in the tests
       backfillingRequired: BackfillingRequirement = BackfillingRequirement.BackfillingNotRequired,
       timeStart: CantonTimestamp = CantonTimestamp.Epoch,
-      windowSizeDays: Int = 1,
       partitionRunwayDays: Int = 7,
   ): Future[UpdateHistory] = {
     val updateHistory = new UpdateHistory(
@@ -1380,7 +1379,6 @@ trait AcsSnapshotStoreTest
       _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
         updateHistory,
         timeStart,
-        windowSizeDays,
         partitionRunwayDays,
       )
     } yield updateHistory

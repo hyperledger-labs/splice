@@ -446,7 +446,7 @@ class UpdateHistory(
       """
     }
 
-  def createPartitions(firstDay: LocalDate, windowSizeDays: Int)(implicit
+  def createPartitions(firstDay: LocalDate)(implicit
       tc: TraceContext
   ): Future[Unit] = {
     def startOf(d: LocalDate) =
@@ -454,7 +454,7 @@ class UpdateHistory(
 
     val tableSuffix = firstDay.format(DateTimeFormatter.BASIC_ISO_DATE)
     val start = startOf(firstDay)
-    val end = startOf(firstDay.plusDays(windowSizeDays.toLong))
+    val end = startOf(firstDay.plusDays(1))
 
     // TODO(#6313): compare CREATE TABLE ... PARTITION OF with separate CREATE and ATTACH PARTITION
     storage.queryAndUpdate(

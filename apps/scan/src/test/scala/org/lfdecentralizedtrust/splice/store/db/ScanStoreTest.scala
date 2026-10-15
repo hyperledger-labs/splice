@@ -1287,7 +1287,6 @@ abstract class ScanStoreTest
   protected def mkUpdateHistory(
       migrationId: Long,
       timeStart: CantonTimestamp,
-      windowSizeDays: Int = 1,
       partitionRunwayDays: Int = 7,
   ): Future[UpdateHistory]
 
@@ -1754,7 +1753,6 @@ class DbScanStoreTest
   override def mkUpdateHistory(
       migrationId: Long,
       timeStart: CantonTimestamp,
-      windowSizeDays: Int = 1,
       partitionRunwayDays: Int = 7,
   ): Future[UpdateHistory] = {
     val updateHistory = new UpdateHistory(
@@ -1776,7 +1774,6 @@ class DbScanStoreTest
       _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
         updateHistory,
         timeStart,
-        windowSizeDays,
         partitionRunwayDays,
       )
     } yield updateHistory

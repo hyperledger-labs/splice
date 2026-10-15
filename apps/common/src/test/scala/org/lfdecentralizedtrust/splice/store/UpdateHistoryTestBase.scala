@@ -234,13 +234,11 @@ abstract class UpdateHistoryTestBase
   protected def initStore(
       store: UpdateHistory,
       timeStart: CantonTimestamp = time(0),
-      windowSizeDays: Int = 1,
       partitionRunwayDays: Int = 7,
   ): Future[Unit] = for {
     _ <- createUpdateHistoryPartitions(
       store,
       timeStart,
-      windowSizeDays,
       partitionRunwayDays,
     )
     _ <- store.testIngestionSink.initialize()
@@ -500,18 +498,16 @@ object UpdateHistoryTestBase {
   def createUpdateHistoryPartitions(
       updateHistory: UpdateHistory,
       timeStart: CantonTimestamp,
-      windowSizeDays: Int,
       partitionRunwayDays: Int,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
     val firstDay = LocalDate.ofInstant(timeStart.toInstant, ZoneOffset.UTC)
     for {
       // for tests that want import updates
       _ <- updateHistory.createPartitions(
-        LocalDate.ofInstant(CantonTimestamp.MinValue.toInstant, ZoneOffset.UTC),
-        windowSizeDays,
+        LocalDate.ofInstant(CantonTimestamp.MinValue.toInstant, ZoneOffset.UTC)
       )
-      _ <- MonadUtil.sequentialTraverse(0.until(partitionRunwayDays, step = windowSizeDays)) { n =>
-        updateHistory.createPartitions(firstDay.plusDays(n.toLong), windowSizeDays)
+      _ <- MonadUtil.sequentialTraverse(0.until(partitionRunwayDays)) { n =>
+        updateHistory.createPartitions(firstDay.plusDays(n.toLong))
       }
     } yield ()
   }

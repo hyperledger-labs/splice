@@ -1057,7 +1057,6 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
   private def newUpdateHistory(
       migrationId: Long,
       timeStart: CantonTimestamp,
-      windowSizeDays: Int,
       partitionRunwayDays: Int,
   ): Future[UpdateHistory] = {
     val participantId = mkParticipantId("ScanEventStoreTest")
@@ -1080,7 +1079,6 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
         updateHistory,
         timeStart,
-        windowSizeDays,
         partitionRunwayDays,
       )
     } yield updateHistory
@@ -1268,11 +1266,10 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       migrationId: Long = domainMigrationId,
       // Tests use CantonTimestamp.now() as record time
       timeStart: CantonTimestamp = CantonTimestamp.now(),
-      windowSizeDays: Int = 1,
       partitionRunwayDays: Int = 7,
   ): Future[EventStoreCtx] =
     for {
-      uh <- newUpdateHistory(migrationId, timeStart, windowSizeDays, partitionRunwayDays)
+      uh <- newUpdateHistory(migrationId, timeStart, partitionRunwayDays)
       vs = newVerdictStore(uh)
       es = new ScanEventStore(vs, uh, loggerFactory)
     } yield EventStoreCtx(vs, uh, es)

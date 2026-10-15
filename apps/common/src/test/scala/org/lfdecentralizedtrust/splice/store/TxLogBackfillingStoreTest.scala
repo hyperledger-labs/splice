@@ -444,7 +444,6 @@ class TxLogBackfillingStoreTest
       _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
         history,
         CantonTimestamp.Epoch,
-        windowSizeDays = 1,
         partitionRunwayDays = 1,
       )
       _ <- history.ingestionSink.initialize()
