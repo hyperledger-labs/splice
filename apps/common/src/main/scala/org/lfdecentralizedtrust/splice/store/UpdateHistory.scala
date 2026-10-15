@@ -456,6 +456,7 @@ class UpdateHistory(
     val start = startOf(firstDay)
     val end = startOf(firstDay.plusDays(windowSizeDays.toLong))
 
+    // TODO(#6313): compare CREATE TABLE ... PARTITION OF with separate CREATE and ATTACH PARTITION
     storage.queryAndUpdate(
       // CREATE TABLE is transactional, so the partitions of all tables are created atomically.
       AdvisoryLocks.withTransactionalLock(
