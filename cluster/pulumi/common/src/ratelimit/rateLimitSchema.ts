@@ -21,11 +21,6 @@ export const PerIpLimitsSchema = BucketRateLimitSchema.extend({
   overrides: z.record(z.string().min(1), OverrideSchema).optional(),
 });
 
-export const RateLimitConfigSchema = BucketRateLimitSchema.extend({
-  type: z.literal('limited'),
-  perIpLimits: PerIpLimitsSchema.optional(),
-});
-
 export type ExternalRateLimit = z.infer<typeof RateLimitSchema>;
 
 export const defaultGlobalLimits = {
@@ -43,15 +38,4 @@ export const defaultGlobalPerIpLimits = {
 export const RateLimitSchema = z.object({
   globalLimits: BucketRateLimitSchema.default(defaultGlobalLimits),
   globalPerIpLimits: PerIpLimitsSchema.default(defaultGlobalPerIpLimits),
-  rateLimits: z
-    .object({})
-    .catchall(
-      z.intersection(
-        z.object({
-          name: z.string(),
-        }),
-        RateLimitConfigSchema
-      )
-    )
-    .optional(),
 });
