@@ -67,20 +67,6 @@
           },
           "type": "Literal"
         },
-        "GHA_RUNNER_DIGEST": {
-          "secret": {
-            "key": "GHA_RUNNER_DIGEST",
-            "name": "deployment-env"
-          },
-          "type": "Secret"
-        },
-        "GHA_RUNNER_VERSION": {
-          "secret": {
-            "key": "GHA_RUNNER_VERSION",
-            "name": "deployment-env"
-          },
-          "type": "Secret"
-        },
         "PULUMI_VERSION": {
           "literal": {
             "value": "0.0.0"
