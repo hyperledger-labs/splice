@@ -16,6 +16,7 @@ export type EnvironmentVariable = z.infer<typeof EnvironmentVariableSchema>;
 export const MultiValidatorConfigSchema = z.object({
   multiValidator: z
     .object({
+      enabled: z.boolean().default(false),
       postgresPvcSize: z.string().optional(),
       // Multi-validator needs to be migrated
       postgres: SplicePostgresSchema.default({

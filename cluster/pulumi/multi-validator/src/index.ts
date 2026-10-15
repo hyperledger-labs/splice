@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import { isDevNet } from '@canton-network/splice-pulumi-common';
 
+import { multiValidatorConfig } from './config';
 import { installNode } from './installNode';
 
 async function main() {
-  if (isDevNet) {
+  // TODO(#7801) remove isDevNet when internal config is adjusted
+  if (isDevNet && (multiValidatorConfig?.enabled ?? false)) {
     await installNode();
   } else {
     throw new Error(

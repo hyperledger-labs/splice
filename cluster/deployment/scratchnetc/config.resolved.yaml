@@ -180,6 +180,7 @@ monitoring:
     muteTimeIntervals: []
   enableGrafanaServiceAccountToken: true
 multiValidator:
+  enabled: true
   postgresPvcSize: '100Gi'
   resources:
     participant:
