@@ -14,7 +14,7 @@ async function deferRender() {
   }
 }
 
-deferRender().then(() => {
+void deferRender().then(() => {
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
       <ErrorBoundary>

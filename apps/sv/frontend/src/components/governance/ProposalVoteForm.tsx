@@ -96,7 +96,7 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
         onSubmit={e => {
           e.preventDefault();
           e.stopPropagation();
-          form.handleSubmit();
+          void form.handleSubmit();
         }}
         style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}
       >
@@ -202,7 +202,7 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
                     disabled={!isValid}
                     onClick={() => {
                       form.setFieldValue('vote', 'rejected');
-                      form.handleSubmit();
+                      void form.handleSubmit();
                     }}
                     sx={{ backgroundColor: 'transparent' }}
                     data-testid="your-vote-reject"
@@ -214,7 +214,7 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
                     disabled={!isValid}
                     onClick={() => {
                       form.setFieldValue('vote', 'accepted');
-                      form.handleSubmit();
+                      void form.handleSubmit();
                     }}
                     data-testid="your-vote-accept"
                   >

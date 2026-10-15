@@ -79,7 +79,7 @@ const SendTransfer: React.FC = () => {
       }
     },
     onSuccess: () => {
-      navigate('/transactions');
+      void navigate('/transactions');
     },
     onError: error => {
       // TODO (DACH-NY/canton-network-node#5491): show an error to the user.
@@ -109,7 +109,7 @@ const SendTransfer: React.FC = () => {
       }
     },
     onSuccess: () => {
-      navigate('/transactions');
+      void navigate('/transactions');
     },
     onError: error => {
       // TODO (DACH-NY/canton-network-node#5491): show an error to the user.

@@ -43,10 +43,7 @@ export const TransferOffers: React.FC = () => {
   const primaryPartyId = usePrimaryParty();
 
   const toWalletTransferOffer = useCallback(
-    async (
-      items: Array<PartialWalletTransferOffer>,
-      amuletPrice: BigNumber
-    ): Promise<WalletTransferOffer[]> => {
+    (items: Array<PartialWalletTransferOffer>, amuletPrice: BigNumber): WalletTransferOffer[] => {
       return items
         .filter(item => item.sender !== primaryPartyId)
         .map(item => {
@@ -100,7 +97,7 @@ export const TransferOffers: React.FC = () => {
             return item;
           })
         );
-      toWalletTransferOffer(allTransfers, amuletPrice).then(setOffers);
+      setOffers(toWalletTransferOffer(allTransfers, amuletPrice));
     }
   }, [amuletPrice, toWalletTransferOffer, transferOfferContracts, tokenStandardTransferContracts]);
 

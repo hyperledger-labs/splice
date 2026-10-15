@@ -140,7 +140,7 @@ export const ProposalSearch: React.FC<ProposalSearchProps> = memo(function Propo
         onSearchChangeRef.current(query);
       });
       syncUrl(trimmed);
-      navigate(`/governance/proposals/${trimmed as ContractId<VoteRequest>}`);
+      void navigate(`/governance/proposals/${trimmed as ContractId<VoteRequest>}`);
     }
   };
 

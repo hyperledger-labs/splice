@@ -39,7 +39,7 @@ export const useUnclaimedDevelopmentFundTotal = (): UseUnclaimedDevelopmentFundT
   });
 
   const invalidate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: DEVELOPMENT_FUND_QUERY_KEYS.unclaimedTotal });
+    void queryClient.invalidateQueries({ queryKey: DEVELOPMENT_FUND_QUERY_KEYS.unclaimedTotal });
   }, [queryClient]);
 
   return {

@@ -72,6 +72,18 @@ export default defineConfig([
     },
   },
   {
+    files: ["**/*.{ts,tsx}"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-floating-promises": "error",
+    },
+  },
+  {
     files: ["vite.config.mjs"],
     languageOptions: { globals: globals.node },
   },

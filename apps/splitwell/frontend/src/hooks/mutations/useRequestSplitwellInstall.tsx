@@ -30,7 +30,7 @@ export const useRequestSplitwellInstall = (): UseMutationResult<
       console.error('Failed to setup install contract: ', JSON.stringify(error));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [QuerySplitwellInstallOperationName] });
+      void queryClient.invalidateQueries({ queryKey: [QuerySplitwellInstallOperationName] });
     },
   });
 };

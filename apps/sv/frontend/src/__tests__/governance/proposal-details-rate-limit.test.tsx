@@ -31,7 +31,7 @@ const loginAndOpenDetailsPage = async (): Promise<UserEvent> => {
   );
   expect(await screen.findByText('Log In')).toBeInTheDocument();
   await user.type(screen.getByRole('textbox'), 'sv1');
-  user.click(screen.getByRole('button', { name: 'Log In' }));
+  await user.click(screen.getByRole('button', { name: 'Log In' }));
   expect(await screen.findByTestId('navlink-governance', {}, RETRY_TIMEOUT)).toBeInTheDocument();
 
   window.history.pushState({}, '', `/governance/proposals/${contractId}`);
@@ -72,7 +72,7 @@ describe('proposal details under rate limiting', () => {
     const votingForm = await screen.findByTestId('your-vote-form', {}, RETRY_TIMEOUT);
 
     // Clicking Accept both selects the vote and submits; not awaited so the submitting state is observable.
-    user.click(within(votingForm).getByTestId('your-vote-accept'));
+    void user.click(within(votingForm).getByTestId('your-vote-accept'));
 
     const successMessage = await screen.findByTestId('vote-submission-success', {}, RETRY_TIMEOUT);
     expect(successMessage.textContent).toMatch(/Vote successfully updated/);

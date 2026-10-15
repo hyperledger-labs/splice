@@ -113,7 +113,7 @@ describe('Set DSO Config Rules Form', () => {
 
     await user.click(submitButton);
     expect(submitButton.getAttribute('disabled')).not.toBeNull();
-    expect(async () => await user.click(submitButton)).rejects.toThrowError(
+    await expect(async () => await user.click(submitButton)).rejects.toThrowError(
       /Unable to perform pointer interaction/
     );
 

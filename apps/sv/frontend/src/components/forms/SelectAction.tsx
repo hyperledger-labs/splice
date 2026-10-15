@@ -47,13 +47,13 @@ export const SelectAction: React.FC = () => {
       action: '',
     },
     onSubmit: async ({ value }) => {
-      navigate(`/governance/proposals/create?action=${value.action}`);
+      void navigate(`/governance/proposals/create?action=${value.action}`);
     },
   });
 
   const handleCancel = () => {
     form.reset();
-    navigate('/governance/proposals');
+    void navigate('/governance/proposals');
   };
 
   return (
@@ -73,7 +73,7 @@ export const SelectAction: React.FC = () => {
           onSubmit={e => {
             e.preventDefault();
             e.stopPropagation();
-            form.handleSubmit();
+            void form.handleSubmit();
           }}
         >
           <form.Field

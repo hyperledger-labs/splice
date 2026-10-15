@@ -99,7 +99,7 @@ describe('Create Proposal', () => {
     expect(actionDropdown).toBeDefined();
 
     const selectInput = actionDropdown.querySelector('[role="combobox"]') as HTMLElement;
-    user.click(selectInput);
+    await user.click(selectInput);
 
     await waitFor(() => {
       expect(screen.getByText('Offboard Member')).toBeInTheDocument();

@@ -179,11 +179,15 @@ const OnboardingRow: React.FC<OnboardingRowProps> = props => {
   const networkInstanceName = useNetworkInstanceName();
 
   const copySecret = useCallback(() => {
-    navigator.clipboard.writeText(props.secret);
+    navigator.clipboard
+      .writeText(props.secret)
+      .catch(err => console.warn('Failed to copy to clipboard', err));
   }, [props]);
 
   const copyOnboardingInfo = useCallback(() => {
-    navigator.clipboard.writeText(onboardingInfo(props, networkInstanceName));
+    navigator.clipboard
+      .writeText(onboardingInfo(props, networkInstanceName))
+      .catch(err => console.warn('Failed to copy to clipboard', err));
   }, [props, networkInstanceName]);
 
   return (

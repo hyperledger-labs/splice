@@ -69,7 +69,8 @@ object Headers {
       (
         ((Compile / baseDirectory).value ** "*.ts") ---
           ((Compile / baseDirectory).value ** "node_modules" ** "*") ---
-          ((Compile / baseDirectory).value ** "daml.js" ** "*")
+          ((Compile / baseDirectory).value ** "daml.js" ** "*") ---
+          ((Compile / baseDirectory).value ** "lib" ** "*")
       ).get ++
       (
         ((Compile / baseDirectory).value ** "*.js") ---

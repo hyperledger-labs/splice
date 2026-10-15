@@ -150,7 +150,7 @@ export const useDevelopmentFundAllocationForm = (): UseDevelopmentFundAllocation
     },
     onSuccess: () => {
       resetForm();
-      invalidateAllDevelopmentFundQueries(queryClient);
+      void invalidateAllDevelopmentFundQueries(queryClient);
     },
     onError: err => {
       console.error('Failed to allocate development fund coupon', err);

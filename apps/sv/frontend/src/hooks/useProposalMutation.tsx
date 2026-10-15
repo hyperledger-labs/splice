@@ -46,7 +46,7 @@ export const useProposalMutation: () => UseMutationResult<
 
     onSuccess: () => {
       toast.success('Successfully submitted the proposal');
-      navigate('/governance/proposals');
+      void navigate('/governance/proposals');
     },
 
     onError: error => {

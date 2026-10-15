@@ -25,7 +25,7 @@ const TransferPreapproval: React.FC = () => {
       return await createTransferPreapproval().then(async () => transferPreapprovalQuery.refetch());
     },
     onSuccess: () => {
-      navigate('/transactions');
+      void navigate('/transactions');
     },
     onError: error => {
       // TODO (DACH-NY/canton-network-node#5491): show an error to the user.

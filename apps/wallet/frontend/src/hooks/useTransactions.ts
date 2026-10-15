@@ -12,14 +12,11 @@ export const useTransactions: () => UseInfiniteQueryResult<InfiniteData<Transact
 
   return useInfiniteQuery({
     queryKey: ['transactions', primaryPartyId],
-    queryFn: async ({ pageParam }) => {
-      const txs = await listTransactions(pageParam === '' ? undefined : pageParam);
-      // react-query requires us to return undefined here to show that no more data is available
-      return txs.length === 0 ? undefined : txs;
-    },
+    queryFn: async ({ pageParam }) => listTransactions(pageParam === '' ? undefined : pageParam),
     initialPageParam: '',
     getNextPageParam: lastPage => {
-      return lastPage && lastPage[lastPage.length - 1].id;
+      // returning undefined for an empty page tells react-query that no more data is available
+      return lastPage.at(-1)?.id;
     },
   });
 };

@@ -1749,6 +1749,9 @@ lazy val `apps-common-frontend` = {
       npmLint := {
         val log = streams.value.log
         npmInstall.value
+        // Type-aware lint rules need the type declarations of the openapi clients and common libs.
+        // Without them, imports from those packages resolve to `any` and the rules silently skip them.
+        bundle.value
         runCommand(
           Seq("npm-run-parallel", "check"),
           log,

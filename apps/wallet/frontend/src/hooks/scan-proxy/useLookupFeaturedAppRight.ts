@@ -10,7 +10,7 @@ import { useValidatorScanProxyClient } from '../../contexts/ValidatorScanProxyCo
 
 const useLookupFeaturedAppRight = (
   primaryPartyId?: string
-): UseQueryResult<Contract<FeaturedAppRight> | undefined> => {
+): UseQueryResult<Contract<FeaturedAppRight> | null> => {
   const scanClient = useValidatorScanProxyClient();
 
   return useLookupFeaturedAppRightBuilder(

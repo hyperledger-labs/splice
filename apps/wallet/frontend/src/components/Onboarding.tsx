@@ -26,7 +26,7 @@ const Onboarding: React.FC = () => {
       return await registerUser();
     },
     onSuccess: () => {
-      navigate('/transactions');
+      void navigate('/transactions');
     },
     onError: error => {
       // TODO (DACH-NY/canton-network-node#5491): show an error to the user.

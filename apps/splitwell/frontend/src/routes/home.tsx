@@ -81,7 +81,9 @@ const Home: React.FC = () => {
         }
       }
     };
-    requestInstalls();
+    requestInstalls().catch(() => {
+      // Already logged by useRequestSplitwellInstall's onError
+    });
   }, [
     primaryPartyId,
     provider,

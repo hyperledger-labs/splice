@@ -46,7 +46,7 @@ const ValidatorLicenses: React.FC<ValidatorLicensesProps> = ({
 
   useEffect(() => {
     if (inView && hasNextLicensesPage && !isFetchingNextLicensesPage) {
-      fetchNextLicensesPage();
+      void fetchNextLicensesPage();
     }
   }, [inView, hasNextLicensesPage, isFetchingNextLicensesPage, fetchNextLicensesPage]);
 

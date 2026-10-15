@@ -10,7 +10,7 @@ import { useScanClient } from './ScanClientContext';
 
 const useLookupFeaturedAppRight = (
   primaryPartyId?: string
-): UseQueryResult<Contract<FeaturedAppRight> | undefined> => {
+): UseQueryResult<Contract<FeaturedAppRight> | null> => {
   const scanClient = useScanClient();
 
   return useLookupFeaturedAppRightBuilder(
@@ -22,16 +22,15 @@ const useLookupFeaturedAppRight = (
 export function useLookupFeaturedAppRightBuilder(
   getResult: () => Promise<LookupFeaturedAppRightResponse>,
   primaryPartyId?: string
-): UseQueryResult<Contract<FeaturedAppRight> | undefined> {
+): UseQueryResult<Contract<FeaturedAppRight> | null> {
   return useQuery({
     queryKey: ['scan-api', 'lookupFeaturedAppRight', primaryPartyId, FeaturedAppRight],
     queryFn: async () => {
       const response = await getResult();
 
-      return (
-        response.featured_app_right &&
-        Contract.decodeOpenAPI(response.featured_app_right, FeaturedAppRight)
-      );
+      return response.featured_app_right
+        ? Contract.decodeOpenAPI(response.featured_app_right, FeaturedAppRight)
+        : null;
     },
     enabled: !!primaryPartyId,
   });

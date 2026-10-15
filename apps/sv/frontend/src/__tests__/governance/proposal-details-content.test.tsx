@@ -133,7 +133,7 @@ describe('SV user can', () => {
     await user.type(input, 'sv1');
 
     const button = screen.getByRole('button', { name: 'Log In' });
-    user.click(button);
+    await user.click(button);
 
     const svParties = await screen.findAllByDisplayValue(svPartyId);
     svParties.forEach(party => expect(party).toBeInTheDocument());
@@ -1221,7 +1221,7 @@ describe('Proposal Details > Votes & Voting', () => {
     // Clicking the Accept button both selects the vote and submits
     // It's usually a good idea to await this click action. However this happens to be one where we shouldn't
     // This is because awaiting the button click makes it very difficult for the test runner to see the loading state
-    user.click(acceptButton);
+    void user.click(acceptButton);
 
     // once submission starts, the vote buttons are unmounted (replaced by the
     // "Submitting..." state and then the submission message)
@@ -1286,7 +1286,7 @@ describe('Proposal Details > Votes & Voting', () => {
     // Clicking the Accept button both selects the vote and submits
     // It's usually a good idea to await this click action. However this happens to be one where we shouldn't
     // This is because awaiting the button click makes it very difficult for the test runner to see the loading state
-    user.click(acceptButton);
+    void user.click(acceptButton);
 
     // once submission starts, the vote buttons are unmounted (replaced by the
     // "Submitting..." state and then the submission message)

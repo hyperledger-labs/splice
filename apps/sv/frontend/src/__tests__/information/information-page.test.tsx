@@ -26,7 +26,7 @@ describe('The Information page', () => {
     const input = screen.getByRole('textbox');
     await user.type(input, 'sv1');
     const button = screen.getByRole('button', { name: 'Log In' });
-    user.click(button);
+    await user.click(button);
     expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
   });
 

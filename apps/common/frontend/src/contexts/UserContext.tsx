@@ -94,7 +94,7 @@ export const UserProvider: React.FC<{
       const state = { redirectTo: window.location.href.replace(window.location.origin, '') };
       // We store the user id in localStorage. If it really was cleared
       // users should get a chance to login as a different user.
-      auth.signinRedirect({ prompt: 'login', state });
+      void auth.signinRedirect({ prompt: 'login', state });
     }
   };
 
@@ -102,9 +102,12 @@ export const UserProvider: React.FC<{
 
   const signoutFromIdp = useCallback(() => {
     if (auth === undefined || !auth.isAuthenticated) return;
-    auth.removeUser().finally(() => {
-      window.location.href = window.location.origin;
-    });
+    auth
+      .removeUser()
+      .catch(e => console.warn('Failed to remove user on signout', e))
+      .finally(() => {
+        window.location.href = window.location.origin;
+      });
   }, [auth]);
 
   const signoutOnExpiry = useCallback(() => {
@@ -116,7 +119,7 @@ export const UserProvider: React.FC<{
   useEffect(() => onAuthExpired(signoutOnExpiry), [signoutOnExpiry]);
 
   useEffect(() => {
-    async function f(user: User) {
+    function f(user: User) {
       const { access_token } = user;
       const access_token_sub = tryDecodeTokenSub(access_token);
 
@@ -134,13 +137,13 @@ export const UserProvider: React.FC<{
       const storedUserId = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
       const secret = getHs256UnsafeSecret(authConf);
       if (storedUserId) {
-        loginWithSst(storedUserId, secret, authConf.token_audience, authConf.token_scope);
+        void loginWithSst(storedUserId, secret, authConf.token_audience, authConf.token_scope);
       }
     } else if (testAuthConf) {
       const storedUserId = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
       const secret = testAuthConf.secret;
       if (storedUserId) {
-        loginWithSst(storedUserId, secret, authConf.token_audience, authConf.token_scope);
+        void loginWithSst(storedUserId, secret, authConf.token_audience, authConf.token_scope);
       }
     }
   }, [auth, authConf, authMethod, loginWithSst, testAuthConf]);
