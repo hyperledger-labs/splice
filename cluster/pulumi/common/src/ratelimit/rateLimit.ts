@@ -92,7 +92,6 @@ export function installRateLimits(
     inboundPort: appPort,
     globalLimits: rateLimit.globalLimits,
     globalPerIpLimits: rateLimit.globalPerIpLimits,
-    rateLimits: rateLimit.rateLimits,
     protocol,
     xffNumTrustedHops: sidecarXffNumTrustedHops(),
   });

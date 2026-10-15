@@ -15,24 +15,10 @@ export interface PerIpLimits extends Limits {
   overrides?: Record<string, { ips: string[] } & Limits>;
 }
 
-interface MatchedLimits extends Limits {
-  type: 'limited';
-  perIpLimits?: PerIpLimits;
-}
-
-interface LocalLimits<L> {
-  [pathPrefix: string]: LocalLimit<L>;
-}
-
-type LocalLimit<L> = {
-  name: string;
-} & L;
-
 // The descriptor entry key emitted by envoy's `masked_remote_address` rate limit action.
 // This is hardcoded in envoy (see MaskedRemoteAddressAction::populateDescriptor) and
 // cannot be configured, so the descriptors we generate must use exactly this key.
 const clientIpEntryKey = 'masked_remote_address';
-const reservedEntryKeys = [clientIpEntryKey, 'client_ip'];
 
 // The per-IP descriptors are wildcard descriptors: envoy allocates a token bucket per
 // observed client IP and keeps them in an LRU cache whose size defaults to a mere 20
@@ -52,10 +38,6 @@ const maxTokenValue = 4294967295;
 // Limits that must all be respected therefore live in separate filters, each of which consumes
 // a token of its own bucket for every request. There is exactly one filter per limit, so that
 // the metrics and the access logs can attribute a rejection to the limit that caused it:
-//   - `perEndpointPerIpRateLimitFilterName`: the per-endpoint, per-client-IP limits (including
-//     the per-IP overrides).
-//   - `perEndpointRateLimitFilterName`: the per-endpoint limits, one bucket per configured
-//     endpoint.
 //   - `globalPerIpRateLimitFilterName`: a single wildcard descriptor keyed on the client IP, i.e.
 //     one bucket per client IP, consumed by every request.
 //   - `globalRateLimitFilterName`: the global limit, consumed by every request.
@@ -66,10 +48,7 @@ const maxTokenValue = 4294967295;
 // hammering a single endpoint burns its own per-endpoint per-IP bucket and leaves the global
 // bucket to everybody else.
 export const globalRateLimitFilterName = 'envoy.filters.http.local_ratelimit';
-export const perEndpointRateLimitFilterName = 'envoy.filters.http.local_ratelimit.endpoint';
 export const globalPerIpRateLimitFilterName = 'envoy.filters.http.local_ratelimit.per_ip';
-export const perEndpointPerIpRateLimitFilterName =
-  'envoy.filters.http.local_ratelimit.endpoint_per_ip';
 
 // Envoy emits `<stat_prefix>.http_local_rate_limit.{enabled,ok,rate_limited,enforced}` per filter
 // and does not label them, so the stat prefix is the only thing telling the filters apart in the
@@ -120,7 +99,7 @@ export const rateLimiterMetricRelabelings = [
   },
 ];
 
-export interface RateLimitEnvoyFilterArgs extends PerEndpointLimits {
+export interface RateLimitEnvoyFilterArgs {
   namespace: string;
 
   appLabel: pulumi.Input<string>;
@@ -150,44 +129,6 @@ export type RateLimitProtocol = 'http' | 'grpc';
 // The gRPC status code (`RESOURCE_EXHAUSTED`) envoy returns for a rate limited gRPC call, see
 // `rate_limited_as_resource_exhausted` in `localRateLimitFilterConfig`.
 export const rateLimitedGrpcStatus = 8;
-
-export interface PerEndpointLimits {
-  // all the rate limits must be respected, there's an AND relationship between them
-  rateLimits?: LocalLimits<MatchedLimits>;
-}
-
-export function extractPathPrefixes(rateLimits?: PerEndpointLimits['rateLimits']): string[] {
-  if (!rateLimits) {
-    return [];
-  }
-
-  return Object.keys(rateLimits).filter(
-    pathPrefix => pathPrefix.startsWith('/api/scan') || pathPrefix.startsWith('/registry')
-  );
-}
-
-/**
- * Checks that the configured path prefixes can actually match a gRPC request.
- *
- * gRPC maps every call onto the HTTP/2 path `/<fully.qualified.Service>/<Method>`, which is what
- * the route level `header_match` actions match on. A prefix that is not of that shape (e.g. an
- * HTTP endpoint such as `/api/scan/v0/...`, or a bare service name without the leading slash)
- * would never match any request, so the limit would silently never be enforced.
- */
-export function validateGrpcPathPrefixes(rateLimits?: PerEndpointLimits['rateLimits']): void {
-  // `/<service>/` optionally followed by a method name; the service must be a dotted, non-empty
-  // fully qualified protobuf name.
-  const grpcPathPrefix = /^\/[A-Za-z_][\w]*(\.[A-Za-z_][\w]*)+\/[A-Za-z_]?\w*$/;
-  const invalid = Object.keys(rateLimits || {}).filter(
-    pathPrefix => !grpcPathPrefix.test(pathPrefix)
-  );
-  if (invalid.length > 0) {
-    throw new Error(
-      `invalid gRPC path prefixes: ${invalid.join(', ')}; expected '/<fully.qualified.Service>/<Method>' ` +
-        `(a trailing '/' matches every method of the service), otherwise the limit would never match a request`
-    );
-  }
-}
 
 export function validateIpLimits(context: string, perIpLimits?: PerIpLimits): void {
   if (!perIpLimits) {
@@ -263,64 +204,17 @@ function validatePerIpTokenBuckets(
   );
 }
 
-export function validateTokenBuckets(
-  globalLimits: Limits,
-  effectiveRateLimits: LocalLimits<MatchedLimits>,
-  globalPerIpLimits?: PerIpLimits
-): void {
+export function validateTokenBuckets(globalLimits: Limits, globalPerIpLimits?: PerIpLimits): void {
   validateLimits('globalLimits', globalLimits);
   const globalFillIntervalMs = parseFillIntervalMs(globalLimits.fillInterval, 'globalLimits');
   if (globalPerIpLimits) {
     validatePerIpTokenBuckets('globalPerIpLimits', globalPerIpLimits, globalFillIntervalMs);
   }
-  Object.entries(effectiveRateLimits).forEach(([pathPrefix, rateLimit]) => {
-    validateLimits(pathPrefix, rateLimit, globalFillIntervalMs);
-    if (rateLimit.perIpLimits) {
-      validatePerIpTokenBuckets(
-        `${pathPrefix} perIpLimits`,
-        rateLimit.perIpLimits,
-        globalFillIntervalMs
-      );
-    }
-  });
 }
 
-export function validateEffectiveRateLimits(
-  args: RateLimitEnvoyFilterArgs
-): LocalLimits<MatchedLimits> {
-  const collidingPathNames = Object.entries(args.rateLimits || {})
-    .filter(([, rl]) => reservedEntryKeys.includes(rl.name))
-    .map(([path]) => path);
-  if (collidingPathNames.length > 0) {
-    throw new Error(
-      `${collidingPathNames.join(', ')} use reserved name ${reservedEntryKeys.join('/')}; choose a different name`
-    );
-  }
-
-  const effectiveRateLimits: LocalLimits<MatchedLimits> = args.rateLimits || {};
-
-  // the name is the descriptor value identifying the endpoint bucket, so two endpoints sharing
-  // one would share their buckets (and make envoy reject the duplicated descriptors)
-  const names = Object.values(effectiveRateLimits).map(rl => rl.name);
-  const duplicateNames = [...new Set(names.filter((name, i) => names.indexOf(name) !== i))];
-  if (duplicateNames.length > 0) {
-    throw new Error(
-      `duplicate rate limit names: ${duplicateNames.join(', ')}; every endpoint needs its own name`
-    );
-  }
-
-  if (args.protocol === 'grpc') {
-    validateGrpcPathPrefixes(effectiveRateLimits);
-  }
-
+export function validateEffectiveRateLimits(args: RateLimitEnvoyFilterArgs): void {
   validateIpLimits('globalPerIpLimits', args.globalPerIpLimits);
-  Object.entries(effectiveRateLimits).forEach(([pathPrefix, rateLimit]) => {
-    validateIpLimits(pathPrefix, rateLimit.perIpLimits);
-  });
-
-  validateTokenBuckets(args.globalLimits, effectiveRateLimits, args.globalPerIpLimits);
-
-  return effectiveRateLimits;
+  validateTokenBuckets(args.globalLimits, args.globalPerIpLimits);
 }
 
 export function clientIpDescriptorValue(ip: string): string {
@@ -466,77 +360,6 @@ export function moreSpecificPathPrefixes(pathPrefix: string, allPathPrefixes: st
   );
 }
 
-export function buildRateLimitActions(effectiveRateLimits: LocalLimits<MatchedLimits>): unknown[] {
-  const allPathPrefixes = Object.keys(effectiveRateLimits);
-  return Object.entries(effectiveRateLimits).flatMap(([pathPrefix, rateLimit]) => {
-    const actions = [];
-
-    // Action 1: generate the per-endpoint action.
-    // Configured prefixes may nest (e.g. `/registry/transfer-instruction/v1` and
-    // `/registry/transfer-instruction/v1/transfer-factory`). Without excluding the more specific
-    // prefixes, a request to the nested endpoint would generate *both* descriptors, and envoy
-    // consumes at most one descriptor bucket per filter, which would silently drop the limit
-    // configured for the more specific endpoint. Hence every endpoint matches exactly the
-    // requests that no more specific endpoint matches.
-    const baseAction = {
-      header_value_match: {
-        descriptor_value: rateLimit.name,
-        expect_match: true,
-        headers: [
-          pathMatcher(pathPrefix, false),
-          ...moreSpecificPathPrefixes(pathPrefix, allPathPrefixes).map(nested =>
-            pathMatcher(nested, true)
-          ),
-        ],
-      },
-    };
-
-    actions.push({ actions: [baseAction] });
-
-    // Action 2: generate the per-IP action if perIpLimits exists
-    if (rateLimit.perIpLimits) {
-      actions.push({
-        actions: [baseAction, maskedRemoteAddressAction],
-      });
-    }
-
-    return actions;
-  });
-}
-
-/**
- * The descriptors of the filter enforcing the global limit: one bucket per configured endpoint.
- * The global bucket itself is the filter's default token bucket, which is consumed by every
- * request, including the ones matching one of these descriptors.
- */
-export function buildEndpointRateLimitDescriptors(
-  effectiveRateLimits: LocalLimits<MatchedLimits>
-): unknown[] {
-  return Object.values(effectiveRateLimits).map(rateLimit => ({
-    entries: [{ key: 'header_match', value: rateLimit.name }],
-    token_bucket: tokenBucket(rateLimit),
-  }));
-}
-
-/**
- * The descriptors of the filter enforcing the per-endpoint, per-client-IP limits, ordered from the
- * most to the least specific one, as envoy consumes a token from the first matching descriptor
- * only. These are consumed on top of the global per-client-IP bucket, which is enforced by a
- * separate filter.
- */
-export function buildPerEndpointPerIpRateLimitDescriptors(
-  effectiveRateLimits: LocalLimits<MatchedLimits>
-): unknown[] {
-  return Object.values(effectiveRateLimits).flatMap(rateLimit =>
-    rateLimit.perIpLimits
-      ? buildPerIpDescriptors(
-          [{ key: 'header_match', value: rateLimit.name }],
-          rateLimit.perIpLimits
-        )
-      : []
-  );
-}
-
 /**
  * A bucket that never rate limits anything, used as the default token bucket of the filters whose
  * limits are all expressed as descriptors. Envoy requires the default bucket to be set, but these
@@ -618,52 +441,15 @@ function localRateLimitFilterConfig(filter: RateLimitFilter, protocol: RateLimit
  * The local rate limit filters to install, one per limit that must be respected on its own, ordered
  * from the most to the least specific limit.
  * Every request consumes a token from the global bucket *and* a token from the bucket of its
- * client IP, and, on the endpoints with configured limits, a token from the per-endpoint bucket
- * and one from the per-endpoint bucket of its client IP.
+ * client IP.
  * The filters run in the returned order, so a request rejected by a more specific limit never
  * reaches (and never consumes the tokens of) the broader ones.
  */
 export function buildRateLimitFilters(
   globalLimits: Limits,
-  globalPerIpLimits: PerIpLimits,
-  effectiveRateLimits: LocalLimits<MatchedLimits>
+  globalPerIpLimits: PerIpLimits
 ): RateLimitFilter[] {
-  const perEndpointPerIpDescriptors =
-    buildPerEndpointPerIpRateLimitDescriptors(effectiveRateLimits);
-  const perEndpointDescriptors = buildEndpointRateLimitDescriptors(effectiveRateLimits);
-  // a filter without descriptors would only ever consume its (unlimited) default bucket
-  const endpointFilters: RateLimitFilter[] = [
-    // consumed on top of the global per-IP bucket, requests to endpoints without per-IP limits
-    // match no descriptor here and are not limited by this filter
-    ...(perEndpointPerIpDescriptors.length > 0
-      ? [
-          {
-            name: perEndpointPerIpRateLimitFilterName,
-            statPrefix: perEndpointPerIpRateLimitStatPrefix,
-            limitName: perEndpointPerIpRateLimitName,
-            defaultTokenBucket: unlimitedTokenBucket(globalLimits.fillInterval),
-            alwaysConsumeDefaultTokenBucket: false,
-            descriptors: perEndpointPerIpDescriptors,
-          },
-        ]
-      : []),
-    // one bucket per configured endpoint; requests to any other endpoint match no descriptor
-    // here and are only limited globally
-    ...(perEndpointDescriptors.length > 0
-      ? [
-          {
-            name: perEndpointRateLimitFilterName,
-            statPrefix: perEndpointRateLimitStatPrefix,
-            limitName: perEndpointRateLimitName,
-            defaultTokenBucket: unlimitedTokenBucket(globalLimits.fillInterval),
-            alwaysConsumeDefaultTokenBucket: false,
-            descriptors: perEndpointDescriptors,
-          },
-        ]
-      : []),
-  ];
   return [
-    ...endpointFilters,
     {
       name: globalPerIpRateLimitFilterName,
       statPrefix: globalPerIpRateLimitStatPrefix,
@@ -763,18 +549,12 @@ export class RateLimitEnvoyFilter extends pulumi.ComponentResource {
     opts?: pulumi.ComponentResourceOptions
   ) {
     super('splice:RateLimit', `splice-${args.namespace}-${name}`, args, opts);
-    const effectiveRateLimits = validateEffectiveRateLimits(args);
+    validateEffectiveRateLimits(args);
     const xffNumTrustedHops = args.xffNumTrustedHops ?? directIngressXffNumTrustedHops;
     // The global per-IP action comes last so that the more specific per-endpoint
     // descriptors are matched first.
-    const rateLimitActions = buildRateLimitActions(effectiveRateLimits).concat([
-      buildGlobalPerIpRateLimitAction(),
-    ]);
-    const rateLimitFilters = buildRateLimitFilters(
-      args.globalLimits,
-      args.globalPerIpLimits,
-      effectiveRateLimits
-    );
+    const rateLimitActions = buildGlobalPerIpRateLimitAction();
+    const rateLimitFilters = buildRateLimitFilters(args.globalLimits, args.globalPerIpLimits);
 
     this.envoyFilter = new k8s.apiextensions.CustomResource(
       `${args.namespace}-${name}`,
