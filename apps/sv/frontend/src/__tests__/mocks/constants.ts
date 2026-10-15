@@ -8,6 +8,7 @@ import {
 } from '@canton-network/splice-common-test-handlers';
 import { dsoInfo } from '@canton-network/splice-common-test-handlers';
 import {
+  Contract,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
   ListVoteRequestByTrackingCidResponse,
@@ -394,3 +395,21 @@ export const activeProposalCid =
   '10f1a2cbcd5a2dc9ad2fb9d17fec183d75de19ca91f623cbd2eaaf634e8d7cb4b5ca101220b5c5c20442f608e151ca702e0c4f51341a338c5979c0547dfcc80f911061ca91';
 export const closedVoteCid =
   '99f1a2cbcd5a2dc9ad2fb9d17fec183d75de19ca91f623cbd2eaaf634e8d7cb4b5ca101220b5c5c20442f608e151ca702e0c4f51341a338c5979c0547dfcc80f911061ca99';
+
+// An active RegisteredSynchronizer, served by the by-contract-id lookup; any other contract
+// id reads as archived.
+export const activeSynchronizerRegistrationPayload = {
+  dso: dsoInfo.dso_party_id,
+  synchronizerId: 'dedicated::1220deadbeef',
+  operator: 'operator::1220cafebabe',
+  governanceParameters: { discountFactor: '0.8000000000' },
+};
+
+export const activeSynchronizerRegistration: Contract = {
+  template_id: 'splice-amulet:Splice.DecentralizedSynchronizer:RegisteredSynchronizer',
+  contract_id:
+    '00a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90ca101220aabbccddeeff',
+  payload: activeSynchronizerRegistrationPayload,
+  created_event_blob: '',
+  created_at: '2026-09-01T12:00:00.000000Z',
+};

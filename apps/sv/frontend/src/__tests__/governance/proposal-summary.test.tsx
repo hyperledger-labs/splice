@@ -245,6 +245,69 @@ describe('Review Proposal Component', () => {
     expect(screen.queryByTestId('updateReason-field')).not.toBeInTheDocument();
   });
 
+  const registration = {
+    contractId: '00a1b2c3d4e5f6',
+    synchronizerId: 'dedicated::1220deadbeef',
+    operator: 'operator::1220cafebabe',
+    governanceParameters: { discountFactor: '0.8000000000' },
+  };
+
+  test('should render review proposal component for offboard dedicated synchronizer', () => {
+    const actionName = 'Offboard Dedicated Synchronizer';
+
+    render(
+      <ProposalSummary
+        actionName={actionName}
+        url={url}
+        summary={summary}
+        expiryDate={expiryDate}
+        effectiveDate={effectiveDate}
+        formType="archive-synchronizer-registration"
+        registration={registration}
+        onEdit={() => {}}
+        onSubmit={() => {}}
+      />
+    );
+
+    expectCommonReviewFields(actionName);
+    expect(screen.getByTestId('synchronizerId-field').textContent).toBe(
+      registration.synchronizerId
+    );
+    expect(screen.getByTestId('operator-party-id-value').textContent).toBe(registration.operator);
+    expect(screen.getByTestId('registeredSynchronizerCid-field').textContent).toBe(
+      registration.contractId
+    );
+    expect(screen.queryByTestId('governanceParameters-field')).not.toBeInTheDocument();
+  });
+
+  test('should render review proposal component for set dedicated synchronizer parameters', () => {
+    const actionName = 'Set Dedicated Synchronizer Parameters';
+
+    render(
+      <ProposalSummary
+        actionName={actionName}
+        url={url}
+        summary={summary}
+        expiryDate={expiryDate}
+        effectiveDate={effectiveDate}
+        formType="set-synchronizer-governance-parameters"
+        registration={registration}
+        newGovernanceParameters={{ discountFactor: '0.5' }}
+        onEdit={() => {}}
+        onSubmit={() => {}}
+      />
+    );
+
+    expectCommonReviewFields(actionName);
+    expect(screen.getByTestId('registeredSynchronizerCid-field').textContent).toBe(
+      registration.contractId
+    );
+    expect(screen.getByTestId('governanceParameters-title').textContent).toBe('Proposed Changes');
+    expect(screen.getByTestId('config-change-field-label').textContent).toBe('Traffic Discount');
+    expect(screen.getByTestId('config-change-current-value').textContent).toBe('0.8000000000');
+    expect(screen.getByTestId('config-change-new-value').textContent).toBe('0.5');
+  });
+
   test('should render review proposal component for dso rules config', () => {
     const actionName = 'Set DSO Rules Configuration';
     const numThresholdTitle = 'Number of Unclaimed Rewards Threshold';

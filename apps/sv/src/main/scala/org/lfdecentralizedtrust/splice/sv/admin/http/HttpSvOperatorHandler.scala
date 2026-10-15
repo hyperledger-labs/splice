@@ -250,8 +250,7 @@ class HttpSvOperatorHandler(
   }
 
   /** Intended use: the SV app UI, to warn a proposer that a synchronizer id is already
-    * registered, and to resolve the registration an offboard or set-parameters proposal
-    * targets. The DSO party signs every registration, so the SV app's own DSO store holds them.
+    * registered. The DSO party signs every registration, so the SV app's own DSO store holds them.
     */
   override def lookupSynchronizerRegistration(
       respond: r0.LookupSynchronizerRegistrationResponse.type
@@ -274,6 +273,26 @@ class HttpSvOperatorHandler(
             definitions.LookupSynchronizerRegistrationResponse(registration.toHttp)
           )
       }
+    }
+  }
+
+  /** Intended use: the SV app UI, to pick the registration an offboard or set-parameters
+    * proposal targets, including a duplicate registration of the same synchronizer id.
+    */
+  override def listSynchronizerRegistrations(
+      respond: r0.ListSynchronizerRegistrationsResponse.type
+  )(synchronizerId: String)(
+      extracted: ActAsKnownUserRequest
+  ): Future[r0.ListSynchronizerRegistrationsResponse] = {
+    implicit val ActAsKnownUserRequest(traceContext) = extracted
+    withSpan(s"$workflowId.listSynchronizerRegistrations") { _ => _ =>
+      for {
+        registrations <- dsoStore.listSynchronizerRegistrations(synchronizerId)
+      } yield respond.OK(
+        definitions.ListSynchronizerRegistrationsResponse(
+          registrations.map(_.contract.toHttp).toVector
+        )
+      )
     }
   }
 

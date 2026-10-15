@@ -282,6 +282,27 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           result <- store.lookupSynchronizerRegistration("dedicated::1220aa")
         } yield result should be(Some(ContractWithState(lower, Assigned(dummyDomain))))
       }
+
+      "list every active registration of a synchronizer id, in contract-id order" in {
+        val lower = registeredSynchronizer(userParty(1), "dedicated::1220aa")
+        val higher = registeredSynchronizer(userParty(2), "dedicated::1220aa")
+        val archived = registeredSynchronizer(userParty(3), "dedicated::1220aa")
+        val other = registeredSynchronizer(userParty(4), "dedicated::1220bb")
+        lower.contractId.contractId should be < higher.contractId.contractId
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(higher)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(lower)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(archived)(store.multiDomainAcsStore)
+          _ <- dummyDomain.archive(archived)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(other)(store.multiDomainAcsStore)
+          listed <- store.listSynchronizerRegistrations("dedicated::1220aa")
+          missing <- store.listSynchronizerRegistrations("dedicated::1220zz")
+        } yield {
+          listed.map(_.contract) should be(Seq(lower, higher))
+          missing should be(empty)
+        }
+      }
     }
 
     "getOpenMiningRoundTriple" should {

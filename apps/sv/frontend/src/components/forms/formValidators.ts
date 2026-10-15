@@ -71,6 +71,12 @@ export const discountFactorSchema = z
     message: 'Must be greater than 0 and at most 1',
   });
 
+// Canton contract ids are hex strings.
+export const contractIdSchema = z
+  .string()
+  .min(1, { message: 'Required' })
+  .regex(/^[0-9a-fA-F]+$/, { message: 'Invalid contract id. Expected a hex string' });
+
 export const svWeightSchema = z
   .string()
   .min(1, { message: 'Weight is required' })
@@ -229,6 +235,11 @@ export const validateSynchronizerId = (value: string): string | false => {
 
 export const validateDiscountFactor = (value: string): string | false => {
   const result = discountFactorSchema.safeParse(value);
+  return result.success ? false : result.error.issues[0].message;
+};
+
+export const validateContractId = (value: string): string | false => {
+  const result = contractIdSchema.safeParse(value);
   return result.success ? false : result.error.issues[0].message;
 };
 

@@ -1986,6 +1986,29 @@ class DbSvDsoStore(
       } yield row.map(contractWithStateFromRow(RegisteredSynchronizer.COMPANION)(_))
     }
 
+  override def listSynchronizerRegistrations(synchronizerId: String, limit: Limit = defaultLimit)(
+      implicit tc: TraceContext
+  ): Future[Seq[ContractWithState[RegisteredSynchronizer.ContractId, RegisteredSynchronizer]]] =
+    waitUntilAcsIngested {
+      for {
+        result <- storage
+          .query(
+            selectFromAcsTableWithState(
+              DsoTables.acsTableName,
+              acsStoreId,
+              domainMigrationId,
+              RegisteredSynchronizer.COMPANION,
+              additionalWhere = sql"""and registered_synchronizer_id = ${lengthLimited(
+                  synchronizerId
+                )}""",
+              orderLimit = sql"""order by contract_id limit ${sqlLimit(limit)}""",
+            ),
+            "listSynchronizerRegistrations",
+          )
+        limited = applyLimit("listSynchronizerRegistrations", limit, result)
+      } yield limited.map(contractWithStateFromRow(RegisteredSynchronizer.COMPANION)(_))
+    }
+
   override def listClosedRounds(
       roundNumbers: Set[Long],
       synchronizerId: SynchronizerId,

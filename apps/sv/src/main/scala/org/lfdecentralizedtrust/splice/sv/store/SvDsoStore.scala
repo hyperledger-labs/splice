@@ -1047,6 +1047,14 @@ trait SvDsoStore
     splice.decentralizedsynchronizer.RegisteredSynchronizer,
   ]]]
 
+  /** Every active registration for a dedicated synchronizer id, ordered by contract id. */
+  def listSynchronizerRegistrations(synchronizerId: String, limit: Limit = defaultLimit)(implicit
+      tc: TraceContext
+  ): Future[Seq[ContractWithState[
+    splice.decentralizedsynchronizer.RegisteredSynchronizer.ContractId,
+    splice.decentralizedsynchronizer.RegisteredSynchronizer,
+  ]]]
+
   def lookupFeaturedAppRight(
       providerPartyId: PartyId
   )(implicit
