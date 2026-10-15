@@ -58,7 +58,8 @@ alter table update_history_backfilling
 
 -- Create all new tables:
 -- * For sequences, ALTER SEQUENCE would fail with 'cannot change ownership of identity sequence'.
--- * The tables no longer have primary key, because it would have to be (row_id, record_time), which wouldn't prevent double inserts.
+-- * The primary key is (row_id, record_time), as a primary key on a partitioned table must include the partition key.
+--   It serves as the row identity (e.g., as replica identity for logical replication), deduplication is done by the unique indexes.
 -- * We do still have unique checks with record_time added that prevent the same row from being inserted twice.
 --   They can't however prevent two different rows with equal columns except for record_time to be inserted.
 -- * creates, exercises and assignments get _interned columns (see interned_strings).
@@ -76,7 +77,8 @@ create table update_history_transactions
     root_event_ids            text[]                   not null,
     workflow_id               text,
     command_id                text,
-    external_transaction_hash bytea
+    external_transaction_hash bytea,
+    primary key (row_id, record_time)
 )
     partition by range (record_time);
 select setval(pg_get_serial_sequence('update_history_transactions', 'row_id'), last_value, is_called)
@@ -115,7 +117,8 @@ create table update_history_creates
     template_id_package_id_interned  bigint                   not null,
     template_id_module_name_interned bigint                   not null,
     template_id_entity_name_interned bigint                   not null,
-    package_name_interned            bigint                   not null
+    package_name_interned            bigint                   not null,
+    primary key (row_id, record_time)
 )
     partition by range (record_time);
 select setval(pg_get_serial_sequence('update_history_creates', 'row_id'), last_value, is_called)
@@ -158,7 +161,8 @@ create table update_history_exercises
     template_id_module_name_interned bigint                   not null,
     template_id_entity_name_interned bigint                   not null,
     package_name_interned            bigint                   not null,
-    choice_interned                  bigint                   not null
+    choice_interned                  bigint                   not null,
+    primary key (row_id, record_time)
 )
     partition by range (record_time);
 select setval(pg_get_serial_sequence('update_history_exercises', 'row_id'), last_value, is_called)
@@ -194,7 +198,8 @@ create table update_history_assignments
     template_id_package_id_interned  bigint                   not null,
     template_id_module_name_interned bigint                   not null,
     template_id_entity_name_interned bigint                   not null,
-    package_name_interned            bigint                   not null
+    package_name_interned            bigint                   not null,
+    primary key (row_id, record_time)
 )
     partition by range (record_time);
 select setval(pg_get_serial_sequence('update_history_assignments', 'row_id'), last_value, is_called)
@@ -217,7 +222,8 @@ create table update_history_unassignments
     target_domain        text                     not null,
     reassignment_id      text                     not null,
     submitter            text                     not null,
-    contract_id          text                     not null
+    contract_id          text                     not null,
+    primary key (row_id, record_time)
 )
     partition by range (record_time);
 select setval(pg_get_serial_sequence('update_history_unassignments', 'row_id'), last_value, is_called)
