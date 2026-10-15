@@ -57,7 +57,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
     originalText: '',
   });
   const requestGroup = useRequestGroup(party, provider, dso, domainId, newGroupRules);
-  const onCreateGroup = async () => {
+  const onCreateGroup = () => {
     requestGroup.mutate(groupId);
   };
 
@@ -95,7 +95,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
 
   const joinGroup = useJoinGroup();
 
-  const onJoinGroup = async () => {
+  const onJoinGroup = () => {
     // otherwise this callback shouldn't have been called
     if (groupInvite.type === 'good') {
       const {
@@ -113,8 +113,10 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
     }
   };
 
-  const copyToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text);
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard
+      .writeText(text)
+      .catch(err => console.warn('Failed to copy to clipboard', err));
   };
 
   if (groupInvites.isPending) {

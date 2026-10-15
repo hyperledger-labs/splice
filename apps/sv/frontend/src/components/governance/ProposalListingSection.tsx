@@ -373,7 +373,7 @@ const VoteRow: React.FC<VoteRowProps> = React.memo(props => {
 
   return (
     <TableRow
-      onClick={() => navigate(`/governance/proposals/${contractId}`)}
+      onClick={() => void navigate(`/governance/proposals/${contractId}`)}
       sx={{
         display: 'grid',
         gridTemplateColumns: gridTemplate,

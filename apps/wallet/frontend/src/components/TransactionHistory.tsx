@@ -116,7 +116,7 @@ const TransactionHistory: React.FC = () => {
               ? 'Load More'
               : 'Nothing more to load'
         }
-        loadMore={() => txQuery.fetchNextPage()}
+        loadMore={() => void txQuery.fetchNextPage()}
         disabled={!txQuery.hasNextPage}
         idSuffix="transactions"
       />

@@ -21,7 +21,7 @@ interface UserState {
   isAuthenticated: boolean;
   oidcAuthState?: AuthState;
 
-  loginWithSst: (id: string, secret: string, audience: string, scope?: string) => void;
+  loginWithSst: (id: string, secret: string, audience: string, scope?: string) => Promise<void>;
   loginWithOidc: () => void;
   logout: () => void;
 }

@@ -270,7 +270,9 @@ export const Governance: React.FC = () => {
             uniqueId="vote-history"
             showStatus
             showVoteStats
-            fetchNextPage={hasSearch ? undefined : voteResultsInfiniteQuery.fetchNextPage}
+            fetchNextPage={
+              hasSearch ? undefined : () => void voteResultsInfiniteQuery.fetchNextPage()
+            }
             hasNextPage={hasSearch ? false : (voteResultsInfiniteQuery.hasNextPage ?? false)}
             isFetchingNextPage={hasSearch ? false : voteResultsInfiniteQuery.isFetchingNextPage}
             pageCount={

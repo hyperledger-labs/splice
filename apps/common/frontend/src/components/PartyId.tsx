@@ -27,7 +27,13 @@ const PartyId: React.FC<PartyIdProps> = ({ className, id, partyId, noCopy }) => 
       inputProps={{ 'data-testid': `${id}-input` }}
       endAdornment={
         !noCopy && (
-          <IconButton onClick={() => navigator.clipboard.writeText(partyId)}>
+          <IconButton
+            onClick={() => {
+              navigator.clipboard
+                .writeText(partyId)
+                .catch(err => console.warn('Failed to copy to clipboard', err));
+            }}
+          >
             <ContentCopyIcon fontSize={'small'} />
           </IconButton>
         )

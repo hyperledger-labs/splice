@@ -13,7 +13,11 @@ export type CopyableTypographyProps = {
 
 const CopyableTypography: React.FC<CopyableTypographyProps> = props => {
   const { text, maxWidth, ...typographyProps } = props;
-  const handleClick = () => navigator.clipboard.writeText(text);
+  const handleClick = () => {
+    navigator.clipboard
+      .writeText(text)
+      .catch(err => console.warn('Failed to copy to clipboard', err));
+  };
 
   return (
     <div style={{ display: 'flex', alignItems: 'center' }}>

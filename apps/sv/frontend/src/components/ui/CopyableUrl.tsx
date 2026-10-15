@@ -108,7 +108,11 @@ const CopyableUrl: React.FC<CopyableUrlProps> = ({
           color="secondary"
           data-testid={`${testId}-copy-button`}
           sx={{ flexShrink: 0 }}
-          onClick={() => navigator.clipboard.writeText(sanitizedUrl)}
+          onClick={() => {
+            navigator.clipboard
+              .writeText(sanitizedUrl)
+              .catch(err => console.warn('Failed to copy to clipboard', err));
+          }}
         >
           <ContentCopy sx={{ fontSize }} />
         </IconButton>

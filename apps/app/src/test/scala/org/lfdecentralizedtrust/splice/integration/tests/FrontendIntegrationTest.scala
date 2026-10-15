@@ -444,14 +444,6 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     }
   }
 
-  protected def consumeError(err: String)(implicit webDriver: WebDriver): Unit = {
-    find(id("error")).value.text should include(err)
-    eventuallyClickOn(id("clear-error-button"))
-    eventually() {
-      find(id("error")) shouldBe None
-    }
-  }
-
   /** Takes a screenshot of the current browser state, into a timestamped png file in log directory.
     * Currently intended only for manual use during development and debugging.
     */

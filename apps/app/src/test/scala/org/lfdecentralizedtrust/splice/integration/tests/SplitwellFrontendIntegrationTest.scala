@@ -290,7 +290,13 @@ class SplitwellFrontendIntegrationTest
           enterSplitwellPayment("unknown::abc", PartyId.tryFromProtoPrimitive("unknown::abc"), 42),
           logs => forExactly(1, logs)(_.errorMessage should include(errorMsg)),
         )
-        consumeError(errorMsg)
+        eventually() {
+          find(className("wallet-button-error")).value.text should include(errorMsg)
+        }
+        eventuallyClickOn(cssSelector(".wallet-button-error button[aria-label='Close']"))
+        eventually() {
+          find(className("wallet-button-error")) shouldBe None
+        }
       }
     }
 

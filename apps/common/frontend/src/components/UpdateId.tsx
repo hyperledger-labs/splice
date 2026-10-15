@@ -21,7 +21,13 @@ export const UpdateId: React.FC<{ updateId: string }> = ({ updateId }) => (
       readOnly
       value={updateId}
       endAdornment={
-        <IconButton onClick={() => navigator.clipboard.writeText(updateId)}>
+        <IconButton
+          onClick={() => {
+            navigator.clipboard
+              .writeText(updateId)
+              .catch(err => console.warn('Failed to copy to clipboard', err));
+          }}
+        >
           <ContentCopyIcon fontSize={'small'} />
         </IconButton>
       }

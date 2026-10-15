@@ -60,7 +60,7 @@ export const BaseAnsField: React.FC<BaseAnsFieldProps> = propas => {
     }
   }, [userInput, ansEntry, resolvedPartyId, onPartyChanged]);
 
-  const onInputChange = async (_: React.SyntheticEvent, newValue: string, reason: string) => {
+  const onInputChange = (_: React.SyntheticEvent, newValue: string, reason: string) => {
     if (reason === 'reset') {
       return;
     }
@@ -72,7 +72,7 @@ export const BaseAnsField: React.FC<BaseAnsFieldProps> = propas => {
     updateUserInput({ type: 'typed', value: newValue });
   };
 
-  const onItemSelected = async (_: React.SyntheticEvent, item: AnsEntry | string | null) => {
+  const onItemSelected = (_: React.SyntheticEvent, item: AnsEntry | string | null) => {
     if (item === null || typeof item === 'string') {
       return;
     }

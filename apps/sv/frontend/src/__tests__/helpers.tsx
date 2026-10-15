@@ -36,7 +36,7 @@ const WrapperProviders: React.FC<{ children: React.ReactNode }> = ({ children })
 
   return (
     <ThemeProvider theme={theme}>
-      <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
+      <AuthProvider authConf={config.auth} redirect={(path: string) => void navigate(path)}>
         <QueryClientProvider client={testQueryClient}>
           <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
             <SvClientProvider url={config.services.sv.url}>

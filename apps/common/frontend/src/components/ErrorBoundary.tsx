@@ -57,7 +57,7 @@ class ErrorBoundary extends React.Component<IProps, IState> {
     this.setState(getErrorState(error));
   };
 
-  private clearError = async () => {
+  private clearError = () => {
     this.setState(DEFAULT_STATE);
   };
 

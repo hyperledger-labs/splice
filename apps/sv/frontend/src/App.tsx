@@ -57,7 +57,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
+      <AuthProvider authConf={config.auth} redirect={(path: string) => void navigate(path)}>
         <QueryClientProvider client={queryClient}>
           <QueryDevtools />
           <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>

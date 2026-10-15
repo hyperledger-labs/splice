@@ -10,10 +10,10 @@ import {
 } from '@canton-network/splice-common-frontend';
 import { Contract } from '@canton-network/splice-common-frontend-utils';
 import BigNumber from 'bignumber.js';
-import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
+import { useMutation } from '@tanstack/react-query';
 
 import {
   SubscriptionRequest,
@@ -125,22 +125,39 @@ const SubscriptionContainer: React.FC<{ subscription: Contract<SubscriptionReque
 const ConfirmSubscriptionButton: React.FC<{ cid: ContractId<damlSubscriptionRequest> }> = ({
   cid,
 }) => {
-  const [clicked, setClicked] = useState(false);
   const { acceptSubscriptionRequest } = useWalletClient();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect');
 
-  const onAccept = async () => {
-    setClicked(true);
-    await acceptSubscriptionRequest(cid);
-    if (redirect) {
-      window.location.assign(redirect);
-    }
-  };
+  const acceptMutation = useMutation({
+    mutationFn: async () => {
+      await acceptSubscriptionRequest(cid);
+    },
+    onSuccess: () => {
+      if (redirect) {
+        window.location.assign(redirect);
+      }
+    },
+    onError: error => {
+      console.error('Failed to accept subscription request', error);
+    },
+  });
 
   return (
-    <DisableConditionally conditions={[{ disabled: clicked, reason: 'Loading...' }]}>
-      <Button variant="pill" size="large" onClick={onAccept} className="sub-request-accept-button">
+    <DisableConditionally
+      conditions={[
+        {
+          disabled: acceptMutation.isPending || acceptMutation.isSuccess,
+          reason: 'Loading...',
+        },
+      ]}
+    >
+      <Button
+        variant="pill"
+        size="large"
+        onClick={() => acceptMutation.mutate()}
+        className="sub-request-accept-button"
+      >
         Confirm Subscription
       </Button>
     </DisableConditionally>

@@ -44,7 +44,7 @@ export const useDevelopmentFund = (): UseDevelopmentFundResult => {
     unclaimedTotalData.isLoading;
 
   const invalidateAll = React.useCallback(() => {
-    return invalidateAllDevelopmentFundQueries(queryClient);
+    void invalidateAllDevelopmentFundQueries(queryClient);
   }, [queryClient]);
 
   return {

@@ -109,7 +109,7 @@ const SstLoginPrompt: React.FC<SstLoginPromptProps> = ({ secret, audience, scope
         onChange={evt => setUserId(evt.target.value)}
         onKeyDown={evt => {
           if (evt.key === 'Enter') {
-            loginWithSst(userId, secret, audience, scope);
+            void loginWithSst(userId, secret, audience, scope);
             evt.preventDefault();
           }
         }}
@@ -140,7 +140,7 @@ const SstLoginPrompt: React.FC<SstLoginPromptProps> = ({ secret, audience, scope
           size="large"
           onClick={e => {
             e.preventDefault();
-            loginWithSst(userId, secret, audience, scope);
+            void loginWithSst(userId, secret, audience, scope);
             setUserId('');
           }}
         >
