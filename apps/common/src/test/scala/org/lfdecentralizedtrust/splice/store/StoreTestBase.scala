@@ -67,8 +67,15 @@ import com.digitalasset.daml.lf.data.Numeric
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppKind,
+  FeaturedAppRight,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
+  AmuletConfig,
+  RewardConfig,
+  USD,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.{RewardState, SvRewardState}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1.InstrumentId
@@ -292,6 +299,7 @@ abstract class StoreTestBase
       amuletPrice: Double,
       opensAt: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS),
       contractId: String = nextCid(),
+      rewardConfig: Optional[RewardConfig] = Optional.empty(),
   ) = {
     val template = new roundCodegen.OpenMiningRound(
       dso.toProtoPrimitive,
@@ -304,7 +312,7 @@ abstract class StoreTestBase
       SpliceUtil.issuanceConfig(10.0, 10.0, 10.0),
       new RelTime(1_000_000),
       Optional.empty(), // trafficPrice
-      Optional.empty(), // rewardConfig
+      rewardConfig,
     )
 
     contract(
@@ -720,13 +728,15 @@ abstract class StoreTestBase
       providerParty: PartyId,
       contractId: String = nextCid(),
       activityWeight: Option[BigDecimal] = None,
+      appKind: Option[FeaturedAppKind] = None,
+      opsParties: Option[Seq[PartyId]] = None,
   ) = {
     val template = new FeaturedAppRight(
       dsoParty.toProtoPrimitive,
       providerParty.toProtoPrimitive,
       activityWeight.map(_.bigDecimal).toJava,
-      Optional.empty(),
-      Optional.empty(),
+      appKind.toJava,
+      opsParties.map(_.map(_.toProtoPrimitive).asJava).toJava,
     )
     contract(
       FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID,
