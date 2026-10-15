@@ -463,7 +463,7 @@ class HttpSvPublicHandler(
             for {
               participantId <- candidateParticipant(candidateParty)
               prepared <- HttpSvPublicHandler.unavailableOnGrpcFailure(
-                s"Checking whether the DSO party is authorized on $participantId",
+                s"Preparing DSO party hosting on $participantId",
                 logger,
               )(dsoPartyMigration.prepareParticipantForHostingDsoParty(participantId).value)
               response <- HttpSvPublicHandler.onboardSvPartyMigrationPrepareResponse(

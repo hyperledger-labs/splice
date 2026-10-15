@@ -34,14 +34,7 @@ class SponsorDsoPartyHosting(
 ) extends NamedLogging {
 
   def ensureDsoPartyToParticipantProposalSigned(
-      domain: SynchronizerId,
-      participantId: ParticipantId,
-  )(implicit traceContext: TraceContext): EitherT[Future, DsoPartyMigrationFailure, Unit] =
-    proposePartyHostingAndEnsureAuthorized(domain, dsoParty, participantId).map(_ => ())
-
-  private def proposePartyHostingAndEnsureAuthorized(
       synchronizerId: SynchronizerId,
-      party: PartyId,
       newParticipant: ParticipantId,
   )(implicit
       traceContext: TraceContext
@@ -54,7 +47,7 @@ class SponsorDsoPartyHosting(
           participantAdminConnection
             .ensurePartyToParticipantAdditionProposalWithSerial(
               synchronizerId,
-              party,
+              dsoParty,
               newParticipant,
               PositiveInt.tryCreate(proposal.base.serial.value - 1),
               waitForAuthorization = false,
