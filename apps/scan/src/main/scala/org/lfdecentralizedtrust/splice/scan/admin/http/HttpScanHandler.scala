@@ -855,6 +855,8 @@ class HttpScanHandler(
                 verdictEncoded,
                 trafficSummaryEncoded,
                 appActivityRecordEncoded,
+                assetActivityRecords = None,
+                submittingAppProvider = None,
               )
             )
           }
@@ -928,6 +930,8 @@ class HttpScanHandler(
           verdictEncoded,
           trafficSummaryEncoded,
           appActivityRecordEncoded,
+          assetActivityRecords = None,
+          submittingAppProvider = None,
         )
       }.toVector
     }
