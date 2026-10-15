@@ -88,8 +88,6 @@ select setval(pg_get_serial_sequence('update_history_transactions', 'row_id'), l
 from update_history_transactions_legacy_row_id_seq;
 create index updt_hist_tran_hi_mi_di_rt on update_history_transactions (history_id, migration_id, domain_id, record_time);
 create index updt_hist_tran_hi_mi_rt_di on update_history_transactions (history_id, migration_id, record_time, domain_id);
-create index updt_hist_tran_hi_mi_ui_import_updates on update_history_transactions (history_id, migration_id, update_id)
-    where record_time = -62135596800000000;
 create unique index updt_hist_tran_hi_mi_ui_u on update_history_transactions (history_id, migration_id, domain_id, update_id, record_time);
 create index updt_hist_tran_hi_ui on update_history_transactions (history_id, update_id);
 -- Moved here from SqlIndexInitializationTrigger: CREATE INDEX CONCURRENTLY is not supported on partitioned tables,
