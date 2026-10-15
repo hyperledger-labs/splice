@@ -505,8 +505,9 @@ object UpdateHistoryTestBase {
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
     val firstDay = LocalDate.ofInstant(timeStart.toInstant, ZoneOffset.UTC)
     for {
+      // for tests that want import updates
       _ <- updateHistory.createPartitions(
-        UpdateHistory.ImportUpdatesPartitionStart,
+        LocalDate.ofInstant(CantonTimestamp.MinValue.toInstant, ZoneOffset.UTC),
         windowSizeDays,
       )
       _ <- MonadUtil.sequentialTraverse(0.until(partitionRunwayDays, step = windowSizeDays)) { n =>
