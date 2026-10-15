@@ -17,5 +17,6 @@ object AdvisoryLockIds {
 
   final val acsSnapshotDataInsert: Long = base + 1
   final val ddlStatement: Long = base + 2
-  final val createUpdateHistoryPartitionStatement: Long = base + 3
+  final val acsSnapshotIndex: Long = base + 3
+  final val createUpdateHistoryPartitionStatement: Long = base + 4
 }

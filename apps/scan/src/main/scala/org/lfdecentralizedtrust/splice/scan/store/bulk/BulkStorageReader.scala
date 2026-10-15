@@ -189,14 +189,13 @@ class BulkStorageReader(
   def getObjectChecksums(
       objectKeys: Seq[String]
   ): Future[Seq[Option[String]]] = {
+    def checksumMap(objects: Seq[S3BucketConnection.ObjectKeyAndChecksum]) =
+      objects.view.map(obj => obj.key -> obj.checksum).toMap
     for {
       committed <- committedS3Connection.getChecksums(objectKeys)
-      staging <- stagingS3Connection.getChecksums(objectKeys)
-    } yield {
-      objectKeys.map { key =>
-        committed.find(_.key == key).orElse(staging.find(_.key == key)).map(_.checksum)
-      }
-    }
+      committedByKey = checksumMap(committed)
+      staging <- stagingS3Connection.getChecksums(objectKeys filterNot committedByKey.keySet)
+    } yield objectKeys map (committedByKey orElse checksumMap(staging)).lift
   }
 
   private def getSegmentStartingAt(
