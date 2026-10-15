@@ -627,7 +627,7 @@ object ScanHttpEncodings {
     val records = record.appProviderParties
       .zip(record.appActivityWeights)
       .map { case (party, weight) =>
-        definitions.AppActivityRecord(party = party, weight = weight)
+        definitions.ActivityRecord(party = party, weight = weight)
       }
       .toVector
     definitions.EventHistoryAppActivityRecords(

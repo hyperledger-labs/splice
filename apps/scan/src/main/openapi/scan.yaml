@@ -3943,18 +3943,18 @@ components:
             App activity records, one per app provider.
           type: array
           items:
-            $ref: "#/components/schemas/AppActivityRecord"
-    AppActivityRecord:
+            $ref: "#/components/schemas/ActivityRecord"
+    ActivityRecord:
       type: object
       description: |
-        ActivityRecord for an app.
+        ActivityRecord for a provider.
       required:
         - party
         - weight
       properties:
         party:
           description: |
-            The app provider party identifier.
+            The provider party identifier.
           type: string
         weight:
           description: |
@@ -3979,24 +3979,7 @@ components:
             Asset activity records, one per asset provider.
           type: array
           items:
-            $ref: "#/components/schemas/AssetActivityRecord"
-    AssetActivityRecord:
-      type: object
-      description: |
-        ActivityRecord for an asset provider.
-      required:
-        - party
-        - weight
-      properties:
-        party:
-          description: |
-            The asset provider party identifier.
-          type: string
-        weight:
-          description: |
-            Activity weight in bytes of traffic.
-          type: integer
-          format: int64
+            $ref: "#/components/schemas/ActivityRecord"
 
     ListUnclaimedDevelopmentFundCouponsResponse:
       type: object
