@@ -956,6 +956,7 @@ object ParticipantAdminCommands {
         representativePackageIdOverride: RepresentativePackageIdOverride,
         excludedStakeholders: Set[PartyId],
         synchronizerId: SynchronizerId,
+        forceRepairWhenTopologyTransactionAtLedgerEnd: Boolean,
     )(implicit ec: ExecutionContext, loggingContext: ErrorLoggingContext)
         extends GrpcAdminCommand[
           Unit,
@@ -987,6 +988,7 @@ object ParticipantAdminCommands {
               excludedStakeholders.map(_.toProtoPrimitive).toSeq,
               Option.when(isFirst)(representativePackageIdOverride.toProtoV30),
               Option.when(isFirst)(synchronizerId.toProtoPrimitive),
+              forceRepairWhenTopologyTransactionAtLedgerEnd,
             )
           },
           new FileInputStream(importFilePath),
@@ -1005,6 +1007,7 @@ object ParticipantAdminCommands {
         representativePackageIdOverride: RepresentativePackageIdOverride,
         excludedStakeholders: Set[PartyId],
         synchronizerId: SynchronizerId,
+        forceRepairWhenTopologyTransactionAtLedgerEnd: Boolean,
     )(implicit ec: ExecutionContext, loggingContext: ErrorLoggingContext)
         extends GrpcAdminCommand[
           Unit,
@@ -1034,6 +1037,7 @@ object ParticipantAdminCommands {
               excludedStakeholders.map(_.toProtoPrimitive).toSeq,
               Some(representativePackageIdOverride.toProtoV30),
               Some(synchronizerId.toProtoPrimitive),
+              forceRepairWhenTopologyTransactionAtLedgerEnd,
             ),
           new SequenceInputStream(acsChunk.iterator.map(_.newInput()).asJavaEnumeration),
         )

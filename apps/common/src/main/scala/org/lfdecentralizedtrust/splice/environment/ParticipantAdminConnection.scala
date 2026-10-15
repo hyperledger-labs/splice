@@ -237,6 +237,8 @@ class ParticipantAdminConnection(
             excludedStakeholders = Set.empty,
             representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
             synchronizerId = synchronizerId,
+            // TODO(#7800) Remove when Canton gives us an option to.
+            forceRepairWhenTopologyTransactionAtLedgerEnd = true,
           ),
         timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
       ).map(_ => ()),
