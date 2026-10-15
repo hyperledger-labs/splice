@@ -1,0 +1,101 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://registry.sweet.security/helm/operatorchart",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "sweet-operator",
+    "namespace": "sweet",
+    "values": {
+      "admiral": {
+        "extraValues": {
+          "admirald": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_infra",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_infra",
+                "operator": "Exists"
+              }
+            ]
+          }
+        }
+      },
+      "frontier": {
+        "extraValues": {
+          "informer": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_infra",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_infra",
+                "operator": "Exists"
+              }
+            ]
+          }
+        }
+      },
+      "operator": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "sweet": {}
+    },
+    "version": "1.0.265090+06a1b12d61fc35ceb20b350388f7e812d382e4b2"
+  },
+  "name": "sweet-operator",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}
