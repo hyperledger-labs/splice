@@ -219,25 +219,39 @@ class ValidatorApp(
             // Therefore, we must purchase traffic (if configured) and wait for the permission
             // to be visible on scan before allowing the synchronizer registration to proceed.
             _ <- appInitStep("Checking participant synchronizer permissions") {
-              for {
-                dsoRules <- scanConnection.getDsoRules()
-                isPermissionedSynchronizer = SwitchOverTimes.permissionedSynchronizerEnabled(
-                  clock,
-                  dsoRules.payload,
-                )
-                _ <-
-                  if (isPermissionedSynchronizer) {
-                    for {
-                      synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
-                      _ <- config.onboarding match {
-                        case Some(oc) if config.enableAutoOnboardingTrafficPurchase =>
-                          submitBuyMemberTraffic(oc.svClient, participantId)
-                        case _ => Future.unit
-                      }
-                      _ <- waitForTopologyPermission(scanConnection, synchronizerId, participantId)
-                    } yield ()
-                  } else Future.unit
-              } yield ()
+              config.onboarding match {
+                case Some(oc) if !domainAlreadyRegistered =>
+                  for {
+                    dsoRules <- retryProvider.retry(
+                      RetryFor.WaitingOnInitDependency,
+                      "get_dso_rules",
+                      "get DSO rules to check permissioned synchronizer status",
+                      scanConnection.getDsoRules(),
+                      logger,
+                    )
+                    isPermissionedSynchronizer = SwitchOverTimes.permissionedSynchronizerEnabled(
+                      clock,
+                      dsoRules.payload,
+                    )
+                    _ <-
+                      if (isPermissionedSynchronizer) {
+                        for {
+                          synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
+                          _ <-
+                            if (config.enableAutoOnboardingTrafficPurchase) {
+                              submitBuyMemberTraffic(oc.svClient, participantId)
+                            } else Future.unit
+                          _ <- waitForTopologyPermission(
+                            scanConnection,
+                            synchronizerId,
+                            participantId,
+                          )
+                        } yield ()
+                      } else Future.unit
+                  } yield ()
+                case _ =>
+                  Future.unit
+              }
             }
             _ <-
               if (config.svValidator && config.disableSvValidatorBftSequencerConnection)
