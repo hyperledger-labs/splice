@@ -56,10 +56,6 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
   }
 
   private val handler = new SvPublicStreamHandler[TraceContext] {
-    private def unsupported[T] = Future.failed[T](new UnsupportedOperationException)
-    override def onboardSvSequencer(
-        respond: SvPublicStreamResource.OnboardSvSequencerResponse.type
-    )(body: definitions.OnboardSvSequencerRequest)(extracted: TraceContext) = unsupported
     override def onboardSvDownload(
         respond: SvPublicStreamResource.OnboardSvDownloadResponse.type
     )(id: String)(extracted: TraceContext) =

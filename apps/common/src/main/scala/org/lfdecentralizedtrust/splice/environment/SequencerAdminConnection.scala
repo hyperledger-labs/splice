@@ -195,15 +195,6 @@ class SequencerAdminConnection(
     )
   }
 
-  def getOnboardingState(sequencerIdOrTimestamp: Either[SequencerId, CantonTimestamp])(implicit
-      traceContext: TraceContext
-  ): Future[Seq[ByteString]] = {
-    val responseObserver = new SeqAccumulatingObserver[OnboardingStateV2Response]
-    runCmd(
-      SequencerAdminCommands.OnboardingStateV2(responseObserver, sequencerIdOrTimestamp)
-    ).flatMap(_ => responseObserver.resultFuture.map(_.map(_.onboardingStateForSequencer)))
-  }
-
   def getOnboardingStateToFile(
       sequencerIdOrTimestamp: Either[SequencerId, CantonTimestamp],
       file: Path,

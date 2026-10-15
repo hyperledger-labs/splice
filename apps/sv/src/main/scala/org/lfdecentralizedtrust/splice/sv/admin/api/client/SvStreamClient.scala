@@ -6,16 +6,12 @@ package org.lfdecentralizedtrust.splice.sv.admin.api.client
 import cats.data.EitherT
 import org.apache.pekko.http.scaladsl.marshalling.{Marshal, ToEntityMarshaller}
 import org.apache.pekko.http.scaladsl.model.*
-import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.http.scaladsl.util.FastFuture
 import org.apache.pekko.stream.Materializer
-import org.apache.pekko.stream.scaladsl.Sink
-import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.http.v0.Implicits.*
 import org.lfdecentralizedtrust.splice.http.v0.PekkoHttpImplicits.*
-import org.lfdecentralizedtrust.splice.http.v0.definitions
-import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
 
+import scala.annotation.unused
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Guardrail doesn't seem to nicely autogenerate streaming clients so we handwrite it here.
@@ -37,20 +33,14 @@ object SvStreamClient {
   object OnboardSvDownloadResponse {
     case class OK(entity: ResponseEntity) extends OnboardSvDownloadResponse
   }
-
-  sealed abstract class OnboardSvSequencerResponse
-  object OnboardSvSequencerResponse {
-    case class OK(value: Seq[ByteString]) extends OnboardSvSequencerResponse
-    case class BadRequest(value: ErrorResponse) extends OnboardSvSequencerResponse
-  }
 }
 
 class SvStreamClient(host: String = "https://example.com")(implicit
     httpClient: HttpRequest => Future[HttpResponse],
     ec: ExecutionContext,
-    mat: Materializer,
+    @unused mat: Materializer,
 ) {
-  import SvStreamClient.{OnboardSvDownloadResponse, OnboardSvSequencerResponse}
+  import SvStreamClient.OnboardSvDownloadResponse
 
   val basePath: String = "/api/sv"
 
@@ -81,17 +71,6 @@ class SvStreamClient(host: String = "https://example.com")(implicit
     )
   }
 
-  private val errorResponseDecoder = {
-    structuredJsonEntityUnmarshaller.flatMap(_ =>
-      _ =>
-        json =>
-          io.circe
-            .Decoder[ErrorResponse]
-            .decodeJson(json)
-            .fold(FastFuture.failed, FastFuture.successful)
-    )
-  }
-
   def onboardSvDownload(
       id: String,
       headers: List[HttpHeader] = Nil,
@@ -109,43 +88,6 @@ class SvStreamClient(host: String = "https://example.com")(implicit
             resp.status match {
               case StatusCodes.OK =>
                 FastFuture.successful(Right(OnboardSvDownloadResponse.OK(resp.entity)))
-              case _ => FastFuture.successful(Left(Right(resp)))
-            }
-          )
-          .recover({ case e: Throwable => Left(Left(e)) })
-      )
-    )
-  }
-
-  def onboardSvSequencer(
-      body: definitions.OnboardSvSequencerRequest,
-      headers: List[HttpHeader] = Nil,
-  ): EitherT[Future, Either[Throwable, HttpResponse], OnboardSvSequencerResponse] = {
-    val allHeaders = headers ++ scala.collection.immutable.Seq[Option[HttpHeader]]().flatten
-    makeRequest(
-      HttpMethods.POST,
-      host + basePath + "/v0/onboard/sv/sequencer",
-      allHeaders,
-      body,
-      HttpProtocols.`HTTP/1.1`,
-    ).flatMap(req =>
-      EitherT(
-        httpClient(req)
-          .flatMap(resp =>
-            resp.status match {
-              case StatusCodes.OK =>
-                resp.entity.dataBytes
-                  .runWith(Sink.seq)
-                  .map(chunks =>
-                    Right(OnboardSvSequencerResponse.OK(chunks)): Either[Either[
-                      Throwable,
-                      HttpResponse,
-                    ], OnboardSvSequencerResponse]
-                  )
-              case StatusCodes.BadRequest =>
-                Unmarshal(resp.entity)
-                  .to[ErrorResponse](errorResponseDecoder, implicitly, implicitly)
-                  .map(x => Right(OnboardSvSequencerResponse.BadRequest(x)))
               case _ => FastFuture.successful(Left(Right(resp)))
             }
           )
