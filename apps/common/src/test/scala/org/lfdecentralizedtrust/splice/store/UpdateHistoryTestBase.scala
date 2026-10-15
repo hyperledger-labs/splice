@@ -508,11 +508,12 @@ object UpdateHistoryTestBase {
       windowSizeDays: Int,
       partitionRunwayDays: Int,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
-    val importUpdatesStart = CantonTimestamp.MinValue
-    val importUpdatesEnd = CantonTimestamp.MinValue.plusSeconds(1L)
-
     for {
-      _ <- createPartitionsWithRetry(updateHistory, importUpdatesStart, importUpdatesEnd)
+      _ <- createPartitionsWithRetry(
+        updateHistory,
+        UpdateHistory.ImportUpdatesPartitionStart,
+        UpdateHistory.ImportUpdatesPartitionEnd,
+      )
       _ <- MonadUtil.sequentialTraverse(0.until(partitionRunwayDays, step = windowSizeDays)) { n =>
         val windowStart = timeStart.plus(java.time.Duration.ofDays(n.toLong))
         val windowEnd = windowStart.plus(java.time.Duration.ofDays(windowSizeDays.toLong))

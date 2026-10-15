@@ -2425,6 +2425,9 @@ class UpdateHistory(
 
 object UpdateHistory {
 
+  val ImportUpdatesPartitionStart: CantonTimestamp = CantonTimestamp.MinValue
+  val ImportUpdatesPartitionEnd: CantonTimestamp = CantonTimestamp.MinValue.immediateSuccessor
+
   sealed trait BackfillingRequirement
   object BackfillingRequirement {
 
