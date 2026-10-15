@@ -48,7 +48,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -134,7 +134,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -220,7 +220,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -341,7 +341,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -464,7 +464,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -581,7 +581,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -704,7 +704,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -827,7 +827,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -913,7 +913,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -999,7 +999,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -1148,7 +1148,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -1297,7 +1297,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -1415,7 +1415,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -1523,7 +1523,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -1635,7 +1635,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -1758,7 +1758,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -1870,7 +1870,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -2017,7 +2017,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -2162,7 +2162,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -2248,7 +2248,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -2370,7 +2370,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -2492,7 +2492,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -2613,7 +2613,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -2735,7 +2735,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -2821,7 +2821,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -2943,7 +2943,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -3065,7 +3065,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -3187,7 +3187,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -3535,7 +3535,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -3684,7 +3684,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -3833,7 +3833,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"
@@ -4580,7 +4580,7 @@
                   "spec": {
                     "query": {
                       "kind": "DataQuery",
-                      "group": "grafana",
+                      "group": "prometheus",
                       "version": "v0",
                       "datasource": {
                         "name": "prometheus"

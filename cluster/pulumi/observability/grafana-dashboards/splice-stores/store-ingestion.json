@@ -1350,7 +1350,7 @@
           "skipUrlSync": false,
           "query": {
             "kind": "DataQuery",
-            "group": "grafana",
+            "group": "prometheus",
             "version": "v0",
             "spec": {
               "qryType": 1,
@@ -1383,7 +1383,7 @@
           "skipUrlSync": false,
           "query": {
             "kind": "DataQuery",
-            "group": "grafana",
+            "group": "prometheus",
             "version": "v0",
             "spec": {
               "qryType": 1,
@@ -1417,7 +1417,7 @@
           "description": "The name of the store",
           "query": {
             "kind": "DataQuery",
-            "group": "grafana",
+            "group": "prometheus",
             "version": "v0",
             "spec": {
               "qryType": 1,
@@ -1451,7 +1451,7 @@
           "description": "The party that the store is ingesting data for",
           "query": {
             "kind": "DataQuery",
-            "group": "grafana",
+            "group": "prometheus",
             "version": "v0",
             "spec": {
               "qryType": 1,

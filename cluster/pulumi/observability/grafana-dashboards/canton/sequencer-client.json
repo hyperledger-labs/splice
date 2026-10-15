@@ -1415,7 +1415,7 @@
           "skipUrlSync": false,
           "query": {
             "kind": "DataQuery",
-            "group": "grafana",
+            "group": "prometheus",
             "version": "v0",
             "spec": {
               "qryType": 1,
@@ -1449,7 +1449,7 @@
           "skipUrlSync": false,
           "query": {
             "kind": "DataQuery",
-            "group": "grafana",
+            "group": "prometheus",
             "version": "v0",
             "spec": {
               "qryType": 1,
@@ -1483,7 +1483,7 @@
           "skipUrlSync": false,
           "query": {
             "kind": "DataQuery",
-            "group": "grafana",
+            "group": "prometheus",
             "version": "v0",
             "spec": {
               "qryType": 1,

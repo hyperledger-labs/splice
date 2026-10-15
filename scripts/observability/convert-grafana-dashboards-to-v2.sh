@@ -9,6 +9,11 @@
 # read back through the dashboard.grafana.app/v2 API. Files that are already in a Kubernetes resource
 # format (have an `apiVersion`) are left untouched. Either all files are converted or none are.
 #
+# The converter resolves datasource references against the datasources of that Grafana instance; a
+# query without a datasource is bound to the type of the default datasource. By default, a Prometheus
+# datasource with uid `prometheus` is the default. Pass --datasources with a Grafana datasource
+# provisioning file that matches your Grafana instance if your dashboards use other datasources.
+#
 # Requires: docker, curl, jq
 
 set -euo pipefail
@@ -17,21 +22,25 @@ default_image="grafana/grafana:13.2.2"
 
 usage() {
   cat <<EOF
-Usage: $0 [--grafana-image IMAGE] DIR
+Usage: $0 [--grafana-image IMAGE] [--datasources FILE] DIR
 
 Convert all classic Grafana dashboard JSON files under DIR (recursively) to the V2 resource format.
 
 Options:
   --grafana-image IMAGE   Grafana image used for the conversion (default: $default_image)
+  --datasources FILE      Grafana datasource provisioning file describing the datasources the
+                          dashboards use (default: a default Prometheus datasource with uid prometheus)
   -h, --help              Show this help
 EOF
 }
 
 image="$default_image"
+datasources=""
 dir=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --grafana-image) image="$2"; shift 2 ;;
+    --datasources) datasources="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     -*) echo "ERROR: unknown option $1" >&2; usage >&2; exit 1 ;;
     *)
@@ -46,6 +55,9 @@ if [[ -z "$dir" ]]; then
 fi
 if [[ ! -d "$dir" ]]; then
   echo "ERROR: '$dir' is not a directory" >&2; exit 1
+fi
+if [[ -n "$datasources" && ! -f "$datasources" ]]; then
+  echo "ERROR: '$datasources' is not a file" >&2; exit 1
 fi
 for tool in docker curl jq; do
   command -v "$tool" >/dev/null || { echo "ERROR: $tool is required" >&2; exit 1; }
@@ -103,8 +115,8 @@ if [[ $total -eq 0 ]]; then
   echo "INFO: No classic dashboards found under $dir" >&2; exit 0
 fi
 
-mkdir -p "$work/provisioning"
-cat > "$work/provisioning/dashboards.yaml" <<EOF
+mkdir -p "$work/provisioning/dashboards" "$work/provisioning/datasources"
+cat > "$work/provisioning/dashboards/dashboards.yaml" <<EOF
 apiVersion: 1
 providers:
   - name: convert
@@ -112,25 +124,43 @@ providers:
     options:
       path: /dashboards
 EOF
-# The container runs as a different user and must be able to read the mounted files.
+if [[ -n "$datasources" ]]; then
+  cp "$datasources" "$work/provisioning/datasources/datasources.yaml"
+else
+  cat > "$work/provisioning/datasources/datasources.yaml" <<EOF
+apiVersion: 1
+datasources:
+  - name: prometheus
+    uid: prometheus
+    type: prometheus
+    url: http://localhost:9090
+    isDefault: true
+EOF
+fi
+# The container runs as a different user and must be able to read the copied files.
 chmod -R a+rX "$work"
 
-password=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+# Kept out of command lines so that other local users can't read it from the process list.
+GF_SECURITY_ADMIN_PASSWORD=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+export GF_SECURITY_ADMIN_PASSWORD
 echo "Starting $image to convert $total dashboards" >&2
-container=$(docker run -d \
+# Files are copied into the container rather than bind-mounted, which also works with remote docker
+# daemons and VMs that don't share the temp directory.
+container=$(docker create \
   -p 127.0.0.1::3000 \
-  -e GF_SECURITY_ADMIN_PASSWORD="$password" \
+  -e GF_SECURITY_ADMIN_PASSWORD \
   -e GF_ANALYTICS_REPORTING_ENABLED=false \
   -e GF_ANALYTICS_CHECK_FOR_UPDATES=false \
   -e GF_PLUGINS_PREINSTALL_DISABLED=true \
-  -v "$work/provisioning:/etc/grafana/provisioning/dashboards:ro" \
-  -v "$staging:/dashboards:ro" \
   "$image")
+docker cp "$work/provisioning/." "$container:/etc/grafana/provisioning" >/dev/null
+docker cp "$staging" "$container:/dashboards" >/dev/null
+docker start "$container" >/dev/null
 port=$(docker port "$container" 3000/tcp | head -n 1 | sed 's/.*://')
 url="http://127.0.0.1:$port"
 
 api() {
-  curl -sSf -u "admin:$password" "$url$1"
+  curl -sSf -K - "$url$1" <<<"user = \"admin:$GF_SECURITY_ADMIN_PASSWORD\""
 }
 
 # Wait until Grafana has provisioned every staged dashboard. Once Grafana reports that the initial
@@ -145,8 +175,14 @@ while true; do
       break
     fi
   fi
+  if [[ $(docker inspect -f '{{.State.Running}}' "$container") != true ]]; then
+    echo "ERROR: Grafana exited:" >&2
+    docker logs "$container" 2>&1 | tail -n 20 >&2
+    exit 1
+  fi
+  # Not grep -q: exiting early would make `docker logs` fail with SIGPIPE.
   if [[ $deadline -gt $((SECONDS + 20)) ]] &&
-    docker logs "$container" 2>&1 | grep -q 'finished to provision dashboards'; then
+    docker logs "$container" 2>&1 | grep 'finished to provision dashboards' >/dev/null; then
     deadline=$((SECONDS + 20))
   fi
   if [[ $SECONDS -ge $deadline ]]; then
@@ -164,6 +200,15 @@ while read -r uid rel; do
   if ! jq -e '(.status.conversion.failed // false | not) and (.spec.elements != null)' \
     <<<"$dashboard" >/dev/null; then
     echo "ERROR: $rel: conversion failed: $(jq -c '.status.conversion // .' <<<"$dashboard")" >&2
+    failed=true; continue
+  fi
+  # A query bound to the built-in Grafana datasource although it didn't reference it means that the
+  # converter couldn't resolve the datasource it refers to.
+  unresolved=$(jq -r '[.. | objects | select(.kind == "DataQuery" and .group == "grafana"
+      and ((.datasource.name // "") | IN("-- Grafana --", "grafana") | not))] | length' <<<"$dashboard")
+  if [[ $unresolved -gt 0 ]]; then
+    echo "ERROR: $rel: $unresolved queries could not be resolved to a datasource;" \
+      "pass a default datasource and the ones your dashboards use with --datasources" >&2
     failed=true; continue
   fi
   source_path=$(jq -r '.metadata.annotations["grafana.app/sourcePath"] // ""' <<<"$dashboard")
