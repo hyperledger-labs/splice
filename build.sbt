@@ -137,6 +137,9 @@ lazy val root: Project = (project in file("."))
     `canton-ledger-api-value`,
     `canton-fork-community-common-test`,
     `canton-fork-logback-test`,
+    `canton-fork-app-base`,
+    `canton-fork-base`,
+    `canton-fork-common`,
     pulumi,
     `load-tester`,
     tools,
@@ -1199,12 +1202,35 @@ lazy val `canton-fork-community-common-test` =
       Headers.ApacheDAHeaderSettings,
     )
 
+lazy val `canton-fork-base` =
+  project
+    .in(file("canton-fork/base"))
+    .dependsOn(`canton-community-base`)
+    .settings(Headers.ApacheDAHeaderSettings)
+
+lazy val `canton-fork-common` =
+  project
+    .in(file("canton-fork/common"))
+    .dependsOn(`canton-community-common`)
+    .settings(Headers.ApacheDAHeaderSettings)
+
+lazy val `canton-fork-app-base` =
+  project
+    .in(file("canton-fork/app-base"))
+    .dependsOn(`canton-community-app-base`)
+    .settings(
+      Headers.ApacheDAHeaderSettings,
+      CantonDependencies.excludeTranscodeConflictingDependencies,
+    )
+
 lazy val `apps-common` =
   project
     .in(file("apps/common"))
     .dependsOn(
       `canton-community-common`,
       `canton-community-app`,
+      `canton-fork-app-base`,
+      `canton-fork-base`,
       `canton-community-testing` % Test,
       `canton-fork-community-common-test` % Test,
       `lf-value-json`,
@@ -1910,6 +1936,7 @@ lazy val `apps-splitwell` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
+      `canton-fork-common`,
       `splitwell-daml`,
     )
     .settings(

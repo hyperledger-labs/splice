@@ -2491,7 +2491,7 @@ object CantonConfig {
     * @return
     *   [[scala.Right]] [[com.typesafe.config.Config]] if parsing was successful.
     */
-  def parseAndMergeConfigs(
+  private def parseAndMergeConfigs(
       files: NonEmpty[Seq[File]]
   )(implicit elc: ErrorLoggingContext): Either[CantonConfigError, Config] = {
     val baseConfig = ConfigFactory.load()

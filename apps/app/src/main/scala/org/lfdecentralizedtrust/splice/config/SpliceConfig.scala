@@ -55,6 +55,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.{
 }
 import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.config.CantonConfigAccess.*
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.{
   CantonConfigError,
@@ -62,6 +63,8 @@ import com.digitalasset.canton.config.ConfigErrors.{
   NoConfigFiles,
   SubstitutionError,
 }
+import com.digitalasset.canton.config.NonNegativeFiniteDurationAccess.*
+import com.digitalasset.canton.config.PositiveFiniteDurationAccess.*
 import com.digitalasset.canton.config.{PerClientIpRateLimitConfig as _, RateLimitersConfig as _, *}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.discard.Implicits.DiscardOps

@@ -1604,7 +1604,7 @@ object VettedPackage {
 }
 
 // Package vetting
-final case class VettedPackages(
+final case class VettedPackages private (
     participantId: ParticipantId,
     packages: Seq[VettedPackage],
 ) extends TopologyMapping {
