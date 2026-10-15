@@ -92,7 +92,8 @@ create index updt_hist_tran_hi_mi_ui_import_updates on update_history_transactio
     where record_time = -62135596800000000;
 create unique index updt_hist_tran_hi_mi_ui_u on update_history_transactions (history_id, migration_id, domain_id, update_id, record_time);
 create index updt_hist_tran_hi_ui on update_history_transactions (history_id, update_id);
--- Same definition as in SqlIndexInitializationTrigger, which cannot create indexes concurrently on partitioned tables
+-- Moved here from SqlIndexInitializationTrigger: CREATE INDEX CONCURRENTLY is not supported on partitioned tables,
+-- and on the empty parent a plain CREATE INDEX is instant.
 create index updt_hist_tran_hi_eth on update_history_transactions (history_id, external_transaction_hash)
     where external_transaction_hash is not null;
 
