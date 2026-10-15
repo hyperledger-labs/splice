@@ -2346,10 +2346,11 @@ burnTransfer sender amount inputs usage = Transfer with
       ]
     beneficiaries = None -- No beneficiaries for self-transfer
 
--- | Use `SkipValidatorRewardCoupon` for burns done by external parties so it skips minting `ValidatorRewardCoupon`.
 data BurnRewardPolicy
   = IssueValidatorRewardCoupon
   | SkipValidatorRewardCoupon
+  -- | A token-standard/external-party transfer has no open round to give the coupon, so the caller has to supply one.
+  | IssueValidatorRewardCouponForRound Round
   deriving (Eq, Show)
 
 splitAndBurn : ContractId TransferEventsV2.EventLog -> Party -> Decimal -> [TransferInput] -> TransferContext -> Party -> [Party] -> Text -> BurnRewardPolicy -> Update (TransferResult, Metadata)
@@ -2371,12 +2372,14 @@ splitAndBurn' eventLogCid csum sender amount inputs usage burnRewardPolicy = do
   -- record event
   logAmuletBurn dso eventLogCid sender amount usage (toInterfaceContractId amuletCid)
   -- create validator activity rewards over the whole burn.
+  let issueValidatorRewardCoupon couponRound = void $ create ValidatorRewardCoupon with
+        dso
+        round = couponRound
+        user = sender
+        amount = amount + sum transferResult.summary.outputFees
   case burnRewardPolicy of
-    IssueValidatorRewardCoupon -> void $ create ValidatorRewardCoupon with
-      dso
-      round = transferResult.round
-      user = sender
-      amount = amount + sum transferResult.summary.outputFees
+    IssueValidatorRewardCoupon -> issueValidatorRewardCoupon transferResult.round
+    IssueValidatorRewardCouponForRound couponRound -> issueValidatorRewardCoupon couponRound
     SkipValidatorRewardCoupon -> pure ()
   let amuletAsOfRoundZero = amulet.amount.initialAmount + amulet.amount.ratePerRound.rate * intToDecimal amulet.amount.createdAt.number
   -- adjust the balance changes to account for the archival. This primarily matters for the tx log parsers in scan and the wallet.

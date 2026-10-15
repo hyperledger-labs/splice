@@ -30,6 +30,7 @@ import Splice.AmuletAllocationV2 as AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
 import Splice.DecentralizedSynchronizer (MemberTrafficPurchase(..), parseTrafficPurchaseMemo)
+import Splice.Round (OpenMiningRound(..), OpenMiningRound_Fetch(..))
 import Splice.Types
 import Splice.Util
 
@@ -408,6 +409,19 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
     paymentContext <- unfeaturedPaymentContextFromChoiceContext dso arg.extraArgs.context
     csum <- summarizeAndValidateExternalPartyContext paymentContext dso transfer.sender
     require "Traffic price must be positive" (trafficConfig.trafficPrice > 0.0)
+    burnRewardPolicy <-
+      if purchaseMemo.forfeitValidatorRewardCoupon
+        then pure SkipValidatorRewardCoupon
+        else do
+          optOpenRoundCid <- lookupFromContextU @(ContractId OpenMiningRound) arg.extraArgs.context openRoundContextKey
+          openRoundCid <- case optOpenRoundCid of
+            None -> fail $
+              "Traffic purchase needs an OpenMiningRound under the choice context key " <> openRoundContextKey <>
+              " to issue the validator reward coupon; set forfeitValidatorRewardCoupon=true in the memo to purchase without it"
+            Some cid -> pure cid
+          openRound <- fetchPublicReferenceData (ForDso dso) openRoundCid (OpenMiningRound_Fetch transfer.sender)
+          assertDeadlineExceeded "openRound.opensAt" openRound.opensAt
+          pure (IssueValidatorRewardCouponForRound openRound.round)
     let trafficCostUsd = transfer.amount * csum.amuletPrice
         purchase = MemberTrafficPurchase with
           provider = transfer.sender
@@ -418,7 +432,7 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
     inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) transfer.inputHoldingCids
     result <- buyMemberTraffic (toInterfaceContractId configStateCid) csum trafficConfig purchase
       (transfer.amount, trafficCostUsd) inputs
-      SkipValidatorRewardCoupon
+      burnRewardPolicy
     pure Api.Token.TransferInstructionV1.TransferInstructionResult with
       senderChangeCids = toInterfaceContractId <$> optionalToList result.transferResult.senderChangeAmulet
       output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
