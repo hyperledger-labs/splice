@@ -121,6 +121,7 @@ export const ValidatorNodeConfigSchema = z.object({
   validatorApp: ValidatorAppConfigSchema.optional(),
   disableAuth: z.boolean().default(false), // Note that this is currently ignored everywhere except for validator1, where it is used for testing only
   walletGateway: WalletGatewayConfigSchema,
+  enableAutoOnboardingTrafficPurchase: z.boolean().optional(),
 });
 export const PartyAllocatorConfigSchema = z.object({
   enable: z.boolean(),
