@@ -228,3 +228,5 @@ SERVER_OVERLOADED.*Reached the limit of concurrent requests for.*DownloadTopolog
 
 # TODO(#7789) Remove this once Canton stops logging warnings due to normal concurrent operations.
 sequenced.*but rejected.*during topology validation
+
+Not accepting submission as aggregation ID.*is already marked as delivered
