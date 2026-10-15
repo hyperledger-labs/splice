@@ -315,9 +315,12 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
         new ARC_DsoRules(
           new SRARC_CreateFeaturedAppConfigUpdateInstruction(
             new DsoRules_CreateFeaturedAppConfigUpdateInstruction(
-              provider.toProtoPrimitive,
-              new splice.amulet.FeaturedAppRight_UpdateConfig(config(baseOps), config(newOps)),
-              Collections.emptyList[Tuple2[String, splice.amulet.FeaturedAppRight_UpdateConfig]](),
+              Collections.singletonList(
+                new Tuple2(
+                  provider.toProtoPrimitive,
+                  new splice.amulet.FeaturedAppRight_UpdateConfig(config(baseOps), config(newOps)),
+                )
+              )
             )
           )
         )
@@ -328,7 +331,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
       ): splice.amulet.FeaturedAppRight_UpdateConfig =
         new splice.amulet.FeaturedAppRight_UpdateConfig(config(baseOps), config(newOps))
 
-      // primary = (provider, baseOps, newOps); additional entries become additionalUpdates.
+      // all entries (primary + additional) go into a single `updates` list.
       def amendActionMulti(
           primary: (PartyId, Seq[PartyId], Seq[PartyId]),
           additional: Seq[(PartyId, Seq[PartyId], Seq[PartyId])],
@@ -336,11 +339,10 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
         new ARC_DsoRules(
           new SRARC_CreateFeaturedAppConfigUpdateInstruction(
             new DsoRules_CreateFeaturedAppConfigUpdateInstruction(
-              primary._1.toProtoPrimitive,
-              updateConfig(primary._2, primary._3),
-              additional.map { case (p, b, n) =>
-                new Tuple2(p.toProtoPrimitive, updateConfig(b, n))
-              }.asJava,
+              (new Tuple2(primary._1.toProtoPrimitive, updateConfig(primary._2, primary._3)) +:
+                additional.map { case (p, b, n) =>
+                  new Tuple2(p.toProtoPrimitive, updateConfig(b, n))
+                }).asJava
             )
           )
         )

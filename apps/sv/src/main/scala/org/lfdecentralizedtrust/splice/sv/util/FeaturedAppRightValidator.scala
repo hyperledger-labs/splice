@@ -42,15 +42,13 @@ object FeaturedAppRightValidator {
 
           case u: SRARC_CreateFeaturedAppConfigUpdateInstruction =>
             val value = u.dsoRules_CreateFeaturedAppConfigUpdateInstructionValue
-            // One instruction can amend multiple providers' configs (the primary `update` plus every
-            // entry in `additionalUpdates`), each carrying its own opsParties. Validate them all,
-            // short-circuiting on the first failure, so conflicting opsParties cannot be smuggled in
-            // via additionalUpdates.
+            // One instruction can amend multiple providers' configs via `updates`, each entry
+            // carrying its own opsParties. Validate them all, short-circuiting on the first failure,
+            // so conflicting opsParties cannot be smuggled in via a later entry.
             // Residual: two entries in the same instruction claiming the same opsParty both pass,
             // since neither is in the ACS yet — same cross-contract race as the TOCTOU note below.
             val allUpdates: Seq[(String, FeaturedAppRight_UpdateConfig)] =
-              (value.provider, value.update) +:
-                value.additionalUpdates.asScala.toSeq.map(t => (t._1, t._2))
+              value.updates.asScala.toSeq.map(t => (t._1, t._2))
             allUpdates.foldLeft(Future.successful(Right(()): Either[String, Unit])) {
               (accF, entry) =>
                 accF.flatMap {
