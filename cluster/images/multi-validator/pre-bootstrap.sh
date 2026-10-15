@@ -86,8 +86,10 @@ canton.validator-apps.validator_backend_$index = {
 
     participant-client = {
         admin-api = {
-            address = \${SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS}
-            port = $participant_admin_port
+            client-config = {
+                address = \${SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS}
+                port = $participant_admin_port
+            }
         }
         ledger-api = {
             client-config = {

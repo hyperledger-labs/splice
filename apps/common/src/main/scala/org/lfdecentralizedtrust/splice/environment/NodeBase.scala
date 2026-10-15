@@ -142,27 +142,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
       loggerFactory,
     )
   } yield {
-    // AuthTokenSourceNone source does not work with AuthTokenManager which re-requests on None result
-    val getToken: () => Future[Option[AuthToken]] =
-      authTokenSource match {
-        case none: AuthTokenSourceNone => () => none.getToken
-        case other =>
-          val clock = new WallClock(timeouts, loggerFactory)
-          val authTokenManager = new AuthTokenManager(
-            () => other.getToken,
-            this.isClosing,
-            clock,
-            loggerFactory,
-          )
-          () =>
-            retryProvider.retry(
-              RetryFor.WaitingOnInitDependency,
-              "acquire_auth_token",
-              "Acquiring auth token",
-              authTokenManager.getToken,
-              logger,
-            )
-      }
+    val getToken = createTokenProvider(authTokenSource)
     new SpliceLedgerClient(
       participantClient.ledgerApi.clientConfig,
       // Note: When ledger API auth is enabled, application ID must be equal to user ID
@@ -340,6 +320,49 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
       )
     }
   }
+
+  protected def createParticipantAdminConnection()(implicit
+      tc: TraceContext
+  ): ParticipantAdminConnection = {
+    val tokenSource = AuthTokenSource.fromConfig(
+      participantClient.adminApi.authConfig,
+      nodeMetrics.httpClientMetrics,
+      loggerFactory,
+    )
+    val tokenProvider = createTokenProvider(tokenSource)
+    new ParticipantAdminConnection(
+      participantClient.adminApi.clientConfig,
+      parameters.loggingConfig.api,
+      loggerFactory,
+      nodeMetrics.grpcClientMetrics,
+      retryProvider,
+      tokenProvider,
+    )
+  }
+
+  private def createTokenProvider(
+      tokenSource: AuthTokenSource
+  )(implicit tc: TraceContext): () => Future[Option[AuthToken]] =
+    tokenSource match {
+      // AuthTokenSourceNone source does not work with AuthTokenManager which re-requests on None result
+      case none: AuthTokenSourceNone => () => none.getToken
+      case other =>
+        val clock = new WallClock(timeouts, loggerFactory)
+        val authTokenManager = new AuthTokenManager(
+          () => other.getToken,
+          this.isClosing,
+          clock,
+          loggerFactory,
+        )
+        () =>
+          retryProvider.retry(
+            RetryFor.WaitingOnInitDependency,
+            "acquire_auth_token",
+            "Acquiring auth token",
+            authTokenManager.getToken,
+            logger,
+          )
+    }
 }
 
 object NodeBase {

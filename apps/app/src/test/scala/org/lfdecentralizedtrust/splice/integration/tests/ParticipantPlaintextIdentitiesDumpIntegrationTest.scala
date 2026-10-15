@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAllScanAppConfigs,
   updateAllSvAppConfigs,
   updateAllValidatorConfigs,
+  useSelfSignedTokensForParticipantAdminApiAuth,
 }
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -25,6 +26,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.util.StandaloneCanton
 import monocle.macros.syntax.lens.*
+import org.lfdecentralizedtrust.splice.auth.AuthUtil
 
 import java.nio.file.{Files, Path, Paths}
 
@@ -66,7 +68,12 @@ class ParticipantPlaintextIdentitiesIntegrationTest
       .addConfigTransforms(
         (_, config) => ensureNovelDamlNames()(config),
         (_, config) => ConfigTransforms.withPausedSvDomainComponentsOffboardingTriggers()(config),
-        (_, config) => useSelfSignedTokensForLongRunningLedgerApiAuth("test", config),
+        (_, config) => useSelfSignedTokensForLongRunningLedgerApiAuth(AuthUtil.testSecret, config),
+        (_, config) =>
+          useSelfSignedTokensForParticipantAdminApiAuth(
+            AuthUtil.testSecret,
+            AuthUtil.testParticipantAdminApiAudience,
+          )(config),
         (_, config) =>
           updateAllValidatorConfigs { case (name, c) =>
             if (name == "aliceValidatorLocal") {

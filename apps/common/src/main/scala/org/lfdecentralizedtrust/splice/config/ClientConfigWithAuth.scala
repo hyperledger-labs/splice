@@ -8,7 +8,7 @@ import com.digitalasset.canton.config.FullClientConfig
 /** @param clientConfig Connection parameters
   * @param authConfig Auth tokens used by the app
   */
-case class LedgerApiClientConfig(
+case class ClientConfigWithAuth(
     clientConfig: FullClientConfig,
     authConfig: AuthTokenSourceConfig,
 )

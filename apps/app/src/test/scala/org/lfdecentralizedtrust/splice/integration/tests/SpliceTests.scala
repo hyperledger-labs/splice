@@ -278,7 +278,7 @@ object SpliceTests extends LazyLogging with HasRetryProvider {
           AuthTokenSourceConfig.Static(userToken, adminToken)
         }
         case AuthTokenSourceConfig.SelfSigned(audience, _, secret, adminToken) => {
-          AuthTokenSourceConfig.SelfSigned(audience, newUser, secret, adminToken)
+          AuthTokenSourceConfig.SelfSigned(audience, Some(newUser), secret, adminToken)
         }
         case _ => conf
       }

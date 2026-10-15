@@ -3,12 +3,15 @@
 
 package org.lfdecentralizedtrust.splice.console
 
+import cats.instances.future.*
+import cats.syntax.apply.*
 import org.apache.pekko.http.scaladsl.model.HttpHeader
 import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.digitalasset.daml.lf.archive.DarParser
 import org.lfdecentralizedtrust.splice.admin.api.client.HttpAdminAppClient
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.config.{
+  AuthTokenSourceConfig,
   BaseParticipantClientConfig,
   NetworkAppClientConfig,
   SpliceBackendConfig,
@@ -49,7 +52,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.VettedPackage
 
 import java.io.File
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.reflect.ClassTag
 import scala.util.Try
@@ -100,9 +103,6 @@ trait AppReference extends InstanceReference {
       timeout: NonNegativeDuration = spliceConsoleEnvironment.commandTimeouts.bounded,
       maxBackoff: NonNegativeDuration = NonNegativeDuration.tryFromDuration(20.seconds),
   ): Unit
-
-  // Doesn't make sense for Splice
-  override def adminToken: Nothing = ???
 }
 
 trait HttpAppReference extends AppReference with HttpCommandRunner {
@@ -115,6 +115,8 @@ trait HttpAppReference extends AppReference with HttpCommandRunner {
   override def adminCommand[Result](
       grpcCommand: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] = noGrpcError()
+
+  override def adminApiToken: Option[String] = None
 
   private def noGrpcError() = throw new NotImplementedError(
     "This app is not supposed to be used via gRPC."
@@ -258,22 +260,36 @@ trait AppBackendReference extends AppReference with LocalInstanceReference {
   private def getRemoteParticipantConfigWithToken(
       participantClientConfig: BaseParticipantClientConfig
   )(implicit ec: ExecutionContext): RemoteParticipantConfig = {
-    val tokenStrO = Await.result(
-      spliceConsoleEnvironment.httpClient
-        .getToken(participantClientConfig.ledgerApi.authConfig)
-        .map(_.map(_.accessToken)),
+    val (maybeLedgerApiToken, maybeAdminApiToken) = Await.result(
+      (
+        getAccessToken(participantClientConfig.ledgerApi.authConfig),
+        getAccessToken(participantClientConfig.adminApi.authConfig),
+      ).tupled, // Future eagerness makes this parallel
       30.seconds,
     )
     RemoteParticipantConfig(
-      participantClientConfig.adminApi,
+      participantClientConfig.adminApi.clientConfig,
       participantClientConfig.ledgerApi.clientConfig,
-      token = tokenStrO,
+      token = maybeLedgerApiToken,
+      adminApiToken = maybeAdminApiToken,
     )
   }
+
+  private def getAccessToken(
+      authConfig: AuthTokenSourceConfig
+  ): Future[Option[String]] = for {
+    maybeToken <- spliceConsoleEnvironment.httpClient.getToken(authConfig)
+  } yield maybeToken.map(_.accessToken)
+
   implicit val ec: ExecutionContext = executionContext
 
   /** Remote participant this splitwell app is configured to interact with. */
   lazy val participantClient = getParticipantClient()
+
+  // Doesn't make sense for Splice
+  override def adminToken: Nothing = ???
+
+  override def adminApiToken: Option[String] = super.adminApiToken
 }
 
 /** Subclass of participantClient that takes the config as an argument
@@ -312,6 +328,8 @@ class ParticipantClientReference(
     }
     hash
   }
+
+  override def ledgerApiToken: Option[String] = super.ledgerApiToken
 }
 
 class SequencerClientReference(

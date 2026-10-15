@@ -7,6 +7,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.useSelfSignedToke
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import com.digitalasset.canton.logging.SuppressionRule
+import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.slf4j.event.Level
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
@@ -26,7 +27,17 @@ class BootstrapTest extends IntegrationTestWithIsolatedEnvironment {
       .addConfigTransforms((_, config) =>
         ConfigTransforms.withPausedSvDomainComponentsOffboardingTriggers()(config)
       )
-      .addConfigTransform((_, config) => useSelfSignedTokensForLedgerApiAuth("test")(config))
+      .addConfigTransform((_, config) =>
+        useSelfSignedTokensForLedgerApiAuth(AuthUtil.testSecret)(config)
+      )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.useSelfSignedTokensForParticipantAdminApiAuth(
+          AuthUtil.testSecret,
+          AuthUtil.testParticipantAdminApiAudience,
+        )(
+          config
+        )
+      )
       // We reduce the polling interval here primarily for the top-up trigger to ensure that a top-up happens as soon as
       // possible during the validator setup and other txs do not get throttled for want of traffic.
       .addConfigTransform((_, config) => ConfigTransforms.reducePollingInterval(config))

@@ -105,13 +105,7 @@ class SplitwellApp(
         loggerFactory,
       )
     }
-    participantAdminConnection = new ParticipantAdminConnection(
-      config.participantClient.adminApi,
-      amuletAppParameters.loggingConfig.api,
-      loggerFactory,
-      metrics.grpcClientMetrics,
-      retryProvider,
-    )
+    participantAdminConnection = createParticipantAdminConnection()
     participantId <- appInitStep("Get participant id") {
       participantAdminConnection.getParticipantId()
     }

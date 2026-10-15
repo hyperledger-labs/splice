@@ -122,13 +122,7 @@ class SvApp(
     super.packagesForJsonDecoding ++ DarResources.dsoGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.amuletNameService.all
 
   override def preInitializeBeforeLedgerConnection()(implicit tc: TraceContext): Future[Unit] = {
-    val participantAdminConnection = new ParticipantAdminConnection(
-      config.participantClient.adminApi,
-      amuletAppParameters.loggingConfig.api,
-      loggerFactory,
-      metrics.grpcClientMetrics,
-      retryProvider,
-    )
+    val participantAdminConnection = createParticipantAdminConnection()
     (for {
       _ <-
         appInitStep("Ensure participant is initialized with expected id") {
@@ -152,13 +146,7 @@ class SvApp(
   override def initializeNode(
       ledgerClient: SpliceLedgerClient
   )(implicit tc: TraceContext): Future[SvApp.State] = {
-    val participantAdminConnection = new ParticipantAdminConnection(
-      config.participantClient.adminApi,
-      amuletAppParameters.loggingConfig.api,
-      loggerFactory,
-      metrics.grpcClientMetrics,
-      retryProvider,
-    )
+    val participantAdminConnection = createParticipantAdminConnection()
 
     def localSyncNodeFromConfig(svSynchronizerConfig: SvSynchronizerNodeConfig) = {
       CometBftNode(

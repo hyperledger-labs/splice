@@ -6,19 +6,21 @@ package org.lfdecentralizedtrust.splice.config
 import com.digitalasset.canton.config.FullClientConfig
 import com.digitalasset.canton.participant.config.{BaseParticipantConfig, RemoteParticipantConfig}
 
-abstract class BaseParticipantClientConfig(
-    val adminApi: FullClientConfig,
-    val ledgerApi: LedgerApiClientConfig,
-) extends BaseParticipantConfig {
-  override def clientAdminApi: FullClientConfig = adminApi
+trait BaseParticipantClientConfig extends BaseParticipantConfig {
+
+  def adminApi: ClientConfigWithAuth
+  def ledgerApi: ClientConfigWithAuth
+
+  override def clientAdminApi: FullClientConfig = adminApi.clientConfig
   override def clientLedgerApi: FullClientConfig = ledgerApi.clientConfig
   override def httpHealthClientConfig = None
 
   def participantClientConfigWithAdminToken: RemoteParticipantConfig =
     RemoteParticipantConfig(
-      adminApi,
+      adminApi.clientConfig,
       ledgerApi.clientConfig,
       token = ledgerApi.authConfig.adminToken,
+      adminApiToken = adminApi.authConfig.adminToken,
     )
 }
 
@@ -28,6 +30,6 @@ abstract class BaseParticipantClientConfig(
   * @param ledgerApi the configuration to connect the console to the remote ledger api
   */
 case class ParticipantClientConfig(
-    override val adminApi: FullClientConfig,
-    override val ledgerApi: LedgerApiClientConfig,
-) extends BaseParticipantClientConfig(adminApi, ledgerApi)
+    override val adminApi: ClientConfigWithAuth,
+    override val ledgerApi: ClientConfigWithAuth,
+) extends BaseParticipantClientConfig

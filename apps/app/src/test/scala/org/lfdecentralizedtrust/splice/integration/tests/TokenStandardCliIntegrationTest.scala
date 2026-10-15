@@ -134,7 +134,7 @@ class TokenStandardCliIntegrationTest
               "-l",
               "http://localhost:6501", // not available in any config
               "-a",
-              aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
+              aliceValidatorBackend.participantClientWithAdminToken.ledgerApiToken.value,
               "-u",
               "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
               "--reason",
@@ -179,7 +179,7 @@ class TokenStandardCliIntegrationTest
               "-l",
               "http://localhost:6501", // not available in any config
               "-a",
-              aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
+              aliceValidatorBackend.participantClientWithAdminToken.ledgerApiToken.value,
               "-u",
               "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
             ),

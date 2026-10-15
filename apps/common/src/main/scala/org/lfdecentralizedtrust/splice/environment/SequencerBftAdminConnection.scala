@@ -16,7 +16,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 trait SequencerBftAdminConnection {
-  this: AppConnection =>
+  this: AdminConnection =>
   implicit val ec: ExecutionContextExecutor
 
   def addPeerEndpoint(peer: P2PEndpoint)(implicit tc: TraceContext): Future[Unit] = {

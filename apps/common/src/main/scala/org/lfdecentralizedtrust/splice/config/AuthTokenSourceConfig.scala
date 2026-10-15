@@ -25,7 +25,7 @@ object AuthTokenSourceConfig {
   /** Settings for generating self-signed tokens. Use for testing purposes only. */
   final case class SelfSigned(
       audience: String,
-      user: String,
+      user: Option[String],
       secret: String,
       adminToken: Option[String],
   ) extends AuthTokenSourceConfig

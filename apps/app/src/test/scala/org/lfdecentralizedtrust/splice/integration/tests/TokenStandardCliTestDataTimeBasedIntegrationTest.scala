@@ -1192,7 +1192,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           Seq(
             RawHeader(
               "Authorization",
-              s"Bearer ${aliceValidatorBackend.participantClientWithAdminToken.adminToken.value}",
+              s"Bearer ${aliceValidatorBackend.participantClientWithAdminToken.ledgerApiToken.value}",
             )
           )
         )

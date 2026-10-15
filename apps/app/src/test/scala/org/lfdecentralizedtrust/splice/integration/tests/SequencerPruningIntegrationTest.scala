@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.logging.SuppressionRule
@@ -60,7 +60,12 @@ class SequencerPruningIntegrationTest
                 bobValidatorConfig
                   .copy(
                     participantClient = ParticipantClientConfig(
-                      FullClientConfig(port = Port.tryCreate(5902)),
+                      bobValidatorConfig.participantClient.adminApi.copy(
+                        clientConfig =
+                          bobValidatorConfig.participantClient.adminApi.clientConfig.copy(
+                            port = Port.tryCreate(5902)
+                          )
+                      ),
                       bobValidatorConfig.participantClient.ledgerApi.copy(
                         clientConfig =
                           bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(

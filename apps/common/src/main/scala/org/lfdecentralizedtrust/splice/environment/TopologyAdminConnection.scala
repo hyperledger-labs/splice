@@ -60,6 +60,7 @@ import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
+import org.lfdecentralizedtrust.splice.auth.AuthToken
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
@@ -85,12 +86,14 @@ abstract class TopologyAdminConnection(
     loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
     override protected[this] val retryProvider: RetryProvider,
+    getToken: () => Future[Option[AuthToken]] = () => Future.successful(None),
 )(implicit ec: ExecutionContextExecutor, tracer: Tracer)
-    extends AppConnection(
+    extends AdminConnection(
       config,
       apiLoggingConfig,
       loggerFactory,
       grpcClientMetrics,
+      getToken,
     )
     with RetryProvider.Has
     with LsuTopologyAdminConnection

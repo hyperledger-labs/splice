@@ -15,6 +15,7 @@ import com.digitalasset.canton.topology.{
   SequencerId,
   UniqueIdentifier,
 }
+import org.lfdecentralizedtrust.splice.auth.{AuthToken, AuthUtil}
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, PruningConfig, SpliceBackendConfig}
 import org.lfdecentralizedtrust.splice.console.AppBackendReference
 import org.lfdecentralizedtrust.splice.environment.*
@@ -29,6 +30,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.FoundDso
 import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, TriggerTestUtil, WalletTestUtil}
 
 import java.util.UUID
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 class ManualStartIntegrationTest
@@ -422,11 +424,22 @@ class ManualStartIntegrationTest
     import env.executionContext
     val loggerFactoryWithKey = loggerFactory.append("participant", name)
     new ParticipantAdminConnection(
-      FullClientConfig(port = config.participantClient.adminApi.port),
+      FullClientConfig(port = config.participantClient.adminApi.clientConfig.port),
       env.environment.config.monitoring.logging.api,
       loggerFactoryWithKey,
       grpcClientMetrics,
       retryProvider,
+      getToken = () =>
+        Future.successful(
+          Some(
+            AuthToken(
+              AuthUtil.CantonAdminApi.testToken(
+                secret = AuthUtil.testSecret,
+                audience = AuthUtil.testParticipantAdminApiAudience,
+              )
+            )
+          )
+        ),
     )
   }
 }

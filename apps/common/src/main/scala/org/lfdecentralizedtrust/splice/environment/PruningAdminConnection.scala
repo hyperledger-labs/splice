@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.config.PruningConfig
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 trait PruningAdminConnection {
-  this: AppConnection & RetryProvider.Has =>
+  this: AdminConnection & RetryProvider.Has =>
   protected implicit val ec: ExecutionContextExecutor
   type Status <: NodeStatus.Status
   protected val pruningCommands: PruningSchedulerCommands[?]

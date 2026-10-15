@@ -74,12 +74,19 @@ case class AuthTokenSourceStatic(
 
 case class AuthTokenSourceSelfSigned(
     audience: String,
-    user: String,
+    user: Option[String],
     secret: String,
 ) extends AuthTokenSource {
   override def getToken(implicit tc: TraceContext): Future[Option[AuthToken]] =
     Future.successful(
-      Some(AuthToken(AuthUtil.testTokenSecret(audience, user, secret)))
+      Some(
+        AuthToken(
+          user match {
+            case Some(user) => AuthUtil.testTokenSecret(audience, user, secret)
+            case None => AuthUtil.CantonAdminApi.testToken(secret, audience)
+          }
+        )
+      )
     )
 }
 

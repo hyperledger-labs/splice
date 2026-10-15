@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
+import com.daml.grpc.AuthCallCredentials
 import org.lfdecentralizedtrust.splice.admin.api.client.TraceContextPropagation.*
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.admin.api.client.{
@@ -34,11 +35,12 @@ import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.circe.Json
-import io.grpc.{CallCredentials, Deadline, Status}
+import io.grpc.{Deadline, Status}
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, MediaTypes, StatusCode, Uri}
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
+import org.lfdecentralizedtrust.splice.auth.AuthToken
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -166,13 +168,14 @@ object BaseAppConnection {
 
 }
 
-/** Base class for connecting and calling Canton gRPC APIs.
+/** Base class for connecting and calling Canton gRPC admin APIs.
   */
-abstract class AppConnection(
+abstract class AdminConnection(
     config: ClientConfig,
     apiLoggingConfig: ApiLoggingConfig,
     override val loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
+    getToken: () => Future[Option[AuthToken]],
 )(implicit ec: ExecutionContextExecutor)
     extends BaseAppConnection(loggerFactory)
     with FlagCloseableAsync
@@ -196,7 +199,6 @@ abstract class AppConnection(
   // instead of turning everything into a String.
   protected def runCmd[Req, Res, Result](
       cmd: GrpcAdminCommand[Req, Res, Result],
-      credentials: Option[CallCredentials] = None,
       timeoutOverride: Option[TimeoutType] = None,
   )(implicit traceContext: TraceContext): Future[Result] = {
     val dso =
@@ -210,28 +212,27 @@ abstract class AppConnection(
           new GrpcMetricsClientInterceptor(grpcClientMetrics),
         )
 
-    val dsoAuth = credentials match {
-      case Some(creds) => dso.withCallCredentials(creds)
-      case None => dso
-    }
-
-    val timeout = timeoutOverride.getOrElse(cmd.timeoutType) match {
-      case ServerEnforcedTimeout =>
-        None
-      case CustomClientTimeout(timeout) =>
-        Some(timeout)
-      case DefaultBoundedTimeout =>
-        Some(timeouts.default)
-      case DefaultUnboundedTimeout =>
-        Some(timeouts.unbounded)
-    }
-    val withDeadline = timeout.map(_.duration) match {
-      case Some(finite: FiniteDuration) =>
-        dsoAuth.withDeadline(Deadline.after(finite.length, finite.unit))
-      case _ => dsoAuth
-    }
-
     for {
+      maybeToken <- getToken()
+      dsoAuth = maybeToken match {
+        case Some(token) => dso.withCallCredentials(new AuthCallCredentials(token.accessToken))
+        case None => dso
+      }
+      timeout = timeoutOverride.getOrElse(cmd.timeoutType) match {
+        case ServerEnforcedTimeout =>
+          None
+        case CustomClientTimeout(timeout) =>
+          Some(timeout)
+        case DefaultBoundedTimeout =>
+          Some(timeouts.default)
+        case DefaultUnboundedTimeout =>
+          Some(timeouts.unbounded)
+      }
+      withDeadline = timeout.map(_.duration) match {
+        case Some(finite: FiniteDuration) =>
+          dsoAuth.withDeadline(Deadline.after(finite.length, finite.unit))
+        case _ => dsoAuth
+      }
       req <- toFuture(cmd.createRequestInternal())
       response <- TraceContextGrpc.withGrpcContext(traceContext)(
         cmd.submitRequestInternal(withDeadline, req)

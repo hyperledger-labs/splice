@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.crypto.{EncryptionPublicKey, SigningPublicKey}
 import com.digitalasset.canton.topology.ParticipantId
+import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, ParticipantBootstrapDumpConfig}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAllSvAppConfigs,
@@ -72,7 +73,15 @@ class ParticipantKmsIdentitiesIntegrationTest
         },
         // default transforms that look relevant
         (_, config) => ConfigTransforms.makeAllTimeoutsBounded(config),
-        (_, config) => ConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(config),
+        (_, config) =>
+          ConfigTransforms.useSelfSignedTokensForLedgerApiAuth(AuthUtil.testSecret)(config),
+        (_, config) =>
+          ConfigTransforms.useSelfSignedTokensForParticipantAdminApiAuth(
+            AuthUtil.testSecret,
+            AuthUtil.testParticipantAdminApiAudience,
+          )(
+            config
+          ),
         (_, config) => ConfigTransforms.reducePollingInterval(config),
         (_, config) => ConfigTransforms.withPausedSvDomainComponentsOffboardingTriggers()(config),
         (_, config) => ConfigTransforms.disableOnboardingParticipantPromotionDelay()(config),

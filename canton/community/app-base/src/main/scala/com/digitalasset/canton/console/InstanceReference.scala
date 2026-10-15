@@ -88,8 +88,6 @@ trait InstanceReference
     with FeatureFlagFilter
     with PrettyPrinting {
 
-  def adminToken: Option[String]
-
   @inline final override def uid: UniqueIdentifier = id.uid
 
   val name: String
@@ -395,9 +393,12 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
   ): ConsoleCommandResult[Result] =
     runCommandIfRunning(
       consoleEnvironment.grpcAdminCommandRunner
-        .runCommand(name, grpcCommand, config.clientAdminApi, adminToken)
+        .runCommand(name, grpcCommand, config.clientAdminApi, adminApiToken)
     )
 
+  override protected[console] def adminApiToken: Option[String] = adminToken
+
+  def adminToken: Option[String]
 }
 
 trait RemoteInstanceReference extends InstanceReference {
@@ -415,7 +416,7 @@ trait RemoteInstanceReference extends InstanceReference {
       name,
       grpcCommand,
       config.clientAdminApi,
-      adminToken,
+      adminApiToken,
     )
 }
 
@@ -431,14 +432,14 @@ trait RemoteInstanceReference extends InstanceReference {
   *   the port of the ledger api server
   * @param tls
   *   the tls config to use on the client
-  * @param token
+  * @param ledgerApiToken
   *   the jwt token to use on the client
   */
 class ExternalLedgerApiClient(
     hostname: String,
     port: Port,
     tls: Option[TlsClientConfig],
-    val token: Option[String] = None,
+    val ledgerApiToken: Option[String] = None,
 )(implicit val consoleEnvironment: ConsoleEnvironment)
     extends BaseLedgerApiAdministration
     with LedgerApiCommandRunner
@@ -454,7 +455,7 @@ class ExternalLedgerApiClient(
       command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcLedgerCommandRunner
-      .runCommand("sourceLedger", command, FullClientConfig(hostname, port, tls), token)
+      .runCommand("sourceLedger", command, FullClientConfig(hostname, port, tls), ledgerApiToken)
 
   override def optionallyAwait[Tx](
       tx: Tx,
@@ -712,7 +713,8 @@ class RemoteParticipantReference(environment: ConsoleEnvironment, override val n
     extends ParticipantReference(environment, name)
     with RemoteInstanceReference {
 
-  def adminToken: Option[String] = config.token
+  override protected[console] def adminApiToken: Option[String] =
+    config.adminApiToken.orElse(config.token)
 
   @Help.Summary("Return remote participant config")
   def config: RemoteParticipantConfig =
@@ -728,7 +730,7 @@ class RemoteParticipantReference(environment: ConsoleEnvironment, override val n
       config.token,
     )
 
-  override protected[console] def token: Option[String] = config.token
+  override protected[console] def ledgerApiToken: Option[String] = config.token
 
   private lazy val testing_ = new ParticipantTestingGroup(this, consoleEnvironment, loggerFactory)
 
@@ -789,7 +791,7 @@ class LocalParticipantReference(
     consoleEnvironment.environment.participants.getStarting(name)
 
   /** secret, not publicly documented way to get the admin token */
-  override def adminToken: Option[String] = runningNode.flatMap(_.getAdminToken)
+  def adminToken: Option[String] = runningNode.flatMap(_.getAdminToken)
 
   private lazy val testing_ =
     new LocalParticipantTestingGroup(this, consoleEnvironment, loggerFactory)
@@ -808,10 +810,10 @@ class LocalParticipantReference(
   ): ConsoleCommandResult[Result] =
     runCommandIfRunning(
       consoleEnvironment.grpcLedgerCommandRunner
-        .runCommand(name, command, config.clientLedgerApi, adminToken)
+        .runCommand(name, command, config.clientLedgerApi, ledgerApiToken)
     )
 
-  override protected[console] def token: Option[String] = adminToken
+  override protected[console] def ledgerApiToken: Option[String] = adminToken
 }
 
 object SequencerReference {
@@ -1443,7 +1445,8 @@ class LocalSequencerReference(
   override protected[canton] def executionContext: ExecutionContext =
     consoleEnvironment.environment.executionContext
 
-  override def adminToken: Option[String] = runningNode.flatMap(_.getAdminToken)
+  /** secret, not publicly documented way to get the admin token */
+  def adminToken: Option[String] = runningNode.flatMap(_.getAdminToken)
 
   @Help.Summary("Returns the sequencer configuration")
   override def config: SequencerNodeConfig =
@@ -1474,7 +1477,7 @@ class RemoteSequencerReference(val environment: ConsoleEnvironment, val name: St
     extends SequencerReference(environment, name)
     with RemoteInstanceReference {
 
-  def adminToken: Option[String] = config.token
+  override protected[console] def adminApiToken: Option[String] = config.token
 
   override protected[canton] def executionContext: ExecutionContext =
     consoleEnvironment.environment.executionContext
@@ -1590,7 +1593,8 @@ class LocalMediatorReference(consoleEnvironment: ConsoleEnvironment, val name: S
   override protected[canton] def executionContext: ExecutionContext =
     consoleEnvironment.environment.executionContext
 
-  override def adminToken: Option[String] = runningNode.flatMap(_.getAdminToken)
+  /** secret, not publicly documented way to get the admin token */
+  def adminToken: Option[String] = runningNode.flatMap(_.getAdminToken)
 
   @Help.Summary("Returns the mediator configuration")
   override def config: MediatorNodeConfig =
@@ -1610,7 +1614,7 @@ class RemoteMediatorReference(val environment: ConsoleEnvironment, val name: Str
     with RemoteInstanceReference
     with SequencerConnectionAdministration {
 
-  def adminToken: Option[String] = config.token
+  override protected[console] def adminApiToken: Option[String] = config.token
 
   @Help.Summary("Returns the remote mediator configuration")
   def config: RemoteMediatorConfig =
