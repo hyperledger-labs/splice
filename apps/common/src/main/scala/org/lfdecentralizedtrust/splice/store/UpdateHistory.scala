@@ -2437,8 +2437,8 @@ object UpdateHistory {
     "update_history_unassignments",
   )
 
-  val ImportUpdatesPartitionStart: CantonTimestamp = CantonTimestamp.MinValue
-  val ImportUpdatesPartitionEnd: CantonTimestamp = CantonTimestamp.MinValue.immediateSuccessor
+  val ImportUpdatesPartitionStart: LocalDate =
+    LocalDate.ofInstant(CantonTimestamp.MinValue.toInstant, ZoneOffset.UTC)
 
   sealed trait BackfillingRequirement
   object BackfillingRequirement {

@@ -503,9 +503,9 @@ object UpdateHistoryTestBase {
       windowSizeDays: Int,
       partitionRunwayDays: Int,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
+    val firstDay = LocalDate.ofInstant(timeStart.toInstant, ZoneOffset.UTC)
     for {
-      _ <- createPartitionsWithRetry(
-        updateHistory,
+      _ <- updateHistory.createPartitions(
         UpdateHistory.ImportUpdatesPartitionStart,
         windowSizeDays,
       )
