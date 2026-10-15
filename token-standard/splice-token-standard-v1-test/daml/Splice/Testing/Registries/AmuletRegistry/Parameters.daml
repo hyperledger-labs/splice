@@ -99,6 +99,8 @@ defaultAmuletConfig = AmuletConfig with
 
   rewardConfig = None
 
+  validatorRewardConfig = None
+
   transferPreapprovalBaseDuration = None
 
   minDevelopmentFundMintingDelay = None

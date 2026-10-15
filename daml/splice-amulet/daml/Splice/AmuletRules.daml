@@ -34,12 +34,14 @@ import Splice.TokenStandard.Utils
 import Splice.Amulet
 import Splice.Amulet.CryptoHash qualified as CryptoHash
 import Splice.Amulet.RewardAccountingV2
+import Splice.Amulet.ValidatorRewardAccountingV2 (CalculateValidatorRewardsV2(..), ProcessValidatorRewardsV2(..))
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletConfig
   ( transferConfigToTransferConfigV2, AmuletConfig(..), TransferConfig(..), TransferConfigV2(..), validAmuletConfig
   , defaultTransferPreapprovalFee, getDevelopmentFundManagerBlacklist, getExternalPartyConfigStateTickDuration
   , getTransferPreapprovalBaseDuration, useTrafficBasedAppRewards
   , RewardVersion(..), useFeaturedAppMarkers
+  , useAmuletBurnValidatorRewards, useTrafficBasedValidatorRewards
   )
 import qualified Splice.AmuletConfig as Unit
 import Splice.ExternalPartyConfigState
@@ -123,7 +125,16 @@ data AmuletRules_ClaimExpiredRewardsV2Result = AmuletRules_ClaimExpiredRewardsV2
 data AmuletRules_StartProcessingRewardsV2Result = AmuletRules_StartProcessingRewardsV2Result {}
   deriving (Serializable)
 
+data AmuletRules_StartProcessingValidatorRewardsV2Result = AmuletRules_StartProcessingValidatorRewardsV2Result {}
+  deriving (Serializable)
+
 data AmuletRules_UnhideRewardCouponsV2Result = AmuletRules_UnhideRewardCouponsV2Result {}
+  deriving (Serializable)
+
+data AmuletRules_UnhideValidatorRewardCouponsV2Result = AmuletRules_UnhideValidatorRewardCouponsV2Result {}
+  deriving (Serializable)
+
+data AmuletRules_ClaimExpiredValidatorRewardsV2Result = AmuletRules_ClaimExpiredValidatorRewardsV2Result {}
   deriving (Serializable)
 
 data AmuletRules_ArchiveDryRunRewardAccountingV2Result = AmuletRules_ArchiveDryRunRewardAccountingV2Result {}
@@ -446,6 +457,7 @@ template AmuletRules
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
         let rewardConfig = configUsd.rewardConfig
+        let validatorRewardConfig = configUsd.validatorRewardConfig
         let trafficPrice =
               if isSome rewardConfig
                 then Some configUsd.decentralizedSynchronizer.fees.extraTrafficPrice
@@ -479,13 +491,13 @@ template AmuletRules
 
         oldest <- create OpenMiningRound with
           dso; round = Round nr0; amuletPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
-          trafficPrice; rewardConfig
+          trafficPrice; rewardConfig; validatorRewardConfig
         newestOpen <- create OpenMiningRound with
           dso; round = Round nr1; amuletPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
-          trafficPrice; rewardConfig
+          trafficPrice; rewardConfig; validatorRewardConfig
         last <- create OpenMiningRound with
           dso; round = Round nr2; amuletPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
-          trafficPrice; rewardConfig
+          trafficPrice; rewardConfig; validatorRewardConfig
 
         exercise self AmuletRules_BootstrapExternalPartyConfigState with
           openMiningRoundTriple = OpenMiningRoundTriple with
@@ -536,6 +548,7 @@ template AmuletRules
             tickDuration = roundToArchive.tickDuration
             trafficPrice = roundToArchive.trafficPrice
             rewardConfig = roundToArchive.rewardConfig
+            validatorRewardConfig = roundToArchive.validatorRewardConfig
 
         -- trigger off-ledger reward calculation if needed
         forA_ roundToArchive.rewardConfig $ \rewardConfig -> do
@@ -555,6 +568,24 @@ template AmuletRules
               rewardCouponTimeToLive = rewardConfig.rewardCouponTimeToLive
               dryRun = True
 
+        -- trigger off-ledger validator-reward calculation if needed (CIP-0120)
+        forA_ roundToArchive.validatorRewardConfig $ \validatorRewardConfig -> do
+          when (useTrafficBasedValidatorRewards (Some validatorRewardConfig.mintingVersion)) $ do
+            void $ create CalculateValidatorRewardsV2 with
+              dso
+              round = roundToArchive.round
+              roundClosedAt = now
+              rewardCouponTimeToLive = validatorRewardConfig.rewardCouponTimeToLive
+              dryRun = False
+
+          when (useTrafficBasedValidatorRewards validatorRewardConfig.dryRunVersion) $ do
+            void $ create CalculateValidatorRewardsV2 with
+              dso
+              round = roundToArchive.round
+              roundClosedAt = now
+              rewardCouponTimeToLive = validatorRewardConfig.rewardCouponTimeToLive
+              dryRun = True
+
         -- create the new open round
         newOpenRound <- do
           let configUsd = getValueAsOf now configSchedule
@@ -563,6 +594,7 @@ template AmuletRules
               opensAt = addRelTime (max now latestRound.opensAt) tickDuration
               newOpenRoundIssuingFor = latestRound.issuingFor + latestRound.tickDuration
               rewardConfig = configUsd.rewardConfig
+              validatorRewardConfig = configUsd.validatorRewardConfig
           create OpenMiningRound with
               dso
               round = Round (latestRound.round.number + 1)
@@ -577,6 +609,7 @@ template AmuletRules
               issuanceConfig = getValueAsOf newOpenRoundIssuingFor configUsd.issuanceCurve
               tickDuration
               rewardConfig
+              validatorRewardConfig
               trafficPrice =
                 if isSome rewardConfig
                   then Some configUsd.decentralizedSynchronizer.fees.extraTrafficPrice
@@ -744,6 +777,28 @@ template AmuletRules
           void $ create UnclaimedReward with dso; amount
         return AmuletRules_ClaimExpiredRewardsV2Result {}
 
+    -- batch claim of expired validator rewards under CIP-0120
+    nonconsuming choice AmuletRules_ClaimExpiredValidatorRewardsV2 : AmuletRules_ClaimExpiredValidatorRewardsV2Result
+      with
+        rewardCouponCids : [ContractId ValidatorRewardCouponV2]
+        expiryObservers : [Party]
+      observer expiryObservers
+      controller dso
+      do
+        require "at least one coupon" (not (null rewardCouponCids))
+
+        coupons <- forA rewardCouponCids $ \cid -> do
+          coupon <- fetchAndArchive (ForDso with dso) cid
+          assertDeadlineExceeded "coupon.expiresAt" coupon.expiresAt
+          return coupon
+        let actualExpiryObservers = concat [ coupon.node :: optionalToList coupon.beneficiary | coupon <- coupons, coupon.nodeIsObserver ]
+        require "expiryObservers match coupons" (sort expiryObservers == dedupSort actualExpiryObservers)
+
+        let amount = sum [ coupon.amount | coupon <- coupons ]
+        when (amount > 0.0) $
+          void $ create UnclaimedReward with dso; amount
+        return AmuletRules_ClaimExpiredValidatorRewardsV2Result {}
+
     nonconsuming choice AmuletRules_StartProcessingRewardsV2 : AmuletRules_StartProcessingRewardsV2Result
       with
         calculateRewardsCid : ContractId CalculateRewardsV2
@@ -760,6 +815,23 @@ template AmuletRules
           batchHash
 
         return AmuletRules_StartProcessingRewardsV2Result {}
+
+    nonconsuming choice AmuletRules_StartProcessingValidatorRewardsV2 : AmuletRules_StartProcessingValidatorRewardsV2Result
+      with
+        calculateRewardsCid : ContractId CalculateValidatorRewardsV2
+        batchHash : CryptoHash.Hash
+      controller dso
+      do
+        calculateRewards <- fetchAndArchive (ForDso with dso) calculateRewardsCid
+        create ProcessValidatorRewardsV2 with
+          dso
+          round = calculateRewards.round
+          roundClosedAt = calculateRewards.roundClosedAt
+          dryRun = calculateRewards.dryRun
+          rewardCouponTimeToLive = calculateRewards.rewardCouponTimeToLive
+          batchHash
+
+        return AmuletRules_StartProcessingValidatorRewardsV2Result {}
 
     -- batch conversion of coupons not yet observable by their providers
     nonconsuming choice AmuletRules_UnhideRewardCouponsV2 : AmuletRules_UnhideRewardCouponsV2Result
@@ -783,6 +855,27 @@ template AmuletRules
         require "providers match coupons" (dedupSort providers == dedupSort actualProviders)
 
         return AmuletRules_UnhideRewardCouponsV2Result {}
+
+    -- batch conversion of validator reward coupons not yet observable by their nodes
+    nonconsuming choice AmuletRules_UnhideValidatorRewardCouponsV2 : AmuletRules_UnhideValidatorRewardCouponsV2Result
+      with
+        rewardCouponCids : [ContractId ValidatorRewardCouponV2]
+        nodes : [Party]
+      observer nodes
+      controller dso
+      do
+        require "at least one coupon" (not (null rewardCouponCids))
+
+        actualNodes <- forA rewardCouponCids $ \cid -> do
+          coupon <- fetchAndArchive (ForDso with dso) cid
+          require "node is no observer on the coupon" (not (coupon.nodeIsObserver))
+          assertWithinDeadline "coupon.expiresAt" coupon.expiresAt
+          create coupon with nodeIsObserver = True
+          pure coupon.node
+
+        require "nodes match coupons" (dedupSort nodes == dedupSort actualNodes)
+
+        return AmuletRules_UnhideValidatorRewardCouponsV2Result {}
 
     -- Choice to cleanup the state of stuck dry-runs in case getting them unstuck is too expensive.
     nonconsuming choice AmuletRules_ArchiveDryRunRewardAccountingV2 : AmuletRules_ArchiveDryRunRewardAccountingV2Result
@@ -1553,6 +1646,21 @@ summarizeAndConsumeInputs csum dso sender inps = do
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
         totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
+    summarizeAndConsumeInput _round s (InputValidatorRewardCouponV2 couponCid) = do
+      coupon <- fetchAndArchive forOwner couponCid
+      assertWithinDeadline "ValidatorRewardCouponV2.expiresAt" coupon.expiresAt
+      return TransferInputsSummary with
+        totalAmuletAmount = s.totalAmuletAmount
+        totalAppRewardAmount = s.totalAppRewardAmount
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount + coupon.amount
+        totalUnclaimedActivityRecordAmount = s.totalUnclaimedActivityRecordAmount
+        totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
+        totalSvRewardAmount = s.totalSvRewardAmount
+        totalHoldingFees = s.totalHoldingFees
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
+
     summarizeAndConsumeValidatorFaucetInput s couponCid = do
       coupon <- fetchAndArchive forOwner couponCid
       -- compute balance change
@@ -1895,6 +2003,7 @@ data TransferInput
   | InputUnclaimedActivityRecord (ContractId UnclaimedActivityRecord)
   | InputDevelopmentFundCoupon (ContractId DevelopmentFundCoupon)
   | InputRewardCouponV2 (ContractId RewardCouponV2)
+  | InputValidatorRewardCouponV2 (ContractId ValidatorRewardCouponV2)
   deriving (Eq, Ord, Show, Serializable)
 
 -- | Smart constructor for inputing validator faucet coupons into a transfer.
@@ -2298,12 +2407,16 @@ splitAndBurn eventLogCid sender amount inputs context dso developmentFundManager
   amulet <- fetchAndArchive (ForOwner with dso; owner = sender) amuletCid
   -- record event
   logAmuletBurn dso eventLogCid sender amount usage (toInterfaceContractId amuletCid)
-  -- create validator activity rewards over the whole burn.
-  create ValidatorRewardCoupon with
-    dso
-    round = transferResult.round
-    user = sender
-    amount = amount + sum transferResult.summary.outputFees
+  -- Gate legacy ValidatorRewardCoupon creation: skipped once the round is
+  -- configured for the CIP-0120 traffic-based scheme (batches signed by
+  -- the DSO party produce ValidatorRewardCouponV2 instead).
+  contextMiningRound <- fetchPublicReferenceData (ForDso dso) context.openMiningRound (OpenMiningRound_Fetch dso)
+  when (useAmuletBurnValidatorRewards ((.mintingVersion) <$> contextMiningRound.validatorRewardConfig)) $
+    void $ create ValidatorRewardCoupon with
+      dso
+      round = transferResult.round
+      user = sender
+      amount = amount + sum transferResult.summary.outputFees
   let amuletAsOfRoundZero = amulet.amount.initialAmount + amulet.amount.ratePerRound.rate * intToDecimal amulet.amount.createdAt.number
   -- adjust the balance changes to account for the archival. This primarily matters for the tx log parsers in scan and the wallet.
   let result = transferResult with

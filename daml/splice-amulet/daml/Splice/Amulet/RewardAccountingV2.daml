@@ -41,7 +41,9 @@ template CalculateRewardsV2 with
   where
     signatory dso
 
--- | A minting allowance for a service provider to mint Amulet.
+-- | A minting allowance for a party to mint Amulet.
+-- The 'provider' field holds the app provider under CIP-104
+-- and the validator node under CIP-0120.
 data MintingAllowance = MintingAllowance with
     provider : Party
     amount : Decimal
@@ -49,6 +51,9 @@ data MintingAllowance = MintingAllowance with
 
 type MintingAllowances = [MintingAllowance]
 
+-- | Batch used by both the app-reward and validator-reward flows.
+-- The 'BatchOfMintingAllowances' variant carries the leaf data for either
+-- flow; differentiation happens in the choice that consumes it.
 data Batch
   = BatchOfBatches [CryptoHash.Hash]
   | BatchOfMintingAllowances MintingAllowances

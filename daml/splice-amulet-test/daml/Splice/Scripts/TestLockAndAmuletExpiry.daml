@@ -36,6 +36,7 @@ scaleAmuletConfig amuletPrice config = AmuletConfig with
   developmentFundManagerBlacklist = config.developmentFundManagerBlacklist
   externalPartyConfigStateTickDuration = config.externalPartyConfigStateTickDuration
   rewardConfig = config.rewardConfig
+  validatorRewardConfig = config.validatorRewardConfig
   transferPreapprovalBaseDuration = config.transferPreapprovalBaseDuration
   minDevelopmentFundMintingDelay = config.minDevelopmentFundMintingDelay
   amuletSwitchOverTimes = config.amuletSwitchOverTimes

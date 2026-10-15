@@ -106,6 +106,7 @@ object RewardComputationInputsTest {
       new RelTime(600L * 1000000L),
       trafficPrice,
       rewardConfig,
+      Optional.empty(), // validatorRewardConfig
     )
   }
 

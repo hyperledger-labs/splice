@@ -406,6 +406,8 @@ object SpliceUtil {
       Optional.empty(),
       // amuletSwitchOverTimes
       Optional.empty(),
+      // validatorRewardConfig
+      Optional.empty(),
     )
 
   def defaultAnsConfig(

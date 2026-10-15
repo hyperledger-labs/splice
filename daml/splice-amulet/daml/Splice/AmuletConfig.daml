@@ -88,6 +88,46 @@ data RewardConfig = RewardConfig with
     -- to ignore minting allowances lower than this value.
   deriving (Eq, Show, Serializable)
 
+-- | How validator rewards and their minting allowances are tracked and computed.
+data ValidatorRewardVersion
+  = ValidatorRewardVersion_AmuletBurn
+      -- ^ Weight-based, amulet-burn-triggered coupons (pre CIP-0120).
+  | ValidatorRewardVersion_TrafficBased
+      -- ^ Traffic-based validator rewards introduced in CIP-0120.
+  deriving (Eq, Show, Serializable)
+
+-- | True when the pre-CIP-0120 amulet-burn-triggered ValidatorRewardCoupon
+-- creation should still run for a round. Pre-CIP-0120 network state
+-- (`None`) and explicit AmuletBurn both keep the legacy path; TrafficBased
+-- switches it off in favour of the batch flow signed by the DSO party.
+useAmuletBurnValidatorRewards : Optional ValidatorRewardVersion -> Bool
+useAmuletBurnValidatorRewards rv = case rv of
+  None -> True
+  Some ValidatorRewardVersion_AmuletBurn -> True
+  Some ValidatorRewardVersion_TrafficBased -> False
+
+-- | True when a round should trigger the off-ledger validator-reward
+-- calculation flow (CIP-0120 TBVR).
+useTrafficBasedValidatorRewards : Optional ValidatorRewardVersion -> Bool
+useTrafficBasedValidatorRewards = not . useAmuletBurnValidatorRewards
+
+-- | Configuration for how validator reward accounting and calculation should be performed.
+data ValidatorRewardConfig = ValidatorRewardConfig with
+    mintingVersion : ValidatorRewardVersion
+      -- ^ Scheme to use for minting validator rewards.
+    dryRunVersion : Optional ValidatorRewardVersion
+      -- ^ Scheme to use for dry-run. If None, dry-runs are disabled.
+    batchSize : Int
+      -- ^ Batch size for the Merkle tree over validator allowances.
+    rewardCouponTimeToLive : RelTime
+      -- ^ Time to live for validator reward coupons.
+    confirmingValidatorRewardPercentage : Decimal
+      -- ^ Fraction of each activity record's weight assigned to confirming
+      -- validators (0.3 in CIP-0120).
+    maximumDecentralizationValue : Int
+      -- ^ Cap on the per-party fault-tolerance denominator (7 in CIP-0120).
+  deriving (Eq, Show, Serializable)
+
 
 -- Full AmuletConfig
 --------------------
@@ -119,6 +159,8 @@ data AmuletConfig unit = AmuletConfig with
       -- ^ Minimum delay between allocation and minting. Default: 0 days.
     amuletSwitchOverTimes : Optional (TextMap Time)
       -- ^ Timepoints for synchronized switch-overs of amulet functionality both on and off-ledger.
+    validatorRewardConfig : Optional ValidatorRewardConfig
+      -- ^ Configuration for validator reward accounting under CIP-0120. If None, the pre-CIP-0120 amulet-burn-triggered mechanism is used.
   deriving (Eq, Show, Serializable)
 
 getExternalPartyConfigStateTickDuration : AmuletConfig a -> RelTime
@@ -151,6 +193,7 @@ validAmuletConfig AmuletConfig
     , transferPreapprovalFee
     , featuredAppActivityMarkerAmount
     , rewardConfig
+    , validatorRewardConfig
     , minDevelopmentFundMintingDelay
     }
   =
@@ -163,6 +206,7 @@ validAmuletConfig AmuletConfig
     optional True (>= 0.0) featuredAppActivityMarkerAmount &&
     featuredAppActivityMarkerAmount == Some transferConfig.extraFeaturedAppRewardAmount &&
     optional True validRewardConfig rewardConfig &&
+    optional True validValidatorRewardConfig validatorRewardConfig &&
     optional True (>= days 0) minDevelopmentFundMintingDelay
 
 validTransferConfig : TransferConfig unit -> Bool
@@ -199,6 +243,20 @@ validRewardConfig (RewardConfig
     rewardCouponTimeToLive > hours 0 &&
     appRewardCouponThreshold >= 0.0
 
+validValidatorRewardConfig : ValidatorRewardConfig -> Bool
+validValidatorRewardConfig (ValidatorRewardConfig
+  _mintingVersion
+  _dryRunVersion
+  batchSize
+  rewardCouponTimeToLive
+  confirmingValidatorRewardPercentage
+  maximumDecentralizationValue) =
+    batchSize > 0 &&
+    rewardCouponTimeToLive > hours 0 &&
+    confirmingValidatorRewardPercentage >= 0.0 &&
+    confirmingValidatorRewardPercentage <= 1.0 &&
+    maximumDecentralizationValue > 0
+
 -- | The package config defines for each daml package (identified by name)
 -- the package version that should be used for command submissions
 -- at that point.
@@ -221,6 +279,9 @@ validPackageConfig _ = True
 instance Patchable RewardVersion where
   patch = patchScalar
 
+instance Patchable ValidatorRewardVersion where
+  patch = patchScalar
+
 instance Patchable (AmuletConfig USD) where
   patch new base current = AmuletConfig with
     transferConfig = patch new.transferConfig base.transferConfig current.transferConfig
@@ -238,6 +299,7 @@ instance Patchable (AmuletConfig USD) where
     transferPreapprovalBaseDuration = patch new.transferPreapprovalBaseDuration base.transferPreapprovalBaseDuration current.transferPreapprovalBaseDuration
     minDevelopmentFundMintingDelay = patch new.minDevelopmentFundMintingDelay base.minDevelopmentFundMintingDelay current.minDevelopmentFundMintingDelay
     amuletSwitchOverTimes = patch new.amuletSwitchOverTimes base.amuletSwitchOverTimes current.amuletSwitchOverTimes
+    validatorRewardConfig = patch new.validatorRewardConfig base.validatorRewardConfig current.validatorRewardConfig
 
 instance Patchable RewardConfig where
   patch new base current = RewardConfig with
@@ -246,6 +308,15 @@ instance Patchable RewardConfig where
     batchSize = patch new.batchSize base.batchSize current.batchSize
     rewardCouponTimeToLive = patch new.rewardCouponTimeToLive base.rewardCouponTimeToLive current.rewardCouponTimeToLive
     appRewardCouponThreshold = patch new.appRewardCouponThreshold base.appRewardCouponThreshold current.appRewardCouponThreshold
+
+instance Patchable ValidatorRewardConfig where
+  patch new base current = ValidatorRewardConfig with
+    mintingVersion = patch new.mintingVersion base.mintingVersion current.mintingVersion
+    dryRunVersion = patch new.dryRunVersion base.dryRunVersion current.dryRunVersion
+    batchSize = patch new.batchSize base.batchSize current.batchSize
+    rewardCouponTimeToLive = patch new.rewardCouponTimeToLive base.rewardCouponTimeToLive current.rewardCouponTimeToLive
+    confirmingValidatorRewardPercentage = patch new.confirmingValidatorRewardPercentage base.confirmingValidatorRewardPercentage current.confirmingValidatorRewardPercentage
+    maximumDecentralizationValue = patch new.maximumDecentralizationValue base.maximumDecentralizationValue current.maximumDecentralizationValue
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with

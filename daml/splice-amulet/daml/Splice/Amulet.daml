@@ -477,6 +477,41 @@ template RewardCouponV2
       rewardCoupon_assignBeneficiariesImpl self arg = rewardCouponV2_assignBeneficiariesImpl this self arg
 
 
+-- | A coupon for receiving traffic-based validator rewards under CIP-0120.
+-- See Splice.Amulet.ValidatorRewardAccountingV2 for the batch-processing side.
+template ValidatorRewardCouponV2
+  with
+    dso : Party
+    node : Party -- ^ The validator node that earned the minting right.
+    round : Round -- ^ The round in which the node's activity was recorded.
+    amount : Decimal -- ^ The amount of reward that can be minted for this coupon. Denominated in Amulet.
+    expiresAt : Time -- ^ Time-based expiry. Used to determine when the reward can no longer be minted.
+    nodeIsObserver : Bool
+      -- ^ Whether the node should be an observer, which they are unless
+      -- their vetting state at the time of coupon creation does not allow it.
+      -- DSO automation will then attempt to make the node an observer when they
+      -- change their vetting state unless the coupon expired in the meantime.
+    beneficiary : Optional Party
+      -- ^ The party that can mint the reward for the activity by the node.
+      -- If not set, this is the node.
+  where
+    signatory dso
+    observer if nodeIsObserver then [node] ++ optionalToList beneficiary else []
+    ensure amount > 0.0
+
+    interface instance Api.RewardAssignmentV1.RewardCoupon for ValidatorRewardCouponV2 where
+      view = Api.RewardAssignmentV1.RewardCouponView with
+        dso
+        provider = node
+        beneficiary
+        amount
+        expiresAt
+        meta = Api.Token.MetadataV1.emptyMetadata
+        maxNumNewBeneficiaries = maxNumNewCouponV2Beneficiaries
+
+      rewardCoupon_assignBeneficiariesImpl self arg = validatorRewardCouponV2_assignBeneficiariesImpl this self arg
+
+
 -- | A coupon for receiving validator rewards proportional to the usage fee paid by a user
 -- hosted by a validator operator.
 template ValidatorRewardCoupon
@@ -695,6 +730,42 @@ rewardCouponV2_assignBeneficiariesImpl coupon _self arg = do
   return Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiariesResult with
     newBeneficiariesCouponCids = perBeneficiaryCids
 
+-- | Implementation of the 'RewardCoupon_AssignBeneficiaries' choice for 'ValidatorRewardCouponV2'.
+validatorRewardCouponV2_assignBeneficiariesImpl
+  : ValidatorRewardCouponV2
+  -> ContractId Api.RewardAssignmentV1.RewardCoupon
+  -> Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries
+  -> Update Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiariesResult
+validatorRewardCouponV2_assignBeneficiariesImpl coupon _self arg = do
+  let newBeneficiaries = arg.newBeneficiaries
+  require "Beneficiary has not been assigned yet" (isNone coupon.beneficiary)
+  require "Beneficaries are unique" (unique (map (.beneficiary) newBeneficiaries))
+  require "Beneficiary percentages are between 0.0 and 1.0"
+    (all (\b -> 0.0 < b.percentage && b.percentage <= 1.0) newBeneficiaries)
+  require "Beneficiary percentages add up to 1.0" (sum (map (.percentage) newBeneficiaries) == 1.0)
+  require ("No more than " <> show maxNumNewCouponV2Beneficiaries <> " beneficiaries assigned")
+    (length newBeneficiaries <= maxNumNewCouponV2Beneficiaries)
+
+  additionalCoupons <- forA arg.additionalCoupons $ \cid -> do
+    c <- fetchAndArchive (ForOwner with dso = coupon.dso; owner = coupon.node) (fromInterfaceContractId @ValidatorRewardCouponV2 cid)
+    require "Additional coupon has not been assigned yet" (isNone c.beneficiary)
+    require "Additional coupon has same node" (c.node == coupon.node)
+    pure c
+
+  let allCoupons = coupon :: additionalCoupons
+
+  -- create coupons for new beneficiaries for each coupon
+  perBeneficiaryCids <- forA newBeneficiaries $ \newBeneficiary -> do
+    cids <- forA allCoupons $ \c ->
+      toInterfaceContractId <$> create c with
+        amount = c.amount * newBeneficiary.percentage
+        beneficiary = Some newBeneficiary.beneficiary
+        nodeIsObserver = True
+    pure (newBeneficiary.beneficiary, cids)
+
+  return Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiariesResult with
+    newBeneficiariesCouponCids = perBeneficiaryCids
+
 -- tx history v2 logging
 ------------------------
 
@@ -741,6 +812,12 @@ instance HasCheckedFetch RewardCouponV2 ForOwner where
 
 instance HasCheckedFetch RewardCouponV2 ForDso where
   contractGroupId RewardCouponV2{..} = ForDso with dso
+
+instance HasCheckedFetch ValidatorRewardCouponV2 ForOwner where
+  contractGroupId ValidatorRewardCouponV2{..} = ForOwner with dso; owner = fromOptional node beneficiary
+
+instance HasCheckedFetch ValidatorRewardCouponV2 ForDso where
+  contractGroupId ValidatorRewardCouponV2{..} = ForDso with dso
 
 instance HasCheckedFetch Api.RewardAssignmentV1.RewardCouponView ForOwner where
   contractGroupId Api.RewardAssignmentV1.RewardCouponView{..} =

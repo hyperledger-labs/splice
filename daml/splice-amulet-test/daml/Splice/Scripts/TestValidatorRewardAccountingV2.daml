@@ -1,0 +1,361 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestValidatorRewardAccountingV2 where
+
+import DA.Action (void)
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.List (sortOn)
+import DA.Map qualified as Map
+import DA.Set qualified as Set
+import DA.Time
+
+import Daml.Script
+
+import Splice.Amulet
+import Splice.Amulet.CryptoHash qualified as CryptoHash
+import Splice.Amulet.RewardAccountingV2 (Batch(..), MintingAllowance(..))
+import Splice.Amulet.ValidatorRewardAccountingV2
+import Splice.AmuletConfig
+import Splice.AmuletRules
+import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
+import Splice.Types
+
+import Splice.Scripts.Util
+import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultAmuletConfig)
+import Splice.Testing.Utils (emptyExtraArgs)
+import Splice.Scripts.TestTransferPreapproval (createTransferPreapproval)
+
+sampleValidatorRewardConfig : ValidatorRewardConfig
+sampleValidatorRewardConfig = ValidatorRewardConfig with
+  mintingVersion = ValidatorRewardVersion_TrafficBased
+  dryRunVersion = None
+  batchSize = 100
+  rewardCouponTimeToLive = hours 36
+  confirmingValidatorRewardPercentage = 0.3
+  maximumDecentralizationValue = 7
+
+-- TransferPreapproval_Send routes through splitAndBurn to pay the
+-- preapproval fee. With TrafficBased in force the legacy
+-- ValidatorRewardCoupon creation is gated off.
+test_splitAndBurn_traffic_based_skips_coupon : Script ()
+test_splitAndBurn_traffic_based_skips_coupon = do
+  app <- setupAppWithConfig
+    (defaultAmuletConfig with validatorRewardConfig = Some sampleValidatorRewardConfig)
+  (alice, aliceValidator) <- setupSelfHostedUser app "alice"
+  (bob, _bobValidator) <- setupSelfHostedUser app "bob"
+  runNextIssuance app
+  runAmuletDepositBots app
+
+  now <- getTime
+  transferPreapprovalCid <- createTransferPreapproval
+    alice.primaryParty aliceValidator.primaryParty app.dso (now `addRelTime` days 1)
+  context <- getPaymentTransferContext app bob
+  amuletCid <- tap app bob 50.0
+  _ <- submit (actAs bob.primaryParty <> readAs app.dso) $
+    exerciseCmd transferPreapprovalCid TransferPreapproval_Send with
+      sender = bob.primaryParty
+      context
+      inputs = [InputAmulet amuletCid]
+      amount = 10.0
+      description = None
+
+  coupons <- query @ValidatorRewardCoupon app.dso
+  assertMsg "no ValidatorRewardCoupon should be created under TrafficBased" (null coupons)
+
+-- Exercise RewardCoupon_AssignBeneficiaries via the interface. Split the
+-- original coupon 60/40 between two new beneficiaries; verify the
+-- original is archived and each beneficiary owns a new coupon with the
+-- correct share of the amount.
+test_ValidatorRewardCouponV2_assign_beneficiaries : Script ()
+test_ValidatorRewardCouponV2_assign_beneficiaries = do
+  app <- setupApp
+  node <- allocateParty "validator-node"
+  bob <- allocateParty "bob"
+  charlie <- allocateParty "charlie"
+  now <- getTime
+  let expiresAt = now `addRelTime` hours 36
+  couponCid <- submit app.dso $ createCmd ValidatorRewardCouponV2 with
+    dso = app.dso
+    node
+    round = Round 0
+    amount = 100.0
+    expiresAt
+    nodeIsObserver = True
+    beneficiary = None
+  let percentages = [(bob, 0.6), (charlie, 0.4)]
+  result <- submit (actAs node <> readAs app.dso) $
+    exerciseCmd (toInterfaceContractId @Api.RewardAssignmentV1.RewardCoupon couponCid)
+      Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+        additionalCoupons = []
+        newBeneficiaries = map (uncurry Api.RewardAssignmentV1.RewardBeneficiary) percentages
+        extraArgs = emptyExtraArgs
+  None <- queryContractId node couponCid
+  forA_ result.newBeneficiariesCouponCids $ \(beneficiary, cids) -> do
+    let Some (_, percentage) = find (\(p, _) -> p == beneficiary) percentages
+    length cids === 1
+    forA_ cids $ \cid -> do
+      Some newCoupon <- queryContractId beneficiary (fromInterfaceContractId @ValidatorRewardCouponV2 cid)
+      newCoupon.node === node
+      newCoupon.beneficiary === Some beneficiary
+      newCoupon.amount === 100.0 * percentage
+      newCoupon.nodeIsObserver === True
+      newCoupon.round === Round 0
+  pure ()
+
+-- ProcessBatch rejects when the supplied batch's hash does not match the
+-- batchHash the ProcessValidatorRewardsV2 contract was created with.
+test_ProcessValidatorRewardsV2_rejects_hash_mismatch : Script ()
+test_ProcessValidatorRewardsV2_rejects_hash_mismatch = do
+  app <- setupApp
+  alice <- allocateParty "validator-alice"
+  now <- getTime
+  let originalBatch = BatchOfMintingAllowances [MintingAllowance alice 100.0]
+  let tamperedBatch = BatchOfMintingAllowances [MintingAllowance alice 999.0]
+
+  processCid <- submit app.dso $ createCmd ProcessValidatorRewardsV2 with
+    dso = app.dso
+    round = Round 0
+    roundClosedAt = now
+    dryRun = False
+    rewardCouponTimeToLive = hours 36
+    batchHash = CryptoHash.hash originalBatch
+
+  submitMustFail app.dso $ exerciseCmd processCid ProcessValidatorRewardsV2_ProcessBatch with
+    batch = tamperedBatch
+    nodesWithWrongVettingState = Set.empty
+
+-- Unhide rejects a coupon whose node is already an observer.
+test_UnhideValidatorRewardCouponsV2_rejects_already_observable : Script ()
+test_UnhideValidatorRewardCouponsV2_rejects_already_observable = do
+  app <- setupApp
+  node <- allocateParty "validator-node"
+  now <- getTime
+  observableCid <- submit app.dso $ createCmd ValidatorRewardCouponV2 with
+    dso = app.dso
+    node
+    round = Round 0
+    amount = 100.0
+    expiresAt = now `addRelTime` hours 36
+    nodeIsObserver = True
+    beneficiary = None
+
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_UnhideValidatorRewardCouponsV2 with
+    rewardCouponCids = [observableCid]
+    nodes = [node]
+
+-- Claim expired archives the coupon and produces an UnclaimedReward for
+-- its amount once the coupon's expiresAt has passed.
+test_ClaimExpiredValidatorRewardsV2_happy_path : Script ()
+test_ClaimExpiredValidatorRewardsV2_happy_path = do
+  app <- setupApp
+  node <- allocateParty "validator-node"
+  now <- getTime
+  let expiresAt = now `addRelTime` hours 1
+  couponCid <- submit app.dso $ createCmd ValidatorRewardCouponV2 with
+    dso = app.dso
+    node
+    round = Round 0
+    amount = 100.0
+    expiresAt
+    nodeIsObserver = True
+    beneficiary = None
+  setTime $ expiresAt `addRelTime` minutes 1
+
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  _ <- submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_ClaimExpiredValidatorRewardsV2 with
+    rewardCouponCids = [couponCid]
+    expiryObservers = [node]
+
+  None <- queryContractId app.dso couponCid
+  unclaimed <- query @UnclaimedReward app.dso
+  case unclaimed of
+    [(_, r)] -> r.amount === 100.0
+    _ -> fail "expected exactly one UnclaimedReward after expiry"
+
+-- Claim expired rejects a coupon that is still within its deadline.
+test_ClaimExpiredValidatorRewardsV2_rejects_deadline_not_exceeded : Script ()
+test_ClaimExpiredValidatorRewardsV2_rejects_deadline_not_exceeded = do
+  app <- setupApp
+  node <- allocateParty "validator-node"
+  now <- getTime
+  couponCid <- submit app.dso $ createCmd ValidatorRewardCouponV2 with
+    dso = app.dso
+    node
+    round = Round 0
+    amount = 100.0
+    expiresAt = now `addRelTime` hours 36
+    nodeIsObserver = True
+    beneficiary = None
+
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_ClaimExpiredValidatorRewardsV2 with
+    rewardCouponCids = [couponCid]
+    expiryObservers = [node]
+
+-- Claim expired rejects when the supplied expiryObservers don't match
+-- the parties that would be observers of the archived coupons.
+test_ClaimExpiredValidatorRewardsV2_rejects_wrong_observer_set : Script ()
+test_ClaimExpiredValidatorRewardsV2_rejects_wrong_observer_set = do
+  app <- setupApp
+  node <- allocateParty "validator-node"
+  intruder <- allocateParty "intruder"
+  now <- getTime
+  let expiresAt = now `addRelTime` hours 1
+  couponCid <- submit app.dso $ createCmd ValidatorRewardCouponV2 with
+    dso = app.dso
+    node
+    round = Round 0
+    amount = 100.0
+    expiresAt
+    nodeIsObserver = True
+    beneficiary = None
+  setTime $ expiresAt `addRelTime` minutes 1
+
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_ClaimExpiredValidatorRewardsV2 with
+    rewardCouponCids = [couponCid]
+    expiryObservers = [intruder]
+
+
+-- End-to-end coverage of the CIP-0120 validator flow: round-close creates
+-- a CalculateValidatorRewardsV2; the DSO party starts processing with a
+-- root batch hash; recursive ProcessValidatorRewardsV2_ProcessBatch calls
+-- unfold the Merkle tree and create coupons; hidden coupons are
+-- unhidden once nodes vet; each coupon mints an amulet.
+
+create_and_process_validator_reward_batches :
+  Bool -> Script (Script (), (AmuletApp, Party, Party, Party, Party))
+create_and_process_validator_reward_batches dryRun = do
+  app <- setupAppWithConfig $ defaultAmuletConfig with
+    validatorRewardConfig = Some $ ValidatorRewardConfig with
+      mintingVersion = if dryRun then ValidatorRewardVersion_AmuletBurn else ValidatorRewardVersion_TrafficBased
+      dryRunVersion = if dryRun then Some ValidatorRewardVersion_TrafficBased else None
+      batchSize = 100
+      rewardCouponTimeToLive = hours 36
+      confirmingValidatorRewardPercentage = 0.3
+      maximumDecentralizationValue = 7
+
+  alice <- allocateParty "Alice"
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+  dora <- allocateParty "Dora"
+
+  runNextIssuance app  -- triggers CalculateValidatorRewardsV2 creation
+
+  let allowances1 = sortOn (.provider)
+        [ MintingAllowance alice 1000.0
+        , MintingAllowance bob 2000.0
+        ]
+  let allowances2 = sortOn (.provider)
+        [ MintingAllowance charlie 30.0
+        , MintingAllowance dora 5.1
+        ]
+  let b1 = BatchOfMintingAllowances allowances1
+  let b2 = BatchOfMintingAllowances allowances2
+  let rootBatch = BatchOfBatches [CryptoHash.hash b1, CryptoHash.hash b2]
+  let rootBatchHash = CryptoHash.hash rootBatch
+  -- bob and dora are simulated as having wrong vetting state
+  let batchesWithHiding = [(b1, [bob]), (b2, [dora]), (rootBatch, [])]
+
+  [(calculateCid, _)] <- query @CalculateValidatorRewardsV2 app.dso
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+
+  _ <- submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_StartProcessingValidatorRewardsV2 with
+    calculateRewardsCid = calculateCid
+    batchHash = rootBatchHash
+
+  let processBatches = do
+        states <- query @ProcessValidatorRewardsV2 app.dso
+        forA_ states $ \(processCid, process) -> do
+          let Some (b, badVettingState) =
+                find (\(b, _) -> CryptoHash.hash b == process.batchHash) batchesWithHiding
+          void $ submit app.dso $ exerciseCmd processCid
+            ProcessValidatorRewardsV2_ProcessBatch with
+              batch = b
+              nodesWithWrongVettingState = Set.fromList badVettingState
+
+  pure (processBatches, (app, alice, bob, charlie, dora))
+
+-- Four nodes; bob and dora are hidden at creation time. Verify created
+-- coupons match expected, unhiding flips their observer field, and each
+-- node can mint its coupon into an amulet.
+test_validator_reward_accounting_v2 : Script ()
+test_validator_reward_accounting_v2 = do
+  (processBatches, (app, alice, bob, charlie, dora)) <- create_and_process_validator_reward_batches False
+
+  processBatches  -- root hash → child batch hashes
+  processBatches  -- child batch hashes → coupons
+
+  [] <- query @CalculateValidatorRewardsV2 app.dso
+  [] <- query @ProcessValidatorRewardsV2 app.dso
+
+  now <- getTime
+  let couponExpiryTime = now `addRelTime` hours 36
+  let expectedAmounts = [(alice, 1000.0), (bob, 2000.0), (charlie, 30.0), (dora, 5.1)]
+  let expectedCoupons = do
+        (node, amount) <- expectedAmounts
+        pure ValidatorRewardCouponV2 with
+          dso = app.dso
+          node
+          amount
+          round = Round 0
+          expiresAt = couponExpiryTime
+          nodeIsObserver = node `notElem` [bob, dora]
+          beneficiary = None
+
+  actualCoupons0 <- query @ValidatorRewardCouponV2 app.dso
+  let actualCoupons = sortOn (.node) $ fmap snd actualCoupons0
+  actualCoupons === expectedCoupons
+
+  -- unhide bob's and dora's coupons (simulate them changing their vetting state)
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  unobservableCoupons <- queryFilter @ValidatorRewardCouponV2 app.dso (\c -> not c.nodeIsObserver)
+  void $ submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_UnhideValidatorRewardCouponsV2 with
+    rewardCouponCids = map fst unobservableCoupons
+    nodes = map (._2.node) unobservableCoupons
+
+  couponsAfterUnhiding <- query @ValidatorRewardCouponV2 app.dso
+  sortOn (.node) (map snd couponsAfterUnhiding) ===
+    map (\c -> c with nodeIsObserver = True) expectedCoupons
+
+  -- mint each coupon and verify an amulet was created for the node
+  couponCids <- query @ValidatorRewardCouponV2 app.dso
+  (openMiningRound, _) <- getLatestOpenRound app
+  let ctx = TransferContext with
+        openMiningRound
+        issuingMiningRounds = Map.empty
+        validatorRights = Map.empty
+        featuredAppRight = None
+  forA_ couponCids $ \(couponCid, coupon) -> do
+    void $ submitExerciseAmuletRulesByKey app [coupon.node] [] AmuletRules_Transfer with
+      transfer = Transfer with
+        sender = coupon.node
+        provider = coupon.node
+        inputs = [InputValidatorRewardCouponV2 couponCid]
+        outputs = []
+        beneficiaries = None
+      context = ctx
+      expectedDso = Some app.dso
+    amulets <- queryFilter @Splice.Amulet.Amulet coupon.node (\a -> a.owner == coupon.node)
+    assertMsg
+      ("expected at least one Amulet for " <> show coupon.node)
+      (not (null amulets))
+
+-- Dry-run: batches are processed but no coupons are created, and the
+-- state contracts are archived just as in the happy path.
+test_validator_reward_accounting_v2_dry_run : Script ()
+test_validator_reward_accounting_v2_dry_run = do
+  (processBatches, (app, _, _, _, _)) <- create_and_process_validator_reward_batches True
+
+  processBatches
+  processBatches
+
+  [] <- query @CalculateValidatorRewardsV2 app.dso
+  [] <- query @ProcessValidatorRewardsV2 app.dso
+
+  -- no coupons created in dry-run mode
+  [] <- query @ValidatorRewardCouponV2 app.dso
+  pure ()

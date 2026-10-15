@@ -1,0 +1,104 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Validator-reward accounting based on off-ledger calculations (CIP-0120).
+-- Uses the shared 'MintingAllowance' and 'Batch' types from
+-- 'Splice.Amulet.RewardAccountingV2'; the choice bodies here differentiate
+-- the validator flow from the app-reward flow.
+module Splice.Amulet.ValidatorRewardAccountingV2 where
+
+import DA.Action (unless)
+import DA.Foldable (forA_)
+import DA.Set as Set
+import DA.Time
+
+import Splice.Amulet.CryptoHash qualified as CryptoHash
+import Splice.Amulet
+import Splice.Amulet.RewardAccountingV2 (Batch(..), MintingAllowance(..), batchProviders)
+import Splice.Types
+import Splice.Util
+
+-- | State contract tracking the need to calculate and confirm the validator
+-- reward amounts for the given round.
+template CalculateValidatorRewardsV2 with
+    dso : Party
+    round : Round
+    roundClosedAt : Time
+      -- ^ The time at which the round was closed. Equal to the creation time
+      -- of this contract. Stored for debugging and metrics.
+    rewardCouponTimeToLive : RelTime
+      -- ^ Copied from the AmuletConfig at round-open time so the value can't drift
+      -- if the config changes while processing is in flight.
+    dryRun : Bool
+      -- ^ Whether to only simulate the confirmation without creating any
+      -- ValidatorRewardCouponV2 contracts.
+  where
+    signatory dso
+
+data ProcessValidatorRewardsV2_ProcessBatchResult = ProcessValidatorRewardsV2_ProcessBatchResult {}
+  deriving (Eq, Show, Serializable)
+
+-- | State contract tracking outstanding processing of validator rewards for a
+-- given round and batch hash.
+template ProcessValidatorRewardsV2 with
+    dso : Party
+    round : Round
+    roundClosedAt : Time
+      -- ^ The time at which the round was closed.
+      --
+      -- Copied from the originating CalculateValidatorRewardsV2 contract.
+      -- Stored for debugging and metrics.
+    dryRun : Bool -- ^ Whether to only simulate the processing without creating any ValidatorRewardCouponV2 contracts.
+    rewardCouponTimeToLive : RelTime
+    batchHash : CryptoHash.Hash
+  where
+    signatory dso
+
+    choice ProcessValidatorRewardsV2_ProcessBatch : ProcessValidatorRewardsV2_ProcessBatchResult
+      with
+        batch : Batch
+        nodesWithWrongVettingState : Set Party
+          -- ^ Validator nodes that do not have the correct vetting state for receiving rewards.
+      observer batchProviders nodesWithWrongVettingState batch
+      controller dso
+      do
+        let actualHash = CryptoHash.hash batch
+        require "batch hash matches" (actualHash == batchHash)
+        case batch of
+          BatchOfBatches batchHashes -> do
+            forA_ batchHashes $ \newBatchHash ->
+              create ProcessValidatorRewardsV2 with
+                dso
+                round
+                roundClosedAt
+                rewardCouponTimeToLive
+                dryRun
+                batchHash = newBatchHash
+          BatchOfMintingAllowances mintingAllowances -> do
+            unless dryRun $ do
+              -- Coupon expiry is determined here based on the time of creation to
+              -- ensure nodes get the full rewardCouponTimeToLive duration to redeem,
+              -- independent of how long processing takes and how many batches there are.
+              now <- getTime
+              let expiresAt = now `addRelTime` rewardCouponTimeToLive
+              forA_ mintingAllowances $ \MintingAllowance{..} ->
+                create ValidatorRewardCouponV2 with
+                  dso
+                  round
+                  node = provider
+                  amount
+                  expiresAt
+                  nodeIsObserver =
+                    not $ Set.member provider nodesWithWrongVettingState
+                  beneficiary = None
+
+        return ProcessValidatorRewardsV2_ProcessBatchResult {}
+
+
+-- instances
+
+instance HasCheckedFetch ProcessValidatorRewardsV2 ForDso where
+  contractGroupId ProcessValidatorRewardsV2 with .. = ForDso with ..
+
+instance HasCheckedFetch CalculateValidatorRewardsV2 ForDso where
+  contractGroupId CalculateValidatorRewardsV2 with .. = ForDso with ..
