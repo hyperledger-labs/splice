@@ -20,7 +20,7 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 qualified as V2
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
 
-import Splice.Amulet (ValidatorRewardCoupon)
+import Splice.Amulet (ValidatorRewardCoupon(..))
 import Splice.AmuletTransferInstruction
 import Splice.Amulet.TokenApiUtils
 import Splice.DecentralizedSynchronizer (MemberTraffic(..))
@@ -194,8 +194,9 @@ test_transferFactory_TransferV2_trafficPurchase = do
   traffic.amuletSpent === amount
   traffic.usdSpent === 5.0
   WalletClientV2.checkBalance alice instrId (50.0 - amount)
-  coupons <- query @ValidatorRewardCoupon dso
-  coupons === []
+  [(_, coupon)] <- query @ValidatorRewardCoupon dso
+  coupon.user === alice
+  coupon.amount === amount
 
 test_transferFactory_PublicFetchV2 : Script ()
 test_transferFactory_PublicFetchV2  = do

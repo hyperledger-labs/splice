@@ -558,7 +558,7 @@ class TokenStandardV2TransferIntegrationTest
     }
 
     "buy traffic through a transfer to the traffic purchase receiver" in { implicit env =>
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(100)
 
       val memberId = aliceValidatorBackend.participantClient.id
@@ -603,6 +603,15 @@ class TokenStandardV2TransferIntegrationTest
         value.receiverHoldingCids shouldBe empty
       }
       balanceBefore - aliceWalletClient.balance().unlockedQty shouldBe spentAmuletAmount
+
+      clue("Alice's validator gets a validator reward coupon for the purchase") {
+        eventually() {
+          aliceValidatorWalletClient
+            .listValidatorRewardCoupons()
+            .filter(_.payload.user == aliceParty.toProtoPrimitive)
+            .map(coupon => BigDecimal(coupon.payload.amount)) should contain(spentAmuletAmount)
+        }
+      }
 
       checkTxHistory(
         aliceWalletClient,

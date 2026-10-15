@@ -225,6 +225,10 @@ registryApi_getTransferFactory
 registryApi_getTransferFactory registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
   transferC <- getExternalPartyConfigStateContext registry
+  openRoundC <-
+    if arg.transfer.receiver == trafficPurchaseReceiver
+      then getOpenRoundContext registry
+      else pure emptyOpenApiChoiceContext
   let isSelfTransfer = arg.transfer.sender == arg.transfer.receiver
   (optPreapproval, preapprovalC) <-
     if isSelfTransfer
@@ -234,7 +238,7 @@ registryApi_getTransferFactory registry arg = do
     None -> pure emptyOpenApiChoiceContext
     Some preapproval -> getFeaturedAppRightContext registry preapproval.provider
   let fullContext = withExtraDisclosures extAmuletRulesD
-        (transferC <> preapprovalC <> featuredAppRightC)
+        (transferC <> openRoundC <> preapprovalC <> featuredAppRightC)
   pure EnrichedFactoryChoice with
     factoryCid = toInterfaceContractId @TransferFactory extAmuletRulesCid
     arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
@@ -387,6 +391,15 @@ lookupPreapprovalWithContext registry receiver = do
           choiceContext = mkAmuletContext $
             TextMap.fromList [(transferPreapprovalContextKey, AV_ContractId (coerceContractId preapprovalCid))]
         )
+
+getOpenRoundContext : AmuletRegistry -> Script OpenApiChoiceContext
+getOpenRoundContext registry = do
+  (openRoundCid, _) <- getLatestOpenRound registry
+  openRoundD <- queryDisclosure' @OpenMiningRound registry.dso openRoundCid
+  pure OpenApiChoiceContext with
+    choiceContext = mkAmuletContext $ TextMap.fromList
+        [(openRoundContextKey, AV_ContractId $ coerceContractId openRoundCid)]
+    disclosures = openRoundD
 
 getFeaturedAppRightContext : AmuletRegistry -> Party -> Script OpenApiChoiceContext
 getFeaturedAppRightContext registry provider = do

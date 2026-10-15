@@ -13,10 +13,12 @@ import Daml.Script
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
 
-import Splice.Amulet (ValidatorRewardCoupon)
-import Splice.Amulet.TokenApiUtils (reasonMetaKey)
+import Splice.Amulet (ValidatorRewardCoupon(..))
+import Splice.Amulet.TokenApiUtils (externalPartyConfigStateContextKey, getFromContext, openRoundContextKey, reasonMetaKey)
 import Splice.DecentralizedSynchronizer (MemberTraffic(..))
 import Splice.ExternalPartyAmuletRules (trafficPurchaseReceiver)
+import Splice.ExternalPartyConfigState (ExternalPartyConfigState(..))
+import Splice.Round (OpenMiningRound(..))
 
 import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
@@ -81,23 +83,27 @@ memoTagMeta : Text -> Metadata
 memoTagMeta memoTag = Metadata with
   values = TextMap.fromList [(reasonMetaKey, memoTag)]
 
-buyTraffic : TestSetup -> Api.Token.TransferInstructionV1.Transfer -> Script TransferInstructionResult
-buyTraffic TestSetup{..} transfer = do
-  enrichedChoice <- transferFactoryChoice registry transfer
+submitTrafficPurchase
+  : TestSetup -> EnrichedFactoryChoice TransferFactory TransferFactory_Transfer
+  -> Script TransferInstructionResult
+submitTrafficPurchase TestSetup{..} enrichedChoice =
   submitWithDisclosures' alice enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
-buyTrafficMustFail : TestSetup -> Api.Token.TransferInstructionV1.Transfer -> Script ()
-buyTrafficMustFail TestSetup{..} transfer = do
-  enrichedChoice <- transferFactoryChoice registry transfer
-  submitWithDisclosuresMustFail' alice enrichedChoice.disclosures $
-    exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
-
-buyTrafficMustFailWith : FailureStatusCheck -> TestSetup -> Api.Token.TransferInstructionV1.Transfer -> Script ()
-buyTrafficMustFailWith check TestSetup{..} transfer = do
-  enrichedChoice <- transferFactoryChoice registry transfer
+submitTrafficPurchaseMustFailWith
+  : FailureStatusCheck -> TestSetup -> EnrichedFactoryChoice TransferFactory TransferFactory_Transfer
+  -> Script ()
+submitTrafficPurchaseMustFailWith check TestSetup{..} enrichedChoice =
   submitWithDisclosuresMustFail'' check alice enrichedChoice.disclosures $
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+buyTraffic : TestSetup -> Api.Token.TransferInstructionV1.Transfer -> Script TransferInstructionResult
+buyTraffic setup transfer =
+  transferFactoryChoice setup.registry transfer >>= submitTrafficPurchase setup
+
+buyTrafficMustFailWith : FailureStatusCheck -> TestSetup -> Api.Token.TransferInstructionV1.Transfer -> Script ()
+buyTrafficMustFailWith check setup transfer =
+  transferFactoryChoice setup.registry transfer >>= submitTrafficPurchaseMustFailWith check setup
 
 transferFactoryChoice
   : AmuletRegistry.AmuletRegistry -> Api.Token.TransferInstructionV1.Transfer
@@ -107,6 +113,12 @@ transferFactoryChoice registry transfer =
     expectedAdmin = registry.dso
     transfer
     extraArgs = emptyExtraArgs
+
+dropOpenRound
+  : EnrichedFactoryChoice TransferFactory TransferFactory_Transfer
+  -> EnrichedFactoryChoice TransferFactory TransferFactory_Transfer
+dropOpenRound choice = choice with
+  arg.extraArgs.context.values = TextMap.delete openRoundContextKey choice.arg.extraArgs.context.values
 
 -- Happy
 --------
@@ -143,12 +155,34 @@ test_trafficPurchase_spendsEntireInputWithoutChange = script do
   traffic.amuletSpent === initialTap
   traffic.usdSpent === 25.0
 
-test_trafficPurchase_mintsNoValidatorRewardCoupon : Script ()
-test_trafficPurchase_mintsNoValidatorRewardCoupon = script do
+test_trafficPurchase_mintsValidatorRewardCoupon : Script ()
+test_trafficPurchase_mintsValidatorRewardCoupon = script do
   setup@TestSetup{..} <- setupTest
-  _ <- buyTraffic setup defaultTransfer
+  enrichedChoice <- transferFactoryChoice registry defaultTransfer
+  let context = enrichedChoice.arg.extraArgs.context
+  Right openRoundCid <- pure $ getFromContext @(ContractId OpenMiningRound) context openRoundContextKey
+  Right configStateCid <- pure $ getFromContext @(ContractId ExternalPartyConfigState) context externalPartyConfigStateContextKey
+  Some openRound <- queryContractId registry.dso openRoundCid
+  Some configState <- queryContractId registry.dso configStateCid
+  _ <- submitTrafficPurchase setup enrichedChoice
+  [(_, coupon)] <- query @ValidatorRewardCoupon registry.dso
+  coupon.user === alice
+  coupon.amount === oneMegabyteCostAmulet
+  coupon.round === openRound.round
+  assertMsg "coupon round differs from the holding fee round" $
+    coupon.round /= configState.holdingFeesOpenRoundNumber
+
+test_trafficPurchase_forfeitsValidatorRewardCoupon : Script ()
+test_trafficPurchase_forfeitsValidatorRewardCoupon = script do
+  setup@TestSetup{..} <- setupTest
+  let transfer = defaultTransfer with
+        meta = memoTagMeta (defaultMemoTag <> "&forfeitValidatorRewardCoupon=true")
+  enrichedChoice <- dropOpenRound <$> transferFactoryChoice registry transfer
+  _ <- submitTrafficPurchase setup enrichedChoice
   coupons <- query @ValidatorRewardCoupon registry.dso
   coupons === []
+  [(_, traffic)] <- query @MemberTraffic registry.dso
+  traffic.totalPurchased === oneMegabyte
 
 test_trafficPurchase_acceptsMemoTagInAnyOrder : Script ()
 test_trafficPurchase_acceptsMemoTagInAnyOrder = script do
@@ -198,6 +232,12 @@ test_trafficPurchase_rejectsZeroTrafficPrice = rejectsNonPositiveTrafficPrice 0.
 
 test_trafficPurchase_rejectsNegativeTrafficPrice : Script ()
 test_trafficPurchase_rejectsNegativeTrafficPrice = rejectsNonPositiveTrafficPrice (-1.0)
+
+test_trafficPurchase_rejectsMissingOpenRoundWithoutForfeit : Script ()
+test_trafficPurchase_rejectsMissingOpenRoundWithoutForfeit = script do
+  setup@TestSetup{..} <- setupTest
+  enrichedChoice <- dropOpenRound <$> transferFactoryChoice registry defaultTransfer
+  submitTrafficPurchaseMustFailWith (expectMessageContains "forfeitValidatorRewardCoupon=true") setup enrichedChoice
 
 test_trafficPurchase_rejectsExpiredTransfer : Script ()
 test_trafficPurchase_rejectsExpiredTransfer = script do

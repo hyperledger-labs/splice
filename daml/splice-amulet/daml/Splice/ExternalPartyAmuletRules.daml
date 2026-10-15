@@ -421,7 +421,7 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
             Some cid -> pure cid
           openRound <- fetchPublicReferenceData (ForDso dso) openRoundCid (OpenMiningRound_Fetch transfer.sender)
           assertDeadlineExceeded "openRound.opensAt" openRound.opensAt
-          pure (IssueValidatorRewardCouponForRound openRound.round)
+          pure (IssueValidatorRewardCoupon openRound.round)
     let trafficCostUsd = transfer.amount * csum.amuletPrice
         purchase = MemberTrafficPurchase with
           provider = transfer.sender
