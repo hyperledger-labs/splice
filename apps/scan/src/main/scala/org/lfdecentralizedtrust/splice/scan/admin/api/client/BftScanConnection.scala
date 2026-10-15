@@ -50,6 +50,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAp
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoScan
 import org.lfdecentralizedtrust.splice.scan.config.{ScanAppClientConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkObjectKind
 import org.lfdecentralizedtrust.splice.store.{DsoRulesStore, VoteResultsFilters}
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BulkStorageObjects
@@ -950,14 +951,16 @@ class BftScanConnection(
 
   override def getBulkObjectChecksums(
       requiredCatchupTimestamp: CantonTimestamp,
+      kind: BulkObjectKind,
       objectKeys: Seq[String],
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[GetBulkObjectChecksumsResponse] =
-    getBulkObjectChecksumsOutcome(requiredCatchupTimestamp, objectKeys)
+    getBulkObjectChecksumsOutcome(requiredCatchupTimestamp, kind, objectKeys)
       .flatMap(_.toFuture)
       .map(_._1)
 
   def getBulkObjectChecksumsOutcome(
       requiredCatchupTimestamp: CantonTimestamp,
+      kind: BulkObjectKind,
       objectKeys: Seq[String],
   )(implicit
       ec: ExecutionContext,
@@ -968,9 +971,9 @@ class BftScanConnection(
       connectionMetrics,
       retryProvider,
       logger,
-      hasData = _.getBulkObjectsProgress(requiredCatchupTimestamp, BulkStorageBucket.Staging)
+      hasData = _.getBulkObjectsProgress(requiredCatchupTimestamp, BulkStorageBucket.Staging, kind)
         .map(BftScanConnection.dataAvailability),
-      getData = _.getBulkObjectChecksums(requiredCatchupTimestamp, objectKeys),
+      getData = _.getBulkObjectChecksums(requiredCatchupTimestamp, kind, objectKeys),
       endpoint = "getBulkObjectChecksums",
       callConfig = BftCallConfig.default(scanList.scanConnections),
     )
@@ -982,7 +985,11 @@ class BftScanConnection(
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Option[BulkStorageObjects.SnapshotObjects]] =
-    bftCallOnScansCommittedUpTo(atOrBeforeRecordTime, "listBulkAcsSnapshotObjects")(
+    bftCallOnScansCommittedUpTo(
+      atOrBeforeRecordTime,
+      BulkObjectKind.Snapshots,
+      "listBulkAcsSnapshotObjects",
+    )(
       _.listBulkAcsSnapshotObjects(atOrBeforeRecordTime, damlValueEncoding)
     ).flatMap(_.toFuture).map(_._1)
 
@@ -993,7 +1000,11 @@ class BftScanConnection(
       nextPageToken: Option[String],
       damlValueEncoding: Option[DamlValueEncoding],
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[BulkStorageObjects.UpdateObjectsPage] =
-    bftCallOnScansCommittedUpTo(endRecordTime, "listBulkUpdateHistoryObjects")(
+    bftCallOnScansCommittedUpTo(
+      endRecordTime,
+      BulkObjectKind.Updates,
+      "listBulkUpdateHistoryObjects",
+    )(
       _.listBulkUpdateHistoryObjects(
         startRecordTime,
         endRecordTime,
@@ -1010,7 +1021,11 @@ class BftScanConnection(
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[BftOutcome[Option[BulkStorageObjects.SnapshotObjects]]] =
-    bftCallOnScansCommittedUpTo(atOrBeforeRecordTime, "listBulkAcsSnapshotObjects")(
+    bftCallOnScansCommittedUpTo(
+      atOrBeforeRecordTime,
+      BulkObjectKind.Snapshots,
+      "listBulkAcsSnapshotObjects",
+    )(
       _.listBulkAcsSnapshotObjects(atOrBeforeRecordTime, Some(encoding.damlValueEncoding))
     )
 
@@ -1024,7 +1039,11 @@ class BftScanConnection(
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[BftOutcome[BulkStorageObjects.UpdateObjectsPage]] =
-    bftCallOnScansCommittedUpTo(availableAt, "listBulkUpdateHistoryObjects")(
+    bftCallOnScansCommittedUpTo(
+      availableAt,
+      BulkObjectKind.Updates,
+      "listBulkUpdateHistoryObjects",
+    )(
       _.listBulkUpdateHistoryObjects(
         startRecordTime,
         endRecordTime,
@@ -1034,7 +1053,11 @@ class BftScanConnection(
       )
     )
 
-  private def bftCallOnScansCommittedUpTo[T](availableAt: CantonTimestamp, endpoint: String)(
+  private def bftCallOnScansCommittedUpTo[T](
+      availableAt: CantonTimestamp,
+      kind: BulkObjectKind,
+      endpoint: String,
+  )(
       call: SingleScanConnection => Future[T]
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[BftOutcome[T]] =
     BftCallExecutor.bftCallForEventualConsistencyEndpoints(
@@ -1042,7 +1065,7 @@ class BftScanConnection(
       connectionMetrics,
       retryProvider,
       logger,
-      hasData = _.getBulkObjectsProgress(availableAt, BulkStorageBucket.Committed)
+      hasData = _.getBulkObjectsProgress(availableAt, BulkStorageBucket.Committed, kind)
         .map(BftScanConnection.dataAvailability),
       getData = call,
       endpoint = endpoint,

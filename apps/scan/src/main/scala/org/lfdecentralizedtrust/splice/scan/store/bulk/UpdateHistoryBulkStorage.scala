@@ -80,7 +80,7 @@ class UpdateHistoryBulkStorage(
     writer: UpdateHistoryBulkStorageWriter,
     val persistentProgress: UpdateHistoryBulkStoragePersistentProgress,
     appConfig: BulkStorageConfig,
-    backfillingCompleteGate: Source[Boolean, Cancellable],
+    mayStart: Source[Boolean, Cancellable],
     override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, ec: ExecutionContext)
     extends NamedLogging
@@ -134,7 +134,7 @@ class UpdateHistoryBulkStorage(
       tc: TraceContext,
   ): Source[UpdatesSegment, Cancellable] = {
 
-    backfillingCompleteGate.flatMap { _ =>
+    mayStart.flatMap { _ =>
       Source
         .future(persistentProgress.readLatestProcessedSegment)
         .flatMapConcat(getUpdatesSegmentsAfter(_))
