@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.topology.PartyId
+import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   FeaturedAppConfig,
   FeaturedAppRight,
@@ -171,9 +172,12 @@ class FeaturedAppConfigUpdateInstructionTimeBasedIntegrationTest
     val action = new ARC_DsoRules(
       new SRARC_CreateFeaturedAppConfigUpdateInstruction(
         new DsoRules_CreateFeaturedAppConfigUpdateInstruction(
-          providerParty.toProtoPrimitive,
-          new FeaturedAppRight_UpdateConfig(baseConfig, newConfig),
-          java.util.List.of(),
+          java.util.List.of(
+            new Tuple2(
+              providerParty.toProtoPrimitive,
+              new FeaturedAppRight_UpdateConfig(baseConfig, newConfig),
+            )
+          )
         )
       )
     )
