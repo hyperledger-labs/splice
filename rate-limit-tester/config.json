@@ -1,0 +1,14 @@
+{
+  "scan": {
+    "protocol": "http",
+    "endpoint": "https://scan.sv-2.cilr.global.canton.network.digitalasset.com/api/scan/version",
+    "maxRequestsPerIp": 6000,
+    "windowSeconds": 60
+  },
+  "sequencer": {
+    "protocol": "grpc",
+    "endpoint": "sequencer-17.sv-2.cilr.global.canton.network.digitalasset.com:443",
+    "maxRequestsPerIp": 10000,
+    "windowSeconds": 60
+  }
+}
