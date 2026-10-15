@@ -236,4 +236,5 @@ create index updt_hist_unas_hi_mi_di_rt on update_history_unassignments (history
 create index updt_hist_unas_hi_mi_rt_di on update_history_unassignments (history_id, migration_id, record_time, domain_id);
 create unique index updt_hist_unas_hi_mi_ui_u on update_history_unassignments (history_id, migration_id, domain_id, update_id, record_time);
 
--- Initial partitions to be created by the Scala code
+-- No partitions are created here. They are created by UpdateHistory.createPartitions, which must run at startup
+-- before ingestion resumes (#6313), otherwise the first insert after the upgrade fails.
