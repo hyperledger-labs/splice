@@ -12,22 +12,18 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import io.grpc.Status.Code
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity}
-import org.apache.pekko.stream.scaladsl.{FileIO, Source}
-import org.apache.pekko.util.ByteString as PekkoByteString
+import org.apache.pekko.stream.scaladsl.FileIO
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingRequest
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.ValidatorOnboarding
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.http.HttpVotesHandler
 import org.lfdecentralizedtrust.splice.http.v0.{
@@ -509,44 +505,6 @@ class HttpSvPublicHandler(
     *
     * Protection: Endpoint is protected by IP allowlisting
     */
-  override def onboardSvSequencer(
-      respond: rStream.OnboardSvSequencerResponse.type
-  )(
-      body: definitions.OnboardSvSequencerRequest
-  )(extracted: TraceContext): Future[rStream.OnboardSvSequencerResponse] = {
-    implicit val traceContext: TraceContext = extracted
-    withSpan(s"$workflowId.onboardSvSequencer") { _ => _ =>
-      Codec.decode(Codec.Sequencer)(body.sequencerId) match {
-        case Left(err) => Future.failed(HttpErrorHandler.badRequest(err))
-        case Right(sequencerId) =>
-          synchronizerNodeService
-            .activeSynchronizerNode()
-            .flatMap(node =>
-              getSequencerOnboardingState(
-                node.config.sequencer.isCantonBftSequencer,
-                node.sequencerAdminConnection,
-                sequencerId,
-              )
-            )
-            .map(onboardingStateChunks =>
-              rStream.OnboardSvSequencerResponseOK(
-                HttpEntity(
-                  ContentTypes.`application/octet-stream`,
-                  Source(
-                    onboardingStateChunks
-                      .map(chunk => PekkoByteString(chunk.asReadOnlyByteBuffer()))
-                  ),
-                )
-              )
-            )
-      }
-    }
-  }
-
-  /** Intended use: Used by other SV operators
-    *
-    * Protection: Endpoint is protected by IP allowlisting
-    */
   override def onboardSvSequencerPrepare(
       respond: r0.OnboardSvSequencerPrepareResponse.type
   )(
@@ -672,91 +630,6 @@ class HttpSvPublicHandler(
             .map(_.sequencerIds.contains(sequencerId))
         else Future.successful(inSequencerState)
     } yield observed
-
-  /** Returns the sequencing time the first topology transaction where the new sequencer is active */
-  private def waitForNewSequencerObservedByExistingSequencer(
-      isBftSequencer: Boolean,
-      sequencerAdminConnection: SequencerAdminConnection,
-      sequencerId: SequencerId,
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    for {
-      decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
-      _ <- retryProvider.getValueWithRetries(
-        RetryFor.WaitingOnInitDependency, // the trigger runs every 30s, so this should be enough to observe the new sequencer
-        "sequencer_added_to_topology_state",
-        "New sequencer is observed in SequencerSynchronizerState through existing sequencer",
-        sequencerAdminConnection
-          .listSequencerSynchronizerState(
-            decentralizedSynchronizer,
-            store.TimeQuery.Range(None, None),
-            AuthorizedState,
-          )
-          .map { result =>
-            result
-              .sortBy(_.base.serial)
-              .foldLeft[Option[TopologyResult[SequencerSynchronizerState]]](None) {
-                case (_, newMapping) if !newMapping.mapping.allSequencers.contains(sequencerId) =>
-                  None
-                case (None, newMapping) if newMapping.mapping.allSequencers.contains(sequencerId) =>
-                  Some(newMapping)
-                case (Some(mapping), newMapping)
-                    if newMapping.mapping.allSequencers.contains(sequencerId) =>
-                  Some(mapping)
-                case _ => None
-              } match {
-              case Some(activeMapping) =>
-                activeMapping.base.validFrom
-              case None =>
-                throw Status.NOT_FOUND
-                  .withDescription(
-                    s"Sequencer $sequencerId is not in active sequencers $result"
-                  )
-                  .asRuntimeException()
-            }
-          },
-        logger,
-      )
-      _ <-
-        if (isBftSequencer) {
-          retryProvider.waitUntil(
-            RetryFor.WaitingOnInitDependency,
-            "sequencer_ordering_topology",
-            s"Wait for $sequencerId to be in the ordering topology",
-            sequencerAdminConnection
-              .getSequencerOrderingTopology()
-              .map(topology =>
-                if (topology.sequencerIds.contains(sequencerId)) ()
-                else
-                  throw Status.NOT_FOUND
-                    .withDescription(
-                      s"Sequencer $sequencerId is not in the ordering topology $topology"
-                    )
-                    .asRuntimeException()
-              ),
-            logger,
-          )
-        } else Future.unit
-    } yield ()
-  }
-
-  private def getSequencerOnboardingState(
-      isCantonBftSequencer: Boolean,
-      sequencerAdminConnection: SequencerAdminConnection,
-      sequencerId: SequencerId,
-  )(implicit traceContext: TraceContext): Future[Seq[ByteString]] = {
-    logger.info(
-      s"Waiting for sequencer $sequencerId to be onboarded before querying its onboarding state"
-    )
-    for {
-      _ <- waitForNewSequencerObservedByExistingSequencer(
-        isCantonBftSequencer,
-        sequencerAdminConnection,
-        sequencerId,
-      )
-      _ = logger.info(s"Downloading sequencer onboarding state for $sequencerId")
-      onboardingState <- sequencerAdminConnection.getOnboardingState(Left(sequencerId))
-    } yield onboardingState
-  }
 
   private def isCompleted(
       svParty: PartyId,

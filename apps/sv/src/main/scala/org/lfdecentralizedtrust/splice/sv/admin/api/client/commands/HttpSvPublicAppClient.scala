@@ -8,7 +8,6 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.synchronizer.sequencer.SequencerSnapshot as CantonSequencerSnapshot
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.{PartyId, SequencerId}
-import com.google.protobuf.ByteString
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
@@ -239,38 +238,6 @@ object HttpSvPublicAppClient {
         )
       case http.OnboardSvPartyMigrationPrepareResponse.OK(response) =>
         Right(Right(SvOnboardingSnapshotId(response.id)))
-    }
-  }
-
-  case class OnboardSvSequencer(
-      sequencerId: SequencerId
-  ) extends HttpCommand[
-        SvStreamClient.OnboardSvSequencerResponse,
-        Seq[ByteString],
-        SvStreamClient,
-      ] {
-    override val createGenClientFn = (fn, host, ec, mat) =>
-      SvStreamClient.httpClient(fn, host)(ec, mat)
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[
-      Throwable,
-      HttpResponse,
-    ], SvStreamClient.OnboardSvSequencerResponse] =
-      client.onboardSvSequencer(
-        body = definitions.OnboardSvSequencerRequest(
-          Codec.encode(sequencerId)
-        ),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case SvStreamClient.OnboardSvSequencerResponse.OK(onboardingStateChunks) =>
-        Right(onboardingStateChunks.map(chunk => ByteString.copyFrom(chunk.asByteBuffer)))
-      case SvStreamClient.OnboardSvSequencerResponse.BadRequest(response) =>
-        Left(response.error)
     }
   }
 

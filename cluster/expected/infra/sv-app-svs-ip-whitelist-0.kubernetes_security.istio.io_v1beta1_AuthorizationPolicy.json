@@ -40,7 +40,6 @@
                   "/api/sv/v0/migration-id",
                   "/api/sv/v0/onboard/sv/download/*",
                   "/api/sv/v0/onboard/sv/party-migration/prepare",
-                  "/api/sv/v0/onboard/sv/sequencer",
                   "/api/sv/v0/onboard/sv/sequencer/prepare",
                   "/api/sv/v0/onboard/sv/start",
                   "/api/sv/v0/onboard/sv/status/*"
