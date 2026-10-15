@@ -450,9 +450,10 @@ class UpdateHistory(
     val tableSuffix =
       if (windowStart == CantonTimestamp.MinValue) "import_updates"
       else windowStart.toMicros.toString
-    storage.query(
-      // if not exists allows any trigger calling this to recover from half-way crashes. Unfortunately it does not prevent races between concurrent sessions.
-      AdvisoryLocks.withSessionLock(
+    storage.queryAndUpdate(
+      // CREATE TABLE is transactional, so the partitions of all tables are created atomically.
+      AdvisoryLocks.withTransactionalLock(
+        profile,
         AdvisoryLockIds.createUpdateHistoryPartitionStatement,
         DBIO.seq(
           sql"create table if not exists update_history_transactions_#$tableSuffix partition of update_history_transactions for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
