@@ -3,8 +3,8 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.http.v0.sv_public.SvPublicClient
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvStreamClient
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
@@ -230,10 +230,10 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
       }
   }
 
-  private def sponsorClient()(implicit env: SpliceTestConsoleEnvironment): SvStreamClient = {
+  private def sponsorClient()(implicit env: SpliceTestConsoleEnvironment): SvPublicClient = {
     implicit val actorSystem: ActorSystem = env.actorSystem
     registerHttpConnectionPoolsCleanup(env)
-    SvStreamClient.httpClient(Http().singleRequest(_), sv1Backend.httpClientConfig.url.toString)(
+    SvPublicClient.httpClient(Http().singleRequest(_), sv1Backend.httpClientConfig.url.toString)(
       env.executionContext,
       Materializer(actorSystem),
     )

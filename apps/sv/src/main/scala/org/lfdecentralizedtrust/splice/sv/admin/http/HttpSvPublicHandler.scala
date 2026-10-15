@@ -447,12 +447,12 @@ class HttpSvPublicHandler(
     * Protection: Endpoint is protected by IP allowlisting
     */
   override def onboardSvPartyMigrationPrepare(
-      respond: rStream.OnboardSvPartyMigrationPrepareResponse.type
+      respond: r0.OnboardSvPartyMigrationPrepareResponse.type
   )(
       body: definitions.OnboardSvPartyMigrationAuthorizeRequest
   )(
       extracted: TraceContext
-  ): Future[rStream.OnboardSvPartyMigrationPrepareResponse] = {
+  ): Future[r0.OnboardSvPartyMigrationPrepareResponse] = {
     implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.onboardSvPartyMigrationPrepare") { _ => _ =>
       Codec
@@ -908,8 +908,8 @@ object HttpSvPublicHandler {
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[rStream.OnboardSvPartyMigrationPrepareResponse] = {
-    val respond = rStream.OnboardSvPartyMigrationPrepareResponse
+  ): Future[r0.OnboardSvPartyMigrationPrepareResponse] = {
+    val respond = r0.OnboardSvPartyMigrationPrepareResponse
     prepared match {
       case Left(DsoPartyHosting.RequiredProposalNotFound(partyToParticipantSerial)) =>
         Future.successful(respond.BadRequest(proposalNotFoundResponse(partyToParticipantSerial)))

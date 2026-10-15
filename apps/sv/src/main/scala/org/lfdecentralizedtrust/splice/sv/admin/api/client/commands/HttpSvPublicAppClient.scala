@@ -205,6 +205,59 @@ object HttpSvPublicAppClient {
       }
   }
 
+  case class OnboardSvPartyMigrationPrepare(
+      candidate: PartyId
+  ) extends BaseCommandPublic[
+        http.OnboardSvPartyMigrationPrepareResponse,
+        Either[
+          OnboardSvPartyMigrationAuthorizeProposalNotFound,
+          String,
+        ],
+      ] {
+    override val nonErrorStatusCodes = Set(StatusCodes.BadRequest)
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.OnboardSvPartyMigrationPrepareResponse] =
+      client.onboardSvPartyMigrationPrepare(
+        body = definitions.OnboardSvPartyMigrationAuthorizeRequest(
+          candidate.toProtoPrimitive
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = {
+      case http.OnboardSvPartyMigrationPrepareResponse.BadRequest(
+            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse.members
+              .AcceptedStateNotFoundErrorResponse(
+                response
+              )
+          ) =>
+        Left(response.acceptedStateNotFound.error)
+      case http.OnboardSvPartyMigrationPrepareResponse.BadRequest(
+            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse.members
+              .ProposalNotFoundErrorResponse(
+                response
+              )
+          ) =>
+        Right(
+          Left(
+            OnboardSvPartyMigrationAuthorizeProposalNotFound(
+              PositiveInt.tryCreate(response.proposalNotFound.partyToParticipantBaseSerial.intValue)
+            )
+          )
+        )
+      case http.OnboardSvPartyMigrationPrepareResponse.OK(response) =>
+        Right(Right(response.id))
+    }
+  }
+
   case class OnboardSvSequencer(
       sequencerId: SequencerId
   ) extends HttpCommand[
@@ -234,63 +287,6 @@ object HttpSvPublicAppClient {
         Right(onboardingStateChunks.map(chunk => ByteString.copyFrom(chunk.asByteBuffer)))
       case SvStreamClient.OnboardSvSequencerResponse.BadRequest(response) =>
         Left(response.error)
-    }
-  }
-
-  case class OnboardSvPartyMigrationPrepare(
-      candidate: PartyId
-  ) extends HttpCommand[
-        SvStreamClient.OnboardSvPartyMigrationPrepareResponse,
-        Either[
-          OnboardSvPartyMigrationAuthorizeProposalNotFound,
-          String,
-        ],
-        SvStreamClient,
-      ] {
-    override val createGenClientFn = (fn, host, ec, mat) =>
-      SvStreamClient.httpClient(fn, host)(ec, mat)
-
-    override val nonErrorStatusCodes = Set(StatusCodes.BadRequest)
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[
-      Throwable,
-      HttpResponse,
-    ], SvStreamClient.OnboardSvPartyMigrationPrepareResponse] =
-      client.onboardSvPartyMigrationPrepare(
-        body = definitions.OnboardSvPartyMigrationAuthorizeRequest(
-          candidate.toProtoPrimitive
-        ),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = {
-      case SvStreamClient.OnboardSvPartyMigrationPrepareResponse.BadRequest(
-            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse.members
-              .AcceptedStateNotFoundErrorResponse(
-                response
-              )
-          ) =>
-        Left(response.acceptedStateNotFound.error)
-      case SvStreamClient.OnboardSvPartyMigrationPrepareResponse.BadRequest(
-            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse.members
-              .ProposalNotFoundErrorResponse(
-                response
-              )
-          ) =>
-        Right(
-          Left(
-            OnboardSvPartyMigrationAuthorizeProposalNotFound(
-              PositiveInt.tryCreate(response.proposalNotFound.partyToParticipantBaseSerial.intValue)
-            )
-          )
-        )
-      case SvStreamClient.OnboardSvPartyMigrationPrepareResponse.OK(response) =>
-        Right(Right(response.id))
     }
   }
 

@@ -33,23 +33,15 @@ object SvStreamClient {
   )(implicit ec: ExecutionContext, mat: Materializer): SvStreamClient =
     new SvStreamClient(host = host)(httpClient = httpClient, ec = ec, mat = mat)
 
+  sealed abstract class OnboardSvDownloadResponse
+  object OnboardSvDownloadResponse {
+    case class OK(entity: ResponseEntity) extends OnboardSvDownloadResponse
+  }
+
   sealed abstract class OnboardSvSequencerResponse
   object OnboardSvSequencerResponse {
     case class OK(value: Seq[ByteString]) extends OnboardSvSequencerResponse
     case class BadRequest(value: ErrorResponse) extends OnboardSvSequencerResponse
-  }
-
-  sealed abstract class OnboardSvPartyMigrationPrepareResponse
-  object OnboardSvPartyMigrationPrepareResponse {
-    case class OK(value: definitions.OnboardSvSnapshotPrepareResponse)
-        extends OnboardSvPartyMigrationPrepareResponse
-    case class BadRequest(value: definitions.OnboardSvPartyMigrationAuthorizeErrorResponse)
-        extends OnboardSvPartyMigrationPrepareResponse
-  }
-
-  sealed abstract class OnboardSvDownloadResponse
-  object OnboardSvDownloadResponse {
-    case class OK(entity: ResponseEntity) extends OnboardSvDownloadResponse
   }
 }
 
@@ -58,11 +50,7 @@ class SvStreamClient(host: String = "https://example.com")(implicit
     ec: ExecutionContext,
     mat: Materializer,
 ) {
-  import SvStreamClient.{
-    OnboardSvDownloadResponse,
-    OnboardSvPartyMigrationPrepareResponse,
-    OnboardSvSequencerResponse,
-  }
+  import SvStreamClient.{OnboardSvDownloadResponse, OnboardSvSequencerResponse}
 
   val basePath: String = "/api/sv"
 
@@ -93,28 +81,6 @@ class SvStreamClient(host: String = "https://example.com")(implicit
     )
   }
 
-  private val jsonDecoder = {
-    structuredJsonEntityUnmarshaller.flatMap(_ =>
-      _ =>
-        json =>
-          io.circe
-            .Decoder[definitions.OnboardSvPartyMigrationAuthorizeErrorResponse]
-            .decodeJson(json)
-            .fold(FastFuture.failed, FastFuture.successful)
-    )
-  }
-
-  private val prepareResponseDecoder = {
-    structuredJsonEntityUnmarshaller.flatMap(_ =>
-      _ =>
-        json =>
-          io.circe
-            .Decoder[definitions.OnboardSvSnapshotPrepareResponse]
-            .decodeJson(json)
-            .fold(FastFuture.failed, FastFuture.successful)
-    )
-  }
-
   private val errorResponseDecoder = {
     structuredJsonEntityUnmarshaller.flatMap(_ =>
       _ =>
@@ -123,6 +89,31 @@ class SvStreamClient(host: String = "https://example.com")(implicit
             .Decoder[ErrorResponse]
             .decodeJson(json)
             .fold(FastFuture.failed, FastFuture.successful)
+    )
+  }
+
+  def onboardSvDownload(
+      id: String,
+      headers: List[HttpHeader] = Nil,
+  ): EitherT[Future, Either[Throwable, HttpResponse], OnboardSvDownloadResponse] = {
+    makeRequest(
+      HttpMethods.GET,
+      host + basePath + "/v0/onboard/sv/download/" + Formatter.addPath(id),
+      headers,
+      HttpEntity.Empty,
+      HttpProtocols.`HTTP/1.1`,
+    ).flatMap(req =>
+      EitherT(
+        httpClient(req)
+          .flatMap[Either[Either[Throwable, HttpResponse], OnboardSvDownloadResponse]](resp =>
+            resp.status match {
+              case StatusCodes.OK =>
+                FastFuture.successful(Right(OnboardSvDownloadResponse.OK(resp.entity)))
+              case _ => FastFuture.successful(Left(Right(resp)))
+            }
+          )
+          .recover({ case e: Throwable => Left(Left(e)) })
+      )
     )
   }
 
@@ -155,71 +146,6 @@ class SvStreamClient(host: String = "https://example.com")(implicit
                 Unmarshal(resp.entity)
                   .to[ErrorResponse](errorResponseDecoder, implicitly, implicitly)
                   .map(x => Right(OnboardSvSequencerResponse.BadRequest(x)))
-              case _ => FastFuture.successful(Left(Right(resp)))
-            }
-          )
-          .recover({ case e: Throwable => Left(Left(e)) })
-      )
-    )
-  }
-
-  def onboardSvPartyMigrationPrepare(
-      body: definitions.OnboardSvPartyMigrationAuthorizeRequest,
-      headers: List[HttpHeader] = Nil,
-  ): EitherT[Future, Either[Throwable, HttpResponse], OnboardSvPartyMigrationPrepareResponse] = {
-    makeRequest(
-      HttpMethods.POST,
-      host + basePath + "/v0/onboard/sv/party-migration/prepare",
-      headers,
-      body,
-      HttpProtocols.`HTTP/1.1`,
-    ).flatMap(req =>
-      EitherT(
-        httpClient(req)
-          .flatMap[Either[Either[Throwable, HttpResponse], OnboardSvPartyMigrationPrepareResponse]](
-            resp =>
-              resp.status match {
-                case StatusCodes.OK =>
-                  Unmarshal(resp.entity)
-                    .to[definitions.OnboardSvSnapshotPrepareResponse](
-                      prepareResponseDecoder,
-                      implicitly,
-                      implicitly,
-                    )
-                    .map(x => Right(OnboardSvPartyMigrationPrepareResponse.OK(x)))
-                case StatusCodes.BadRequest =>
-                  Unmarshal(resp.entity)
-                    .to[definitions.OnboardSvPartyMigrationAuthorizeErrorResponse](
-                      jsonDecoder,
-                      implicitly,
-                      implicitly,
-                    )
-                    .map(x => Right(OnboardSvPartyMigrationPrepareResponse.BadRequest(x)))
-                case _ => FastFuture.successful(Left(Right(resp)))
-              }
-          )
-          .recover({ case e: Throwable => Left(Left(e)) })
-      )
-    )
-  }
-
-  def onboardSvDownload(
-      id: String,
-      headers: List[HttpHeader] = Nil,
-  ): EitherT[Future, Either[Throwable, HttpResponse], OnboardSvDownloadResponse] = {
-    makeRequest(
-      HttpMethods.GET,
-      host + basePath + "/v0/onboard/sv/download/" + Formatter.addPath(id),
-      headers,
-      HttpEntity.Empty,
-      HttpProtocols.`HTTP/1.1`,
-    ).flatMap(req =>
-      EitherT(
-        httpClient(req)
-          .flatMap[Either[Either[Throwable, HttpResponse], OnboardSvDownloadResponse]](resp =>
-            resp.status match {
-              case StatusCodes.OK =>
-                FastFuture.successful(Right(OnboardSvDownloadResponse.OK(resp.entity)))
               case _ => FastFuture.successful(Left(Right(resp)))
             }
           )

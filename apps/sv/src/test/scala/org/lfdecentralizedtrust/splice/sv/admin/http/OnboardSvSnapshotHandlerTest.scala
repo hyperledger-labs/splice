@@ -19,6 +19,7 @@ import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.http.v0.sv_public.SvPublicResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_public_stream.{
   SvPublicStreamHandler,
   SvPublicStreamResource,
@@ -59,14 +60,6 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
     override def onboardSvSequencer(
         respond: SvPublicStreamResource.OnboardSvSequencerResponse.type
     )(body: definitions.OnboardSvSequencerRequest)(extracted: TraceContext) = unsupported
-    override def onboardSvPartyMigrationPrepare(
-        respond: SvPublicStreamResource.OnboardSvPartyMigrationPrepareResponse.type
-    )(body: definitions.OnboardSvPartyMigrationAuthorizeRequest)(extracted: TraceContext) =
-      HttpSvPublicHandler.onboardSvPartyMigrationPrepareResponse(
-        snapshotService,
-        Right(None),
-        (_, file) => writeSnapshot(file),
-      )
     override def onboardSvDownload(
         respond: SvPublicStreamResource.OnboardSvDownloadResponse.type
     )(id: String)(extracted: TraceContext) =
@@ -160,7 +153,7 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
           Left(DsoPartyHosting.RequiredProposalNotFound(PositiveInt.tryCreate(3))),
           (_, file) => writeSnapshot(file),
         )
-        .futureValue shouldBe SvPublicStreamResource.OnboardSvPartyMigrationPrepareResponse
+        .futureValue shouldBe SvPublicResource.OnboardSvPartyMigrationPrepareResponse
         .BadRequest(
           definitions.ProposalNotFoundErrorResponse(
             definitions.ProposalNotFoundErrorResponse.ProposalNotFound(BigInt(3))
@@ -177,7 +170,7 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
           Right(None),
           (_, file) => writeSnapshot(file),
         )
-        .futureValue shouldBe SvPublicStreamResource.OnboardSvPartyMigrationPrepareResponse
+        .futureValue shouldBe SvPublicResource.OnboardSvPartyMigrationPrepareResponse
         .ServiceUnavailable(
           definitions.ErrorResponse("The DSO party is not yet hosted on the candidate participant")
         )
