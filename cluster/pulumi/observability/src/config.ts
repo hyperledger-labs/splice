@@ -261,16 +261,8 @@ const PrometheusConfigSchema = z.object({
         path: ['pushgatewayExternalAccess', 'enabled'],
       }
     ),
-  // Mirrors infra.ipWhitelisting.excludedIps so excluded IPs stay cut off here too.
-  ipWhitelisting: z
-    .object({
-      excludedIps: z.array(z.string()).default([]),
-    })
-    .optional(),
 });
 
 const infraSubConfig = PrometheusConfigSchema.parse(clusterSubConfig('infra'));
 
 export const prometheusConfig = infraSubConfig.prometheus;
-
-export const excludedIps = infraSubConfig.ipWhitelisting?.excludedIps ?? [];

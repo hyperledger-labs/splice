@@ -32,7 +32,6 @@ import {
 } from '@canton-network/splice-pulumi-common-sv/src/svConfigsBasic';
 import { SweepConfig } from '@canton-network/splice-pulumi-common-validator';
 import { installSplicePostgres, Postgres } from '@canton-network/splice-pulumi-common/src/postgres';
-import { loadInternalWhitelistedIps } from '@canton-network/splice-pulumi-common/src/secrets';
 import { StackReferences } from '@canton-network/splice-pulumi-common/src/stackReferences';
 import { local } from '@pulumi/command';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
@@ -53,7 +52,6 @@ import {
 import {
   type CloudArmorAlertConfig,
   cloudArmorConfig,
-  excludedIps,
   monitoringConfig,
   prometheusConfig,
 } from './config';
@@ -147,72 +145,21 @@ function istioVirtualService(
   );
 }
 
-// Exposes the pushgateway for pushes and reads from internally whitelisted IPs.
+// Exposes the pushgateway through the cluster ingress.
+// Access is governed by the gateway default policies.
 // Pushes from inside the cluster bypass the ingress gateway, so they keep
 // working without any change.
-function exposePushgatewayExternally(ns: k8s.core.v1.Namespace, dependsOn: pulumi.Resource[]) {
+function exposePushgatewayExternally(ns: k8s.core.v1.Namespace) {
   istioVirtualService(ns, 'pushgateway', pushgatewayServiceName, pushgatewayServicePort, {
     uriPrefix: '/metrics',
   });
-  const pushgatewayHosts = [pushgatewayExternalHostname, `${pushgatewayExternalHostname}:*`];
-  const pushgatewayAllowFrom = [
-    { source: { remoteIpBlocks: loadInternalWhitelistedIps(excludedIps) } },
-  ];
-  new k8s.apiextensions.CustomResource(
-    'allow-pushgateway-external',
-    {
-      apiVersion: 'security.istio.io/v1beta1',
-      kind: 'AuthorizationPolicy',
-      metadata: {
-        name: 'allow-pushgateway-external',
-        namespace: clusterIngressNamespace,
-      },
-      spec: {
-        selector: {
-          matchLabels: {
-            app: 'istio-ingress',
-          },
-        },
-        action: 'ALLOW',
-        rules: [
-          {
-            from: pushgatewayAllowFrom,
-            to: [
-              {
-                operation: {
-                  hosts: pushgatewayHosts,
-                  paths: ['/metrics/job/*'],
-                  methods: ['PUT', 'POST'],
-                },
-              },
-            ],
-          },
-          {
-            from: pushgatewayAllowFrom,
-            to: [
-              {
-                operation: {
-                  hosts: pushgatewayHosts,
-                  paths: ['/metrics'],
-                  methods: ['GET'],
-                },
-              },
-            ],
-          },
-        ],
-      },
-    },
-    { dependsOn, deleteBeforeReplace: true }
-  );
 }
 
 const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
-const pushgatewayExternalHostname = `pushgateway.${CLUSTER_HOSTNAME}`;
 const pushgatewayServiceName = 'prometheus-pushgateway';
 const pushgatewayServicePort = 9091;
-const clusterIngressNamespace = 'cluster-ingress';
 const shouldIgnoreNoDataOrDataSourceError = clusterIsResetPeriodically;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -675,7 +622,7 @@ export function configureObservability(namespace: ExactNamespace): pulumi.Resour
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
   if (prometheusConfig.installPrometheusPushgateway) {
-    const pushgateway = new k8s.helm.v3.Release('prometheus-pushgateway', {
+    new k8s.helm.v3.Release('prometheus-pushgateway', {
       name: 'prometheus-pushgateway',
       chart: 'prometheus-pushgateway',
       version: '3.4.1',
@@ -694,7 +641,7 @@ export function configureObservability(namespace: ExactNamespace): pulumi.Resour
       maxHistory: HELM_MAX_HISTORY_SIZE,
     });
     if (prometheusConfig.pushgatewayExternalAccess.enabled) {
-      exposePushgatewayExternally(namespace.ns, [pushgateway]);
+      exposePushgatewayExternally(namespace.ns);
     }
   }
 

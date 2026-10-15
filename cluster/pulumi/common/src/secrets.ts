@@ -30,22 +30,6 @@ export type GrafanaKeys = {
   adminPassword: string;
 };
 
-export const INTERNAL_WHITELIST_SECRET = 'pulumi-internal-whitelists';
-
-export function loadInternalWhitelistedIps(excludedIps: string[] = []): pulumi.Output<string[]> {
-  return getSecretVersionOutput({ secret: INTERNAL_WHITELIST_SECRET }).apply(whitelists => {
-    const secretData = whitelists.secretData;
-    const json = JSON.parse(secretData);
-    const ret: string[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    json.forEach((ip: any) => {
-      ret.push(ip);
-    });
-    const ips = ret.filter(ip => excludedIps.indexOf(ip) < 0);
-    return [...new Set(ips)];
-  });
-}
-
 export function svKeyFromSecret(secretName: string): pulumi.Output<SvIdKey> {
   const keyJson = getSecretVersionOutput({ secret: secretName });
   return keyJson.apply(k => {

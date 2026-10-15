@@ -16,7 +16,7 @@ infra:
     retentionDuration: "1y"
     retentionSize: "1500GB"
     storageSize: "2Ti"
-    # Expose pushgateway for pushes/reads from internally whitelisted IPs:
+    # Expose pushgateway through the cluster ingress
     # pushgatewayExternalAccess:
     #   enabled: true
   gkeGateway:
