@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Auth0Fetch, config, getAuth0ClusterConfig } from "@canton-network/splice-pulumi-common";
+import { installNode } from "./installNode";
 
 async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
   await auth0Fetch.loadAuth0Cache();
 
-  // FIXME: do something useful
+  await installNode(
+    auth0Fetch,
+    "dsync-op-1"
+  )
 
   await auth0Fetch.saveAuth0Cache();
 }
