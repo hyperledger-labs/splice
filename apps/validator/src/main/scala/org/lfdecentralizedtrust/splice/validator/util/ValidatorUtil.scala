@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractState,
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.wallet.{UserWalletManager, UserWalletService}
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions.Proposal
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{SigningPublicKey, v30}
@@ -25,6 +25,7 @@ import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.HexString
+import com.digitalasset.canton.validation.ProtoUnvalidatedSeq
 import io.grpc.{Status, StatusRuntimeException}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
@@ -457,7 +458,7 @@ private[validator] object ValidatorUtil {
           v30.CryptoKeyFormat.CRYPTO_KEY_FORMAT_RAW,
           publicKeyBytes,
           v30.SigningKeyScheme.SIGNING_KEY_SCHEME_ED25519,
-          Seq.empty,
+          ProtoUnvalidatedSeq(Seq.empty),
           v30.SigningKeySpec.SIGNING_KEY_SPEC_EC_CURVE25519,
         )
       )

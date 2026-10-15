@@ -1,0 +1,26 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "kind": "PersistentVolumeClaim",
+    "metadata": {
+      "name": "multi-validator-4-domain-migration-hd-pvc",
+      "namespace": "multi-validator"
+    },
+    "spec": {
+      "accessModes": [
+        "ReadWriteOnce"
+      ],
+      "resources": {
+        "requests": {
+          "storage": "20G"
+        }
+      },
+      "storageClassName": "hyperdisk-standard-rwo"
+    }
+  },
+  "name": "multi-validator-4-domain-migration-pvc",
+  "provider": "",
+  "type": "kubernetes:core/v1:PersistentVolumeClaim"
+}

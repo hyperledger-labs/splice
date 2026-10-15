@@ -3,7 +3,9 @@
 
 package com.digitalasset.canton.console.commands
 
+import cats.syntax.either.*
 import com.digitalasset.canton.admin.api.client.commands.SequencerAdminCommands.{
+  InitializeFromGenesisState,
   InitializeFromGenesisStateV2,
   InitializeFromLsuPredecessor,
   InitializeFromOnboardingState,
@@ -158,6 +160,41 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
       |to need to call this directly.
       """"
   )
+  @deprecated(
+    "Use assign_from_genesis_stateV2 instead.",
+    since = "3.5",
+  )
+  def assign_from_genesis_state(
+      genesisState: ByteString,
+      synchronizerParameters: StaticSynchronizerParameters,
+      waitForReady: Boolean = true,
+  ): InitializeSequencerResponse = {
+    if (waitForReady) node.health.wait_for_ready_for_initialization()
+
+    val nodeStatus = node.health.status
+
+    consoleEnvironment.run {
+      runner.adminCommand(
+        InitializeFromGenesisState(
+          genesisState.newInput(),
+          synchronizerParameters.toInternal.valueOr(consoleEnvironment.raiseError),
+          serverVersion = nodeStatus.releaseVersion,
+        )
+      )
+    }
+  }
+
+  @Help.Summary(
+    "Initialize a sequencer from the beginning of the event stream"
+  )
+  @Help.Description(
+    """This should only be called for sequencer nodes being initialized at the same time as the
+      |corresponding synchronizer node.
+      |
+      |This is called as part of the synchronizer.setup.bootstrap command, so you are unlikely
+      |to need to call this directly.
+      """"
+  )
   def assign_from_genesis_stateV2(
       genesisState: ByteString,
       synchronizerParameters: StaticSynchronizerParameters,
@@ -165,11 +202,14 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
   ): InitializeSequencerResponse = {
     if (waitForReady) node.health.wait_for_ready_for_initialization()
 
+    val nodeStatus = node.health.status
+
     consoleEnvironment.run {
       runner.adminCommand(
         InitializeFromGenesisStateV2(
-          Seq(genesisState),
-          synchronizerParameters.toInternal,
+          genesisState.newInput(),
+          synchronizerParameters.toInternal.valueOr(consoleEnvironment.raiseError),
+          serverVersion = nodeStatus.releaseVersion,
         )
       )
     }
@@ -196,15 +236,18 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
   ): Unit = {
     if (waitForReady) node.health.wait_for_ready_for_initialization()
 
+    val nodeStatus = node.health.status
+
     consoleEnvironment.run {
       runner.adminCommand(
         InitializeFromLsuPredecessor(
           new BufferedInputStream(
             new java.io.FileInputStream(inputFile)
           ),
-          synchronizerParameters.toInternal,
+          synchronizerParameters.toInternal.valueOr(consoleEnvironment.raiseError),
           ignorePsidCheck = ignorePsidCheck,
           synchronizerId = synchronizerId,
+          serverVersion = nodeStatus.releaseVersion,
         )
       )
     }
@@ -226,7 +269,7 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
 
     consoleEnvironment.run {
       runner.adminCommand(
-        InitializeFromOnboardingState(onboardingState = onboardingState)
+        InitializeFromOnboardingState(onboardingStateStream = onboardingState.newInput())
       )
     }
   }
@@ -243,7 +286,7 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
 
     consoleEnvironment.run {
       runner.adminCommand(
-        InitializeFromOnboardingStateV2(onboardingState)
+        InitializeFromOnboardingStateV2(onboardingState.newInput())
       )
     }
   }

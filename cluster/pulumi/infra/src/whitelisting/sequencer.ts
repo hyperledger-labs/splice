@@ -3,8 +3,8 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {
+  CLUSTER_HOSTNAME,
   DecentralizedSynchronizerUpgradeConfig,
-  getDnsNames,
 } from '@canton-network/splice-pulumi-common';
 import { allSvsToDeployBasic } from '@canton-network/splice-pulumi-common-sv/src/svConfigsBasic';
 
@@ -15,7 +15,7 @@ import { createIstioIpAllowPolicies, istioIngressSelector } from './policies';
 export function configureSequencerWhitelist(
   namespace: k8s.core.v1.Namespace
 ): pulumi.Output<pulumi.Resource[]>[] {
-  const dnsNames = [getDnsNames().cantonDnsName, getDnsNames().daDnsName];
+  const dnsNames = [CLUSTER_HOSTNAME];
   const migrations = DecentralizedSynchronizerUpgradeConfig.runningMigrations();
 
   const publicApiHosts = allSvsToDeployBasic.flatMap(sv =>

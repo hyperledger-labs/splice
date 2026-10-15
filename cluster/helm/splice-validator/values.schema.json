@@ -32,6 +32,9 @@
         "imageName": {
           "type": "string"
         },
+        "secretName": {
+          "type": "string"
+        },
         "secretOverrides": {
           "type": "object",
           "properties": {
@@ -149,6 +152,9 @@
         "enabled": {
           "type": "boolean"
         },
+        "secretName": {
+          "type": "string"
+        },
         "secretOverrides": {
           "type": "object",
           "properties": {
@@ -160,6 +166,14 @@
             }
           }
         }
+      }
+    },
+    "appLabels": {
+      "type": "object",
+      "properties": {
+        "validatorApp": { "type": "string" },
+        "walletWebUi": { "type": "string" },
+        "ansWebUi": { "type": "string" }
       }
     }
   },
@@ -428,6 +442,9 @@
               "type": "string",
               "pattern": "^http[s]?://.+$",
               "description": "The URL for the JWKS endpoint for the validator app API"
+            },
+            "secretName": {
+              "type": "string"
             },
             "secretOverrides": {
               "type": "object",

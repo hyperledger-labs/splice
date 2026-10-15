@@ -6,7 +6,6 @@ package com.digitalasset.canton.crypto.store
 import cats.data.EitherT
 import cats.implicits.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
@@ -18,6 +17,7 @@ import com.digitalasset.canton.crypto.store.CryptoPrivateStoreError.{
 }
 import com.digitalasset.canton.crypto.store.db.{DbCryptoPrivateStore, StoredPrivateKey}
 import com.digitalasset.canton.crypto.{Fingerprint, KeyPurpose}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{
   HasLoggerName,
@@ -37,6 +37,7 @@ import com.digitalasset.canton.util.{
   retry,
 }
 import com.digitalasset.canton.version.ReleaseProtocolVersion
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 
 import java.util.concurrent.atomic.AtomicReference

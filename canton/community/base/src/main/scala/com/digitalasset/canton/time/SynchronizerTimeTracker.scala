@@ -7,11 +7,10 @@ import cats.Foldable
 import cats.syntax.foldable.*
 import cats.syntax.option.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.checked
 import com.digitalasset.canton.config.{ProcessingTimeout, SynchronizerTimeTrackerConfig}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
@@ -21,7 +20,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.client.SequencerClient
-import com.digitalasset.canton.sequencing.protocol.{Envelope, TimeProof}
+import com.digitalasset.canton.sequencing.protocol.{Batch, Envelope, TimeProof}
 import com.digitalasset.canton.sequencing.{
   BoxedEnvelope,
   OrdinaryApplicationHandler,
@@ -33,6 +32,8 @@ import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
+import com.digitalasset.canton.{SynchronizedLikeMethod, checked}
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Flow
@@ -92,6 +93,7 @@ class SynchronizerTimeTracker(
   /** Ensures that changes to [[timestampRef]] and [[pendingTicks]] happen atomically */
   private val lock = new Mutex()
 
+  @SynchronizedLikeMethod
   private def withLock[A](fn: => A): A =
     lock.exclusive(fn)
 
@@ -255,11 +257,11 @@ class SynchronizerTimeTracker(
   }
 
   @VisibleForTesting
-  private[time] def update(events: Seq[OrdinarySequencedEvent[Envelope[?]]])(implicit
+  private[time] def update(events: Seq[OrdinarySequencedEvent[Batch[Envelope[?]]]])(implicit
       batchTraceContext: TraceContext
   ): Unit = {
     withLock {
-      def updateOne(event: OrdinarySequencedEvent[Envelope[?]]): Unit = {
+      def updateOne(event: OrdinarySequencedEvent[Batch[Envelope[?]]]): Unit = {
         updateTimestampRef(event.timestamp)
         TimeProof.fromEventO(event).foreach { proof =>
           val oldTimeProof = timeProofRef.getAndSet(LatestAndNext(received(proof).some, None))
@@ -458,8 +460,9 @@ class SynchronizerTimeTracker(
             // schedule next update
             val nextF =
               clock
-                .scheduleAt(
+                .scheduleAtCancelledOnShutdown(
                   _ => maybeScheduleUpdate(immediately = false),
+                  s"${getClass.getName}: scheduling next update",
                   updateBy.value,
                 )
                 .unwrap

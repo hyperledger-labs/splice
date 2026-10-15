@@ -69,7 +69,7 @@ class DockerComposeFullNetworkFrontendIntegrationTest
           withFrontEnd("frontend") { implicit webDriver =>
             actAndCheck(
               "Open the Scan UI",
-              go to "scan.localhost:8080",
+              go to "http://scan.localhost:8080",
             )(
               "Open rounds should be listed",
               _ => findAll(className("open-mining-round-row")) should have length 2,

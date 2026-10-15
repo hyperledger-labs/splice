@@ -22,10 +22,20 @@ import io.grpc.netty.shaded.io.netty.handler.ssl.{SslContext, SslContextBuilder}
 import java.util.concurrent.{Executor, TimeUnit}
 import scala.jdk.CollectionConverters.*
 
+/** @param flowControlWindow
+  *   Switches to manual gRPC flow control and sets its window; if `None`, then it is not configured
+  *   and the implementation default is used. At most one of `flowControlWindow` and
+  *   `initialFlowControlWindow` can be set.
+  * @param initialFlowControlWindow
+  *   Switches to automatic gRPC flow control and sets its initial window; if `None`, then it is not
+  *   configured and the implementation default is used. At most one of `flowControlWindow` and
+  *   `initialFlowControlWindow` can be set.
+  */
 final case class ClientChannelParams(
     maxInboundMessageSize: NonNegativeInt,
     keepAliveClient: Option[KeepAliveClientConfig],
-    flowControlWindow: PositiveInt,
+    flowControlWindow: Option[PositiveInt],
+    initialFlowControlWindow: Option[PositiveInt],
     traceContextPropagation: Propagation,
 )
 
@@ -35,6 +45,7 @@ object ClientChannelParams {
       maxInboundMessageSize = DefaultMaxInboundMessageSize,
       keepAliveClient = None,
       flowControlWindow = ClientChannelParams.DefaultFlowControlWindow,
+      initialFlowControlWindow = ClientChannelParams.DefaultInitialFlowControlWindow,
       TracingConfig.Propagation.Enabled,
     )
   lazy val Default =
@@ -42,9 +53,14 @@ object ClientChannelParams {
       maxInboundMessageSize = DefaultMaxInboundMessageSize,
       keepAliveClient = Some(KeepAliveClientConfig()),
       flowControlWindow = ClientChannelParams.DefaultFlowControlWindow,
+      initialFlowControlWindow = ClientChannelParams.DefaultInitialFlowControlWindow,
       TracingConfig.Propagation.Enabled,
     )
-  val DefaultFlowControlWindow: PositiveInt = PositiveInt.tryCreate(1024 * 1024)
+  // Unset, i.e. impl. (Netty) defaults, unless overridden by initial flow control window
+  val DefaultFlowControlWindow: Option[PositiveInt] = None
+  // Explicit auto flow control with 1MB initial window size
+  val DefaultInitialFlowControlWindow: Option[PositiveInt] =
+    Some(PositiveInt.tryCreate(1024 * 1024))
   val DefaultMaxInboundMessageSize: NonNegativeInt = NonNegativeInt.tryCreate(128 * 1024 * 1024)
 }
 
@@ -58,19 +74,24 @@ class ClientChannelBuilder private (protected val loggerFactory: NamedLoggerFact
 
   /** Set implementation specific channel settings */
   private def additionalChannelBuilderSettings(
-      builder: NettyChannelBuilder
+      builder: NettyChannelBuilder,
+      loadBalancingPolicy: Option[String],
+      healthCheck: Boolean,
   ): Unit = {
-    import scala.jdk.CollectionConverters.*
-    builder.defaultLoadBalancingPolicy("round_robin")
-    // enable health checking as a basis for round robin failover
-    builder.defaultServiceConfig(
-      Map(
-        "healthCheckConfig" -> Map(
-          "serviceName" -> CantonGrpcUtil.sequencerHealthCheckServiceName
-        ).asJava
-      ).asJava
-    )
-    ()
+    loadBalancingPolicy.map(builder.defaultLoadBalancingPolicy).discard
+    if (healthCheck) {
+      // enable health checking as a basis for round-robin failover
+      import scala.jdk.CollectionConverters.*
+      builder
+        .defaultServiceConfig(
+          Map(
+            "healthCheckConfig" -> Map(
+              "serviceName" -> CantonGrpcUtil.sequencerHealthCheckServiceName
+            ).asJava
+          ).asJava
+        )
+        .discard
+    }
   }
 
   def create(
@@ -79,21 +100,32 @@ class ClientChannelBuilder private (protected val loggerFactory: NamedLoggerFact
       executor: Executor,
       trustCertificate: Option[ByteString],
       params: ClientChannelParams,
+      loadBalancingPolicy: Option[String] = Some("round_robin"),
+      healthCheck: Boolean = true,
   ): NettyChannelBuilder = {
     // the bulk of this channel builder is the same between community and enterprise
     // we only extract the bits that are different into calls to the protected implementation specific methods
 
     // the builder calls mutate this instance so is fine to assign to a val
     val builder = createNettyChannelBuilder(endpoint)
-    additionalChannelBuilderSettings(builder)
+    additionalChannelBuilderSettings(builder, loadBalancingPolicy, healthCheck)
 
     builder.executor(executor)
     builder.maxInboundMessageSize(params.maxInboundMessageSize.value)
     ClientChannelBuilder.configureKeepAlive(params.keepAliveClient, builder).discard
-    builder.flowControlWindow(params.flowControlWindow.value)
+
+    params.flowControlWindow.foreach { flowControlWindow =>
+      builder.flowControlWindow(flowControlWindow.value).discard
+    }
+
+    params.initialFlowControlWindow.foreach { initialFlowControlWindow =>
+      builder.initialFlowControlWindow(initialFlowControlWindow.value).discard
+    }
+
     if (params.traceContextPropagation == Propagation.Enabled)
       builder.intercept(TraceContextGrpc.clientInterceptor()).discard
 
+    // TODO(#33984) Apply default TLS cipher suites to the gRPC client
     if (useTls) {
       builder
         .useTransportSecurity() // this is strictly unnecessary as is the default for the channel builder, but can't hurt either
@@ -172,36 +204,43 @@ object ClientChannelBuilder {
   )(implicit executor: Executor): ManagedChannelBuilderProxy =
     createChannelBuilder(clientConfig, maxInboundMessageSize = Some(Int.MaxValue))
 
-  def createChannelBuilder(
+  private def createChannelBuilder(
       clientConfig: ClientConfig,
       maxInboundMessageSize: Option[Int],
   )(implicit executor: Executor): ManagedChannelBuilderProxy = {
-    val nettyChannelBuilder =
+    val config = clientConfig.channel
+    val builder = // Mutable builder
       NettyChannelBuilder
         .forAddress(clientConfig.address, clientConfig.port.unwrap)
         .executor(executor)
+        .maxInboundMessageSize(
+          maxInboundMessageSize.getOrElse(config.maxInboundMessageSize.value)
+        )
 
-    val baseBuilder = nettyChannelBuilder
-      .maxInboundMessageSize(
-        maxInboundMessageSize.getOrElse(clientConfig.channel.maxInboundMessageSize.value)
+    // Leveraging mutable builder for conciseness
+    config.flowControlWindow.map(_.value).map(builder.flowControlWindow).discard
+    config.initialFlowControlWindow.map(_.value).map(builder.initialFlowControlWindow).discard
+
+    if (config.traceContextPropagation == Propagation.Enabled)
+      builder
+        .intercept(TraceContextGrpc.clientInterceptor())
+        .discard
+
+    // Apply TLS settings
+    clientConfig.tlsConfig
+      .flatMap(tls =>
+        Option.when(tls.enabled) {
+          builder
+            .useTransportSecurity()
+            .sslContext(sslContext(tls))
+        }
       )
-      .flowControlWindow(clientConfig.channel.flowControlWindow.value)
+      .getOrElse(builder.usePlaintext())
+      .discard
 
     // apply keep alive settings
-    val builder =
-      clientConfig.tlsConfig
-        // if tls isn't configured assume that it's a plaintext channel
-        .fold(baseBuilder.usePlaintext()) { tls =>
-          if (tls.enabled)
-            baseBuilder
-              .useTransportSecurity()
-              .sslContext(sslContext(tls))
-          else
-            baseBuilder.usePlaintext()
-        }
-
     ManagedChannelBuilderProxy(
-      configureKeepAlive(clientConfig.channel.keepAliveClient, builder)
+      configureKeepAlive(config.keepAliveClient, builder)
     )
   }
 }

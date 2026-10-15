@@ -40,7 +40,7 @@ class AcsJdbcTypesTest
         )
         """,
         "create test table",
-      )(implicitly, implicitly, _ => false)
+      )
       _ <- storage.underlying.update(
         sqlu" insert into jdbc_types_test_table values (${value})",
         "insert",
@@ -82,7 +82,7 @@ class AcsJdbcTypesTest
         )
         """,
         "create test table",
-      )(implicitly, implicitly, _ => false)
+      )
       _ <- storage.underlying.update(
         sqlu" insert into jdbc_types_test_table values (null)",
         "insert",

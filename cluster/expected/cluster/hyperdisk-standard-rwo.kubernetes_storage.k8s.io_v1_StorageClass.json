@@ -1,0 +1,20 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "allowVolumeExpansion": true,
+    "apiVersion": "storage.k8s.io/v1",
+    "kind": "StorageClass",
+    "metadata": {
+      "name": "hyperdisk-standard-rwo"
+    },
+    "parameters": {
+      "type": "hyperdisk-balanced"
+    },
+    "provisioner": "pd.csi.storage.gke.io",
+    "volumeBindingMode": "WaitForFirstConsumer"
+  },
+  "name": "hyperdisk-standard-rwo",
+  "provider": "",
+  "type": "kubernetes:storage.k8s.io/v1:StorageClass"
+}

@@ -13,7 +13,7 @@ import { FormErrors } from '../components/form-components/FormErrors';
 import { ProposalSummaryField } from '../components/form-components/ProposalSummaryField';
 import { ProposalTypeField } from '../components/form-components/ProposalTypeField';
 
-export const { useAppForm } = createFormHook({
+export const { useAppForm, withForm } = createFormHook({
   fieldComponents: {
     ConfigField,
     DateField,

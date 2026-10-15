@@ -1,0 +1,76 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "ingress-sv",
+    "namespace": "sv-da-1",
+    "timeout": 600,
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "cluster": {
+        "dnsName": "mock.global.canton.network.digitalasset.com",
+        "fixedTokens": false,
+        "hostname": "mock.global.canton.network.digitalasset.com",
+        "name": "cn-mocknet",
+        "svIngressName": "sv-1",
+        "svNamespace": "sv-da-1"
+      },
+      "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+      "ingress": {
+        "decentralizedSynchronizer": {
+          "migrationIds": [
+            "9",
+            "8",
+            "7",
+            "10"
+          ]
+        }
+      },
+      "rateLimit": {
+        "scan": {
+          "enable": false
+        }
+      },
+      "spliceDomainNames": {
+        "nameServiceDomain": "cns"
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ],
+      "withSvIngress": true
+    },
+    "version": "0.3.20"
+  },
+  "name": "sv-da-1-ingress-sv",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

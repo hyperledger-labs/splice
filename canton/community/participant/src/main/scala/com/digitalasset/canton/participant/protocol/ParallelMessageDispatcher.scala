@@ -6,8 +6,10 @@ package com.digitalasset.canton.participant.protocol
 import cats.Monoid
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.data.{CantonTimestamp, ViewType}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdownFactory}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.commitment.ReceivedAcsCommitmentValidator
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.metrics.ConnectedSynchronizerMetrics
 import com.digitalasset.canton.participant.protocol.MessageDispatcher.TicksAfter.{
@@ -67,7 +69,10 @@ class ParallelMessageDispatcher(
     override protected val requestProcessors: RequestProcessors,
     override protected val topologyProcessor: ParticipantTopologyProcessor,
     override protected val trafficProcessor: TrafficControlProcessor,
-    override protected val acsCommitmentProcessor: AcsCommitmentProcessor.ProcessorType,
+    override protected val legacyAcsCommitmentProcessorO: Option[
+      AcsCommitmentProcessor.ProcessorType
+    ],
+    override protected val acsCommitmentValidator: ReceivedAcsCommitmentValidator,
     override protected val requestCounterAllocator: RequestCounterAllocator,
     override protected val recordOrderPublisher: RecordOrderPublisher,
     override protected val badRootHashMessagesRequestProcessor: BadRootHashMessagesRequestProcessor,
@@ -133,8 +138,8 @@ class ParallelMessageDispatcher(
       case TrafficControlTransaction(run) =>
         // Traffic control messages are processed synchronously, so we can tick synchronously
         runSynchronously(run)(TickDecision.tickSynchronous, NoEventPublication)
-      case AcsCommitment(run) =>
-        runAsynchronously(run)(TickDecision.tickSynchronous, NoEventPublication)
+      case AcsCommitment(futureEventPublication, run) =>
+        runAsynchronously(run)(TickDecision.tickSynchronous, futureEventPublication)
       case MalformedMessage(run) =>
         runSynchronously(run)(TickDecision.tickSynchronous, NoEventPublication)
       case UnspecifiedMessageKind(run) =>
@@ -175,20 +180,9 @@ class ParallelMessageDispatcher(
           events.collect { case WithOpeningErrors(e: OrdinaryProtocolEvent, _) =>
             e.signedEvent.content
           }
-        ).tapOnShutdown {
-          val batchDesc =
-            s"sc=[${events.headOption.map(_.event.counter)}..${events.lastOption.map(_.event.counter)}]"
-          logger.debug(s"observeSequencing aborted due to shutdown $batchDesc")
-        }
+        )
         (observeSequencing, ticks) = observeSequencingAndTicks
-        process <- MonadUtil
-          .sequentialTraverseMonoid(events)(e =>
-            handle(ticks, e).tapOnShutdown(
-              logger.debug(
-                s"handle aborted due to shutdown sc=${e.event.counter} ts=${e.event.timestamp}"
-              )
-            )
-          )
+        process <- MonadUtil.sequentialTraverseMonoid(events)(handle(ticks, _))
       } yield Monoid.combine(observeSequencing, process)
     }
 
@@ -216,25 +210,18 @@ class ParallelMessageDispatcher(
         )
         // TODO(i31797): This needs to be reworked if / when we start making use of
         // UnthrottledAsync in the protocol processor
-        AsyncResult(
-          asyncResult
-            .flatMapFUS { (unthrottled: UnthrottledAsync) =>
-              ticksF.map(_ => unthrottled)
-            }
-            .unwrap
-            .tapOnShutdown(
-              logger.debug(
-                s"async tail aborted due to shutdown sc=${eventE.event.counter} ts=${eventE.event.timestamp}"
-              )
-            )
-        )
+        asyncResult.flatMapFUS { (unthrottled: UnthrottledAsync) =>
+          ticksF.map(_ => unthrottled)
+        }
       }
     }(traceContext, tracer)
   }
 
   private def processOrdinary(
       sequencerCounter: SequencerCounter,
-      signedEventE: WithOpeningErrors[SignedContent[SequencedEvent[DefaultOpenEnvelope]]],
+      signedEventE: WithOpeningErrors[
+        SignedContent[DecompressedSequencedEvent[DefaultOpenEnvelope]]
+      ],
   )(implicit traceContext: TraceContext): ProcessingResult =
     signedEventE.event.content match {
       case deliver @ Deliver(_pts, ts, _, _, _, _, _) if TimeProof.isTimeProofDeliver(deliver) =>
@@ -254,7 +241,8 @@ class ParallelMessageDispatcher(
         }
         @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
         val deliverE =
-          signedEventE.asInstanceOf[WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]]]
+          signedEventE
+            .asInstanceOf[WithOpeningErrors[SignedContent[Deliver[Batch[DefaultOpenEnvelope]]]]]
         processBatch(sequencerCounter, deliverE)
           .transform {
             case success @ Success(_) => success
@@ -291,8 +279,8 @@ class ParallelMessageDispatcher(
             }
           case Some(futureEvent) =>
             val tickF =
-              futureEvent.subflatMap { case EventPublicationData(event, rc) =>
-                recordOrderPublisher.tick(event, sc, Some(rc))
+              futureEvent.subflatMap { case EventPublicationData(event, rcO) =>
+                recordOrderPublisher.tick(event, sc, rcO)
               }
             // We cannot await the ticking of the record order publisher here because the ticking happens only
             // when the request is decided, i.e., after a mediator verdict arrives or whan a timeout happens.

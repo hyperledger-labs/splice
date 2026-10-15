@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.auth
 
-import com.daml.jwt.{AuthServiceJWTCodec, Jwt, JwtDecoder, StandardJWTPayload}
+import com.daml.jwt.{AuthServiceJWTCodec, Jwt, JwtDecoder, PartyJWTPayload, StandardJWTPayload}
 import com.digitalasset.canton.config.NonNegativeDuration
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.auth.OAuthApi.TokenResponse
@@ -41,6 +41,8 @@ object AuthToken {
     } yield {
       payload match {
         case standard: StandardJWTPayload => standard.userId
+        case _: PartyJWTPayload =>
+          throw new IllegalArgumentException("PartyJWTPayload is not supported")
       }
     }
   }

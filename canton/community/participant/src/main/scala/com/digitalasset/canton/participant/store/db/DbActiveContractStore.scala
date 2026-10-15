@@ -8,15 +8,14 @@ import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
-import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ReassignmentCounter
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.store.ActiveContractSnapshot.ActiveContractIdsChange
@@ -44,6 +43,7 @@ import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.collection.IterableUtil
 import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.nonempty.NonEmpty
 import slick.jdbc.*
 
 import java.util.concurrent.atomic.AtomicLong
@@ -81,7 +81,7 @@ class DbActiveContractStore(
 
   override protected[this] implicit def setParameterIndexedSynchronizer
       : SetParameter[IndexedSynchronizer] = IndexedString.setParameterIndexedString
-  override protected[this] def partitionColumn: String = "synchronizer_idx"
+  override protected[this] def partitionColumn: String & Singleton = "synchronizer_idx"
 
   import ActiveContractStore.*
   import storage.api.*
@@ -296,9 +296,8 @@ class DbActiveContractStore(
     storage.profile match {
       case _: DbStorage.Profile.H2 =>
         // With H2, it is faster to do lookup contracts individually than to use a range query
-        contractIds
-          .to(LazyList)
-          .parTraverseFilter { contractId =>
+        MonadUtil
+          .parTraverseFilterWithLimit(batchingConfig.parallelism)(contractIds.toSeq) { contractId =>
             storage
               .querySingle(fetchContractStateQuery(contractId), functionFullName)
               .semiflatMap(_.toContractState.map(res => (contractId -> res)))
@@ -499,8 +498,11 @@ class DbActiveContractStore(
     }
   }
 
-  override def doPrune(beforeAndIncluding: CantonTimestamp, lastPruning: Option[CantonTimestamp])(
-      implicit traceContext: TraceContext
+  override protected def doPrune(
+      beforeAndIncluding: CantonTimestamp,
+      lastPruning: Option[CantonTimestamp],
+  )(implicit
+      traceContext: TraceContext
   ): FutureUnlessShutdown[Int] =
     // For each contract select the last deactivation before or at the timestamp.
     // If such a deactivation exists then delete all acs records up to and including the deactivation

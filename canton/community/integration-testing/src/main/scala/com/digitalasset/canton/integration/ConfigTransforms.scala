@@ -21,12 +21,13 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.console.FeatureFlag
 import com.digitalasset.canton.http.{JsonApiConfig, WebsocketConfig}
 import com.digitalasset.canton.participant.config.{
+  AcsCommitmentConfig,
   AlphaOnlinePartyReplicationConfig,
   ParticipantNodeConfig,
   RemoteParticipantConfig,
   TestingTimeServiceConfig,
 }
-import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
+import com.digitalasset.canton.platform.apiserver.SeedService
 import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
 import com.digitalasset.canton.platform.indexer.IndexerConfig.AchsConfig
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
@@ -45,7 +46,6 @@ import monocle.macros.syntax.lens.*
 import monocle.macros.{GenLens, GenPrism}
 
 import scala.concurrent.duration.*
-import scala.jdk.DurationConverters.*
 import scala.util.Random
 
 /** Utilities for transforming instances of [[CantonConfig]]. A transform itself is merely a
@@ -77,6 +77,7 @@ object ConfigTransforms {
     def configTransformsWhen(predicate: Boolean)(transforms: => Seq[ConfigTransform]) =
       if (predicate) transforms else Seq()
 
+    val enableDev = configTransformsWhen(pv.isDev)(enableDevVersionSupport)
     val enableAlpha = configTransformsWhen(pv.isAlpha)(enableAlphaVersionSupport)
     val enableBeta = configTransformsWhen(pv.isBeta)(setBetaSupport(true))
 
@@ -85,50 +86,27 @@ object ConfigTransforms {
     val updateParticipants = Seq(
       updateAllParticipantConfigs_(
         _.focus(_.parameters.minimumProtocolVersion)
-          .replace(Some(ParticipantProtocolVersion(pv)))
+          // Set a minimum protocol version only when not already configured
+          .modify(_.orElse(Some(ParticipantProtocolVersion(pv))))
       )
     )
 
-    updateParticipants ++ enableAlpha ++ enableBeta ++ deprecatedPVWarning
+    updateParticipants ++ enableDev ++ enableAlpha ++ enableBeta ++ deprecatedPVWarning
   }
 
   val protocolVersionTransforms: Seq[ConfigTransform] = setProtocolVersion(
     BaseTest.testedProtocolVersion
   )
 
-  val generousRateLimiting: ConfigTransform =
+  private val generousRateLimiting: ConfigTransform =
     updateAllParticipantConfigs_(
       _.focus(_.ledgerApi.rateLimit).replace(Some(RateLimitingConfig.Default))
-    )
-
-  val useFeaturesWithFeatureFlags =
-    Seq(
-      ConfigTransforms.updateAllMediatorConfigs_(
-        _.focus(_.topology.useNewProcessor)
-          .replace(true)
-          .focus(_.topology.useNewClient)
-          .replace(true)
-      ),
-      ConfigTransforms.updateAllSequencerConfigs_(
-        _.focus(_.topology.useNewProcessor)
-          .replace(true)
-          .focus(_.topology.useNewClient)
-          .replace(true)
-      ),
-      ConfigTransforms.updateAllParticipantConfigs_(
-        _.focus(_.topology.useNewProcessor)
-          .replace(true)
-          .focus(_.topology.useNewClient)
-          .replace(true)
-      ),
     )
 
   /** Config transforms to apply to heavy-weight tests using an [[EnvironmentDefinition]]. For
     * example, these transforms should be applied to toxiproxy tests.
     */
   val heavyTestDefaults: Seq[ConfigTransform] = protocolVersionTransforms ++
-    setBetaSupport(BaseTest.testedProtocolVersion.isBeta) ++
-    useFeaturesWithFeatureFlags ++
     Seq(
       ConfigTransforms.uniqueH2DatabaseNames,
       ConfigTransforms.globallyUniquePorts,
@@ -140,8 +118,6 @@ object ConfigTransforms {
       ConfigTransforms.updateAllParticipantConfigs_(
         _.focus(_.parameters.adminWorkflow.bongTestMaxLevel)
           .replace(NonNegativeInt.tryCreate(20))
-          .focus(_.parameters.ledgerApiServer.contractIdSeeding)
-          .replace(Seeding.Weak)
           .focus(_.parameters.engine.enableAdditionalConsistencyChecks)
           .replace(true)
       ),
@@ -155,6 +131,13 @@ object ConfigTransforms {
       _.focus(_.monitoring.logging.api.warnBeyondLoad).replace(Some(10000)),
       // disable exit on fatal error in tests
       ConfigTransforms.setExitOnFatalFailures(false),
+      // tests must be able to observe security alarms without the participant crashing
+      ConfigTransforms.setCrashAfterFailedValidation(false),
+      ConfigTransforms.useNewAggregator(true),
+      // Safe-to-prune checks rely on the indexer streams signalling offset advancements even if there is no activity.
+      ConfigTransforms.setIdleStreamOffsetCheckpointTimeout(
+        config.NonNegativeFiniteDuration.ofSeconds(1)
+      ),
     )
 
   lazy val dontWarnOnDeprecatedPV: Seq[ConfigTransform] = Seq(
@@ -168,6 +151,46 @@ object ConfigTransforms {
       _.focus(_.parameters.dontWarnOnDeprecatedPV).replace(true)
     ),
   )
+
+  lazy val enableNewAcsCommitmentProcessorPipeline: ConfigTransform =
+    updateAllParticipantConfigs_(
+      _.focus(_.parameters.acsCommitments.enableNewAcsCommitmentProcessor)
+        .replace(true)
+        // Let's change the maxNumUpdatesBetweenCheckpoints to a very small value,
+        // so we always have a meaningful checkpoint (close to the ledger end)
+        // for AcsDigestConsistencyChecker
+        .focus(_.parameters.acsCommitments.maxNumUpdatesBetweenCheckpoints)
+        .replace(PositiveInt.one)
+    )
+
+  lazy val disableNewAcsCommitmentProcessorPipeline: ConfigTransform =
+    updateAllParticipantConfigs_(
+      _.focus(_.parameters.acsCommitments.enableNewAcsCommitmentProcessor).replace(false)
+    )
+
+  /** Disable the old acs commitment processor if the testedProtocolVersion meets or exceeds
+    * ProtocolVersion.acsCommitmentRedesign.
+    */
+  lazy val disableOldAcsCommitmentProcessor: ConfigTransform =
+    if (BaseTest.testedProtocolVersion >= ProtocolVersion.acsCommitmentRedesign) {
+      updateAllParticipantConfigs_(
+        _.focus(_.parameters.acsCommitments.disableOldAcsCommitmentProcessor)
+          .replace(AcsCommitmentConfig.DisableOldAcsCommitmentProcessor.Always)
+      )
+    } else identity
+
+  // TODO(#35107) remove after all tests work without this config transformation
+  lazy val enableOldAcsCommitmentProcessor: ConfigTransform =
+    updateAllParticipantConfigs_(
+      _.focus(_.parameters.acsCommitments.disableOldAcsCommitmentProcessor)
+        .replace(AcsCommitmentConfig.DisableOldAcsCommitmentProcessor.Never)
+    )
+
+  def setAcsCommitmentSendDelay(min: Double, max: Double): ConfigTransform =
+    updateAllParticipantConfigs_(
+      _.focus(_.parameters.acsCommitments.sender)
+        .modify(_.copy(minSendDelayFraction = min, maxSendDelayFraction = max))
+    )
 
   lazy val enableInteractiveSubmissionTransforms: ConfigTransform =
     ConfigTransforms
@@ -193,14 +216,49 @@ object ConfigTransforms {
   def setNonStandardConfig(enable: Boolean): ConfigTransform =
     _.focus(_.parameters.nonStandardConfig).replace(enable)
 
-  def setGlobalAlphaVersionSupport(enable: Boolean): ConfigTransform =
+  private def setGlobalDevVersionSupport(enable: Boolean): ConfigTransform =
+    _.focus(_.parameters.devVersionSupport).replace(enable)
+
+  private def setGlobalAlphaVersionSupport(enable: Boolean): ConfigTransform =
     _.focus(_.parameters.alphaVersionSupport).replace(enable)
 
-  def setGlobalBetaVersionSupport(enable: Boolean): ConfigTransform =
+  private def setGlobalBetaVersionSupport(enable: Boolean): ConfigTransform =
     _.focus(_.parameters.betaVersionSupport).replace(enable)
 
   def setExitOnFatalFailures(enable: Boolean): ConfigTransform =
     _.focus(_.parameters.exitOnFatalFailures).replace(enable)
+
+  def setCrashAfterFailedValidation(enable: Boolean): ConfigTransform =
+    updateAllParticipantConfigs_(
+      _.focus(_.parameters.crashAfterFailedValidation).replace(enable)
+    )
+
+  def setDevVersionSupport(enable: Boolean): Seq[ConfigTransform] = Seq(
+    setNonStandardConfig(enable),
+    setGlobalDevVersionSupport(enable),
+    updateAllParticipantConfigs_(
+      _.focus(_.parameters.devVersionSupport)
+        .replace(enable)
+    ),
+  )
+
+  def enableParticipantsDevVersionSupport(
+      participantNames: String*
+  ): Seq[ConfigTransform] = participantNames.map {
+    updateParticipantConfig(_)(_.focus(_.parameters.devVersionSupport).replace(true))
+  }
+
+  def enableSequencersDevVersionSupport(
+      sequencerNames: String*
+  ): Seq[ConfigTransform] = sequencerNames.map {
+    updateSequencerConfig(_)(_.focus(_.parameters.devVersionSupport).replace(true))
+  }
+
+  def enableMediatorsDevVersionSupport(
+      mediatorNames: String*
+  ): Seq[ConfigTransform] = mediatorNames.map {
+    updateMediatorConfig(_)(_.focus(_.parameters.devVersionSupport).replace(true))
+  }
 
   def setAlphaVersionSupport(enable: Boolean): Seq[ConfigTransform] = Seq(
     setNonStandardConfig(enable),
@@ -210,6 +268,24 @@ object ConfigTransforms {
         .replace(enable)
     ),
   )
+
+  def enableParticipantsAlphaVersionSupport(
+      participantNames: String*
+  ): Seq[ConfigTransform] = participantNames.map {
+    updateParticipantConfig(_)(_.focus(_.parameters.alphaVersionSupport).replace(true))
+  }
+
+  def enableSequencersAlphaVersionSupport(
+      sequencerNames: String*
+  ): Seq[ConfigTransform] = sequencerNames.map {
+    updateSequencerConfig(_)(_.focus(_.parameters.alphaVersionSupport).replace(true))
+  }
+
+  def enableMediatorsAlphaVersionSupport(
+      mediatorNames: String*
+  ): Seq[ConfigTransform] = mediatorNames.map {
+    updateMediatorConfig(_)(_.focus(_.parameters.alphaVersionSupport).replace(true))
+  }
 
   def setBetaSupport(enable: Boolean): Seq[ConfigTransform] =
     Seq(
@@ -223,15 +299,37 @@ object ConfigTransforms {
   def setStartupMemoryReportLevel(level: ReportingLevel): ConfigTransform =
     _.focus(_.parameters.startupMemoryCheckConfig).replace(StartupMemoryCheckConfig(level))
 
-  lazy val enableAlphaVersionSupport: Seq[ConfigTransform] = setAlphaVersionSupport(true)
+  lazy val enableDevVersionSupport: Seq[ConfigTransform] = setDevVersionSupport(true)
+  lazy val enableAlphaVersionSupport: Seq[ConfigTransform] = setAlphaVersionSupport(
+    true
+  )
+
+  /** Turns on TEA accounting (not enforcement) on all participants. Used under
+    * CANTON_TEST_EXTERNAL_PARTIES so integration tests exercise the traffic accounting path without
+    * rejecting submissions.
+    */
+  lazy val enableTrafficAccounting: ConfigTransform =
+    updateAllParticipantConfigs_(
+      _.focus(_.trafficAccounting.enabled)
+        .replace(true)
+        .focus(_.trafficAccounting.enforceCostOnSubmissions)
+        .replace(false)
+    )
+
+  /** Turns TEA off on all participants. Use to override [[enableTrafficAccounting]] for tests that
+    * need the base set of Ledger API services without the optional traffic service.
+    */
+  lazy val disableTrafficAccounting: ConfigTransform =
+    updateAllParticipantConfigs_(
+      _.focus(_.trafficAccounting.enabled).replace(false)
+    )
 
   /** Default transforms to apply to tests using a [[EnvironmentDefinition]]. Covers the primary
     * ways that distinct concurrent environments may unintentionally collide.
     */
   val defaults: Seq[ConfigTransform] =
     heavyTestDefaults ++
-      setBetaSupport(BaseTest.testedProtocolVersion.isBeta) ++
-      Seq(
+      Seq[ConfigTransform](
         // Make unbounded durations bounded for integration tests
         _.focus(_.parameters.timeouts.console.unbounded)
           .replace(config.NonNegativeDuration.tryFromDuration(3.minutes))
@@ -261,6 +359,15 @@ object ConfigTransforms {
               h2Config.focus(_.parameters.connectionTimeout).replace(newConnectionTimeout)
           }
         },
+        ConfigTransforms.setSigningKeysIfPV35OrHigher(
+          if (sys.env.get("SESSION_SIGNING_KEYS_ENABLED").contains("true"))
+            SessionSigningKeysConfig.enabled
+          else SessionSigningKeysConfig.disabled
+        ),
+        ConfigTransforms.setAcsCommitmentSendDelay(0.0d, 0.0d),
+        enableNewAcsCommitmentProcessorPipeline,
+        disableOldAcsCommitmentProcessor,
+        enableTrafficAccounting,
       )
 
   lazy val clearMinimumProtocolVersion: Seq[ConfigTransform] =
@@ -434,11 +541,6 @@ object ConfigTransforms {
   /** Enable the testing time service in the ledger API */
   def useTestingTimeService: ParticipantNodeConfig => ParticipantNodeConfig =
     _.focus(_.testingTime).replace(Some(TestingTimeServiceConfig.MonotonicTime))
-
-  def updateContractIdSeeding(seeding: Seeding): ConfigTransform =
-    updateAllParticipantConfigs_(
-      _.focus(_.parameters.ledgerApiServer.contractIdSeeding).replace(seeding)
-    )
 
   def generateUniqueH2DatabaseName(nodeName: String): String = {
     val dbPrefix = Random.alphanumeric.take(8).map(_.toLower).mkString
@@ -741,18 +843,6 @@ object ConfigTransforms {
         .replace(config.NonNegativeFiniteDuration(maxDeduplicationDuration))
     )
 
-  def updateTargetTimestampForwardTolerance(
-      targetTimestampForwardTolerance: scala.concurrent.duration.FiniteDuration
-  ): ConfigTransform = updateTargetTimestampForwardTolerance(targetTimestampForwardTolerance.toJava)
-
-  def updateTargetTimestampForwardTolerance(
-      targetTimestampForwardTolerance: java.time.Duration
-  ): ConfigTransform =
-    ConfigTransforms.updateAllParticipantConfigs_(
-      _.focus(_.parameters.reassignmentsConfig.targetTimestampForwardTolerance)
-        .replace(config.NonNegativeFiniteDuration(targetTimestampForwardTolerance))
-    )
-
   def setPassiveCheckPeriodMediators(
       passiveCheckPeriod: config.PositiveFiniteDuration,
       mediatorNames: String*
@@ -927,12 +1017,14 @@ object ConfigTransforms {
       participantName: String,
       websocketConfig: Option[WebsocketConfig] = None,
       pathPrefix: Option[String] = None,
+      maxInboundMessageSize: Option[NonNegativeInt] = None,
   ): ConfigTransform =
     updateParticipantConfig(participantName)(config =>
       config.copy(httpLedgerApi =
         JsonApiConfig(
           pathPrefix = pathPrefix,
           websocketConfig = websocketConfig,
+          maxInboundMessageSize = maxInboundMessageSize,
         )
       )
     )
@@ -951,4 +1043,65 @@ object ConfigTransforms {
     updateAllMediatorConfigs_(
       _.focus(_.topology.validateInitialTopologySnapshot).replace(false)
     )
+
+  def useNewAggregator(value: Boolean): ConfigTransform =
+    updateAllParticipantConfigs_ {
+      _.focus(_.sequencerClient.useNewAggregator).replace(value)
+    }
+      .compose(updateAllMediatorConfigs_ {
+        _.focus(_.sequencerClient.useNewAggregator).replace(value)
+      })
+      .compose(updateAllSequencerConfigs_ {
+        _.focus(_.sequencerClient.useNewAggregator).replace(value)
+      })
+
+  def disableCache: ConfigTransform =
+    updateAllParticipantConfigs_(
+      _.focus(_.ledgerApi.userManagementService.enabled)
+        .replace(true)
+        .focus(_.ledgerApi.userManagementService.maxCacheSize)
+        .replace(0)
+        .focus(_.ledgerApi.userManagementService.maxRightsPerUser)
+        .replace(100)
+        .focus(_.parameters.ledgerApiServer.contractIdSeeding)
+        .replace(SeedService.Seeding.Weak)
+        .focus(_.ledgerApi.indexService.maxContractKeyStateCacheSize)
+        .replace(0)
+        .focus(_.ledgerApi.indexService.maxContractStateCacheSize)
+        .replace(0)
+        .focus(_.ledgerApi.indexService.maxTransactionsInMemoryFanOutBufferSize)
+        .replace(0)
+    )
+
+  def setTinyCache: ConfigTransform =
+    updateAllParticipantConfigs_ {
+      _.focus(_.ledgerApi.userManagementService.enabled)
+        .replace(true)
+        .focus(_.ledgerApi.userManagementService.maxCacheSize)
+        .replace(2)
+        .focus(_.parameters.ledgerApiServer.contractIdSeeding)
+        .replace(SeedService.Seeding.Weak)
+        .focus(_.ledgerApi.indexService.activeContractsServiceStreams.maxIdsPerIdPage)
+        .replace(2)
+        .focus(
+          _.ledgerApi.indexService.activeContractsServiceStreams.maxPayloadsPerPayloadsPage
+        )
+        .replace(2)
+        .focus(_.ledgerApi.indexService.maxContractKeyStateCacheSize)
+        .replace(2)
+        .focus(_.ledgerApi.indexService.maxContractStateCacheSize)
+        .replace(2)
+        .focus(_.ledgerApi.indexService.maxTransactionsInMemoryFanOutBufferSize)
+        .replace(3)
+        .focus(_.ledgerApi.indexService.bufferedStreamsPageSize)
+        .replace(1)
+    }
+
+  def setIdleStreamOffsetCheckpointTimeout(
+      duration: config.NonNegativeFiniteDuration
+  ): ConfigTransform =
+    ConfigTransforms.updateAllParticipantConfigs_(
+      _.focus(_.ledgerApi.indexService.idleStreamOffsetCheckpointTimeout).replace(duration)
+    )
+
 }

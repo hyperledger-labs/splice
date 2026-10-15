@@ -7,9 +7,9 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.actor.{ActorSystem, Scheduler}
 import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpClientMetrics}
-import org.lfdecentralizedtrust.splice.http.v0.definitions.AcsRequest.RecordTimeMatch
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsResponse, CreatedEvent}
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.GetAcsSnapshotAt
+import org.lfdecentralizedtrust.splice.http.v0.definitions.AcsRequestV2.RecordTimeMatch
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsResponseV2, ActiveContract}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.GetAcsSnapshotAtV2
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
@@ -43,12 +43,12 @@ class DownloadScanAcsSnapshot(
     }
     implicit val scheduler: Scheduler = as.scheduler
 
-    def query(after: Option[Long]): Future[AcsResponse] = {
+    def query(after: Option[String]): Future[AcsResponseV2] = {
       org.apache.pekko.pattern
         .retry(
           () => {
             logger.info(s"Querying at $after")
-            val command = GetAcsSnapshotAt(
+            val command = GetAcsSnapshotAtV2(
               snapshotTime.atOffset(ZoneOffset.UTC),
               migrationId = migrationId.toLong,
               Some(RecordTimeMatch.AtOrBefore),
@@ -80,7 +80,7 @@ class DownloadScanAcsSnapshot(
     }
 
     @tailrec
-    def loop(after: Option[Long], acc: Chain[CreatedEvent]): Chain[CreatedEvent] = {
+    def loop(after: Option[String], acc: Chain[ActiveContract]): Chain[ActiveContract] = {
       val nextResponse = Await.result(query(after), atMost = 2.minutes)
       val newAcc = acc ++ Chain.fromSeq(nextResponse.createdEvents)
       nextResponse.nextPageToken match {
@@ -93,8 +93,8 @@ class DownloadScanAcsSnapshot(
     logger.info(
       s"Finished downloading ACS snapshot."
     )
-    val toWrite = AcsResponse.encodeAcsResponse(
-      AcsResponse(
+    val toWrite = AcsResponseV2.encodeAcsResponseV2(
+      AcsResponseV2(
         snapshotTime.atOffset(ZoneOffset.UTC),
         migrationId.toLong,
         acs.toVector,

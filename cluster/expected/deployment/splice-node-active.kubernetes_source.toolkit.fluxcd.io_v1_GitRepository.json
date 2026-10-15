@@ -1,0 +1,109 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "source.toolkit.fluxcd.io/v1",
+    "kind": "GitRepository",
+    "metadata": {
+      "labels": {
+        "notifications": "true"
+      },
+      "name": "splice-node-active",
+      "namespace": "operator"
+    },
+    "spec": {
+      "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard\n!**/token-standard/*/openapi/**",
+      "include": [
+        {
+          "fromPath": "cluster/stacks/prod/sv-runbook/Pulumi.sv-runbook.mock.yaml",
+          "repository": {
+            "name": "splice-node-active-base"
+          },
+          "toPath": "splice/cluster/pulumi/sv-runbook/Pulumi.sv-runbook.mock.yaml"
+        },
+        {
+          "fromPath": "cluster/stacks/prod/multi-validator/Pulumi.multi-validator.mock.yaml",
+          "repository": {
+            "name": "splice-node-active-base"
+          },
+          "toPath": "splice/cluster/pulumi/multi-validator/Pulumi.multi-validator.mock.yaml"
+        },
+        {
+          "fromPath": "cluster/stacks/prod/validator-runbook/Pulumi.validator-runbook.mock.yaml",
+          "repository": {
+            "name": "splice-node-active-base"
+          },
+          "toPath": "splice/cluster/pulumi/validator-runbook/Pulumi.validator-runbook.mock.yaml"
+        },
+        {
+          "fromPath": "cluster/stacks/prod/validator-runbook/Pulumi.validators.extra-validator.mock.yaml",
+          "repository": {
+            "name": "splice-node-active-base"
+          },
+          "toPath": "splice/cluster/pulumi/validator-runbook/Pulumi.validators.extra-validator.mock.yaml"
+        },
+        {
+          "fromPath": "cluster/stacks/prod/validator1/Pulumi.validator1.mock.yaml",
+          "repository": {
+            "name": "splice-node-active-base"
+          },
+          "toPath": "splice/cluster/pulumi/validator1/Pulumi.validator1.mock.yaml"
+        },
+        {
+          "fromPath": "cluster/stacks/prod/splitwell/Pulumi.splitwell.mock.yaml",
+          "repository": {
+            "name": "splice-node-active-base"
+          },
+          "toPath": "splice/cluster/pulumi/splitwell/Pulumi.splitwell.mock.yaml"
+        },
+        {
+          "fromPath": "cluster/stacks/prod/infra/Pulumi.infra.mock.yaml",
+          "repository": {
+            "name": "splice-node-active-base"
+          },
+          "toPath": "splice/cluster/pulumi/infra/Pulumi.infra.mock.yaml"
+        },
+        {
+          "fromPath": "cluster/stacks/prod/canton-network/Pulumi.canton-network.mock.yaml",
+          "repository": {
+            "name": "splice-node-active-base"
+          },
+          "toPath": "splice/cluster/pulumi/canton-network/Pulumi.canton-network.mock.yaml"
+        },
+        {
+          "fromPath": "cluster/stacks/prod/sv/Pulumi.sv.sv-1.mock.yaml",
+          "repository": {
+            "name": "splice-node-active-base"
+          },
+          "toPath": "splice/cluster/pulumi/sv/Pulumi.sv.sv-1.mock.yaml"
+        },
+        {
+          "fromPath": "cluster/stacks/prod/sv/Pulumi.sv.sv-da-1.mock.yaml",
+          "repository": {
+            "name": "splice-node-active-base"
+          },
+          "toPath": "splice/cluster/pulumi/sv/Pulumi.sv.sv-da-1.mock.yaml"
+        },
+        {
+          "fromPath": "cluster/stacks/prod/sv/Pulumi.sv.sv.mock.yaml",
+          "repository": {
+            "name": "splice-node-active-base"
+          },
+          "toPath": "splice/cluster/pulumi/sv/Pulumi.sv.sv.mock.yaml"
+        }
+      ],
+      "interval": "5m",
+      "recurseSubmodules": true,
+      "ref": {
+        "name": "refs/heads/release-line-0.3.20"
+      },
+      "secretRef": {
+        "name": "github"
+      },
+      "url": "https://github.com/canton-network/splice"
+    }
+  },
+  "name": "splice-node-active",
+  "provider": "",
+  "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+}

@@ -116,7 +116,7 @@ class LsuTransferTrafficTrigger(
       .map(_.filter { announcement =>
         now.isAfter(
           announcement.mapping.upgradeTime
-        ) && announcement.mapping.successorSynchronizerId != synchronizerId
+        ) && announcement.mapping.successorSynchronizerId != synchronizerId.opaque
       })
   }
 }

@@ -11,6 +11,7 @@ import com.digitalasset.canton.concurrent.{
   FutureSupervisor,
 }
 import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{
   HasLoggerName,
@@ -56,6 +57,7 @@ class ParticipantNodePersistentState private (
       pruningStore,
       ledgerApiStore,
       contractStore,
+      acsCounterParticipantConfigStore,
     )(logger)
 }
 

@@ -1,0 +1,13 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "audience": "https://canton.network.global",
+    "scopes": [
+      "daml_ledger_api"
+    ]
+  },
+  "name": "sv1ValidatorBackendAppLegacyGrant",
+  "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+  "type": "auth0:index/clientGrant:ClientGrant"
+}

@@ -5,16 +5,22 @@ package com.digitalasset.canton.data
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
-import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.crypto.{HashOps, HashPurpose, Salt}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.protocol.{v30, *}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{ProtoConverter, ProtocolVersionedMemoizedEvidence}
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
+import com.digitalasset.canton.validation.{
+  ProtoUnvalidatedSeq,
+  ProtoUnvalidatedString,
+  ProtoValidation,
+}
 import com.digitalasset.canton.version.*
 import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.nonempty.NonEmpty
 import com.google.protobuf.ByteString
 
 /** Information about the submitters of the transaction */
@@ -63,46 +69,67 @@ final case class SubmitterMetadata private (
   @transient override protected lazy val companionObj: SubmitterMetadata.type = SubmitterMetadata
 
   protected def toProtoV30: v30.SubmitterMetadata = v30.SubmitterMetadata(
-    actAs = actAs.toSeq,
+    actAs = actAs.toSeq.map(_.toProtoUnvalidated),
     userId = userId.toProtoPrimitive,
     commandId = commandId.toProtoPrimitive,
     submittingParticipantUid = submittingParticipant.uid.toProtoPrimitive,
     salt = Some(salt.toProtoV30),
-    submissionId = submissionId.getOrElse(""),
+    submissionId = submissionId.getOrElse("").toProtoUnvalidated,
     dedupPeriod = Some(SerializableDeduplicationPeriod(dedupPeriod).toProtoV30),
     maxSequencingTime = maxSequencingTime.toProtoPrimitive,
     externalAuthorization = externalAuthorization.map(_.toProtoV30),
   )
 
   protected def toProtoV31: v31.SubmitterMetadata = v31.SubmitterMetadata(
-    actAs = actAs.toSeq,
+    actAs = actAs.toSeq.map(_.toProtoUnvalidated),
     userId = userId.toProtoPrimitive,
     commandId = commandId.toProtoPrimitive,
     submittingParticipantUid = submittingParticipant.uid.toProtoPrimitive,
     salt = Some(salt.toProtoV30),
-    submissionId = submissionId.getOrElse(""),
+    submissionId = submissionId.getOrElse("").toProtoUnvalidated,
     dedupPeriod = Some(SerializableDeduplicationPeriod(dedupPeriod).toProtoV30),
     maxSequencingTime = maxSequencingTime.toProtoPrimitive,
     externalAuthorization = externalAuthorization.map(_.toProtoV31),
   )
 
+  protected def toProtoV32: v32.SubmitterMetadata = v32.SubmitterMetadata(
+    actAs = actAs.toSeq.map(_.toProtoUnvalidated),
+    userId = userId.toProtoPrimitive,
+    commandId = commandId.toProtoPrimitive,
+    submittingParticipantUid = submittingParticipant.uid.toProtoPrimitive,
+    salt = Some(salt.toProtoV30),
+    submissionId = submissionId.getOrElse("").toProtoUnvalidated,
+    dedupPeriod = Some(SerializableDeduplicationPeriod(dedupPeriod).toProtoV30),
+    maxSequencingTime = maxSequencingTime.toProtoPrimitive,
+    externalAuthorization = externalAuthorization.map(_.toProtoV32),
+  )
+
 }
+
+final case class SubmitterMetadataDeserializationContext(
+    hashOps: HashOps,
+    synchronizerLimits: SynchronizerLimits,
+)
 
 object SubmitterMetadata
     extends VersioningCompanionContextMemoization[
       SubmitterMetadata,
-      HashOps,
+      SubmitterMetadataDeserializationContext,
     ] {
   override val name: String = "SubmitterMetadata"
 
   val versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.SubmitterMetadata)(
-      supportedProtoVersionMemoized(_)(fromProtoV30),
+      supportedProtoVersionMemoizedPVV(_)(fromProtoV30),
       _.toProtoV30,
     ),
     ProtoVersion(31) -> VersionedProtoCodec(ProtocolVersion.v35)(v31.SubmitterMetadata)(
-      supportedProtoVersionMemoized(_)(fromProtoV31),
+      supportedProtoVersionMemoizedPVV(_)(fromProtoV31),
       _.toProtoV31,
+    ),
+    ProtoVersion(32) -> VersionedProtoCodec(ProtocolVersion.v36)(v32.SubmitterMetadata)(
+      supportedProtoVersionMemoizedPVV(_)(fromProtoV32),
+      _.toProtoV32,
     ),
   )
 
@@ -159,9 +186,14 @@ object SubmitterMetadata
         )
     }
 
-  private def fromProtoV30(hashOps: HashOps, metaDataP: v30.SubmitterMetadata)(
+  private def fromProtoV30(
+      pvv: ProtocolVersionValidation,
+      context: SubmitterMetadataDeserializationContext,
+      metaDataP: v30.SubmitterMetadata,
+  )(
       bytes: ByteString
   ): ParsingResult[SubmitterMetadata] = {
+    val SubmitterMetadataDeserializationContext(hashOps, synchronizerLimits) = context
     val v30.SubmitterMetadata(
       saltOP,
       actAsP,
@@ -176,10 +208,10 @@ object SubmitterMetadata
 
     for {
       externalAuthorizationO <- externalAuthorizationOP.traverse(
-        ExternalAuthorization.fromProtoV30
+        ExternalAuthorization.fromProtoV30(pvv, _)
       )
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
-      result <- fromProto(hashOps, bytes)(
+      result <- fromProto(pvv, hashOps, synchronizerLimits, bytes)(
         saltOP,
         actAsP,
         userIdP,
@@ -196,9 +228,14 @@ object SubmitterMetadata
 
   }
 
-  private def fromProtoV31(hashOps: HashOps, metaDataP: v31.SubmitterMetadata)(
+  private def fromProtoV31(
+      pvv: ProtocolVersionValidation,
+      context: SubmitterMetadataDeserializationContext,
+      metaDataP: v31.SubmitterMetadata,
+  )(
       bytes: ByteString
   ): ParsingResult[SubmitterMetadata] = {
+    val SubmitterMetadataDeserializationContext(hashOps, synchronizerLimits) = context
     val v31.SubmitterMetadata(
       saltOP,
       actAsP,
@@ -213,10 +250,10 @@ object SubmitterMetadata
 
     for {
       externalAuthorizationO <- externalAuthorizationOP.traverse(
-        ExternalAuthorization.fromProtoV31
+        ExternalAuthorization.fromProtoV31(pvv, _)
       )
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(31))
-      result <- fromProto(hashOps, bytes)(
+      result <- fromProto(pvv, hashOps, synchronizerLimits, bytes)(
         saltOP,
         actAsP,
         userIdP,
@@ -231,41 +268,97 @@ object SubmitterMetadata
     } yield result
   }
 
-  private def fromProto(hashOps: HashOps, bytes: DataByteString)(
+  private def fromProtoV32(
+      pvv: ProtocolVersionValidation,
+      context: SubmitterMetadataDeserializationContext,
+      metaDataP: v32.SubmitterMetadata,
+  )(
+      bytes: ByteString
+  ): ParsingResult[SubmitterMetadata] = {
+    val SubmitterMetadataDeserializationContext(hashOps, synchronizerLimits) = context
+    val v32.SubmitterMetadata(
+      saltOP,
+      actAsP,
+      userIdP,
+      commandIdP,
+      submittingParticipantUidP,
+      submissionIdP,
+      dedupPeriodOP,
+      maxSequencingTimeOP,
+      externalAuthorizationOP,
+    ) = metaDataP
+
+    for {
+      externalAuthorizationO <- externalAuthorizationOP.traverse(
+        ExternalAuthorization.fromProtoV32(pvv, _)
+      )
+      rpv <- protocolVersionRepresentativeFor(ProtoVersion(32))
+      result <- fromProto(pvv, hashOps, synchronizerLimits, bytes)(
+        saltOP,
+        actAsP,
+        userIdP,
+        commandIdP,
+        submittingParticipantUidP,
+        submissionIdP,
+        dedupPeriodOP,
+        maxSequencingTimeOP,
+        externalAuthorizationO,
+        rpv,
+      )
+    } yield result
+  }
+
+  private def fromProto(
+      pvv: ProtocolVersionValidation,
+      hashOps: HashOps,
+      synchronizerLimits: SynchronizerLimits,
+      bytes: DataByteString,
+  )(
       saltOP: Option[com.digitalasset.canton.crypto.v30.Salt],
-      actAsP: Seq[String],
-      userIdP: String,
-      commandIdP: String,
-      submittingParticipantUidP: String,
-      submissionIdP: String,
+      actAsP: ProtoUnvalidatedSeq[ProtoUnvalidatedString],
+      userIdP: ProtoUnvalidatedString,
+      commandIdP: ProtoUnvalidatedString,
+      submittingParticipantUidP: ProtoUnvalidatedString,
+      submissionIdP: ProtoUnvalidatedString,
       dedupPeriodOP: Option[v30.DeduplicationPeriod],
       maxSequencingTimeOP: Long,
       externalAuthorizationO: Option[ExternalAuthorization],
       rpv: RepresentativeProtocolVersion[SubmitterMetadata.type],
   ): ParsingResult[SubmitterMetadata] =
     for {
-      submittingParticipant <- UniqueIdentifier
-        .fromProtoPrimitive(
+      submittingParticipant <- ProtoValidation
+        .validateThen(
           submittingParticipantUidP,
           "SubmitterMetadata.submitter_participant_uid",
-        )
+          pvv,
+        )(UniqueIdentifier.fromProtoPrimitive)
         .map(ParticipantId(_))
-      actAs <- actAsP.traverse(
-        ProtoConverter
-          .parseLfPartyId(_, "act_as")
-          .leftMap(e => ProtoDeserializationError.ValueConversionError("actAs", e.message))
+
+      maxActAs = synchronizerLimits.transactionProtocolLimits.maxActAs
+      actAs <- ProtoValidation
+        .validateThen(actAsP, "act_as", pvv, maxActAs.value)(
+          ProtoConverter.parseLfPartyId
+        )
+      userId <- ProtoValidation.validateThen(userIdP, "userId", pvv)((s, _) =>
+        UserId
+          .fromProtoPrimitive(s)
+          .leftMap(ProtoDeserializationError.ValueConversionError("userId", _))
       )
-      userId <- UserId
-        .fromProtoPrimitive(userIdP)
-        .leftMap(ProtoDeserializationError.ValueConversionError("userId", _))
-      commandId <- CommandId
-        .fromProtoPrimitive(commandIdP)
-        .leftMap(ProtoDeserializationError.ValueConversionError("commandId", _))
+      commandId <- ProtoValidation.validateThen(commandIdP, "commandId", pvv)((s, _) =>
+        CommandId
+          .fromProtoPrimitive(s)
+          .leftMap(ProtoDeserializationError.ValueConversionError("commandId", _))
+      )
       salt <- ProtoConverter
         .parseRequired(Salt.fromProtoV30, "salt", saltOP)
         .leftMap(e => ProtoDeserializationError.ValueConversionError("salt", e.message))
+      submissionIdStr <- ProtoValidation.validate(
+        submissionIdP,
+        "submissionId",
+        pvv,
+      )
       submissionIdO <- Option
-        .when(submissionIdP.nonEmpty)(submissionIdP)
+        .when(submissionIdStr.nonEmpty)(submissionIdStr)
         .traverse(
           LedgerSubmissionId
             .fromString(_)

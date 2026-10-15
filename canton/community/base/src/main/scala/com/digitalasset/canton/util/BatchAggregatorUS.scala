@@ -3,9 +3,9 @@
 
 package com.digitalasset.canton.util
 
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.BatchAggregatorConfig
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   CloseContext,
   FutureUnlessShutdown,
@@ -18,6 +18,7 @@ import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.TryUtil.ForFailedOps
+import com.digitalasset.nonempty.NonEmpty
 
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger

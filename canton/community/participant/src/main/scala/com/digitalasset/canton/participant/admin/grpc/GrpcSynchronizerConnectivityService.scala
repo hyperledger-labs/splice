@@ -21,7 +21,7 @@ import com.digitalasset.canton.admin.sequencer.v30 as sequencerV30
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.CantonBaseError
-import com.digitalasset.canton.error.LsuError.FailedLsu
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
@@ -43,6 +43,7 @@ import com.digitalasset.canton.participant.synchronizer.{
 }
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.serialization.ProtoConverter
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction
 import com.digitalasset.canton.topology.{
   KnownPhysicalSynchronizerId,
   PhysicalSynchronizerId,
@@ -51,7 +52,9 @@ import com.digitalasset.canton.topology.{
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.version.ProtocolVersionValidation
 import com.digitalasset.canton.{ProtoDeserializationError, SynchronizerAlias}
+import com.digitalasset.nonempty.NonEmpty
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -176,7 +179,12 @@ class GrpcSynchronizerConnectivityService(
     val ret = for {
       alias <- parseSynchronizerAlias(synchronizerAlias)
       success <- sync
-        .connectSynchronizer(alias, keepRetrying, ConnectSynchronizer.Connect)
+        .connectSynchronizer(
+          alias,
+          keepRetrying,
+          ConnectSynchronizer.Connect,
+          onboardingTransactions = None,
+        )
         .map(_.isDefined)
       _ <- waitUntilActiveIfSuccess(success, alias)
     } yield v30.ReconnectSynchronizerResponse(connectedSuccessfully = success)
@@ -291,7 +299,11 @@ class GrpcSynchronizerConnectivityService(
       request: v30.ConnectSynchronizerRequest
   ): Future[v30.ConnectSynchronizerResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-    val v30.ConnectSynchronizerRequest(configPO, sequencerConnectionValidationPO) =
+    val v30.ConnectSynchronizerRequest(
+      configPO,
+      sequencerConnectionValidationPO,
+      onboardingTransactionsPO,
+    ) =
       request
 
     val ret: EitherT[FutureUnlessShutdown, CantonBaseError, v30.ConnectSynchronizerResponse] = for {
@@ -301,8 +313,17 @@ class GrpcSynchronizerConnectivityService(
       validation <- EitherT.fromEither[FutureUnlessShutdown](
         parseSequencerConnectionValidation(sequencerConnectionValidationPO)
       )
+      expectedProtocolVersion = config.psid
+        .map(psid => ProtocolVersionValidation(psid.protocolVersion))
+        .getOrElse(ProtocolVersionValidation.AlwaysValidation)
+
+      onboardingTransactions <- EitherT.fromEither[FutureUnlessShutdown](
+        onboardingTransactionsPO
+          .traverse(SignedTopologyTransaction.fromByteString(expectedProtocolVersion, _))
+          .leftMap(ProtoDeserializationFailure.Wrap(_))
+      )
       _ = logger.info(show"Registering new synchronizer $config")
-      _ <- sync.addSynchronizer(config, validation)
+      _ <- sync.addSynchronizer(config, validation, NonEmpty.from(onboardingTransactions))
 
       _ = logger.info(s"Connecting to synchronizer $config")
       success <- sync
@@ -310,6 +331,7 @@ class GrpcSynchronizerConnectivityService(
           synchronizerAlias = config.synchronizerAlias,
           keepRetrying = false,
           connectSynchronizer = ConnectSynchronizer.Connect,
+          onboardingTransactions = NonEmpty.from(onboardingTransactions),
         )
         .map(_.isDefined)
       _ <- waitUntilActiveIfSuccess(success, config.synchronizerAlias)
@@ -327,6 +349,7 @@ class GrpcSynchronizerConnectivityService(
       configPO,
       synchronizerConnectionP,
       sequencerConnectionValidationPO,
+      onboardingTransactionsPO,
     ) =
       request
 
@@ -342,8 +365,17 @@ class GrpcSynchronizerConnectivityService(
         validation <- EitherT.fromEither[FutureUnlessShutdown](
           parseSequencerConnectionValidation(sequencerConnectionValidationPO)
         )
+        protocolVersionValidation = config.psid
+          .map(psid => ProtocolVersionValidation(psid.protocolVersion))
+          .getOrElse(ProtocolVersionValidation.AlwaysValidation)
+
+        onboardingTransactions <- EitherT.fromEither[FutureUnlessShutdown](
+          onboardingTransactionsPO
+            .traverse(SignedTopologyTransaction.fromByteString(protocolVersionValidation, _))
+            .leftMap(ProtoDeserializationFailure.Wrap(_))
+        )
         _ = logger.info(show"Registering new synchronizer $config")
-        _ <- sync.addSynchronizer(config, validation)
+        _ <- sync.addSynchronizer(config, validation, NonEmpty.from(onboardingTransactions))
         _ <-
           if (performHandshake) {
             logger.info(s"Performing handshake to synchronizer $config")
@@ -354,6 +386,7 @@ class GrpcSynchronizerConnectivityService(
                 synchronizerAlias = config.synchronizerAlias,
                 keepRetrying = false,
                 connectSynchronizer = ConnectSynchronizer.HandshakeOnly,
+                onboardingTransactions = NonEmpty.from(onboardingTransactions),
               )
               .leftWiden[CantonBaseError]
           } else EitherT.rightT[FutureUnlessShutdown, CantonBaseError](())
@@ -479,7 +512,7 @@ class GrpcSynchronizerConnectivityService(
 
       _ <- sync
         .performManualLsu(request)
-        .leftMap[CantonBaseError](FailedLsu.Error(_))
+        .leftWiden[CantonBaseError]
     } yield PerformManualLsuResponse()
 
     _mapErrNewEUS(res)

@@ -10,6 +10,7 @@ import com.digitalasset.canton.crypto.{Nonce, Signature}
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.error.{CantonError, ContextualizedCantonError}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcFUSExtended
 import com.digitalasset.canton.sequencer.api.v30.SequencerAuthentication.{
@@ -29,6 +30,7 @@ import com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationToke
 import com.digitalasset.canton.sequencing.authentication.{AuthenticationToken, MemberAuthentication}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.synchronizer.Synchronizer.GrpcSequencerAuthenticationErrorGroup
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerLimits
 import com.digitalasset.canton.synchronizer.sequencing.authentication.MemberAuthenticationService
 import com.digitalasset.canton.synchronizer.sequencing.service.GrpcSequencerAuthenticationService.{
   SequencerAuthenticationFailure,
@@ -38,7 +40,9 @@ import com.digitalasset.canton.synchronizer.service.HandshakeValidator
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.OptionUtil
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
+import com.digitalasset.canton.validation.{ProtoUnvalidatedString, ProtoValidation}
+import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
 import io.grpc.Status
 import org.slf4j.event.Level
 
@@ -48,10 +52,13 @@ class GrpcSequencerAuthenticationService(
     authenticationService: MemberAuthenticationService,
     protocolVersion: ProtocolVersion,
     disableReleaseVersionHandshakeCheck: Boolean,
+    sequencerLimits: SequencerLimits,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends SequencerAuthenticationService
     with NamedLogging {
+
+  private val pvv = ProtocolVersionValidation(protocolVersion)
 
   /** This will complete the participant authentication process using the challenge information and
     * returning a token to be used for further authentication.
@@ -59,7 +66,12 @@ class GrpcSequencerAuthenticationService(
   override def authenticate(request: AuthenticateRequest): Future[AuthenticateResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     (for {
-      member <- eitherT(deserializeMember(request.member))
+      memberStr <- eitherT(
+        ProtoValidation
+          .validate(request.member, "member", pvv)
+          .leftMap(err => (Status.INVALID_ARGUMENT.withDescription(err.toString), true))
+      )
+      member <- eitherT(deserializeMember(memberStr))
       signature <- eitherT(
         ProtoConverter
           .parseRequired(Signature.fromProtoV30, "signature", request.signature)
@@ -81,11 +93,12 @@ class GrpcSequencerAuthenticationService(
       )
     }).valueOr { case (error, isSensitive) =>
       // create error message to appropriately log this error
+      val loggedMember = memberForLogging(request.member)
       val redactedError =
         if (isSensitive) {
           SequencerAuthenticationFaultyOrMalicious
             .AuthenticationFailure(
-              request.member,
+              loggedMember,
               error,
               if (error.getCode != Status.INTERNAL.getCode) Some(Level.INFO)
               else None,
@@ -94,7 +107,7 @@ class GrpcSequencerAuthenticationService(
           error.withDescription("Bad authentication request")
         } else {
           SequencerAuthenticationFailure
-            .AuthenticationFailure(request.member, error)
+            .AuthenticationFailure(loggedMember, error)
             .discard
           error
         }
@@ -112,23 +125,38 @@ class GrpcSequencerAuthenticationService(
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     (for {
       _ <- eitherT(handshakeValidation(request))
-      member <- eitherT(deserializeMember(request.member))
+      memberStr <- eitherT(
+        ProtoValidation
+          .validate(request.member, "member", pvv)
+          .leftMap(err => (Status.INVALID_ARGUMENT.withDescription(err.toString), true))
+      )
+      member <- eitherT(deserializeMember(memberStr))
       result <- authenticationService
-        .generateNonce(member)
+        .generateChallenge(member)
         .leftMap(handleAuthError)
     } yield {
       val (nonce, fingerprints) = result
       ChallengeResponse(
         nonce.toProtoPrimitive,
-        fingerprints.map(_.unwrap).toList,
+        fingerprints.map(_.unwrap.toProtoUnvalidated).toList,
       )
     }).valueOr { case (error, isSensitive) =>
+      val loggedMember = memberForLogging(request.member)
+      // logging only, so an over-long list degrades to empty rather than failing the report
+      val loggedMemberProtocolVersions = ProtoValidation
+        .validateLength(
+          request.memberProtocolVersions,
+          "member_protocol_versions",
+          pvv,
+          sequencerLimits.maxMemberProtocolVersions.value,
+        )
+        .getOrElse(Seq.empty)
       val redactedError =
         if (isSensitive) {
           SequencerAuthenticationFaultyOrMalicious
             .ChallengeFailure(
-              request.member,
-              request.memberProtocolVersions,
+              loggedMember,
+              loggedMemberProtocolVersions,
               error,
               if (error.getCode != Status.INTERNAL.getCode) Some(Level.INFO)
               else None,
@@ -138,8 +166,8 @@ class GrpcSequencerAuthenticationService(
         } else {
           SequencerAuthenticationFailure
             .ChallengeFailure(
-              request.member,
-              request.memberProtocolVersions,
+              loggedMember,
+              loggedMemberProtocolVersions,
               error,
             )
             .discard
@@ -184,16 +212,45 @@ class GrpcSequencerAuthenticationService(
         (Status.INVALID_ARGUMENT.withDescription(s"Failed to deserialize member: $err"), true)
       )
 
+  // A member string that fails content validation must not be echoed verbatim into logs; fall back
+  // to "invalid" (the request has already been rejected in the for-comprehension by then).
+  private def memberForLogging(member: ProtoUnvalidatedString): String =
+    ProtoValidation
+      .validate(member, "member", pvv)
+      .getOrElse("invalid")
+
+  /** Validates the handshake request.
+    *
+    * Returns on handshake validation failure as a Left that contains the Status error and a boolean
+    * indicating if the error is security sensitive.
+    */
   private def handshakeValidation(request: ChallengeRequest): Either[(Status, Boolean), Unit] =
-    HandshakeValidator
-      .clientIsCompatible(
-        protocolVersion,
-        request.memberProtocolVersions,
-        minClientVersionP = None,
-        clientBinaryVersion = OptionUtil.emptyStringAsNone(request.clientVersion),
-        disableReleaseVersionHandshakeCheck = disableReleaseVersionHandshakeCheck,
-      )
-      .leftMap((_, false))
+    for {
+      memberProtocolVersions <- ProtoValidation
+        .validateLength(
+          request.memberProtocolVersions,
+          "member_protocol_versions",
+          pvv,
+          sequencerLimits.maxMemberProtocolVersions.value,
+        )
+        .leftMap(err => (Status.INVALID_ARGUMENT.withDescription(err.toString), false))
+      clientVersion <- ProtoValidation
+        .validate(
+          request.clientVersion,
+          "client_version",
+          pvv,
+        )
+        .leftMap(err => (Status.INVALID_ARGUMENT.withDescription(err.toString), false))
+      _ <- HandshakeValidator
+        .clientIsCompatible(
+          protocolVersion,
+          memberProtocolVersions,
+          minClientVersionP = None,
+          clientBinaryVersion = OptionUtil.emptyStringAsNone(clientVersion),
+          disableReleaseVersionHandshakeCheck = disableReleaseVersionHandshakeCheck,
+        )
+        .leftMap((_, false))
+    } yield ()
 
   /** Unconditionally revoke a member's authentication tokens and disconnect it
     */

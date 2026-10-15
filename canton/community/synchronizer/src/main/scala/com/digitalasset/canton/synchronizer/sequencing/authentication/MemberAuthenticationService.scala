@@ -6,13 +6,18 @@ package com.digitalasset.canton.synchronizer.sequencing.authentication
 import cats.data.EitherT
 import cats.syntax.bifunctor.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, UnlessShutdown}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
+import com.digitalasset.canton.lifecycle.{
+  FlagCloseable,
+  FutureUnlessShutdown,
+  HasCloseContext,
+  UnlessShutdown,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.*
 import com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenWithExpiry
@@ -25,6 +30,7 @@ import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
+import com.digitalasset.nonempty.NonEmpty
 
 import java.time.Duration
 import scala.concurrent.ExecutionContext
@@ -63,13 +69,14 @@ class MemberAuthenticationService(
     val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging
-    with FlagCloseable {
+    with FlagCloseable
+    with HasCloseContext {
 
-  /** synchronizer generates nonce that he expects the participant to use to concatenate with the
-    * synchronizer's id and sign to proceed with the authentication (step 2). We expect to find a
-    * key with usage 'SequencerAuthentication' to sign these messages.
+  /** Synchronizer generates or retrieves the unique nonce for the participant to use, concatenates
+    * it with the allowed signing key fingerprints and returns the tuple as the challenge. We expect
+    * to find a key with usage 'SequencerAuthentication' to sign these messages.
     */
-  def generateNonce(member: Member)(implicit
+  def generateChallenge(member: Member)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, AuthenticationError, (Nonce, NonEmpty[Seq[Fingerprint]])] =
     for {
@@ -90,12 +97,21 @@ class MemberAuthenticationService(
               )
           }
       )
-      nonce = Nonce.generate(cryptoApi.pureCrypto)
-      storedNonce = StoredNonce(member, nonce, clock.now, nonceExpirationInterval)
-      _ = store.saveNonce(storedNonce)
+      // It will only run if the store is empty.
+      // If not, it simply retrieves the existing nonce.
+      // Thus, the same unique nonce will be returned to any member
+      // until it is consumed through a signature or expires.
+      // This prevents the blocking of legitimate actors from
+      // authenticating through constant nonce replacement/deletion.
+      storedNonce = store.fetchOrGenerateNonce(
+        member, {
+          val rawNonce = Nonce.generate(cryptoApi.pureCrypto)
+          StoredNonce(member, rawNonce, clock.now, nonceExpirationInterval)
+        },
+      )
     } yield {
       scheduleExpirations(storedNonce.expireAt)
-      (nonce, fingerprints)
+      (storedNonce.nonce, fingerprints)
     }
 
   private def waitForInitialized(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
@@ -119,14 +135,17 @@ class MemberAuthenticationService(
       _ <- EitherT.right(waitForInitialized)
       _ <- isActive(member)
 
+      // Match the provided nonce with the nonce in the store and fail the method if it is not found
       storedNonce <- EitherT
         .fromEither[FutureUnlessShutdown](
           store
-            .fetchAndRemoveNonce(member, providedNonce)
+            .fetchNonceIfMatches(member, providedNonce)
             .toRight(MissingNonce(member): AuthenticationError)
         )
+
       StoredNonce(_, nonce, generatedAt, expireAt) = storedNonce
 
+      // Ensure the nonce is not expired
       _ <- {
         val now = clock.now
         EitherTUtil.condUnitET[FutureUnlessShutdown](
@@ -139,6 +158,7 @@ class MemberAuthenticationService(
       hash = authentication.hashSynchronizerNonce(nonce, synchronizerId, cryptoApi.pureCrypto)
       snapshot <- EitherT.liftF(cryptoApi.currentSnapshotApproximation)
 
+      // Pre-generation verification
       _ <- snapshot
         .verifySignature(
           hash,
@@ -146,10 +166,28 @@ class MemberAuthenticationService(
           signature,
           SigningKeyUsage.SequencerAuthenticationOnly,
         )
-        .leftMap { err =>
-          logger.warn(s"Member $member provided invalid signature: $err")
-          InvalidSignature(member): AuthenticationError
+        .leftFlatMap {
+          case err: SignatureCheckError.SignatureWithWrongKey =>
+            logger.info(s"Member $member attempted auth with a wrong key. Details: $err")
+            EitherT.leftT[FutureUnlessShutdown, Unit](InvalidSignature(member): AuthenticationError)
+          case err =>
+            logger.info(s"Member $member provided invalid signature. Details: $err")
+            EitherT.leftT[FutureUnlessShutdown, Unit](InvalidSignature(member): AuthenticationError)
         }
+
+      // Delete the token from the store if it is still there.
+      // If this fails, it means another thread has consumed the nonce
+      // already or that it expired in the time after it was fetched.
+      // We defer the deletion to after the signature verification to ensure that
+      // deletion cannot be triggered by illegitimate actors.
+      // This blocks DoS situations where an attacker floods the endpoint with junk
+      // signatures only to knock out the nonce
+      // and prevent the legitimate actor from authenticating.
+      _ <- EitherT.cond[FutureUnlessShutdown](
+        store.removeNonceIfMatches(member, nonce),
+        (),
+        MissingNonce(member): AuthenticationError,
+      )
       token = AuthenticationToken.generate(cryptoApi.pureCrypto)
       maybeRandomTokenExpirationTime =
         if (useExponentialRandomTokenExpiration) {
@@ -163,8 +201,53 @@ class MemberAuthenticationService(
           maxTokenExpirationInterval
         }
       tokenExpiry = clock.now.add(maybeRandomTokenExpirationTime)
-      storedToken = StoredAuthenticationToken(member, tokenExpiry, token)
+      storedToken = StoredAuthenticationToken(
+        member,
+        tokenExpiry,
+        token,
+        signature.authorizingLongTermKey,
+      )
+
+      // Save the token to the database
       _ = store.saveToken(storedToken)
+
+      // Check the active status of the member again. This is required to detect member deactivations that take place
+      // during the running of the validateSignature method, after the initial check. The observed method would miss out
+      // on the corresponding deactivations (through the removal of STC/PSP transactions) because the token would not exist
+      // in the store yet.
+      _ <- isActive(member).leftMap { err =>
+        logger.info(
+          s"Mid-flight member deactivation detected for $member during the running of validateSignature. Rolling back the newly issued token."
+        )
+        // Rollback the newly issued token. The remaining tokens in the store, if any, should have been deactived by the logic in observed.
+        store.invalidateTokensByFingerprint(signature.authorizingLongTermKey)
+        err
+      }
+
+      // Check the active keys of the member again (this was done once during verifySignature).
+      // This is required to detect key revocations that take place
+      // during the running of the validateSignature method, after the initial verifySignature. The observed method would miss out
+      // on the corresponding deactivations (through the removal/replacement of OTK transactions) because the token would not exist
+      // in the store yet.
+      activeKeys <- EitherT.liftF(
+        cryptoApi.headSnapshot.ipsSnapshot
+          .signingKeys(member, SigningKeyUsage.SequencerAuthenticationOnly)
+      )
+
+      _ <- EitherT
+        .cond[FutureUnlessShutdown](
+          activeKeys.exists(_.fingerprint == signature.authorizingLongTermKey),
+          (),
+          InvalidSignature(member): AuthenticationError,
+        )
+        .leftMap { err =>
+          logger.info(
+            s"Mid-flight key revocation detected for $member during the running of validateSignature. Rolling back the newly issued token."
+          )
+          store.invalidateTokensByFingerprint(signature.authorizingLongTermKey)
+          err
+        }
+
     } yield {
       logger.info(
         s"$member authenticated new token with expiry $tokenExpiry"
@@ -185,7 +268,8 @@ class MemberAuthenticationService(
     val tokenExpiry = clock.now.add(tokenDuration)
     logger.info(s"Generating authentication token for member $member expiring at $tokenExpiry")
     val token = AuthenticationToken.generate(cryptoApi.pureCrypto)
-    val storedToken = StoredAuthenticationToken(member, tokenExpiry, token)
+    val testFingerprint = member.fingerprint
+    val storedToken = StoredAuthenticationToken(member, tokenExpiry, token, testFingerprint)
     store.saveToken(storedToken)
     storedToken
   }
@@ -233,8 +317,13 @@ class MemberAuthenticationService(
       logger.debug(s"Expiring nonces and tokens up to $now")
       store.expireNoncesAndTokens(now)
     }.onShutdown(())
-
-    clock.scheduleAt(_ => run(), timestamp).discard
+    clock
+      .scheduleAtCancelledOnShutdown(
+        _ => run(),
+        s"${getClass.getName}: scheduling expirations",
+        timestamp,
+      )
+      .discard
   }
 
   private def isActive(
@@ -489,7 +578,7 @@ class MemberAuthenticationServiceImpl(
             ) // get the snapshot at the previous timestamp
             group <- snapshot.sequencerGroup() // get the modified group
             oldSequencerSet = group
-              .map(g => (g.active ++ g.passive).toSet)
+              .map(g => (g.active.forgetNE ++ g.passive).toSet)
               .getOrElse(Set.empty[SequencerId]) // get the set of all sequencers in the group
             leavers = oldSequencerSet.diff(newSequencerSet)
             _ = logger.info(
@@ -506,6 +595,9 @@ class MemberAuthenticationServiceImpl(
             ) =>
           val modifiedMediatorIndex = newState.group // group index
           val newMediatorSet: Set[MediatorId] = newState.allMediatorsInGroup.toSet
+
+          // we want to capture the timestamp at the previous state, but we do not use .immediatePredecessor here
+          // because the state changes at time T are captured only at T+1
           val measuredTimestampPreviousState = effectiveTimestamp.value
           for {
             snapshot <- cryptoApi
@@ -515,7 +607,7 @@ class MemberAuthenticationServiceImpl(
               _.index == modifiedMediatorIndex
             ) // filter for the modified group index
             oldMediatorSet = changedGroupInOld
-              .map(group => (group.active ++ group.passive).toSet)
+              .map(group => (group.active.forgetNE ++ group.passive).toSet)
               .getOrElse(Set.empty[MediatorId])
             leavers = oldMediatorSet.diff(newMediatorSet)
             _ = logger.info(
@@ -524,16 +616,64 @@ class MemberAuthenticationServiceImpl(
             _ <- safelyRevokeLeavers(leavers, isMediatorActive)
           } yield ()
 
+        // case 8: a OwnerToKeyMapping is removed: targeted key token revocation for OTK mappings
+        case TopologyTransaction(
+              TopologyChangeOp.Remove, // operation
+              _, // serial
+              otk: OwnerToKeyMapping, // mapping
+            ) =>
+          logger.info(
+            s"Received topology transaction for removing OwnerToKeyMapping $otk."
+          )
+          otk.keys.foreach { key =>
+            logger.info(
+              s"Revoking token for ${otk.member} due to removed signing key: $key.fingerprint"
+            )
+            store.invalidateTokensByFingerprint(key.fingerprint)
+          }
+          FutureUnlessShutdown.unit
+
+        // case 9: a OwnerToKeyMapping is replaced: revoke only tokens with that fingerprint
+        case TopologyTransaction(
+              TopologyChangeOp.Replace, // operation,
+              _, // serial
+              otk: OwnerToKeyMapping,
+            ) =>
+          // we want to capture the timestamp at the previous state, but we do not use .immediatePredecessor here
+          // because the state changes at time T are captured only at T+1
+          val measuredTimestampPreviousState = effectiveTimestamp.value
+          val newFingerprints = otk.keys.map(_.fingerprint).toSet
+          for {
+            snapshot <- cryptoApi.ipsSnapshot(measuredTimestampPreviousState)
+            oldKeys <- snapshot.signingKeys(
+              otk.member,
+              com.digitalasset.canton.crypto.SigningKeyUsage.SequencerAuthenticationOnly,
+            )
+            oldFingerprints = oldKeys.map(_.fingerprint).toSet
+            evictedFingerprints = oldFingerprints.diff(newFingerprints)
+            _ = logger.info(
+              s"Received topology transaction for replacing OwnerToKeyMapping $otk."
+            )
+          } yield {
+            // perform evictions
+            evictedFingerprints.foreach { fingerprint =>
+              logger.info(
+                s"Revoking token for ${otk.member} due to replaced signing key: $fingerprint"
+              )
+              store.invalidateTokensByFingerprint(fingerprint)
+            }
+          }
+
         // All other transactions: do nothing
         case TopologyTransaction(
               TopologyChangeOp.Replace | TopologyChangeOp.Remove, // operation
               _, // serial
               (
                 _: NamespaceDelegation | // mapping
-                _: DecentralizedNamespaceDefinition | _: OwnerToKeyMapping | _: PartyToKeyMapping |
-                _: PartyToParticipant | _: VettedPackages | _: PartyHostingLimits |
-                _: SynchronizerParametersState | _: SequencingParametersState | _: LsuAnnouncement |
-                _: LsuSequencerConnectionSuccessor
+                _: DecentralizedNamespaceDefinition | _: PartyToKeyMapping | _: PartyToParticipant |
+                _: VettedPackages | _: PartyHostingLimits | _: SynchronizerParametersState |
+                _: SequencingParametersState |
+                _: LsuAnnouncement | _: LsuSequencerConnectionSuccessor
               ),
             ) =>
           FutureUnlessShutdown.unit

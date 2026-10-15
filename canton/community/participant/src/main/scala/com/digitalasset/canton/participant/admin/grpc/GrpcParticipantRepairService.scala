@@ -3,16 +3,24 @@
 
 package com.digitalasset.canton.participant.admin.grpc
 
+import cats.Eval
 import cats.data.EitherT
 import cats.syntax.all.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.RpcError
-import com.digitalasset.canton.ProtoDeserializationError.{OtherError, ValueConversionError}
+import com.digitalasset.canton.ProtoDeserializationError.{
+  OtherError,
+  ProtoDeserializationFailure,
+  ValueConversionError,
+}
 import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.admin.participant.v30.*
+import com.digitalasset.canton.config.CantonRequireTypes.NonEmptyString
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
+import com.digitalasset.canton.error.CantonBaseError
+import com.digitalasset.canton.ledger.participant.state.InternalIndexService
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.*
@@ -26,7 +34,9 @@ import com.digitalasset.canton.participant.admin.data.{
 }
 import com.digitalasset.canton.participant.admin.grpc.GrpcParticipantRepairService.ValidExportAcsRequest
 import com.digitalasset.canton.participant.admin.repair.RepairServiceError
+import com.digitalasset.canton.participant.commitment.AcsCommitmentProcessorManager
 import com.digitalasset.canton.participant.sync.CantonSyncService
+import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceUnknownSynchronizer.UnknownPhysicalSynchronizerId
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -35,6 +45,7 @@ import com.digitalasset.canton.topology.{
   ParticipantId,
   PartyId,
   PhysicalSynchronizerId,
+  Synchronizer,
   SynchronizerId,
   UniqueIdentifier,
 }
@@ -50,6 +61,7 @@ import com.digitalasset.canton.{
   SynchronizerAlias,
   protocol,
 }
+import com.digitalasset.nonempty.NonEmpty
 import io.grpc.stub.StreamObserver
 import org.apache.pekko.actor.ActorSystem
 
@@ -62,8 +74,10 @@ import scala.util.{Success, Try}
 
 final class GrpcParticipantRepairService(
     sync: CantonSyncService,
+    evalAcsCommitmentProcessorManagerO: Option[Eval[AcsCommitmentProcessorManager]],
+    internalIndexService: Eval[InternalIndexService],
     parameters: ParticipantNodeParameters,
-    override val loggerFactory: NamedLoggerFactory,
+    override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
     actorSystem: ActorSystem,
@@ -98,7 +112,7 @@ final class GrpcParticipantRepairService(
     } yield ()
 
     res.fold(
-      err => Future.failed(err.asGrpcError),
+      err => Future.failed(err.toGrpcError),
       _ => Future.successful(PurgeContractsResponse()),
     )
   }
@@ -113,7 +127,7 @@ final class GrpcParticipantRepairService(
       (out: OutputStream) => processExportAcs(request, new GZIPOutputStream(out)),
       responseObserver,
       byteString => v30.ExportAcsResponse(byteString),
-      processingTimeout.unbounded.duration,
+      processingTimeout.adminStreamOpenBound.duration,
       chunkSizeO = None,
     )
   }
@@ -131,14 +145,10 @@ final class GrpcParticipantRepairService(
       validRequest <- EitherT.fromEither[FutureUnlessShutdown](
         validateExportAcsRequest(request, ledgerEnd, allLogicalSynchronizerIds)
       )
-      indexService <- EitherT.fromOption[FutureUnlessShutdown](
-        sync.internalIndexService,
-        RepairServiceError.InvalidState.Error("Unavailable internal state service"),
-      )
 
       snapshot <- ParticipantCommon
         .writeAcsSnapshot(
-          indexService,
+          internalIndexService.value,
           validRequest.parties,
           validRequest.atOffset,
           out,
@@ -425,7 +435,7 @@ final class GrpcParticipantRepairService(
     EitherTUtil
       .toFutureUnlessShutdown(
         result.bimap(
-          _.asGrpcError,
+          _.toGrpcError,
           _ => ChangeAssignationResponse(),
         )
       )
@@ -568,7 +578,7 @@ final class GrpcParticipantRepairService(
 
       timeoutSeconds <- wrapErrUS(
         ProtoConverter.parseRequired(
-          NonNegativeFiniteDuration.fromProtoPrimitive("initialRetryDelay"),
+          NonNegativeFiniteDuration.fromProtoPrimitive("timeout_seconds"),
           "timeoutSeconds",
           request.timeoutSeconds,
         )
@@ -577,7 +587,7 @@ final class GrpcParticipantRepairService(
       res <- EitherT
         .right[RpcError](
           sync.commitmentsService
-            .reinitializeCommitmentsUsingAcs(
+            .reinitializeLegacyCommitmentsUsingAcs(
               synchronizerIds.toSet,
               counterParticipantsIds,
               partyIds,
@@ -626,17 +636,241 @@ final class GrpcParticipantRepairService(
 
       _ <- sync
         .performLateLsu(validatedRequest)
-        .leftMap[RpcError](
-          RepairServiceError.SynchronizerUpgradeError.Error(validatedRequest.successorPsid, _)
+        .leftMap[RpcError](err =>
+          RepairServiceError.SynchronizerUpgradeError
+            .Error(validatedRequest.successorPsid, err.toString)
         )
     } yield PerformLateLsuResponse()
 
     CantonGrpcUtil.mapErrNewEUS(res)
   }
+
+  override def deleteSynchronizerConnectionConfig(
+      request: DeleteSynchronizerConnectionConfigRequest
+  ): Future[DeleteSynchronizerConnectionConfigResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+    val ret = for {
+      psid <- EitherT
+        .fromEither[FutureUnlessShutdown](
+          PhysicalSynchronizerId
+            .fromProtoPrimitive(request.physicalSynchronizerId, "physical_synchronizer_id")
+            .leftMap[CantonBaseError](err =>
+              ProtoDeserializationFailure.WrapNoLoggingStr(err.message)
+            )
+        )
+      _ <-
+        sync.synchronizerConnectionConfigStore
+          .delete(psid)
+          .leftMap[CantonBaseError](err => UnknownPhysicalSynchronizerId(err.id))
+    } yield DeleteSynchronizerConnectionConfigResponse()
+
+    CantonGrpcUtil.mapErrNewEUS(ret.leftMap(_.toCantonRpcError))
+  }
+
+  override def listPendingOperations(
+      request: ListPendingOperationsRequest
+  ): Future[ListPendingOperationsResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+
+    if (sync.genericPendingOperationStore.isInMemoryStore()) {
+      Future.failed(
+        io.grpc.Status.UNIMPLEMENTED
+          .withDescription(
+            "listPendingOperations is not supported with an in-memory pending operation store"
+          )
+          .asRuntimeException()
+      )
+    } else {
+      val result = for {
+        operationName <- wrapErrUS(
+          request.operationName
+            .traverse(str => NonEmptyString.fromProtoPrimitive(str, "operation_name"))
+        )
+        synchronizer <- wrapErrUS(request.filterSynchronizer.traverse(Synchronizer.fromProtoV30))
+
+        operationKey = request.filterOperationKey.flatMap(OptionUtil.emptyStringAsNone)
+        pendingOperations <- EitherT.right[RpcError](
+          sync.genericPendingOperationStore
+            .getAllMetadata(operationName, synchronizer, operationKey)(traceContext)
+        )
+        sortedMetadata = pendingOperations.toSeq
+          .sortBy(op => (op.name, op.synchronizer.toString, op.key))
+          .map(op =>
+            PendingOperationMetadata(
+              operationName = op.name.unwrap,
+              operationKey = op.key,
+              synchronizer = Some(op.synchronizer.toProtoV30),
+            )
+          )
+      } yield ListPendingOperationsResponse(pendingOperations = sortedMetadata)
+
+      CantonGrpcUtil.mapErrNewEUS(result)
+    }
+  }
+
+  override def deletePendingOperation(
+      request: DeletePendingOperationRequest
+  ): Future[DeletePendingOperationResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+
+    val result = for {
+      operationName <- wrapErrUS(
+        NonEmptyString.fromProtoPrimitive(request.operationName, "operation_name")
+      )
+      synchronizer <- wrapErrUS(
+        request.synchronizer
+          .toRight(ValueConversionError("synchronizer", "missing"))
+          .flatMap(Synchronizer.fromProtoV30)
+      )
+      operationKey = request.operationKey
+      _ <- EitherT.right[RpcError](
+        sync.genericPendingOperationStore.delete(synchronizer, operationKey, operationName)
+      )
+
+    } yield DeletePendingOperationResponse()
+
+    CantonGrpcUtil.mapErrNewEUS(result)
+  }
+
+  override def reinitializeDigestCommitments(
+      request: ReinitializeDigestCommitmentsRequest
+  ): Future[ReinitializeDigestCommitmentsResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+
+    val result =
+      for {
+        evalAcsCommitmentProcessorManager <- EitherT.fromOption[FutureUnlessShutdown](
+          evalAcsCommitmentProcessorManagerO,
+          RepairServiceError.InvalidState
+            .Error(
+              "ACS digest processor is disabled. Enable 'enable-new-acs-commitment-processor' in configuration."
+            )
+            .toCantonRpcError,
+        )
+
+        synchronizerId <- wrapErrUS(
+          SynchronizerId.fromProtoPrimitive(request.synchronizerId, "synchronizer_id")
+        )
+
+        response <- EitherT.right[RpcError] {
+          val digestProcessorManager = evalAcsCommitmentProcessorManager.value
+            .getOrCreate(synchronizerId)
+            .digestProcessorManager
+          digestProcessorManager
+            .startReinitializationDigestProcessor()
+            .map { reinitTime =>
+              v30.ReinitializeDigestCommitmentsResponse(Some(reinitTime.toProtoTimestamp))
+            }
+        }
+      } yield response
+
+    CantonGrpcUtil.mapErrNewEUS(result)
+  }
+
+  override def reinitializeDigestCommitmentsStatus(
+      request: ReinitializeDigestCommitmentsStatusRequest
+  ): Future[ReinitializeDigestCommitmentsStatusResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+
+    val result = for {
+      synchronizerId <- wrapErrUS(
+        SynchronizerId.fromProtoPrimitive(
+          request.synchronizerId,
+          "synchronizer_id",
+        )
+      )
+
+      response <- EitherT.right[RpcError] {
+        sync.syncPersistentStateManager
+          .acsDigestStore(synchronizerId)
+          .traverse(_.latestReinitializationCheckpoint())
+          .map(reinitTimeO =>
+            v30.ReinitializeDigestCommitmentsStatusResponse(
+              reinitTimeO.flatten.map(_.recordTime.toProtoTimestamp)
+            )
+          )
+      }
+    } yield response
+
+    CantonGrpcUtil.mapErrNewEUS(result)
+  }
+
+  override def runDigestConsistencyCheck(
+      request: RunDigestConsistencyCheckRequest
+  ): Future[RunDigestConsistencyCheckResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+
+    val result =
+      for {
+        evalAcsCommitmentProcessorManager <- EitherT.fromOption[FutureUnlessShutdown](
+          evalAcsCommitmentProcessorManagerO,
+          RepairServiceError.InvalidState
+            .Error(
+              "ACS digest processor is disabled. Enable 'enable-new-acs-commitment-processor' in configuration."
+            )
+            .toCantonRpcError,
+        )
+
+        synchronizerId <- wrapErrUS(
+          SynchronizerId.fromProtoPrimitive(request.synchronizerId, "synchronizer_id")
+        )
+
+        response <- EitherT.right[RpcError] {
+          val digestProcessorManager = evalAcsCommitmentProcessorManager.value
+            .getOrCreate(synchronizerId)
+            .digestProcessorManager
+
+          val _ = digestProcessorManager
+            .startConsistencyCheckProcessor()
+
+          FutureUnlessShutdown.pure(RunDigestConsistencyCheckResponse())
+        }
+      } yield response
+
+    CantonGrpcUtil.mapErrNewEUS(result)
+  }
+
+  override def digestConsistencyCheckStatus(
+      request: DigestConsistencyCheckStatusRequest
+  ): Future[DigestConsistencyCheckStatusResponse] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+
+    val result =
+      for {
+        evalAcsCommitmentProcessorManager <- EitherT.fromOption[FutureUnlessShutdown](
+          evalAcsCommitmentProcessorManagerO,
+          RepairServiceError.InvalidState
+            .Error(
+              "ACS digest processor is disabled. Enable 'enable-new-acs-commitment-processor' in configuration."
+            )
+            .toCantonRpcError,
+        )
+
+        synchronizerId <- wrapErrUS(
+          SynchronizerId.fromProtoPrimitive(request.synchronizerId, "synchronizer_id")
+        )
+
+        response <- EitherT.right[RpcError] {
+          val digestProcessorManager = evalAcsCommitmentProcessorManager.value
+            .getOrCreate(synchronizerId)
+            .digestProcessorManager
+
+          val status = digestProcessorManager.getConsistencyCheckProcessorStatus()
+
+          FutureUnlessShutdown.pure(
+            DigestConsistencyCheckStatusResponse(
+              isRunning = status.isRunning,
+              lastStartedCheckTime = status.startTimestamp.map(_.toProtoTimestamp),
+            )
+          )
+        }
+      } yield response
+
+    CantonGrpcUtil.mapErrNewEUS(result)
+  }
 }
 
 object GrpcParticipantRepairService {
-
   private final case class ValidExportAcsRequest(
       parties: Set[PartyId],
       atOffset: Offset,
@@ -644,5 +878,4 @@ object GrpcParticipantRepairService {
       synchronizerId: Option[SynchronizerId],
       contractSynchronizerRenames: Map[String, String],
   )
-
 }

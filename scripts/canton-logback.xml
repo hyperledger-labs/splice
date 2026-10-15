@@ -11,7 +11,10 @@
     TODO(#18445) move all this logic into the "application setup", as this xml file has reached the point of not being maintainable and testable
   -->
   <!-- whoever figures out how to define the encoder once and doesn't use copy pasta such as I did here wins a price! -->
-  <if condition='isDefined("LOG_FORMAT_JSON")'>
+  <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+    <key>LOG_FORMAT_JSON</key>
+  </condition>
+  <if>
     <then>
       <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="com.digitalasset.canton.logging.CantonJsonEncoder">
@@ -23,32 +26,13 @@
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
           <level>${LOG_LEVEL_STDOUT:-WARN}</level>
         </filter>
-        <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
-          <evaluator>
-            <matcher>
-              <Name>hacoordinator_logger</Name>
-              <regex>ha\.(HaCoordinator|PollingChecker)</regex>
-            </matcher>
-            <matcher>
-              <Name>hacoordinator_message</Name>
-              <regex>(Check successful|Scheduled checking|Acquiring lock)</regex>
-            </matcher>
-            <matcher>
-              <Name>requestlogger_message</Name>
-              <regex>StateService/GetConnectedDomains</regex>
-            </matcher>
-            <expression>
-                level &lt;= INFO &amp;&amp;
-                ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) )
-            </expression>
-          </evaluator>
-          <OnMismatch>NEUTRAL</OnMismatch>
-          <OnMatch>DENY</OnMatch>
-        </filter>
       </appender>
     </then>
     <else>
-      <if condition='isDefined("INTERACTIVE_STDOUT")'>
+      <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+        <key>INTERACTIVE_STDOUT</key>
+      </condition>
+      <if>
         <then>
           <!-- show nice colors and omit date on log output if we are running interactively -->
           <!-- attempt to place the correlation-id with a trailing space, however replace with an empty string if it's empty -->
@@ -73,9 +57,15 @@
     </else>
   </if>
 
-  <if condition='isDefined("LOG_FILE_FLAT")'>
+  <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+    <key>LOG_FILE_FLAT</key>
+  </condition>
+  <if>
     <then>
-      <if condition='isDefined("LOG_FORMAT_JSON")'>
+      <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+        <key>LOG_FORMAT_JSON</key>
+      </condition>
+      <if>
         <then>
           <appender name="FILE" class="ch.qos.logback.core.FileAppender">
             <file>${LOG_FILE_NAME:-log/canton.log}</file>
@@ -117,35 +107,19 @@
       </if>
     </then>
     <else>
-      <if condition='isDefined("LOG_FILE_ROLLING")'>
+      <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+        <key>LOG_FILE_ROLLING</key>
+      </condition>
+      <if>
         <then>
-          <if condition='isDefined("LOG_FORMAT_JSON")'>
+          <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+            <key>LOG_FORMAT_JSON</key>
+          </condition>
+          <if>
             <then>
               <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
                 <file>${LOG_FILE_NAME:-log/canton.log}</file>
                 <append>true</append>
-                <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
-                  <evaluator>
-                    <matcher>
-                      <Name>hacoordinator_logger</Name>
-                      <regex>ha\.(HaCoordinator|PollingChecker)</regex>
-                    </matcher>
-                    <matcher>
-                      <Name>hacoordinator_message</Name>
-                      <regex>(Check successful|Scheduled checking|Acquiring lock)</regex>
-                    </matcher>
-                    <matcher>
-                      <Name>requestlogger_message</Name>
-                      <regex>StateService/GetConnectedDomains</regex>
-                    </matcher>
-                    <expression>
-                        level &lt;= INFO &amp;&amp;
-                        ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) )
-                    </expression>
-                  </evaluator>
-                  <OnMismatch>NEUTRAL</OnMismatch>
-                  <OnMatch>DENY</OnMatch>
-                </filter>
                 <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
                 <immediateFlush>${LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
                 <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
@@ -209,11 +183,20 @@
   </if>
 
   <!-- By default, KMS audit logs will go to the Canton log file. To log them to a different file, set the KMS_LOG_FILE_NAME environment variable to the desired file path -->
-  <if condition='isDefined("KMS_LOG_FILE_NAME")'>
+  <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+    <key>KMS_LOG_FILE_NAME</key>
+  </condition>
+  <if>
     <then>
-      <if condition='isDefined("LOG_FILE_FLAT")'>
+      <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+        <key>LOG_FILE_FLAT</key>
+      </condition>
+      <if>
         <then>
-          <if condition='isDefined("LOG_FORMAT_JSON")'>
+          <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+            <key>LOG_FORMAT_JSON</key>
+          </condition>
+          <if>
             <then>
               <appender name="KMS-FILE" class="ch.qos.logback.core.FileAppender">
                 <file>${KMS_LOG_FILE_NAME:-log/canton_kms.log}</file>
@@ -243,9 +226,15 @@
           </if>
         </then>
         <else>
-          <if condition='isDefined("LOG_FILE_ROLLING")'>
+          <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+            <key>LOG_FILE_ROLLING</key>
+          </condition>
+          <if>
             <then>
-              <if condition='isDefined("LOG_FORMAT_JSON")'>
+              <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+                <key>LOG_FORMAT_JSON</key>
+              </condition>
+              <if>
                 <then>
                   <appender name="KMS-FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
                     <file>${KMS_LOG_FILE_NAME:-log/canton_kms.log}</file>
@@ -303,14 +292,21 @@
 
   <!-- include the rewrite appender to rewrite certain log levels of certain messages -->
   <include resource="rewrite-appender.xml"/>
-  <if condition='"false".equals(p("LOG_IMMEDIATE_FLUSH"))'>
+  <condition class="ch.qos.logback.core.boolex.PropertyEqualityCondition">
+    <key>LOG_IMMEDIATE_FLUSH</key>
+    <value>false</value>
+  </condition>
+  <if>
     <then>
       <include resource="rewrite-async-appender.xml"/>
     </then>
   </if>
 
   <!-- If log last errors is true, we set the DA loggers to debug log level but filter out at log level canton on the main log files -->
-  <if condition='isDefined("LOG_LAST_ERRORS")'>
+  <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+    <key>LOG_LAST_ERRORS</key>
+  </condition>
+  <if>
     <then>
       <logger name="com.digitalasset" level="DEBUG"/>
       <logger name="com.daml" level="DEBUG"/>
@@ -325,7 +321,10 @@
     </else>
   </if>
 
-  <if condition='isDefined("LOG_LAST_ERRORS")'>
+  <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+    <key>LOG_LAST_ERRORS</key>
+  </condition>
+  <if>
     <then>
       <appender name="FILE_LAST_ERRORS" class="ch.qos.logback.core.FileAppender">
         <file>${LOG_LAST_ERRORS_FILE_NAME:-log/canton_errors.log}</file>
@@ -336,7 +335,11 @@
         </encoder>
       </appender>
 
-      <if condition='"false".equals(p("LOG_IMMEDIATE_FLUSH"))'>
+      <condition class="ch.qos.logback.core.boolex.PropertyEqualityCondition">
+        <key>LOG_IMMEDIATE_FLUSH</key>
+        <value>false</value>
+      </condition>
+      <if>
         <then>
             <variable name="REWRITE_LOG_LEVEL_MODE" value="REWRITE_LOG_LEVEL"/>
         </then>
@@ -355,14 +358,21 @@
   </if>
 
   <root level="${LOG_LEVEL_ROOT:-INFO}"></root>
-  <if condition='isDefined("LOG_LAST_ERRORS")'>
+  <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+    <key>LOG_LAST_ERRORS</key>
+  </condition>
+  <if>
     <then>
       <root>
         <appender-ref ref="LAST_ERRORS" />
       </root>
     </then>
     <else>
-      <if condition='"false".equals(p("LOG_IMMEDIATE_FLUSH"))'>
+      <condition class="ch.qos.logback.core.boolex.PropertyEqualityCondition">
+        <key>LOG_IMMEDIATE_FLUSH</key>
+        <value>false</value>
+      </condition>
+      <if>
         <then>
           <root>
             <appender-ref ref="REWRITE_LOG_LEVEL" />

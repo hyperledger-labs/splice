@@ -1,0 +1,14 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "network": "projects/da-cn-example-project-id/global/networks/default",
+    "reservedPeeringRanges": [
+      "google-managed-services-default"
+    ],
+    "service": "servicenetworking.googleapis.com"
+  },
+  "name": "google-managed-services-default-connection",
+  "provider": "",
+  "type": "gcp:servicenetworking/connection:Connection"
+}

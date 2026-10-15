@@ -16,6 +16,7 @@ import com.daml.metrics.api.{
 }
 import com.daml.metrics.grpc.{DamlGrpcServerHistograms, DamlGrpcServerMetrics}
 import com.daml.metrics.{CacheMetrics, HealthMetrics}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.environment.BaseMetrics
 import com.digitalasset.canton.logging.TracedLogger
@@ -36,8 +37,14 @@ import com.digitalasset.canton.metrics.{
   TrafficConsumptionMetrics,
 }
 import com.digitalasset.canton.sequencing.protocol.SubmissionRequestType
-import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
+import com.digitalasset.canton.topology.{
+  Member,
+  OpaquePhysicalSynchronizerId,
+  SequencerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
 import scala.annotation.unused
@@ -262,9 +269,6 @@ class SequencerMetrics(
     val purchaseCache: CacheMetrics =
       new CacheMetrics(prefix :+ "purchase-cache", openTelemetryMetricsFactory)
 
-    val consumedCache: CacheMetrics =
-      new CacheMetrics(prefix :+ "consumed-cache", openTelemetryMetricsFactory)
-
     val wastedSequencing: Meter =
       openTelemetryMetricsFactory.meter(
         MetricInfo(
@@ -285,6 +289,8 @@ class SequencerMetrics(
           "Number of events that failed traffic validation and were not delivered because of it.",
         description = """Counter for wasted-sequencing.""",
         qualification = MetricQualification.Traffic,
+        labelsWithDescription =
+          Map("reason" -> "The reason for wasted sequencing (discarded or error code)"),
       )
     )
 
@@ -333,11 +339,11 @@ class SequencerMetrics(
   val trafficControl = new TrafficControlMetrics
 
   // Since gauges don't support metrics context per update, create a map with a gauge per successor psid.
-  private val lsuStatus: TrieMap[PhysicalSynchronizerId, Gauge[Int]] = TrieMap.empty
+  private val lsuStatus: TrieMap[OpaquePhysicalSynchronizerId, Gauge[Int]] = TrieMap.empty
 
   def setLsuContactSuccessorStatus(
       value: Int,
-      successorPsid: PhysicalSynchronizerId,
+      successorPsid: OpaquePhysicalSynchronizerId,
   ): Unit =
     lsuStatus
       .updateWith(successorPsid) {
@@ -378,8 +384,12 @@ class SequencerMetrics(
   // we use this environment variable approach to guard against instantiation in production; but
   // register the metric for the documentation generation.
   if (sys.env.contains("GENERATE_METRICS_FOR_DOCS")) {
-    val dummyPsid = PhysicalSynchronizerId.tryFromString(
-      "da::1220c72c0cdfb591769534ae47a26ee7b2f8ea55e86380eb38499f3fae4702744fe1::34-0"
+    val dummyPsid = OpaquePhysicalSynchronizerId(
+      SynchronizerId.tryFromString(
+        "da::1220c72c0cdfb591769534ae47a26ee7b2f8ea55e86380eb38499f3fae4702744fe1"
+      ),
+      NonNegativeInt.zero,
+      ProtocolVersion.latest.v,
     )
 
     setLsuContactSuccessorStatus(0, dummyPsid)
@@ -396,6 +406,7 @@ object SequencerMetrics {
 
   def submissionTypeMetricsContext(
       member: Member,
+      orderingSequencerId: SequencerId,
       requestType: SubmissionRequestType,
       logger: TracedLogger,
       warnOnUnexpected: Boolean = true,
@@ -418,6 +429,7 @@ object SequencerMetrics {
     MetricsContext(
       "member" -> member.toString,
       "type" -> messageType,
+      "sequencer" -> orderingSequencerId.uid.toProtoPrimitive,
     )
   }
 }

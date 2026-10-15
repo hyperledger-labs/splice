@@ -7,11 +7,11 @@ import cats.data.EitherT
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.data.SynchronizerPredecessor
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore.{
   Active,
@@ -42,6 +42,7 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherTUtil, Mutex}
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
+import com.digitalasset.nonempty.NonEmpty
 import monocle.macros.syntax.lens.*
 
 import scala.collection.concurrent.TrieMap
@@ -106,7 +107,7 @@ class InMemorySynchronizerConnectionConfigStore(
             _ <- checkLogicalIdConsistent(psid, alias)
           } yield ()
 
-        case UnknownPhysicalSynchronizerId => ().asRight
+        case UnknownPhysicalSynchronizerId => Either.unit
       }
 
       _ <- checkStatusConsistent(configuredPsid, alias, status)
@@ -142,6 +143,22 @@ class InMemorySynchronizerConnectionConfigStore(
       putInternal(config, status, configuredPsid, synchronizerPredecessor)
     })
 
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  override def delete(psid: PhysicalSynchronizerId)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, UnknownPsid, Unit] = {
+    var deleted = false
+    lock.exclusive(
+      configuredSynchronizerMap.filterInPlace {
+        case ((_, KnownPhysicalSynchronizerId(`psid`)), _) =>
+          deleted = true
+          false
+        case _ => true
+      }.discard
+    )
+    EitherTUtil.condUnitET[FutureUnlessShutdown](deleted, UnknownPsid(psid))
+  }
+
   /** Ensure no LSU is ongoing for the alias. An LSU is ongoing if there exists a config and
     * successor config with statuses LsuSource and LsuTarget respectively.
     */
@@ -169,14 +186,14 @@ class InMemorySynchronizerConnectionConfigStore(
       alias: SynchronizerAlias,
       status: SynchronizerConnectionConfigStore.Status,
   ): Either[Error, Unit] =
-    if (!status.isActive) Either.right(())
+    if (!status.isActive) Either.unit
     else {
       val existingPsid = configuredSynchronizerMap.collectFirst {
         case ((`alias`, configuredPsid), config) if config.status == Active =>
           configuredPsid
       }
       existingPsid match {
-        case Some(`psid`) | None => Either.right(())
+        case Some(`psid`) | None => Either.unit
         case Some(otherConfiguredPsid) =>
           Either.left(
             AtMostOnePhysicalActive(alias, Set(otherConfiguredPsid, psid)): Error
@@ -265,6 +282,13 @@ class InMemorySynchronizerConnectionConfigStore(
   override def getAll(): Seq[StoredSynchronizerConnectionConfig] =
     configuredSynchronizerMap.values.toSeq
 
+  override def getByAlias(
+      alias: SynchronizerAlias
+  ): Map[ConfiguredPhysicalSynchronizerId, StoredSynchronizerConnectionConfig] =
+    configuredSynchronizerMap.collect { case ((`alias`, id), config) =>
+      id -> config
+    }.toMap
+
   /** We have no cache, so this is a noop. */
   override def refreshCache()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     FutureUnlessShutdown.unit
@@ -280,9 +304,7 @@ class InMemorySynchronizerConnectionConfigStore(
     val connections = configuredSynchronizerMap.collect { case ((`alias`, _), config) =>
       config
     }.toSeq
-
-    if (connections.nonEmpty) NonEmpty.from(connections).toRight(UnknownAlias(alias))
-    else UnknownAlias(alias).asLeft
+    NonEmpty.from(connections).toRight(UnknownAlias(alias))
   }
 
   override protected def getAllForAliasInternal(alias: SynchronizerAlias)(implicit

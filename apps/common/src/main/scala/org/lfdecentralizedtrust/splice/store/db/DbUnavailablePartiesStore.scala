@@ -12,6 +12,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.store.UnavailablePartiesStore
+import org.lfdecentralizedtrust.splice.store.db.AsUpdateReturning.`SQLActionBuilder asUpdateReturning`
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import slick.jdbc.JdbcProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -61,7 +62,7 @@ class DbUnavailablePartiesStore(
                   (party, updated_at, ignore_duration, store_id)
                 select u.party, $nowMicros, $baseMicros, $storeId
                 from unnest($partyArray) as u(party)
-                on conflict (party) do update
+                on conflict (store_id, party) do update
                   set updated_at = excluded.updated_at,
                       ignore_duration = least(
                             dso_unavailable_parties.ignore_duration * 2,
@@ -74,22 +75,19 @@ class DbUnavailablePartiesStore(
     }
 
   // Removes specific parties from the table upon successful transaction processing.
-  def removeParties(parties: Seq[PartyId])(implicit tc: TraceContext): Future[Int] =
-    if (parties.isEmpty) Future.successful(0)
+  def removeParties(parties: Seq[PartyId])(implicit tc: TraceContext): Future[Seq[PartyId]] =
+    if (parties.isEmpty) Future.successful(Seq.empty)
     else {
       val partyArray = parties.distinct.toArray
-      storage.update(
-        sqlu"""delete from dso_unavailable_parties where party = any($partyArray)""",
-        "removeParties",
-      )
+      storage
+        .queryAndUpdate(
+          sql"""delete from dso_unavailable_parties
+                where party = any($partyArray) and store_id = $storeId
+                returning party""".asUpdateReturning[PartyId],
+          "removeParties",
+        )
+        .map(_.toSeq)
     }
-
-  // Removes parties from the table with matching store ID.
-  def removePartiesUpToStoreId(maxStoreId: Long)(implicit tc: TraceContext): Future[Int] =
-    storage.update(
-      sqlu"""delete from dso_unavailable_parties where store_id <= $maxStoreId""",
-      "removePartiesUpToStoreId",
-    )
 
   // List all parties for which updated_at + ignore_duration > nowMicros.
   private[splice] def listPartiesAt(nowMicros: Long)(implicit
@@ -98,7 +96,7 @@ class DbUnavailablePartiesStore(
     storage.query(
       sql"""select party
             from dso_unavailable_parties
-            where updated_at + ignore_duration > $nowMicros""".as[PartyId],
+            where updated_at + ignore_duration > $nowMicros and store_id = $storeId""".as[PartyId],
       "listParties",
     )
 }

@@ -8,7 +8,12 @@ import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  OpaquePhysicalSynchronizerId,
+  PhysicalSynchronizerId,
+  SequencerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.store.TimeQuery.HeadState
@@ -73,14 +78,14 @@ trait LsuTopologyAdminConnection {
           )
           .subflatMap {
             case Some(successor)
-                if successor.mapping.connection == connection && successor.mapping.successorPsid == successorSynchronizerId =>
+                if successor.mapping.connection == connection && successor.mapping.successorPsid == successorSynchronizerId.opaque =>
               Right(successor)
             case Some(existing) => Left(existing.some)
             case None => Left(None)
           },
       { (_: Option[TopologyMapping]) =>
         Right(
-          LsuSequencerConnectionSuccessor(sequencerId, successorSynchronizerId, connection)
+          LsuSequencerConnectionSuccessor(sequencerId, successorSynchronizerId.opaque, connection)
         )
       },
       retryFor = RetryFor.Automation,
@@ -127,7 +132,7 @@ trait LsuTopologyAdminConnection {
       { (_: Option[TopologyMapping]) =>
         Right(
           LsuAnnouncement(
-            PhysicalSynchronizerId(synchronizerId, psid, protocolVersion),
+            OpaquePhysicalSynchronizerId(synchronizerId, psid, protocolVersion.v),
             upgradeTime,
           )
         )

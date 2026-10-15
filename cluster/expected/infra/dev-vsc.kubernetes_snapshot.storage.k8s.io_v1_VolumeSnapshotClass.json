@@ -1,0 +1,16 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "snapshot.storage.k8s.io/v1",
+    "deletionPolicy": "Delete",
+    "driver": "pd.csi.storage.gke.io",
+    "kind": "VolumeSnapshotClass",
+    "metadata": {
+      "name": "dev-vsc"
+    }
+  },
+  "name": "dev-vsc",
+  "provider": "",
+  "type": "kubernetes:snapshot.storage.k8s.io/v1:VolumeSnapshotClass"
+}

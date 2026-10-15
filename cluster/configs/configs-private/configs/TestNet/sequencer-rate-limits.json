@@ -6,6 +6,12 @@
             "globalKbpsCap": 200,
             "perClientKbpsCap": 100
         },
+        "confirmationResponse": {
+            "globalTpsCap": 6,
+            "perClientTpsCap": 5,
+            "globalKbpsCap": 600,
+            "perClientKbpsCap": 500
+        },
         "topology": {
             "globalTpsCap": 4,
             "perClientTpsCap": 3,

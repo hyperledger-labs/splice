@@ -1,0 +1,36 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "security.istio.io/v1beta1",
+    "kind": "AuthorizationPolicy",
+    "metadata": {
+      "name": "allow-public-token-registry",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "action": "ALLOW",
+      "rules": [
+        {
+          "to": [
+            {
+              "operation": {
+                "paths": [
+                  "/registry/*"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "selector": {
+        "matchLabels": {
+          "app": "istio-ingress"
+        }
+      }
+    }
+  },
+  "name": "allow-public-token-registry",
+  "provider": "",
+  "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
+}

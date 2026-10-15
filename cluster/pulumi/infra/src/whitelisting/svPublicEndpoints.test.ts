@@ -12,16 +12,16 @@ import {
   toIngressPath,
 } from './svPublicEndpoints';
 
-const svOpenApiFile = path.join(
-  __dirname,
-  '../../../../../apps/sv/src/main/openapi/sv-internal.yaml'
-);
+const svOpenApiFiles = [
+  '../../../../../apps/sv/src/main/openapi/sv-internal.yaml',
+  '../../../../../apps/sv/src/main/openapi/sv-stream-server.yaml',
+].map(file => path.join(__dirname, file));
 
-describe('the SV OpenAPI spec', () => {
-  const content = fs.readFileSync(svOpenApiFile, 'utf-8');
+describe('the SV OpenAPI specs', () => {
+  const contents = svOpenApiFiles.map(file => fs.readFileSync(file, 'utf-8'));
 
-  test('declares an x-external-audience for every sv_public endpoint', () => {
-    const endpoints = parseSvPublicEndpoints(content);
+  test('declare an x-external-audience for every public endpoint', () => {
+    const endpoints = contents.flatMap(content => parseSvPublicEndpoints(content));
     expect(endpoints.length).toBeGreaterThan(0);
     endpoints.forEach(endpoint => {
       expect(publicAudiences).toContain(endpoint.audience);
@@ -29,10 +29,12 @@ describe('the SV OpenAPI spec', () => {
   });
 
   test('exposes the expected paths per audience', () => {
-    const paths = svPublicIngressPathsByAudience(content);
+    const paths = svPublicIngressPathsByAudience(...contents);
     expect(paths['validators']).toContain('/api/sv/v0/onboard/validator');
     expect(paths['svs']).toContain('/api/sv/v0/migration-id');
     expect(paths['svs']).toContain('/api/sv/v0/onboard/sv/status/*');
+    // defined in sv-stream-server.yaml rather than in sv-internal.yaml
+    expect(paths['svs']).toContain('/api/sv/v0/onboard/sv/party-migration/authorize');
     // clients check the version before any other call, so /version must be reachable
     expect(paths['validators']).toContain('/api/sv/version');
     const allPaths = exposedAudiences.flatMap(audience => paths[audience]);

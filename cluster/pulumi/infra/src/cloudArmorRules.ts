@@ -1,11 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as _ from 'lodash';
+import { WafRuleGroup } from '@canton-network/splice-pulumi-common/src/config/cloudArmorConfig';
 import {
   extractPathPrefixes,
   PerEndpointLimits,
 } from '@canton-network/splice-pulumi-common/src/ratelimit/envoyRateLimiter';
-import { z } from 'zod';
+import { createHash } from 'crypto';
 
 // limits from https://cloud.google.com/armor/quotas#limits, in which a
 // "subexpression" is an arg to && or ||
@@ -48,6 +49,32 @@ export function ipWhitelistRuleChunks(ipRanges: string[], availablePriorities: n
   return chunks;
 }
 
+/**
+ * Picks the priority offset of the first of `ruleNames.length` consecutive rules, derived
+ * deterministically from the rule names.
+ *
+ * Cloud Armor rejects a rule whose priority is still held by another rule, and Pulumi
+ * gives no ordering guarantee between the deletes and creates of sibling rules. If
+ * priorities were plain indexes, reordering, inserting or renaming rules would move an
+ * existing priority to a different rule, so the new rule can be created while the old one
+ * still holds that priority. Seeding with the names moves the whole block to fresh,
+ * almost certainly unused, priorities whenever the set or order of the rules changes,
+ * while unchanged rules keep their priorities.
+ *
+ * @param availablePriorities how many rule priority numbers are reserved for these rules
+ */
+export function seededPriorityOffset(ruleNames: string[], availablePriorities: number): number {
+  const range = availablePriorities - ruleNames.length + 1;
+  if (range <= 0) {
+    throw new Error(
+      `${ruleNames.length} rules do not fit into ${availablePriorities} rule priorities`
+    );
+  }
+  // 48 bits are well within Number.MAX_SAFE_INTEGER
+  const hash = createHash('sha256').update(JSON.stringify(ruleNames)).digest().readUIntBE(0, 6);
+  return hash % range;
+}
+
 // the OWASP CRS version behind each Cloud Armor rule set generation, see
 // https://cloud.google.com/armor/docs/waf-rules. It is part of the opt-out rule ids,
 // and there is no way to derive it from the rule set name.
@@ -56,39 +83,7 @@ const OWASP_CRS_VERSIONS: Record<string, string> = {
   v422: 'v042200',
 };
 
-/**
- * One of Cloud Armor's preconfigured WAF rule sets (see
- * https://cloud.google.com/armor/docs/waf-rules), with the individual OWASP CRS
- * signatures we opt out of.
- */
-const WafSignatureSchema = z.object({
-  // preconfigured rule set name, e.g. 'sqli-v422-stable'
-  name: z.string(),
-  // https://cloud.google.com/armor/docs/rule-tuning#sensitivity_levels: 1 only
-  // evaluates the paranoia level 1 signatures, which are the ones least prone to
-  // false positives. If unset, Cloud Armor's default (all levels) applies.
-  sensitivity: z.number().int().min(0).max(4).optional(),
-  // numeric OWASP CRS ids of the signatures to skip, e.g. '942190' for
-  // 'owasp-crs-v042200-id942190-sqli'. These are the signatures that produced false
-  // positives on our own traffic.
-  optOutRuleIds: z.array(z.string().regex(/^[0-9]+$/, 'numeric OWASP CRS id')).default([]),
-});
-
-export const WafRuleGroupSchema = z.object({
-  name: z.string().min(1),
-  description: z.string(),
-  signatures: z.array(WafSignatureSchema).min(1),
-});
-
-export const WafRuleGroupsSchema = z
-  .array(WafRuleGroupSchema)
-  .refine(
-    groups => new Set(groups.map(g => g.name)).size === groups.length,
-    'WAF rule group names must be unique, they are used as the Cloud Armor rule names'
-  );
-
-type WafSignature = z.infer<typeof WafSignatureSchema>;
-export type WafRuleGroup = z.infer<typeof WafRuleGroupSchema>;
+type WafSignature = WafRuleGroup['signatures'][number];
 
 /**
  * Expands a numeric OWASP CRS id into the full opt-out rule id Cloud Armor expects,
@@ -131,9 +126,14 @@ function wafSignatureCondition(context: string, signature: WafSignature): string
 /**
  * Builds the match expression of a WAF rule: the request matches if any of the
  * group's signatures fires.
+ *
+ * @param excludedHostsExpr condition matching the hosts the WAF rules must not apply to
  */
-export function wafRuleExpression(group: WafRuleGroup): string {
-  const expr = group.signatures.map(s => wafSignatureCondition(group.name, s)).join(' || ');
+export function wafRuleExpression(group: WafRuleGroup, excludedHostsExpr?: string): string {
+  const signatureExpr = group.signatures
+    .map(s => wafSignatureCondition(group.name, s))
+    .join(' || ');
+  const expr = excludedHostsExpr ? `!(${excludedHostsExpr}) && (${signatureExpr})` : signatureExpr;
   if (expr.length > MAX_EXPRESSION_LENGTH) {
     throw new Error(
       `Cloud Armor WAF expression for ${group.name} exceeds the ${MAX_EXPRESSION_LENGTH} character limit (current: ${expr.length}). ` +
@@ -153,35 +153,43 @@ export function checkSubexpressionLength(context: string, expr: string): string 
 }
 
 /**
- * Builds the host match condition for an endpoint, or undefined to match any host.
+ * How a rule selects the hosts it applies to:
+ * - `hostname`: one exact host
+ * - `hostPrefixRegex`: an RE2 fragment matching the leading label(s) under the cluster
+ *   DNS name, e.g. `scan` or `sequencer-[0-9]+`. `perNodeHost` adds the node label in
+ *   between, i.e. `<prefix>.<node>.<cluster dns name>` instead of
+ *   `<prefix>.<cluster dns name>`.
+ */
+export type HostMatch = { hostname: string } | { hostPrefixRegex: string; perNodeHost: boolean };
+
+/**
+ * Builds the host match condition of a rule, or undefined to match any host.
  *
- * A cluster is served under more than one DNS name (see getDnsNames), so a prefix match
- * has to cover all of them, otherwise traffic on the other name falls through to the
- * default deny rule.
+ * Only `clusterHostname` is matched. A cluster resolves under a second DNS name too (see
+ * getDnsNames), but everything is served under CLUSTER_HOSTNAME, so matching just that
+ * one keeps the expressions short and the rules unambiguous.
  *
- * @param context config key of the endpoint, only used for error messages
- * @param dnsNames all DNS names the cluster is served under
- * @param hostname exact hostname to match
- * @param hostPrefixRegex RE2 fragment matching the leading label(s) of a per-node hostname
+ * @param context config key of the rule, only used for error messages
+ * @param clusterHostname the cluster's DNS name, i.e. CLUSTER_HOSTNAME
+ * @param match which hosts the rule applies to, or undefined for all of them
  */
 export function hostCondition(
   context: string,
-  dnsNames: string[],
-  hostname?: string,
-  hostPrefixRegex?: string
+  clusterHostname: string,
+  match?: HostMatch
 ): string | undefined {
-  let hostnameRegex;
-  if (hostname) {
-    hostnameRegex = _.escapeRegExp(hostname.toLowerCase());
-  } else if (hostPrefixRegex) {
-    if (dnsNames.length === 0) {
-      throw new Error(`No cluster DNS names to build a host condition for ${context}`);
-    }
-    const dnsAlternatives = dnsNames.map(n => _.escapeRegExp(n.toLowerCase())).join('|');
-    hostnameRegex = `(?:${hostPrefixRegex})\\.[\\w-]+\\.(?:${dnsAlternatives})`;
-  } else {
+  if (!match) {
     return undefined;
   }
+  const clusterHostRegex = _.escapeRegExp(clusterHostname.toLowerCase());
+  const hostnameRegex =
+    'hostname' in match
+      ? _.escapeRegExp(match.hostname.toLowerCase())
+      : [
+          `(?:${match.hostPrefixRegex})`,
+          ...(match.perNodeHost ? ['[\\w-]+'] : []),
+          clusterHostRegex,
+        ].join('\\.');
   // the host header may carry a port, and Cloud Armor does not strip it
   return checkSubexpressionLength(
     context,

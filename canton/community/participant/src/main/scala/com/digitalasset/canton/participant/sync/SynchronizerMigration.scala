@@ -10,12 +10,12 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation}
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.{CantonError, ContextualizedCantonError, ParentCantonError}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
@@ -50,6 +50,7 @@ import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{MonadUtil, ReassignmentTag, SameReassignmentType}
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.concurrent.ExecutionContext
 
@@ -116,21 +117,16 @@ class SynchronizerMigration(
         .getAllFor(source.unwrap)
         .fold(
           err => SourceSynchronizerIdUnknown(err.alias).asLeft,
-          connections => {
-            if (connections.isEmpty)
-              InvalidArgument.UnknownSourceSynchronizer(source).asLeft
-            else {
-              connections.filter(_.status.canMigrateFrom) match {
-                case Nil => InvalidSynchronizerConfigStatuses(source, Nil).asLeft
-                case Seq(connection) => connection.asRight
-                case other =>
-                  InvalidSynchronizerConfigStatuses(
-                    source,
-                    other.map(c => (c.configuredPsid, c.status)),
-                  ).asLeft
-              }
-            }
-          },
+          connections =>
+            connections.filter(_.status.canMigrateFrom) match {
+              case Nil => InvalidSynchronizerConfigStatuses(source, Nil).asLeft
+              case Seq(connection) => connection.asRight
+              case other =>
+                InvalidSynchronizerConfigStatuses(
+                  source,
+                  other.map(c => (c.configuredPsid, c.status)),
+                ).asLeft
+            },
         )
 
       sourceConnection <- EitherT.fromEither[FutureUnlessShutdown](sourceConnectionE).map(Source(_))

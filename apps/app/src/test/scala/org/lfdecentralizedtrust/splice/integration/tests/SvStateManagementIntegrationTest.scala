@@ -43,6 +43,7 @@ import com.digitalasset.canton.console.CommandFailure
 
 import java.util.Optional
 import scala.collection.parallel.CollectionConverters.seqIsParallelizable
+import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.*
 
@@ -150,7 +151,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         sv1Backend.listVoteRequests().loneElement
       },
     )
-    actAndCheck(
+    actAndCheck(timeUntilSuccess = 40.seconds)(
       "A number of SVs less than the required number of voters cast a vote",
       Seq(sv1Backend, sv2Backend).par.foreach { sv =>
         sv.castVote(

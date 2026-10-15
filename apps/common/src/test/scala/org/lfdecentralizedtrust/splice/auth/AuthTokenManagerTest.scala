@@ -12,7 +12,7 @@ import scala.concurrent.{Future, Promise}
 
 object AuthTokenManagerTest extends org.mockito.MockitoSugar with ArgumentMatchersSugar {
   val mockClock = mock[Clock]
-  when(mockClock.scheduleAt(any[CantonTimestamp => Unit], any[CantonTimestamp]))
+  when(mockClock.scheduleAt(any[CantonTimestamp => Unit], any[String], any[CantonTimestamp]))
     .thenReturn(FutureUnlessShutdown.unit)
 }
 
@@ -88,8 +88,8 @@ class AuthTokenManagerTest extends AsyncWordSpec with BaseTest {
   "automatically renew token in due time" in {
     val clockMock = mock[Clock]
     val retryMe = new AtomicReference[Option[CantonTimestamp => Unit]](None)
-    when(clockMock.scheduleAt(any[CantonTimestamp => Unit], any[CantonTimestamp]))
-      .thenAnswer[CantonTimestamp => Unit, CantonTimestamp] { case (action, _) =>
+    when(clockMock.scheduleAt(any[CantonTimestamp => Unit], any[String], any[CantonTimestamp]))
+      .thenAnswer[CantonTimestamp => Unit, String, CantonTimestamp] { case (action, _, _) =>
         logger.debug(s"schedule at called, ${retryMe.get()}")
         retryMe.getAndUpdate(_ => Some(action)) shouldBe empty
         FutureUnlessShutdown.unit

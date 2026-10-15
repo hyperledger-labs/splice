@@ -1,0 +1,56 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "alertStrategy": {
+      "autoClose": "3600s",
+      "notificationChannelStrategies": [
+        {
+          "notificationChannelNames": [
+            null
+          ],
+          "renotifyInterval": "14400s"
+        }
+      ]
+    },
+    "combiner": "OR",
+    "conditions": [
+      {
+        "conditionThreshold": {
+          "aggregations": [
+            {
+              "alignmentPeriod": "600s",
+              "crossSeriesReducer": "REDUCE_SUM",
+              "groupByFields": [
+                "metric.label.quota_metric"
+              ],
+              "perSeriesAligner": "ALIGN_COUNT_TRUE"
+            }
+          ],
+          "comparison": "COMPARISON_GT",
+          "duration": "600s",
+          "filter": "resource.type=\"consumer_quota\" AND metric.type=\"serviceruntime.googleapis.com/quota/exceeded\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/read_requests\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/write_requests\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/crypto_requests\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/hsm_symmetric_requests\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/hsm_asymmetric_requests\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/hsm_generate_random_requests\" AND metric.label.quota_metric != \"cloudkms.googleapis.com/external_kms_requests\"",
+          "trigger": {
+            "count": 1
+          }
+        },
+        "displayName": "Quota Exceeded in mock"
+      }
+    ],
+    "displayName": "Quota Exceeded in mock",
+    "documentation": {
+      "content": "The quota \"${metric.display_name}\" (${metric.label.quota_metric}) has been exceeded in cluster mock.",
+      "mimeType": "text/markdown",
+      "subject": "Quota ${metric.label.quota_metric} exceeded in mock"
+    },
+    "notificationChannels": [
+      null
+    ],
+    "userLabels": {
+      "cluster": "mock"
+    }
+  },
+  "name": "quotaExceededAlert",
+  "provider": "",
+  "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+}

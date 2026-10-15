@@ -4,8 +4,7 @@
 package com.digitalasset.canton.participant.protocol.conflictdetection
 
 import cats.syntax.functor.*
-import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.data.ContractReassignment
+import com.digitalasset.canton.data.{ContractReassignment, ContractsReassignmentBatch}
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.protocol.conflictdetection.CommitSet.*
@@ -13,14 +12,16 @@ import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlar
 import com.digitalasset.canton.protocol.{
   ContractMetadata,
   GenContractInstance,
+  HostedOnboardingParties,
   LfContractId,
   ReassignmentId,
   RequestId,
 }
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.SetsUtil.requireDisjoint
 import com.digitalasset.canton.{LfPartyId, ReassignmentCounter}
+import com.digitalasset.nonempty.NonEmpty
 
 /** Describes the effect of a confirmation request on the active contracts, contract keys, and
   * reassignments. Transient contracts appear the following two sets:
@@ -37,6 +38,8 @@ import com.digitalasset.canton.{LfPartyId, ReassignmentCounter}
   *   not contain contracts in [[archivals]].
   * @param assignments
   *   The contracts to be assigned, along with their reassignment IDs.
+  * @param reassignments
+  *   The reassignment Ids to be completed in the reassignment store.
   * @throws java.lang.IllegalArgumentException
   *   if `unassignments` overlap with `archivals` or `creations` overlaps with `assignments`.
   */
@@ -45,6 +48,8 @@ final case class CommitSet(
     creations: Map[LfContractId, CreationCommit],
     unassignments: Map[LfContractId, UnassignmentCommit],
     assignments: Map[LfContractId, AssignmentCommit],
+    reassignments: Seq[ReassignmentId],
+    hostedOnboardingPartiesO: Option[HostedOnboardingParties],
 ) extends PrettyPrinting {
   requireDisjoint(unassignments.keySet -> "unassignments", archivals.keySet -> "archivals")
   requireDisjoint(assignments.keySet -> "assignments", creations.keySet -> "creations")
@@ -53,14 +58,19 @@ final case class CommitSet(
     paramIfNonEmpty("archivals", _.archivals),
     paramIfNonEmpty("creations", _.creations),
     paramIfNonEmpty("unassignments", _.unassignments),
-    paramIfNonEmpty("assigments", _.assignments),
+    paramIfNonEmpty("assignments", _.assignments),
+    paramIfNonEmpty("reassignments", _.reassignments),
+    paramIfDefined("onboarding", _.hostedOnboardingPartiesO),
   )
 }
 
 object CommitSet {
 
-  val empty: CommitSet = CommitSet(Map.empty, Map.empty, Map.empty, Map.empty)
+  val empty: CommitSet = CommitSet(Map.empty, Map.empty, Map.empty, Map.empty, Nil, None)
 
+  /** Contract creation reference information needed for persistence and updating of in-memory state
+    * when the associated transaction commits.
+    */
   final case class CreationCommit(
       contractMetadata: ContractMetadata,
       reassignmentCounter: ReassignmentCounter,
@@ -94,6 +104,13 @@ object CommitSet {
       param("reassignmentCounter", _.reassignmentCounter),
     )
   }
+
+  /** Contract archival reference information needed for persistence and updating of in-memory state
+    * when the associated transaction commits.
+    *
+    * @param stakeholders
+    *   all contract stakeholders (i.e. not only locally hosted stakeholders)
+    */
   final case class ArchivalCommit(
       stakeholders: Set[LfPartyId]
   ) extends PrettyPrinting {
@@ -109,40 +126,93 @@ object CommitSet {
       consumedInputsOfHostedParties: Map[LfContractId, Set[LfPartyId]],
       transient: Map[LfContractId, Set[LfPartyId]],
       createdContracts: Map[LfContractId, GenContractInstance],
-      commitAfterFailedActivenessCheck: Boolean,
-  )(implicit loggingContext: ErrorLoggingContext): CommitSet =
-    if (activenessResult.isSuccessful || commitAfterFailedActivenessCheck) {
-      val archivals = (consumedInputsOfHostedParties ++ transient).map {
-        case (cid, hostedStakeholders) =>
-          cid -> CommitSet.ArchivalCommit(hostedStakeholders)
-      }
-      val reassignmentCounter = ReassignmentCounter.Genesis
-      val creations =
-        createdContracts.fmap(c => CommitSet.CreationCommit(c.metadata, reassignmentCounter))
-      CommitSet(
-        archivals = archivals,
-        creations = creations,
-        unassignments = Map.empty,
-        assignments = Map.empty,
-      )
-    } else {
+      crashAfterFailedValidation: Boolean,
+      hostedOnboardingPartiesO: Option[HostedOnboardingParties],
+  )(implicit loggingContext: ErrorLoggingContext): CommitSet = {
+    if (!activenessResult.isSuccessful) {
       SyncServiceAlarm
         .Warn(s"Request $requestId with failed activeness check is approved.")
         .report()
-      loggingContext.debug(s"Failed activeness result for request $requestId is $activenessResult")
-      // TODO(i12904) Handle this case gracefully
-      throw new RuntimeException(s"Request $requestId with failed activeness check is approved.")
+      loggingContext.info(s"Failed activeness result for request $requestId is $activenessResult")
+      if (crashAfterFailedValidation) {
+        throw new RuntimeException(s"Request $requestId with failed activeness check is approved.")
+      }
     }
 
+    val archivals = (consumedInputsOfHostedParties ++ transient).map {
+      case (cid, hostedStakeholders) =>
+        cid -> CommitSet.ArchivalCommit(hostedStakeholders)
+    }
+    val reassignmentCounter = ReassignmentCounter.Genesis
+    val creations =
+      createdContracts.fmap(c => CommitSet.CreationCommit(c.metadata, reassignmentCounter))
+    CommitSet(
+      archivals = archivals,
+      creations = creations,
+      unassignments = Map.empty,
+      assignments = Map.empty,
+      reassignments = Nil,
+      hostedOnboardingPartiesO = hostedOnboardingPartiesO,
+    )
+  }
+
+  /** Creates the commit set of an unassignment request.
+    *
+    * @param contracts
+    *   The contracts to be unassigned, along with their reassignment counters.
+    * @param targetSynchronizer
+    *   The synchronizer the contracts are reassigned to.
+    * @param stakeholders
+    *   The stakeholders of the contracts.
+    */
+  def createForUnassignment(
+      contracts: ContractsReassignmentBatch,
+      targetSynchronizer: Target[PhysicalSynchronizerId],
+      stakeholders: Set[LfPartyId],
+  ): CommitSet = CommitSet(
+    archivals = Map.empty,
+    creations = Map.empty,
+    assignments = Map.empty,
+    unassignments = (contracts.contractIdCounters
+      .map { case (contractId, reassignmentCounter) =>
+        (
+          contractId,
+          CommitSet.UnassignmentCommit(
+            targetSynchronizer.map(_.logical),
+            stakeholders,
+            reassignmentCounter,
+          ),
+        )
+      })
+      .toMap
+      .forgetNE,
+    reassignments = Nil,
+    hostedOnboardingPartiesO = None,
+  )
+
+  /** Creates the commit set of an assignment request.
+    *
+    * @param reassignmentId
+    *   The id of the reassignment the contracts are assigned by.
+    * @param assignments
+    *   The contracts to be assigned, along with their reassignment counters.
+    * @param sourceSynchronizerId
+    *   The synchronizer the contracts are reassigned from.
+    * @param completeReassignmentInStore
+    *   Whether the reassignment is to be completed in the reassignment store, which is the case on
+    *   reassigning participants only.
+    */
   def createForAssignment(
       reassignmentId: ReassignmentId,
       assignments: NonEmpty[Seq[ContractReassignment]],
       sourceSynchronizerId: Source[SynchronizerId],
+      completeReassignmentInStore: Boolean,
   ): CommitSet =
     CommitSet(
       archivals = Map.empty,
       creations = Map.empty,
       unassignments = Map.empty,
+      reassignments = if (completeReassignmentInStore) Seq(reassignmentId) else Nil,
       assignments = assignments
         .map(reassign =>
           reassign.contract.contractId -> CommitSet.AssignmentCommit(
@@ -154,5 +224,6 @@ object CommitSet {
         )
         .toMap
         .forgetNE,
+      hostedOnboardingPartiesO = None,
     )
 }

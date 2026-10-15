@@ -11,16 +11,16 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryReassign
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTrigger
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil
-import com.digitalasset.canton.ScalaFuturesWithPatience
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressingLogger
+import com.digitalasset.canton.scalatest.ScalaFuturesWithPatience
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.scalatest.{Inspectors, LoneElement}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.time.{Millis, Span}
+import org.scalatest.time.{Millis, Minute, Span}
 
 import scala.annotation.tailrec
 import scala.concurrent.duration.*
@@ -53,11 +53,15 @@ class UpdateHistorySanityCheckPlugin(
 
       TriggerTestUtil
         .setTriggersWithin(
-          triggersToPauseAtStart = initializedScans.map(scan =>
+          triggersToPauseAtStart = initializedScans.flatMap { scan =>
             // prevent races with the trigger when taking the forced manual snapshot
-            scan.automation.trigger[AcsSnapshotTrigger]
-          ),
+            val trigger = scan.automation.trigger[AcsSnapshotTrigger]
+            // If the test already paused the trigger, this block will resume it, which we don't want.
+            // Particularly in simtime tests that may cause the trigger to fail after resuming.
+            if (trigger.isPaused) None else Some(trigger)
+          },
           triggersToResumeAtStart = Seq(),
+          pauseTimeout = timeout(Span(1, Minute)),
         ) {
           // This flag should have the same value on all scans
           if (initializedScans.exists(_.config.updateHistoryBackfillEnabled)) {

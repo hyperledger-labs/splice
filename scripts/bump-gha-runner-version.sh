@@ -21,24 +21,23 @@ runner_digest=$(
 
 echo "The newest available image is ghcr.io/actions/actions-runner:${runner_version}@${runner_digest}"
 
-docker_runner_file="${SPLICE_ROOT}/cluster/images/splice-test-docker-runner/Dockerfile"
-runner_hook_file="${SPLICE_ROOT}/cluster/images/splice-test-runner-hook/Dockerfile"
+sources_file="${SPLICE_ROOT}/nix/gha-runner-sources.json"
 
-sed \
-  --in-place \
-  --expression "s/^\(ARG RUNNER_VERSION=\).*/\1${runner_version}/" \
-  --expression "s/^\(ARG RUNNER_DIGEST=\).*/\1${runner_digest}/"  \
-  "${docker_runner_file}" \
-  "${runner_hook_file}"
+jq --indent 4 \
+  --arg version "${runner_version}" \
+  --arg digest "${runner_digest}" \
+  '.version = $version | .digest = $digest' \
+  "${sources_file}" > "${sources_file}.tmp"
+mv "${sources_file}.tmp" "${sources_file}"
 
-if git diff --exit-code --quiet "${docker_runner_file}" "${runner_hook_file}"; then
+if git diff --exit-code --quiet "${sources_file}"; then
   echo "GHA runner version is up to date."
   exit 0
 fi
 
 echo "GHA runner version is not up to date. Creating a PR..."
 
-git add "${docker_runner_file}" "${runner_hook_file}"
+git add "${sources_file}"
 updated_branch="gha-runner-version-bump-$(date +%Y-%m-%d)"
 git switch -c "${updated_branch}"
 git commit -m "[ci] bump GHA runner version to the latest (auto-generated)" -s

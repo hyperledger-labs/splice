@@ -439,3 +439,163 @@ testMintingDelegation_AssignAndMint = do
     (sort rewardCouponExtraBeneficiaryAmounts == sort [coupon1Amount * 0.4, coupon2Amount * 0.4])
 
   pure ()
+
+testMintingDelegation_AssignAndMint_rejectsDelegateOwnCoupon : Script ()
+testMintingDelegation_AssignAndMint_rejectsDelegateOwnCoupon = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  beneficiary <- allocateParty "beneficiary"
+  extraBeneficiary <- allocateParty "extraBeneficiary"
+  let delegate = aliceValidator.primaryParty
+
+  -- Create a MintingDelegation
+  now <- getTime
+  proposalCid <- submit beneficiary $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary
+      delegate
+      expiresAt = now `addRelTime` days 30
+      amuletMergeLimit = 10
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept with
+    existingDelegationCid = None
+
+  -- Create a ValidatorRight for beneficiary (needed for liveness record)
+  validatorRightCid <- submit beneficiary $ createCmd ValidatorRight with
+    dso = app.dso
+    user = beneficiary
+    validator = beneficiary
+
+  (_, openRound) <- getLatestOpenRound app
+
+  -- Create two RewardCouponV2 with provider = delegate, beneficiary = None (unassigned)
+  let coupon1Amount = 1000.0
+  coupon1Cid <- submit app.dso $ createCmd RewardCouponV2 with
+    dso = app.dso
+    provider = delegate
+    amount = coupon1Amount
+    expiresAt = now `addRelTime` hours 36
+    round = openRound.round
+    providerIsObserver = True
+    beneficiary = None
+
+  let coupon2Amount = 500.0
+  coupon2Cid <- submit app.dso $ createCmd RewardCouponV2 with
+    dso = app.dso
+    provider = delegate
+    amount = coupon2Amount
+    expiresAt = now `addRelTime` hours 36
+    round = openRound.round
+    providerIsObserver = True
+    beneficiary = None
+
+  -- Advance rounds so coupons can be minted
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+
+  (openMiningRoundCid, _) <- getLatestOpenRound app
+  now2 <- getTime
+  issuingRounds <- query @IssuingMiningRound app.dso
+  let context = TransferContext with
+        openMiningRound = openMiningRoundCid
+        issuingMiningRounds = Map.fromList
+          [ (round.round, roundCid) | (roundCid, round) <- issuingRounds, round.opensAt <= now2 ]
+        validatorRights = Map.fromList [(beneficiary, validatorRightCid)]
+        featuredAppRight = None
+  (amuletRulesCid, _) <- getAmuletRules app
+
+  submitMustFail''
+    (expectMessageContains "Contract group identifier mismatch")
+    (actAs delegate <> readAs beneficiary <> readAs extraBeneficiary <> readAs app.dso)
+    (exerciseCmd mintingDelegationCid MintingDelegation_AssignAndMint with
+      couponCid = toInterfaceContractId coupon1Cid
+      assignBeneficiaries = Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+        additionalCoupons = [toInterfaceContractId coupon2Cid]
+        newBeneficiaries = [Api.RewardAssignmentV1.RewardBeneficiary extraBeneficiary 1.0]
+        extraArgs = emptyExtraArgs
+      inputs = []
+      context = PaymentTransferContext with
+        context
+        amuletRules = amuletRulesCid)
+
+  beneficiaryCoupon <- submit app.dso $ createCmd RewardCouponV2 with
+    dso = app.dso
+    provider = beneficiary
+    beneficiary = None
+    amount = 100.0
+    round = openRound.round
+    providerIsObserver = True
+    expiresAt = now `addRelTime` hours 36
+
+  submitMustFail''
+    (expectMessageContains "Contract group identifier mismatch")
+    (actAs delegate <> readAs beneficiary <> readAs extraBeneficiary <> readAs app.dso)
+    $ exerciseCmd mintingDelegationCid MintingDelegation_AssignAndMint with
+        couponCid = toInterfaceContractId beneficiaryCoupon
+        assignBeneficiaries = Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+          additionalCoupons = [toInterfaceContractId coupon2Cid]   -- delegate-owned
+          newBeneficiaries = [Api.RewardAssignmentV1.RewardBeneficiary extraBeneficiary 1.0]
+          extraArgs = emptyExtraArgs
+        inputs = []
+        context = PaymentTransferContext with context; amuletRules = amuletRulesCid
+
+  pure ()
+
+
+testMintingDelegation_Mint_rejectsDelegateOwnedInput : Script ()
+testMintingDelegation_Mint_rejectsDelegateOwnedInput = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  beneficiary <- allocateParty "beneficiary"
+  let delegate = aliceValidator.primaryParty
+
+  -- Create a MintingDelegation
+  now <- getTime
+  proposalCid <- submit beneficiary $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary
+      delegate
+      expiresAt = now `addRelTime` days 30
+      amuletMergeLimit = 10
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept with
+    existingDelegationCid = None
+
+  (_, openRound) <- getLatestOpenRound app
+
+  -- Wait for rounds to advance so coupons can be minted
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+
+  (openMiningRoundCid, _) <- getLatestOpenRound app
+  now2 <- getTime
+  issuingRounds <- query @IssuingMiningRound app.dso
+  let context = TransferContext with
+        openMiningRound = openMiningRoundCid
+        issuingMiningRounds = Map.fromList
+          [ (round.round, roundCid) | (roundCid, round) <- issuingRounds, round.opensAt <= now2 ]
+        validatorRights = Map.fromList []
+        featuredAppRight = None
+  (amuletRulesCid, _) <- getAmuletRules app
+
+  delegateCoupon <- submit app.dso $ createCmd RewardCouponV2 with
+    dso = app.dso
+    provider = delegate
+    beneficiary = None        -- owner resolves to `delegate`
+    amount = 42.0
+    round = openRound.round
+    providerIsObserver = False
+    expiresAt = now `addRelTime` days 60
+  
+  submitMustFail''
+    (expectMessageContains "Contract group identifier mismatch")
+    (actAs delegate <> readAs beneficiary <> readAs app.dso)
+    $ exerciseCmd mintingDelegationCid MintingDelegation_Mint with
+        inputs = [InputRewardCouponV2 delegateCoupon]
+        context = PaymentTransferContext with context; amuletRules = amuletRulesCid
+
+  pure ()

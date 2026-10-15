@@ -13,6 +13,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
@@ -25,7 +26,11 @@ import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.SequencerWriter.*
 import com.digitalasset.canton.synchronizer.sequencer.WriterStartupError.FailedToInitializeFromSnapshot
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.SequencerHealthStatus
-import com.digitalasset.canton.synchronizer.sequencer.store.{SequencerStore, SequencerWriterStore}
+import com.digitalasset.canton.synchronizer.sequencer.store.{
+  SequencerMemberId,
+  SequencerStore,
+  SequencerWriterStore,
+}
 import com.digitalasset.canton.synchronizer.sequencer.time.{
   DisasterRecoverySequencingTimeUpperBound,
   LsuSequencingBounds,
@@ -37,6 +42,7 @@ import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.retry.{AllExceptionRetryPolicy, Pause}
+import com.digitalasset.canton.util.signalling.EventSignaller
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.stream.*
@@ -400,7 +406,13 @@ class SequencerWriter(
 
       val onlineP = Promise[Unit]()
       FutureUtil.doNotAwait(
-        clock.scheduleAt(_ => onlineP.success(()), onlineTimestamp).unwrap,
+        clock
+          .scheduleAtCancelledOnShutdown(
+            _ => onlineP.success(()),
+            s"${getClass.getName}: completing online promise",
+            onlineTimestamp,
+          )
+          .unwrap,
         s"wait for becoming online at $onlineTimestamp",
       )
       onlineP.future
@@ -524,7 +536,7 @@ object SequencerWriter {
       sequencerStore: SequencerStore,
       rateLimitManagerO: Option[SequencerRateLimitManager],
       clock: Clock,
-      eventSignaller: EventSignaller,
+      eventSignaller: EventSignaller[SequencerMemberId, Unit],
       protocolVersion: ProtocolVersion,
       loggerFactory: NamedLoggerFactory,
       blockSequencerMode: Boolean,

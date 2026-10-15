@@ -8,7 +8,6 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{ForceFlag, ForceFlags, PartyId}
 import com.digitalasset.daml.lf.data.Ref.{PackageId, PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
@@ -167,43 +166,11 @@ abstract class ExpiryWithMinimalVettedPackagesIntegrationTestBase
     }
 
     val aliceUserId = aliceWalletClient.config.ledgerApiUser
-    val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-    val sv1ParticipantId = sv1Backend.participantClientWithAdminToken.id
-    val aliceParticipantId = aliceValidatorBackend.participantClient.id
-    val sv1Participant = sv1Backend.participantClientWithAdminToken
-    val aliceParticipant = aliceValidatorBackend.participantClient
-
-    clue("Wait for alice's PartyToParticipant mapping to be visible on sv1") {
-      eventually() {
-        sv1Participant.topology.party_to_participant_mappings
-          .list(synchronizerId, filterParty = aliceParty.toProtoPrimitive) should not be empty
-      }
-    }
-
-    // Multi-host alice on sv1Participant to be able to create bare Amulet and LockedAmulet contracts
-    actAndCheck(
-      "Multi-host alice on sv1Participant (alice keeps her old host)",
-      eventuallySucceeds() {
-        aliceParticipant.topology.party_to_participant_mappings.propose_delta(
-          party = aliceParty,
-          adds = Seq((sv1ParticipantId, ParticipantPermission.Submission)),
-          store = synchronizerId,
-        )
-        sv1Participant.topology.party_to_participant_mappings.propose_delta(
-          party = aliceParty,
-          adds = Seq((sv1ParticipantId, ParticipantPermission.Submission)),
-          store = synchronizerId,
-        )
-      },
-    )(
-      "alice is fully authorized on both participants",
-      _ => {
-        val hosts = sv1Participant.topology.party_to_participant_mappings
-          .list(synchronizerId, filterParty = aliceParty.toProtoPrimitive)
-          .flatMap(_.item.participants)
-        hosts.exists(h => h.participantId == sv1ParticipantId && !h.onboarding) shouldBe true
-        hosts.exists(h => h.participantId == aliceParticipantId && !h.onboarding) shouldBe true
-      },
+    val aliceParty = onboardWalletUserHostedAlsoOn(
+      aliceWalletClient,
+      aliceValidatorBackend,
+      sv1Backend.participantClientWithAdminToken,
+      synchronizerId,
     )
 
     val numAmulets = 2

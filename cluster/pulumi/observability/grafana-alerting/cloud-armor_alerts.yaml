@@ -1,0 +1,267 @@
+# The promQL queries carry an unused timeSeriesList: the Cloud Monitoring datasource
+# treats a query without any of metricQuery/timeSeriesQuery/timeSeriesList/sloQuery as a
+# legacy query and rewrites it to a timeSeriesList one, dropping promQLQuery (and then
+# panics with a nil pointer dereference).
+# Cloud Monitoring PromQL requires an exact monitored_resource match (no regex).
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: cloud-armor
+    folder: platform
+    interval: 5m
+    rules:
+      - uid: cloud-armor-denied
+        title: Cloud Armor denied requests
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: $CLOUD_ARMOR_DENIED_RANGE_SECONDS
+              to: 0
+            datasourceUid: gcp-monitoring
+            model:
+              datasource:
+                type: stackdriver
+                uid: gcp-monitoring
+              queryType: promQL
+              timeSeriesList:
+                projectName: $GCP_PROJECT
+                crossSeriesReducer: REDUCE_NONE
+              promQLQuery:
+                projectName: $GCP_PROJECT
+                expr: sum by (backend_target_name) (increase(networksecurity_googleapis_com:https_request_count{monitored_resource="network_security_policy", policy_name="$CLOUD_ARMOR_POLICY_NAME", blocked="true"}[$CLOUD_ARMOR_DENIED_WINDOW]))
+                step: 60s
+              intervalMs: 60000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $CLOUD_ARMOR_DENIED_THRESHOLD
+                    type: gt
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: $CLOUD_ARMOR_DENIED_FOR
+        annotations:
+          severity: warning
+          summary: Cloud Armor denied {{ $values.B }} requests to backend {{ $labels.backend_target_name }}
+          description: |-
+            The Cloud Armor security policy $CLOUD_ARMOR_POLICY_NAME denied requests to $CLUSTER_BASENAME.
+            This is either an abusive client being blocked at the GCP edge, or legitimate traffic that our rules (WAF signatures, IP whitelist, per endpoint throttles, default deny) reject by mistake.
+            The enforcedSecurityPolicy / previewSecurityPolicy fields of the load balancer logs tell which rule matched.
+        labels:
+          gcloud_filter_skip_cluster: 'true'
+          gcloud_filter: 'resource.type%3D(%22http_external_regional_lb_rule%22%20OR%20%22http_load_balancer%22)%0A((jsonPayload.enforcedSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.enforcedSecurityPolicy.outcome%3D%22DENY%22)%20OR%20(jsonPayload.previewSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.previewSecurityPolicy.outcome%3D%22DENY%22))'
+        isPaused: false
+      - uid: cloud-armor-previewed-denied
+        title: Cloud Armor would deny requests
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: $CLOUD_ARMOR_DENIED_RANGE_SECONDS
+              to: 0
+            datasourceUid: gcp-monitoring
+            model:
+              datasource:
+                type: stackdriver
+                uid: gcp-monitoring
+              queryType: promQL
+              timeSeriesList:
+                projectName: $GCP_PROJECT
+                crossSeriesReducer: REDUCE_NONE
+              promQLQuery:
+                projectName: $GCP_PROJECT
+                expr: sum by (backend_target_name) (increase(networksecurity_googleapis_com:https_previewed_request_count{monitored_resource="network_security_policy", policy_name="$CLOUD_ARMOR_POLICY_NAME", blocked="true"}[$CLOUD_ARMOR_DENIED_WINDOW]))
+                step: 60s
+              intervalMs: 60000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $CLOUD_ARMOR_DENIED_THRESHOLD
+                    type: gt
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: $CLOUD_ARMOR_DENIED_FOR
+        annotations:
+          severity: warning
+          summary: Cloud Armor would have denied {{ $values.B }} requests to backend {{ $labels.backend_target_name }}
+          description: |-
+            The Cloud Armor security policy $CLOUD_ARMOR_POLICY_NAME would have denied (rules in preview mode) requests to $CLUSTER_BASENAME.
+            This is either an abusive client being blocked at the GCP edge, or legitimate traffic that our rules (WAF signatures, IP whitelist, per endpoint throttles, default deny) reject by mistake.
+            The enforcedSecurityPolicy / previewSecurityPolicy fields of the load balancer logs tell which rule matched.
+        labels:
+          gcloud_filter_skip_cluster: 'true'
+          gcloud_filter: 'resource.type%3D(%22http_external_regional_lb_rule%22%20OR%20%22http_load_balancer%22)%0A((jsonPayload.enforcedSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.enforcedSecurityPolicy.outcome%3D%22DENY%22)%20OR%20(jsonPayload.previewSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.previewSecurityPolicy.outcome%3D%22DENY%22))'
+        isPaused: false
+      - uid: cloud-armor-waf-rejections
+        title: Cloud Armor WAF rule rejections
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: $CLOUD_ARMOR_WAF_RANGE_SECONDS
+              to: 0
+            datasourceUid: gcp-monitoring
+            model:
+              datasource:
+                type: stackdriver
+                uid: gcp-monitoring
+              queryType: promQL
+              timeSeriesList:
+                projectName: $GCP_PROJECT
+                crossSeriesReducer: REDUCE_NONE
+              promQLQuery:
+                projectName: $GCP_PROJECT
+                expr: label_replace(sum by (rule_priority) (increase({"__name__"="logging.googleapis.com/user/cloud_armor_enforced_rejections_$CLUSTER_BASENAME", "monitored_resource"="http_external_regional_lb_rule", "rule_priority"=~"$CLOUD_ARMOR_WAF_RULE_PRIORITY_REGEX"}[$CLOUD_ARMOR_WAF_WINDOW])), "mode", "enforced", "", "") or label_replace(sum by (rule_priority) (increase({"__name__"="logging.googleapis.com/user/cloud_armor_previewed_rejections_$CLUSTER_BASENAME", "monitored_resource"="http_external_regional_lb_rule", "rule_priority"=~"$CLOUD_ARMOR_WAF_RULE_PRIORITY_REGEX"}[$CLOUD_ARMOR_WAF_WINDOW])), "mode", "previewed", "", "")
+                step: 60s
+              intervalMs: 60000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $CLOUD_ARMOR_WAF_THRESHOLD
+                    type: gt
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: $CLOUD_ARMOR_WAF_FOR
+        annotations:
+          severity: warning
+          summary: 'Cloud Armor WAF rule rejections: {{ $values.B }} requests matched the {{ $labels.mode }} rule with priority {{ $labels.rule_priority }}'
+          description: |-
+            Requests to $CLUSTER_BASENAME matched a WAF (OWASP CRS) rule of the Cloud Armor security policy $CLOUD_ARMOR_POLICY_NAME.
+            Unlike the generic Cloud Armor alert, this one fires only on attack signature matches (SQL injection, XSS, RCE, ...), not on IP whitelist, throttle or default deny rejections. WAF rules in preview mode are included: they only log, they do not reject.
+            The preconfiguredExprIds field of the logs tells an actual attack apart from a false positive on legitimate traffic.
+        labels:
+          gcloud_filter_skip_cluster: 'true'
+          gcloud_filter: 'resource.type%3D(%22http_external_regional_lb_rule%22%20OR%20%22http_load_balancer%22)%0A((jsonPayload.enforcedSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.enforcedSecurityPolicy.outcome%3D%22DENY%22%20AND%20jsonPayload.enforcedSecurityPolicy.priority%3D{{ $$labels.rule_priority }})%20OR%20(jsonPayload.previewSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.previewSecurityPolicy.outcome%3D%22DENY%22%20AND%20jsonPayload.previewSecurityPolicy.priority%3D{{ $$labels.rule_priority }}))'
+        isPaused: false
+      - uid: cloud-armor-throttle-rejections
+        title: Cloud Armor throttle rule rejections
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: $CLOUD_ARMOR_THROTTLE_RANGE_SECONDS
+              to: 0
+            datasourceUid: gcp-monitoring
+            model:
+              datasource:
+                type: stackdriver
+                uid: gcp-monitoring
+              queryType: promQL
+              timeSeriesList:
+                projectName: $GCP_PROJECT
+                crossSeriesReducer: REDUCE_NONE
+              promQLQuery:
+                projectName: $GCP_PROJECT
+                expr: label_replace(sum by (rule_priority) (increase({"__name__"="logging.googleapis.com/user/cloud_armor_enforced_rejections_$CLUSTER_BASENAME", "monitored_resource"="http_external_regional_lb_rule", "rule_priority"=~"$CLOUD_ARMOR_THROTTLE_RULE_PRIORITY_REGEX"}[$CLOUD_ARMOR_THROTTLE_WINDOW])), "mode", "enforced", "", "") or label_replace(sum by (rule_priority) (increase({"__name__"="logging.googleapis.com/user/cloud_armor_previewed_rejections_$CLUSTER_BASENAME", "monitored_resource"="http_external_regional_lb_rule", "rule_priority"=~"$CLOUD_ARMOR_THROTTLE_RULE_PRIORITY_REGEX"}[$CLOUD_ARMOR_THROTTLE_WINDOW])), "mode", "previewed", "", "")
+                step: 60s
+              intervalMs: 60000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $CLOUD_ARMOR_THROTTLE_THRESHOLD
+                    type: gt
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: $CLOUD_ARMOR_THROTTLE_FOR
+        annotations:
+          severity: warning
+          summary: 'Cloud Armor throttle rule rejections: {{ $values.B }} requests matched the {{ $labels.mode }} rule with priority {{ $labels.rule_priority }}'
+          description: |-
+            Requests to $CLUSTER_BASENAME were rejected (HTTP 429) by a per source IP throttle rule of the Cloud Armor security policy $CLOUD_ARMOR_POLICY_NAME.
+            A client exceeded the request rate allowed for an endpoint. This is either an abusive client, or a legitimate client whose load outgrew the configured throttle. Throttle rules in preview mode are included: they only log, they do not reject.
+        labels:
+          gcloud_filter_skip_cluster: 'true'
+          gcloud_filter: 'resource.type%3D(%22http_external_regional_lb_rule%22%20OR%20%22http_load_balancer%22)%0A((jsonPayload.enforcedSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.enforcedSecurityPolicy.outcome%3D%22DENY%22%20AND%20jsonPayload.enforcedSecurityPolicy.priority%3D{{ $$labels.rule_priority }})%20OR%20(jsonPayload.previewSecurityPolicy.name%3D%22$CLOUD_ARMOR_POLICY_NAME%22%20AND%20jsonPayload.previewSecurityPolicy.outcome%3D%22DENY%22%20AND%20jsonPayload.previewSecurityPolicy.priority%3D{{ $$labels.rule_priority }}))'
+        isPaused: false

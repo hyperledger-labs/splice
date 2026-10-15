@@ -1,0 +1,1194 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Scan database size over time: per database, per family of tables, per table, with growth rates and bulk export lag. Sized for the Scan pruning programme; works for any namespace the postgres exporter covers.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "postgres",
+    "scan",
+    "size"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {
+          "text": "Prometheus",
+          "value": "prometheus"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "options": [],
+        "refresh": 1,
+        "regex": ""
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": {
+          "uid": "$datasource"
+        },
+        "definition": "label_values(pg_up,namespace)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(pg_up,namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "current": {
+          "text": [
+            "sv-1"
+          ],
+          "value": [
+            "sv-1"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "options": [],
+        "refresh": 1,
+        "regex": "",
+        "sort": 1
+      },
+      {
+        "name": "datname",
+        "type": "query",
+        "datasource": {
+          "uid": "$datasource"
+        },
+        "definition": "label_values(pg_stat_user_tables_table_size_bytes{namespace=~\"$namespace\"},datname)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(pg_stat_user_tables_table_size_bytes{namespace=~\"$namespace\"},datname)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "options": [],
+        "refresh": 1,
+        "regex": "",
+        "sort": 1
+      },
+      {
+        "name": "topk",
+        "type": "custom",
+        "query": "10,15,25,50",
+        "current": {
+          "text": "15",
+          "value": "15"
+        },
+        "options": [
+          {
+            "text": "10",
+            "value": "10",
+            "selected": false
+          },
+          {
+            "text": "15",
+            "value": "15",
+            "selected": true
+          },
+          {
+            "text": "25",
+            "value": "25",
+            "selected": false
+          },
+          {
+            "text": "50",
+            "value": "50",
+            "selected": false
+          }
+        ],
+        "hide": 0,
+        "includeAll": false,
+        "multi": false
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Scan Database Size",
+  "uid": "scan-db-size",
+  "version": 1,
+  "weekStart": "",
+  "panels": [
+    {
+      "type": "row",
+      "title": "Databases on the instance",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": [],
+      "id": 1
+    },
+    {
+      "type": "stat",
+      "title": "Table bytes, selected databases",
+      "description": "sum of pg_table_size over all user tables: heap plus TOAST, no indexes",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "area",
+        "textMode": "value",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "sum(pg_stat_user_tables_table_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"} > 0)",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "id": 2
+    },
+    {
+      "type": "stat",
+      "title": "Index bytes, selected databases",
+      "description": "sum of pg_indexes_size over all user tables",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "area",
+        "textMode": "value",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "sum(pg_stat_user_tables_index_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"} > 0)",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "id": 3
+    },
+    {
+      "type": "stat",
+      "title": "Database size, selected databases",
+      "description": "pg_database_size: tables, indexes, TOAST, free space map; excludes WAL",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "area",
+        "textMode": "value",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "sum(max by (datname) (pg_database_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"}))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "id": 4
+    },
+    {
+      "type": "stat",
+      "title": "Growth per day, 7-day window",
+      "description": "database size delta over the last 7 days divided by 7",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "area",
+        "textMode": "value",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "sum(delta(max by (datname) (pg_database_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"})[7d:1h])) / 7",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "id": 5
+    },
+    {
+      "type": "timeseries",
+      "title": "Table bytes per database",
+      "description": "sum by (namespace, datname) of pg_stat_user_tables_table_size_bytes; heap plus TOAST, no indexes",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto",
+            "gradientMode": "none",
+            "lineInterpolation": "linear"
+          },
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "sum by (namespace, datname) (pg_stat_user_tables_table_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"} > 0)",
+          "legendFormat": "{{namespace}} {{datname}}",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "id": 6
+    },
+    {
+      "type": "timeseries",
+      "title": "Database size per database (all databases in the namespace)",
+      "description": "pg_database_size_bytes for every database the exporter sees, so co-hosted databases on a shared instance are visible",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto",
+            "gradientMode": "none",
+            "lineInterpolation": "linear"
+          },
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "max by (namespace, datname) (pg_database_size_bytes{namespace=~\"$namespace\"})",
+          "legendFormat": "{{namespace}} {{datname}}",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "id": 7
+    },
+    {
+      "type": "row",
+      "title": "Families",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "panels": [],
+      "id": 8
+    },
+    {
+      "type": "timeseries",
+      "title": "Table bytes per family",
+      "description": "tables grouped by name pattern: update history, verdicts, ACS snapshots (legacy, per-snapshot, incremental), txlog, rewards, round aggregates, acs stores",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 25,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "axisPlacement": "auto",
+            "gradientMode": "none",
+            "lineInterpolation": "linear"
+          },
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "sum by (family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(pg_stat_user_tables_table_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"}, \"family\", \"other\", \"relname\", \".*\"), \"family\", \"update history\", \"relname\", \"update_history_.*\"), \"family\", \"verdicts\", \"relname\", \"scan_verdict.*\"), \"family\", \"acs snapshots legacy\", \"relname\", \"acs_snapshot_data\"), \"family\", \"acs snapshots per-snapshot\", \"relname\", \"acs_snapshot_(creates|stakeholders)_.*\"), \"family\", \"acs snapshots incremental\", \"relname\", \"acs_incremental_snapshot.*\"), \"family\", \"txlog\", \"relname\", \"scan_txlog_store\"), \"family\", \"rewards\", \"relname\", \"app_(activity|reward)_.*\"), \"family\", \"round aggregates\", \"relname\", \"round_(party_)?totals\"), \"family\", \"acs stores\", \"relname\", \".*acs_store\"))",
+          "legendFormat": "{{family}}",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "id": 9
+    },
+    {
+      "type": "timeseries",
+      "title": "Index bytes per family",
+      "description": "",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 25,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "axisPlacement": "auto",
+            "gradientMode": "none",
+            "lineInterpolation": "linear"
+          },
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "sum by (family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(pg_stat_user_tables_index_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"}, \"family\", \"other\", \"relname\", \".*\"), \"family\", \"update history\", \"relname\", \"update_history_.*\"), \"family\", \"verdicts\", \"relname\", \"scan_verdict.*\"), \"family\", \"acs snapshots legacy\", \"relname\", \"acs_snapshot_data\"), \"family\", \"acs snapshots per-snapshot\", \"relname\", \"acs_snapshot_(creates|stakeholders)_.*\"), \"family\", \"acs snapshots incremental\", \"relname\", \"acs_incremental_snapshot.*\"), \"family\", \"txlog\", \"relname\", \"scan_txlog_store\"), \"family\", \"rewards\", \"relname\", \"app_(activity|reward)_.*\"), \"family\", \"round aggregates\", \"relname\", \"round_(party_)?totals\"), \"family\", \"acs stores\", \"relname\", \".*acs_store\"))",
+          "legendFormat": "{{family}}",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "id": 10
+    },
+    {
+      "type": "timeseries",
+      "title": "Growth per family, bytes per day (7-day window)",
+      "description": "7-day delta of table and index bytes per family, divided by 7; the share of growth per family is what the pruning milestones are sized on",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto",
+            "gradientMode": "none",
+            "lineInterpolation": "linear"
+          },
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "sum by (family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(delta(pg_stat_user_tables_table_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"}[7d:1h]), \"family\", \"other\", \"relname\", \".*\"), \"family\", \"update history\", \"relname\", \"update_history_.*\"), \"family\", \"verdicts\", \"relname\", \"scan_verdict.*\"), \"family\", \"acs snapshots legacy\", \"relname\", \"acs_snapshot_data\"), \"family\", \"acs snapshots per-snapshot\", \"relname\", \"acs_snapshot_(creates|stakeholders)_.*\"), \"family\", \"acs snapshots incremental\", \"relname\", \"acs_incremental_snapshot.*\"), \"family\", \"txlog\", \"relname\", \"scan_txlog_store\"), \"family\", \"rewards\", \"relname\", \"app_(activity|reward)_.*\"), \"family\", \"round aggregates\", \"relname\", \"round_(party_)?totals\"), \"family\", \"acs stores\", \"relname\", \".*acs_store\")) / 7",
+          "legendFormat": "{{family}} tables",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "sum by (family) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(delta(pg_stat_user_tables_index_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"}[7d:1h]), \"family\", \"other\", \"relname\", \".*\"), \"family\", \"update history\", \"relname\", \"update_history_.*\"), \"family\", \"verdicts\", \"relname\", \"scan_verdict.*\"), \"family\", \"acs snapshots legacy\", \"relname\", \"acs_snapshot_data\"), \"family\", \"acs snapshots per-snapshot\", \"relname\", \"acs_snapshot_(creates|stakeholders)_.*\"), \"family\", \"acs snapshots incremental\", \"relname\", \"acs_incremental_snapshot.*\"), \"family\", \"txlog\", \"relname\", \"scan_txlog_store\"), \"family\", \"rewards\", \"relname\", \"app_(activity|reward)_.*\"), \"family\", \"round aggregates\", \"relname\", \"round_(party_)?totals\"), \"family\", \"acs stores\", \"relname\", \".*acs_store\")) / 7",
+          "legendFormat": "{{family}} indexes",
+          "range": true,
+          "instant": false,
+          "refId": "B"
+        }
+      ],
+      "id": 11
+    },
+    {
+      "type": "row",
+      "title": "Tables",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "panels": [],
+      "id": 12
+    },
+    {
+      "type": "timeseries",
+      "title": "Table bytes, top $topk tables",
+      "description": "",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 33
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto",
+            "gradientMode": "none",
+            "lineInterpolation": "linear"
+          },
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "topk($topk, max by (datname, relname) (pg_stat_user_tables_table_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"}))",
+          "legendFormat": "{{relname}}",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "id": 13
+    },
+    {
+      "type": "timeseries",
+      "title": "Index bytes, top $topk tables",
+      "description": "",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 33
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto",
+            "gradientMode": "none",
+            "lineInterpolation": "linear"
+          },
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "topk($topk, max by (datname, relname) (pg_stat_user_tables_index_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"}))",
+          "legendFormat": "{{relname}}",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "id": 14
+    },
+    {
+      "type": "table",
+      "title": "Current size and growth per table",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "description": "instant values: table bytes, index bytes, and the 7-day and 30-day change in table bytes",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Table"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Database"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Table bytes",
+            "desc": true
+          }
+        ],
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "max by (datname, relname) (pg_stat_user_tables_table_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"} > 0)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "max by (datname, relname) (pg_stat_user_tables_index_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"} > 0)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "B",
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "max by (datname, relname) (delta(pg_stat_user_tables_table_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"}[7d:1h]))",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "C",
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "max by (datname, relname) (delta(pg_stat_user_tables_table_size_bytes{namespace=~\"$namespace\", datname=~\"$datname\"}[30d:1h]))",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "D",
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "datname": "Database",
+              "relname": "Table",
+              "Value #A": "Table bytes",
+              "Value #B": "Index bytes",
+              "Value #C": "Table growth 7d",
+              "Value #D": "Table growth 30d"
+            },
+            "indexByName": {
+              "Database": 0,
+              "Table": 1,
+              "Table bytes": 2,
+              "Index bytes": 3,
+              "Table growth 7d": 4,
+              "Table growth 30d": 5
+            }
+          }
+        }
+      ],
+      "id": 15
+    },
+    {
+      "type": "row",
+      "title": "Bulk storage export",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 54
+      },
+      "panels": [],
+      "id": 16
+    },
+    {
+      "type": "timeseries",
+      "title": "Bulk export lag: days between now and the latest committed update segment",
+      "description": "how far the bulk storage export trails the present; the slope of the underlying metric is history-days exported per day",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 55
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto",
+            "gradientMode": "none",
+            "lineInterpolation": "linear"
+          },
+          "unit": "d",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "(time() - min by (namespace) ((splice_history_bulk_storage_latest_updates_segment_committed{namespace=~\"$namespace\"} > -62135596800000000) / 1000000.0)) / 86400",
+          "legendFormat": "{{namespace}}",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "id": 17
+    },
+    {
+      "type": "timeseries",
+      "title": "Dead tuples, top $topk tables",
+      "description": "bloat indicator; rows deleted or updated but not yet vacuumed",
+      "datasource": {
+        "uid": "$datasource"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 55
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto",
+            "gradientMode": "none",
+            "lineInterpolation": "linear"
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "topk($topk, max by (datname, relname) (pg_stat_user_tables_n_dead_tup{namespace=~\"$namespace\", datname=~\"$datname\"}))",
+          "legendFormat": "{{relname}}",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "id": 18
+    }
+  ]
+}

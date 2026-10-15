@@ -1,0 +1,14 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "name": "cnadmin",
+    "password": {
+      "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+      "value": null
+    }
+  },
+  "name": "user-sv-sequencer-9-pg-cnadmin",
+  "provider": "",
+  "type": "gcp:sql/user:User"
+}

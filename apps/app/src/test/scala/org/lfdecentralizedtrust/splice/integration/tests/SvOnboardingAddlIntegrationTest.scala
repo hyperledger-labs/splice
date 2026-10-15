@@ -210,7 +210,14 @@ class SvOnboardingAddlIntegrationTest
         }
         val nodeState = sv1NodeStates.get(svParty).value.payload
         val synchronizerNode = nodeState.state.synchronizerNodes.values.loneElement
-        val localSequencerUrl: String = synchronizerNode.sequencer.toScala.value.url
+        val localSequencerUrl: String =
+          synchronizerNode.physicalSynchronizers.toScala.value
+            .values()
+            .loneElement
+            .sequencer
+            .toScala
+            .value
+            .url
         localSequencerUrls should contain(localSequencerUrl)
         synchronizerNode.mediator.toScala.value.mediatorId should not be empty withClue "mediatorId"
 

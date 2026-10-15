@@ -6,12 +6,12 @@ package com.digitalasset.canton.sequencing.protocol
 import cats.data.EitherT
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{HashBuilder, Signature, SigningKeyUsage, SyncCryptoApi}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggingContext}
 import com.digitalasset.canton.protocol.v30
@@ -22,15 +22,19 @@ import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{MediatorId, Member, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
+import com.digitalasset.canton.validation.{ProtoUnvalidatedString, ProtoValidation}
 import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
+  ProtocolVersionValidation,
   ProtocolVersionedCompanionDbHelpers,
   RepresentativeProtocolVersion,
   VersionedProtoCodec,
   VersioningCompanionContext,
 }
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.immutable.SortedMap
@@ -271,6 +275,34 @@ object AggregationRuleInput extends HasLoggerName {
     )
   }
 
+  /** Validates sender eligibility and cryptographic signatures for a set of aggregations.
+    *
+    * This method performs a multi-step validation to ensure that a batch of aggregations meets the
+    * required threshold for delivery. It enforces the following rules:
+    *   1. Senders must be present in the `eligibleSenders` list (e.g., not offboarded).
+    *   1. Signatures must be cryptographically valid according to the provided `snapshot`.
+    *   1. If any individual envelope within a sender's aggregation loses all of its valid
+    *      signatures, that sender's entire aggregation is discarded.
+    *
+    * @note
+    *   To avoid the performance overhead of deeply nested asynchronous traversals, this
+    *   implementation uses a flatten-and-rebuild strategy: it extracts unique signatures into a
+    *   flat list, runs cryptographic verifications in a single parallel batch, and synchronously
+    *   reconstructs the nested aggregations using an O(1) Set lookup.
+    *
+    * @param aggregatedSignatures
+    *   The raw map of senders to their respective aggregations.
+    * @param eligibleSenders
+    *   The list of members currently active/eligible in the topology.
+    * @param snapshot
+    *   The cryptographic snapshot used to verify signature key usage.
+    * @param threshold
+    *   The minimum number of valid sender aggregations required.
+    * @return
+    *   A Future containing the maximum sequencing timestamp and the pruned map of valid
+    *   aggregations. Returns `None` if the final number of valid aggregations falls below the
+    *   `threshold`.
+    */
   private def validateSignaturesAtThresholdAndTimestamp(
       aggregatedSignatures: SortedMap[Member, AggregationBySender],
       eligibleSenders: Seq[Member],
@@ -280,70 +312,81 @@ object AggregationRuleInput extends HasLoggerName {
       loggingContext: NamedLoggingContext,
       executionContext: ExecutionContext,
   ): FutureUnlessShutdown[Option[(CantonTimestamp, SortedMap[Member, AggregationBySender])]] =
-    // immediately return if we don't have enough signatures at all
+    // Immediately return if we don't have enough aggregations to meet the threshold.
     if (aggregatedSignatures.sizeIs < threshold.value) {
       FutureUnlessShutdown.pure(None)
     } else {
       ErrorUtil.requireState(
         aggregatedSignatures.values
+          .maxByOption(_.sequencingTimestamp)
           .map(_.sequencingTimestamp)
-          .maxOption
           .contains(snapshot.ipsSnapshot.timestamp),
-        s"snapshot does not align with aggregations? ${snapshot.ipsSnapshot.timestamp} vs ${aggregatedSignatures.values
+        s"Snapshot does not align with aggregations? ${snapshot.ipsSnapshot.timestamp} vs ${aggregatedSignatures.values
             .map(_.sequencingTimestamp)}",
       )
+
       val eligibleMembersSet = eligibleSenders.toSet
-      val cleanedUpSignaturesF = aggregatedSignatures.view
-        // filter out all senders that are not eligible anymore (e.g. mediator
-        // got offboarded)
-        .filter { case (member, _) =>
-          eligibleMembersSet.contains(member)
-        }
-        .toSeq
-        .parTraverseFilter { case (member, aggregationBySender) =>
-          aggregationBySender.signatures
-            .parTraverse { envelopeSignatures =>
-              // filter out all signatures that are no longer valid
-              envelopeSignatures.parTraverseFilter { signature =>
-                snapshot
-                  .verifyKeyUsage(
-                    member,
-                    signature.authorizingLongTermKey,
-                    signature.signatureDelegation,
-                    usage = SigningKeyUsage.ProtocolOnly,
-                  )(loggingContext.traceContext)
-                  .value
-                  .map {
-                    case Right(()) => Some(signature)
-                    case Left(_) =>
-                      loggingContext.info(
-                        s"Signature of member $member for aggregation is no longer valid at ${snapshot.ipsSnapshot.timestamp} and will not be carried forward: $signature"
-                      )
-                      None
-                  }
-              }
-            }
+      val eligibleAggregations: List[(Member, AggregationBySender)] = aggregatedSignatures.view
+        // Keep only senders that are still eligible (e.g., filter out offboarded mediators).
+        .filter { case (member, _) => eligibleMembersSet.contains(member) }.toList
+
+      // `.distinct` omitted because Members are already unique (originating Map), and a single member's signatures
+      // are almost universally distinct since they cover different envelopes. Overhead of checking for uniqueness
+      // outweighs the cost of redundantly validating a rare duplicate signature.
+      val signaturesToVerify: List[(Member, Signature)] = eligibleAggregations.iterator.flatMap {
+        case (member, agg) => agg.signatures.flatten.map(member -> _)
+      }.toList
+
+      // TODO(#33650) - replace with unboundedTraverseFilter; safe to run unbounded for now as the flat list is
+      //  bounded by topology (eligible members) * payload size (envelopes) * signatures per envelope. And because the
+      //  eligible members are currently mediator/sequencer groups this is a small number
+      val validSignatureSetF = signaturesToVerify
+        .parTraverseFilter { case (member, signature) =>
+          // filter out all signatures that are no longer valid
+          snapshot
+            .verifyKeyUsage(
+              member,
+              signature.authorizingLongTermKey,
+              signature.signatureDelegation,
+              usage = SigningKeyUsage.ProtocolOnly,
+            )(loggingContext.traceContext)
+            .value
             .map {
-              // if we do not have enough signatures left for all envelopes, we cannot include this senders
-              // aggregations anymore. Normally, the same key will be used for all envelopes, but this is
-              // not guaranteed.
-              case cleanedSignatures if cleanedSignatures.forall(_.nonEmpty) =>
-                Some((member, aggregationBySender.copy(signatures = cleanedSignatures)))
-              case _ => None
+              case Right(()) => Some((member, signature))
+              case Left(_) =>
+                loggingContext.info(
+                  s"Signature of member $member for aggregation is no longer valid at ${snapshot.ipsSnapshot.timestamp} and will not be carried forward: $signature"
+                )
+                None
             }
+        }
+        .map(_.toSet)
+
+      validSignatureSetF.map { validSignatureSet =>
+        val validAggregations = eligibleAggregations.flatMap { case (member, agg) =>
+          val allEnvelopesWithSignaturesO =
+            agg.signatures.traverse { sigs =>
+              val filtered = sigs.filter(sig => validSignatureSet.contains(member -> sig))
+              Option.when(filtered.nonEmpty)(filtered)
+            }
+
+          // If any envelope loses all of its valid signatures, we cannot include this sender's aggregations anymore.
+          // Normally, the same key is used for all envelopes, but this is not guaranteed.
+          allEnvelopesWithSignaturesO.map(validEnvelopes =>
+            member -> agg.copy(signatures = validEnvelopes)
+          )
         }
 
-      cleanedUpSignaturesF.map { cleanedUpSignatures =>
-        // now, return the result if we have enough signatures left after cleanup,
-        // together with the pruned signatures that should be included in the delivery
-        if (cleanedUpSignatures.sizeIs >= threshold.value) {
-          cleanedUpSignatures
+        // Finally, return the result if we still have enough valid aggregations to meet the threshold,
+        // together with the pruned signatures that should be included in the delivery.
+        if (validAggregations.sizeIs >= threshold.value) {
+          validAggregations
+            .maxByOption(_._2.sequencingTimestamp)
             .map(_._2.sequencingTimestamp)
-            .maxOption
-            .map((_, SortedMap.from(cleanedUpSignatures)))
+            .map((_, SortedMap.from(validAggregations)))
         } else {
           loggingContext.info(
-            s"Not enough valid signatures left after cleanup (had=${aggregatedSignatures.size}, cleaned=${cleanedUpSignatures.size}, threshold=${threshold.value}) to meet the threshold, cannot deliver yet"
+            s"Not enough valid aggregations (had=${aggregatedSignatures.size}, valid=${validAggregations.size}, threshold=${threshold.value}) to meet the threshold, cannot deliver yet"
           )
           None
         }
@@ -478,17 +521,17 @@ final case class AggregationRule(
     input match {
       case AggregationRuleInput.Resolved(eligibleSenders, threshold) =>
         v30.AggregationRule(
-          eligibleMembers = eligibleSenders.map(_.toProtoPrimitive),
+          eligibleMembers = eligibleSenders.map(_.toProtoPrimitive.toProtoUnvalidated),
           threshold = threshold.value,
         )
       case AggregationRuleInput.MediatorGroup(index) =>
         v30.AggregationRule(
-          eligibleMembers = Seq(MediatorGroupRecipient(index).toProtoPrimitive),
+          eligibleMembers = Seq(MediatorGroupRecipient(index).toProtoPrimitive.toProtoUnvalidated),
           threshold = 0, // ignored
         )
       case AggregationRuleInput.SequencerGroup =>
         v30.AggregationRule(
-          eligibleMembers = Seq(SequencersOfSynchronizer.toProtoPrimitive),
+          eligibleMembers = Seq(SequencersOfSynchronizer.toProtoPrimitive.toProtoUnvalidated),
           threshold = 0, // ignored
         )
       case AggregationRuleInput.SenderDedup =>
@@ -504,9 +547,25 @@ final case class AggregationRule(
 
 }
 
+// See https://github.com/DACH-NY/canton/pull/32193
+private[sequencing] final case class LegacyUseMemberIdsAsEligibleMembers(v: Boolean) extends AnyVal
+
+object LegacyUseMemberIdsAsEligibleMembers {
+  def apply(pv: ProtocolVersion): LegacyUseMemberIdsAsEligibleMembers =
+    if (pv == ProtocolVersion.v34) LegacyUseMemberIdsAsEligibleMembers(true)
+    else LegacyUseMemberIdsAsEligibleMembers(false)
+}
+
 object AggregationRule
-    extends VersioningCompanionContext[AggregationRule, ProtocolVersion]
+    extends VersioningCompanionContext[AggregationRule, LegacyUseMemberIdsAsEligibleMembers]
     with ProtocolVersionedCompanionDbHelpers[AggregationRule] {
+
+  override val versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.AggregationRule)(
+      supportedProtoVersionPVV(_)(fromProtoV30),
+      _.toProtoV30,
+    )
+  )
 
   @VisibleForTesting
   def testing(
@@ -565,24 +624,30 @@ object AggregationRule
 
   override def name: String = "AggregationRule"
 
-  override val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.AggregationRule)(
-      supportedProtoVersion(_)(fromProtoV30),
-      _.toProtoV30,
-    )
-  )
-
   private[canton] def fromProtoV30(
-      expectedProtocolVersion: ProtocolVersion,
+      pvv: ProtocolVersionValidation,
+      useMemberIdsAsEligibleMembers: LegacyUseMemberIdsAsEligibleMembers,
       proto: v30.AggregationRule,
   ): ParsingResult[AggregationRule] = {
     val v30.AggregationRule(eligibleMembersP, thresholdP) = proto
-    if (expectedProtocolVersion == ProtocolVersion.v34) {
+
+    if (useMemberIdsAsEligibleMembers.v) {
       for {
+        eligibleMembersSeqP <- ProtoValidation
+          .validateLength(
+            eligibleMembersP,
+            "eligible_members",
+            pvv,
+            ProtoValidation.MaxCollectionSize,
+          )
         eligibleMembers <- ProtoConverter.parseRequiredNonEmpty(
-          Member.fromProtoPrimitive(_, "eligible_members"),
+          (member: ProtoUnvalidatedString) =>
+            ProtoValidation
+              .validateThen(member, "eligible_members", pvv)(
+                Member.fromProtoPrimitive
+              ),
           "eligible_members",
-          eligibleMembersP,
+          eligibleMembersSeqP,
         )
         threshold <- ProtoConverter.parsePositiveInt("threshold", thresholdP)
         rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
@@ -619,10 +684,18 @@ object AggregationRule
               threshold <- ProtoConverter.parsePositiveInt("threshold", thresholdP)
             } yield AggregationRuleInput.Resolved(membersNE, threshold)
         }
+
       for {
-        recipients <- eligibleMembersP.traverse(Recipient.fromProtoPrimitive(_, "eligible_members"))
+        recipients <- ProtoValidation.validateThen(
+          eligibleMembersP,
+          "eligible_members",
+          pvv,
+          ProtoValidation.MaxCollectionSize,
+        )(
+          Recipient.fromProtoPrimitive
+        )
         rule <- ruleFromRecipients(recipients.toList)
-        rpv = protocolVersionRepresentativeFor(expectedProtocolVersion)
+        rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
       } yield AggregationRule(rule)(rpv)
     }
   }

@@ -1,0 +1,34 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "networking.istio.io/v1beta1",
+    "kind": "DestinationRule",
+    "metadata": {
+      "name": "sv-da-1-global-domain-9-sequencer-high-perf-grpc-rule",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "host": "global-domain-9-sequencer.sv-da-1.svc.cluster.local",
+      "trafficPolicy": {
+        "connectionPool": {
+          "http": {
+            "http1MaxPendingRequests": 20000,
+            "http2MaxRequests": 20000,
+            "maxConcurrentStreams": 20000,
+            "maxRequestsPerConnection": 0
+          },
+          "tcp": {
+            "maxConnections": 20000
+          }
+        },
+        "loadBalancer": {
+          "simple": "LEAST_REQUEST"
+        }
+      }
+    }
+  },
+  "name": "sv-da-1-global-domain-9-sequencer-high-perf-grpc-rule",
+  "provider": "",
+  "type": "kubernetes:networking.istio.io/v1beta1:DestinationRule"
+}

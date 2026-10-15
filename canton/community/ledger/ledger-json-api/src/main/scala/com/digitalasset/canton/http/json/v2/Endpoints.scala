@@ -29,8 +29,8 @@ import io.circe.{Decoder, Encoder}
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
 import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
+import org.apache.pekko.stream.{AbruptStageTerminationException, Materializer}
 import sttp.capabilities.WebSockets
 import sttp.capabilities.pekko.PekkoStreams
 import sttp.model.{Header, StatusCode}
@@ -137,7 +137,7 @@ trait Endpoints extends NamedLogging {
             TracedInput(i)
           ) // We do not pass traceheaders on Websockets
             .map(out => Right[JsCantonError, O](out))
-            .recover(handleErrorInSocket(TraceContext.empty))
+            .recover(handleErrorInSocket(jwt.traceContext()))
         // According to tapir documentation pekko-http does not expose control frames (Ping, Pong and Close)
         //  We cannot send error as close frame
         Future.successful(errorHandlingService)
@@ -293,9 +293,7 @@ trait Endpoints extends NamedLogging {
   ): Endpoint[CallerContext, TracedInput[P], E, Unit, Any] =
     endpoint.mapIn(traceHeadersMapping[P]())
 
-  implicit class FutureOps[R](future: Future[R]) {
-    // TODO(#27556): Pass TraceContext from caller
-    implicit val traceContext: TraceContext = TraceContext.empty
+  implicit class FutureOps[R](future: Future[R])(implicit traceContext: TraceContext) {
     def resultToRight: Future[Either[JsCantonError, R]] =
       future
         .map(Right(_))
@@ -341,18 +339,11 @@ trait Endpoints extends NamedLogging {
                 s"Request failed with legacy error ${sre.getStatus} / ${sre.getMessage}",
                 sre.getCause,
               )
-              JsCantonError(
+              JsCantonError.fromUnstructuredError(
                 code = Option(sre.getStatus.getDescription)
                   .getOrElse("Status description not available"),
                 cause = sre.getMessage,
-                correlationId = None,
-                traceId = None,
-                context = Map(),
-                resources = Seq(),
-                errorCategory = -1,
                 grpcCodeValue = Some(sre.getStatus.getCode.value()),
-                retryInfo = None,
-                definiteAnswer = None,
               )
             },
         )
@@ -401,6 +392,17 @@ trait Endpoints extends NamedLogging {
           ),
         )
       )
+    // Special case for timed out requests
+    case _: AbruptStageTerminationException =>
+      Left(
+        (
+          StatusCode.RequestTimeout,
+          JsCantonError.fromUnstructuredError(
+            code = "REQUEST_TIMEOUT",
+            cause = "The request timed out before it completed.",
+          ),
+        )
+      )
     case NonFatal(error) =>
       val internalError =
         LedgerApiErrors.InternalError.Generic(
@@ -434,6 +436,22 @@ object Endpoints {
   val wsSubprotocol: Header =
     sttp.model.Header("Sec-WebSocket-Protocol", "daml.ws.auth")
 
+  // RFC 6455 clients send comma-space separated subprotocol values (e.g.
+  // "daml.ws.auth, jwt.token.<TOKEN>"), so each element must be trimmed before
+  // matching the jwt.token. prefix, or tokens are silently dropped and the
+  // request proceeds unauthenticated.
+  private[v2] def extractWsJwtToken(header: Option[String]): Option[Jwt] = {
+    val tokenPrefix = "jwt.token."
+    header
+      .map(_.split(",").toSeq)
+      .getOrElse(Seq.empty)
+      .map(_.trim)
+      .filter(_.startsWith(tokenPrefix))
+      .map(_.substring(tokenPrefix.length))
+      .headOption
+      .map(Jwt.apply)
+  }
+
   lazy val baseEndpoint: Endpoint[CallerContext, Unit, Unit, Unit, Any] = endpoint
     .securityIn(
       auth
@@ -445,16 +463,7 @@ object Endpoints {
         .and(
           auth
             .apiKey(header[Option[String]]("Sec-WebSocket-Protocol"))
-            .map { bearer =>
-              val tokenPrefix = "jwt.token." // TODO (i21030) test this
-              bearer
-                .map(_.split(",").toSeq)
-                .getOrElse(Seq.empty)
-                .filter(_.startsWith(tokenPrefix))
-                .map(_.substring(tokenPrefix.length))
-                .headOption
-                .map(Jwt.apply)
-            }(_.map(_.token))
+            .map(extractWsJwtToken)(_.map(_.token))
             .description("Ledger API standard JWT token (websocket)")
         )
         .and(
@@ -628,8 +637,11 @@ final case class ProtoLink(file: String, service: String, method: String) {
 }
 
 object ProtoLink {
-  private val grpcMethodExtractor =
+  private val ledgerApiGrpcMethodExtractor =
     raw"com\.daml\.ledger\.api\.v2\.((?:(?:[a-z0-9])*\.)*)([A-Za-z0-9]+)".r
+
+  private val teaApiGrpcMethodExtractor =
+    raw"com\.digitalasset\.canton\.tea\.v1\.((?:(?:[a-z0-9])*\.)*)([A-Za-z0-9]+)".r
 
   private val importGRPCCommentPattern =
     raw"<gRPC:([A-Za-z0-9_/]+\.proto)/([A-Za-z0-9_]+)/([A-Za-z0-9_]+)>".r
@@ -638,16 +650,23 @@ object ProtoLink {
     val serviceName: String = methodDescriptor.getServiceName
     val bareMethodName = methodDescriptor.getBareMethodName
     serviceName match {
-      case grpcMethodExtractor(packageName, service) =>
-        val snake = service.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase
-        val pck1 = packageName.replace('.', '/')
-        ProtoLink(pck1 + snake + ".proto", service, bareMethodName)
+      case ledgerApiGrpcMethodExtractor(packageName, service) =>
+        createProtoLink(bareMethodName, packageName, service)
+      case teaApiGrpcMethodExtractor(packageName, service) =>
+        createProtoLink(bareMethodName, packageName, service)
       case _ =>
         throw new IllegalArgumentException(
           s"Could not create link to proto documentation for: $methodDescriptor"
         )
     }
   }
+
+  private def createProtoLink(bareMethodName: String, packageName: String, service: String) = {
+    val snake = service.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase
+    val pck1 = packageName.replace('.', '/')
+    ProtoLink(pck1 + snake + ".proto", service, bareMethodName)
+  }
+
   def unapply(link: String): Option[(String, String, String)] = link match {
     case importGRPCCommentPattern(file, service, method) =>
       Some((file, service, method))

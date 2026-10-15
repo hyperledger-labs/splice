@@ -120,7 +120,6 @@ class SvOffboardingSequencerTrigger(
       .flatMap(config =>
         config.sequencerIdentity.toScala
           .map(_.sequencerId)
-          .orElse(config.sequencer.toScala.map(_.sequencerId))
       )
       .flatMap(sequencerId =>
         SequencerId

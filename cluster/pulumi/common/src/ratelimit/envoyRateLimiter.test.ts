@@ -11,7 +11,10 @@ import {
   buildRateLimitActions,
   buildRateLimitFilters,
   buildTypedPerFilterConfig,
+  buildXffNumTrustedHopsPatch,
+  directIngressXffNumTrustedHops,
   extractPathPrefixes,
+  gkeL7GatewayNumTrustedProxies,
   globalPerIpRateLimitFilterName,
   globalPerIpRateLimitStatPrefix,
   globalRateLimitFilterName,
@@ -328,6 +331,34 @@ test('buildHttpFilterPatches keeps the filter order by pinning the insertion poi
   // the filters are configured per route, the chain only declares them with their stat prefix
   expect(patches[0].patch.value.typed_config.value).toEqual({
     stat_prefix: perEndpointPerIpRateLimitStatPrefix,
+  });
+});
+
+test('buildXffNumTrustedHopsPatch keys the per-IP buckets on the client behind extra proxies', () => {
+  const patch = buildXffNumTrustedHopsPatch(5008, gkeL7GatewayNumTrustedProxies) as {
+    applyTo: string;
+    match: {
+      context: string;
+      listener: { portNumber: number; filterChain: { filter: { name: string } } };
+    };
+    patch: { operation: string; value: { typed_config: Record<string, unknown> } };
+  };
+
+  expect(patch.applyTo).toEqual('NETWORK_FILTER');
+  expect(patch.match.context).toEqual('SIDECAR_INBOUND');
+  // like the http filter patches, only the externally reachable port is patched
+  expect(patch.match.listener.portNumber).toEqual(5008);
+  expect(patch.match.listener.filterChain.filter.name).toEqual(
+    'envoy.filters.network.http_connection_manager'
+  );
+  // merged into the connection manager istio generates, which must keep all its other settings
+  expect(patch.patch.operation).toEqual('MERGE');
+  // istiod merges the typed config into the one it generated and panics on a descriptor mismatch,
+  // dropping every listener patch, so this must be the concrete type and not a TypedStruct
+  expect(patch.patch.value.typed_config).toEqual({
+    '@type':
+      'type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager',
+    xff_num_trusted_hops: gkeL7GatewayNumTrustedProxies,
   });
 });
 

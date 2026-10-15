@@ -1,0 +1,32 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "bootDisk": {
+      "initializeParams": {
+        "image": "debian-cloud/debian-12"
+      }
+    },
+    "labels": {
+      "cluster": "mock"
+    },
+    "machineType": "e2-micro",
+    "metadata": {
+      "enable-osconfig": "TRUE",
+      "enable-oslogin": "true",
+      "startup-script": "#! /bin/bash\n\nexport DB_ADDR=undefined\nexport DB_PORT=5432\n\n# Enable the VM to receive packets whose destinations do\n# not match any running process local to the VM\necho 1 > /proc/sys/net/ipv4/ip_forward\n\n# Ask the Metadata server for the IP address of the VM nic0\n# network interface:\nmd_url_prefix=\"http://169.254.169.254/computeMetadata/v1/instance\"\nvm_nic_ip=\"$(curl -H \"Metadata-Flavor: Google\" $md_url_prefix/network-interfaces/0/ip)\"\n\n# Clear any existing iptables NAT table entries (all chains):\niptables -t nat -F\n\n# Create a NAT table entry in the prerouting chain, matching\n# any packets with destination database port, changing the destination\n# IP address of the packet to the SQL instance IP address:\niptables -t nat -A PREROUTING \\\n     -p tcp --dport $DB_PORT \\\n     -j DNAT \\\n     --to-destination $DB_ADDR\n\n# Create a NAT table entry in the postrouting chain, matching\n# any packets with destination database port, changing the source IP\n# address of the packet to the NAT VM's primary internal IPv4 address:\niptables -t nat -A POSTROUTING \\\n     -p tcp --dport $DB_PORT \\\n     -j SNAT \\\n     --to-source $vm_nic_ip\n\n# Save iptables configuration:\niptables-save\n"
+    },
+    "networkInterfaces": [
+      {
+        "accessConfigs": [
+          {}
+        ],
+        "network": "default"
+      }
+    ],
+    "zone": "europe-west6-a"
+  },
+  "name": "sv-1-nat-vm",
+  "provider": "",
+  "type": "gcp:compute/instance:Instance"
+}

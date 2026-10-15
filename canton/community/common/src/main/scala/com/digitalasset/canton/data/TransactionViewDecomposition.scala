@@ -3,9 +3,9 @@
 
 package com.digitalasset.canton.data
 
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.annotation.tailrec
 
@@ -49,6 +49,18 @@ object TransactionViewDecomposition {
 
     override def lfNode: LfActionNode = rootNode
 
+    // This new view plus all new views in our children
+    lazy val viewCount: Int = {
+      @tailrec
+      def go(nodes: List[NewView], acc: Int): Int = nodes match {
+        case Nil =>
+          acc
+        case head :: tail =>
+          go(tail ++: head.tailNodes.collect { case v: NewView => v }.toList, acc + 1)
+      }
+      go(List(this), 0)
+    }
+
     /** All nodes of this view, i.e. core nodes and subviews, in execution order */
     def allNodes: NonEmpty[Seq[TransactionViewDecomposition]] =
       NonEmpty(Seq, SameView(rootNode, nodeId, rbContext), tailNodes*)
@@ -59,7 +71,7 @@ object TransactionViewDecomposition {
       param("root node template", _.rootNode.templateId),
       param("view confirmation parameters", _.viewConfirmationParameters),
       param("node ID", _.nodeId),
-      param("rollback context", _.rbContext),
+      param("in rollback", _.rbContext.inRollback),
       param("tail nodes", _.tailNodes),
     )
   }
@@ -76,7 +88,7 @@ object TransactionViewDecomposition {
     override protected def pretty: Pretty[SameView] = prettyOfClass(
       param("lf node template", _.lfNode.templateId),
       param("node ID", _.nodeId),
-      param("rollback context", _.rbContext),
+      param("in rollback", _.rbContext.inRollback),
     )
   }
 

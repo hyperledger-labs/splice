@@ -5,6 +5,7 @@ import {
   AuthProvider,
   ErrorBoundary,
   ErrorRouterPage,
+  QueryDevtools,
   UserProvider,
   retryQuery,
   theme,
@@ -12,7 +13,6 @@ import {
 } from '@canton-network/splice-common-frontend';
 import { replaceEqualDeep } from '@canton-network/splice-common-frontend-utils';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   Navigate,
@@ -34,7 +34,6 @@ import AuthCheck from './routes/authCheck';
 import Dso from './routes/dso';
 import Root from './routes/root';
 import ValidatorOnboarding from './routes/validatorOnboarding';
-import Voting from './routes/voting';
 import { useConfigPollInterval, useSvConfig } from './utils';
 import { Governance } from './routes/governance';
 import { VoteRequestDetails } from './routes/voteRequestDetails';
@@ -60,7 +59,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
         <QueryClientProvider client={queryClient}>
-          <ReactQueryDevtools initialIsOpen={false} />
+          <QueryDevtools />
           <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
             <SvClientProvider url={config.services.sv.url}>
               <SvAppVotesHooksProvider>
@@ -97,8 +96,7 @@ const App: React.FC = () => {
           <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
           <Route path="amulet-price" element={<AmuletPrice />} />
           <Route path="delegate-election" element={<DelegateElection />} />
-          <Route path="governance-old" element={<Voting />} />
-          <Route path="votes" element={<Navigate to="/governance-old" replace />} />
+          <Route path="votes" element={<Navigate to="/governance/proposals" replace />} />
 
           <Route path="governance" element={<Navigate to="/governance/proposals" replace />} />
           <Route path="governance/proposals" element={<Governance />} />

@@ -6,6 +6,7 @@ src_dir := ${SPLICE_ROOT}/.github/runners/runner-container-hooks
 package_files := $(src_dir)/package.json $(src_dir)/packages/k8s/package.json $(src_dir)/packages/hooklib/package.json
 source_files :=	$(shell find $(src_dir)/packages/k8s/src -name '*.ts') $(shell find $(src_dir)/packages/hooklib/src -name '*.ts')
 
+$(dir)/$(docker-build): build_arg := --build-arg runner_version=${GHA_RUNNER_VERSION} --build-arg image_sha256=${GHA_RUNNER_DIGEST}
 $(dir)/$(docker-build): $(dir)/target/LICENSE $(dir)/target/.npm_installed $(dir)/target/index.js
 
 $(dir)/target/LICENSE: ${SPLICE_ROOT}/LICENSE | $(dir)/target

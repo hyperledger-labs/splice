@@ -16,6 +16,9 @@ const url = 'https://example.com';
 const summary = 'Summary of the proposal';
 const expiryDate = '2025-09-25 11:00';
 const effectiveDate = '2025-09-26 11:00';
+// vitest.global-setup.ts pins TZ=ETC/GMT-2 (UTC+2), so these render deterministically.
+const expiryDateFormatted = '2025-09-25 11:00 (UTC+02:00)';
+const effectiveDateFormatted = '2025-09-26 11:00 (UTC+02:00)';
 
 /** Shared labels for the post-rebase ProposalSummary / ProposalReviewField chrome. */
 const REVIEW_LABELS = {
@@ -36,7 +39,7 @@ function expectCommonReviewFields(actionName: string) {
   expect(screen.getByTestId('summary-title').textContent).toBe(REVIEW_LABELS.summary);
   expect(screen.getByTestId('summary-field').textContent).toBe(summary);
   expect(screen.getByTestId('expiryDate-title').textContent).toBe(REVIEW_LABELS.expiryDate);
-  expect(screen.getByTestId('expiryDate-field').textContent).toBe(expiryDate);
+  expect(screen.getByTestId('expiryDate-field').textContent).toBe(expiryDateFormatted);
   expect(screen.getByTestId('effectiveDate-title').textContent).toBe(REVIEW_LABELS.effectiveDate);
 }
 
@@ -60,7 +63,7 @@ describe('Review Proposal Component', () => {
     );
 
     expectCommonReviewFields(actionName);
-    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDateFormatted);
 
     expect(screen.getByTestId('offboardMember-title').textContent).toBe('Member');
     expect(screen.getByTestId('offboardMember-party-id-value').textContent).toBe(offboardMember);
@@ -113,7 +116,7 @@ describe('Review Proposal Component', () => {
     );
 
     expectCommonReviewFields(actionName);
-    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDateFormatted);
 
     expect(screen.getByTestId('svRewardWeightMember-title').textContent).toBe('Member');
     expect(screen.getByTestId('svRewardWeightMember-party-id-value').textContent).toBe(
@@ -148,7 +151,7 @@ describe('Review Proposal Component', () => {
     );
 
     expectCommonReviewFields(actionName);
-    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDateFormatted);
 
     expect(screen.getByTestId('grantRight-title').textContent).toBe('Provider Party ID');
     expect(screen.getByTestId('grantRight-party-id-value').textContent).toBe(provider);
@@ -181,7 +184,7 @@ describe('Review Proposal Component', () => {
     );
 
     expectCommonReviewFields(actionName);
-    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDateFormatted);
 
     expect(screen.getByTestId('revokeProviderPartyId-title').textContent).toBe('Provider Party ID');
     expect(screen.getByTestId('revokeProviderPartyId-party-id-value').textContent).toBe(
@@ -220,7 +223,7 @@ describe('Review Proposal Component', () => {
     );
 
     expectCommonReviewFields(actionName);
-    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDateFormatted);
 
     expect(screen.getByTestId('updateProviderPartyId-title').textContent).toBe('Provider Party ID');
     expect(screen.getByTestId('updateProviderPartyId-party-id-value').textContent).toBe(
@@ -277,7 +280,7 @@ describe('Review Proposal Component', () => {
     );
 
     expectCommonReviewFields(actionName);
-    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDateFormatted);
 
     expect(screen.getByTestId('configChange-title').textContent).toBe(
       'Proposed Configuration Changes'
@@ -339,7 +342,7 @@ describe('Review Proposal Component', () => {
     );
 
     expectCommonReviewFields(actionName);
-    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDate);
+    expect(screen.getByTestId('effectiveDate-field').textContent).toBe(effectiveDateFormatted);
 
     expect(screen.getByTestId('configChange-title').textContent).toBe(
       'Proposed Configuration Changes'

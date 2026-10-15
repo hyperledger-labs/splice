@@ -61,7 +61,7 @@ abstract class AcsSnapshotTriggerBase(
       store
         .initializeIncrementalSnapshot(
           table = snapshotTable,
-          initializeFrom = from,
+          initializeFromT = from,
           targetRecordTime = nextAt,
         )
         .map(_ => TaskSuccess(s"Initialized incremental snapshot from $from"))
@@ -111,8 +111,12 @@ abstract class AcsSnapshotTriggerBase(
         .map(size => {
           snapshotMetrics.latestRecordTimeSave.updateValue(snapshot.recordTime)
           size match {
-            case Some(v) => snapshotMetrics.snapshotSize.updateValue(v)
-            case None => snapshotMetrics.snapshotSize.updateValue(-1)
+            case Some(v) =>
+              snapshotMetrics.snapshotSize.updateValue(v.createRows)
+              snapshotMetrics.snapshotStakeholdersSize.updateValue(v.stakeholderRows)
+            case None =>
+              snapshotMetrics.snapshotSize.updateValue(-1)
+              snapshotMetrics.snapshotStakeholdersSize.updateValue(-1)
           }
           TaskSuccess(s"Saved incremental snapshot at ${snapshot.recordTime}")
         })

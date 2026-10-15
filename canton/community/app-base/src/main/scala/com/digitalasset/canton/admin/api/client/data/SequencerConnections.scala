@@ -6,7 +6,6 @@ package com.digitalasset.canton.admin.api.client.data
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.{Id, Monad}
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.console.ConsoleEnvironment
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -15,8 +14,10 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnectionValidation as SequencerConnectionValidationInternal,
   SequencerConnections as SequencerConnectionsInternal,
   SubmissionRequestAmplification as SubmissionRequestAmplificationInternal,
+  SubscriptionLivenessLimits as SubscriptionLivenessLimitsInternal,
 }
 import com.digitalasset.canton.{SequencerAlias, config}
+import com.digitalasset.nonempty.NonEmpty
 import com.google.protobuf.ByteString
 import io.scalaland.chimney.Transformer
 import io.scalaland.chimney.dsl.*
@@ -29,6 +30,7 @@ final case class SequencerConnections(
     sequencerLivenessMargin: NonNegativeInt,
     submissionRequestAmplification: SubmissionRequestAmplification,
     sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
+    subscriptionLivenessLimits: SubscriptionLivenessLimits,
 ) extends PrettyPrinting {
   require(
     aliasToConnection.sizeIs >= sequencerTrustThreshold.unwrap,
@@ -117,6 +119,7 @@ final case class SequencerConnections(
       param("sequencer liveness margin", _.sequencerLivenessMargin),
       param("submission request amplification", _.submissionRequestAmplification),
       param("sequencer connection pool delays", _.sequencerConnectionPoolDelays),
+      param("subscription liveness limits", _.subscriptionLivenessLimits),
     )
 
   private[canton] def toInternal: SequencerConnectionsInternal =
@@ -127,6 +130,7 @@ final case class SequencerConnections(
         sequencerLivenessMargin,
         submissionRequestAmplification.toInternal,
         sequencerConnectionPoolDelays.toInternal,
+        subscriptionLivenessLimits.toInternal,
       )
       .valueOr(err => throw new IllegalArgumentException(s"Invariants not respected: $err"))
 }
@@ -147,6 +151,7 @@ object SequencerConnections {
       sequencerLivenessMargin = NonNegativeInt.zero,
       submissionRequestAmplification = SubmissionRequestAmplification.NoAmplification,
       sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+      subscriptionLivenessLimits = SubscriptionLivenessLimits.default,
     )
 
   def many(
@@ -155,6 +160,7 @@ object SequencerConnections {
       sequencerLivenessMargin: NonNegativeInt,
       submissionRequestAmplification: SubmissionRequestAmplification,
       sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
+      subscriptionLivenessLimits: SubscriptionLivenessLimits,
   ): Either[String, SequencerConnections] = {
     val repeatedAliases = connections.groupBy(_.sequencerAlias).filter { case (_, connections) =>
       connections.lengthCompare(1) > 0
@@ -173,6 +179,7 @@ object SequencerConnections {
             sequencerLivenessMargin,
             submissionRequestAmplification,
             sequencerConnectionPoolDelays,
+            subscriptionLivenessLimits,
           )
         )
         .leftMap(_.getMessage)
@@ -185,6 +192,7 @@ object SequencerConnections {
       sequencerLivenessMargin: NonNegativeInt,
       submissionRequestAmplification: SubmissionRequestAmplification,
       sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
+      subscriptionLivenessLimits: SubscriptionLivenessLimits,
   ): Either[String, SequencerConnections] =
     for {
       connectionsNE <- NonEmpty.from(connections).toRight("connections should not be empty")
@@ -194,6 +202,7 @@ object SequencerConnections {
         sequencerLivenessMargin,
         submissionRequestAmplification,
         sequencerConnectionPoolDelays,
+        subscriptionLivenessLimits,
       )
     } yield result
 
@@ -203,6 +212,7 @@ object SequencerConnections {
       sequencerLivenessMargin: NonNegativeInt,
       submissionRequestAmplification: SubmissionRequestAmplification,
       sequencerConnectionPoolDelays: SequencerConnectionPoolDelays,
+      subscriptionLivenessLimits: SubscriptionLivenessLimits,
   )(implicit consoleEnvironment: ConsoleEnvironment): SequencerConnections =
     many(
       connections,
@@ -210,6 +220,7 @@ object SequencerConnections {
       sequencerLivenessMargin,
       submissionRequestAmplification,
       sequencerConnectionPoolDelays,
+      subscriptionLivenessLimits,
     ).valueOr(consoleEnvironment.raiseError)
 
   private[canton] def fromInternal(internal: SequencerConnectionsInternal): SequencerConnections =
@@ -222,6 +233,7 @@ object SequencerConnections {
         internal.sequencerLivenessMargin,
         SubmissionRequestAmplification.fromInternal(internal.submissionRequestAmplification),
         SequencerConnectionPoolDelays.fromInternal(internal.sequencerConnectionPoolDelays),
+        SubscriptionLivenessLimits.fromInternal(internal.subscriptionLivenessLimits),
       )
       .valueOr(err =>
         throw new IllegalStateException(
@@ -310,6 +322,11 @@ final case class SequencerConnectionPoolDelays(
     param("subscriptionRequestDelay", _.subscriptionRequestDelay),
   )
 
+  def withWarnValidationDelay(
+      delay: config.NonNegativeFiniteDuration
+  ): SequencerConnectionPoolDelays =
+    copy(warnValidationDelay = delay)
+
   def toInternal: SequencerConnectionPoolDelaysInternal =
     this.transformInto[SequencerConnectionPoolDelaysInternal]
 }
@@ -322,4 +339,40 @@ object SequencerConnectionPoolDelays {
       internal: SequencerConnectionPoolDelaysInternal
   ): SequencerConnectionPoolDelays =
     internal.transformInto[SequencerConnectionPoolDelays]
+}
+
+/** Configuration to determine subscription liveness. Both limits must be exceeded for a
+  * subscription to be considered silent.
+  *
+  * @param maxTimestampDelta
+  *   Maximum difference between the latest aggregated event and the latest event provided by a
+  *   subscription.
+  * @param maxOrdinalDelta
+  *   Maximum difference between the ordinal of the latest aggregated event and the ordinal of the
+  *   latest event provided by a subscription.
+  *
+  * Setting both [[maxTimestampDelta]] and [[maxOrdinalDelta]] to 0 disables the silent subscription
+  * detection.
+  */
+final case class SubscriptionLivenessLimits(
+    maxTimestampDelta: config.NonNegativeFiniteDuration,
+    maxOrdinalDelta: NonNegativeInt,
+) extends PrettyPrinting {
+  override protected def pretty: Pretty[SubscriptionLivenessLimits] = prettyOfClass(
+    param("maxTimestampDelta", _.maxTimestampDelta),
+    param("maxOrdinalDelta", _.maxOrdinalDelta),
+  )
+
+  def toInternal: SubscriptionLivenessLimitsInternal =
+    this.transformInto[SubscriptionLivenessLimitsInternal]
+}
+
+object SubscriptionLivenessLimits {
+  val default: SubscriptionLivenessLimits =
+    SubscriptionLivenessLimitsInternal.default.transformInto[SubscriptionLivenessLimits]
+
+  private[canton] def fromInternal(
+      internal: SubscriptionLivenessLimitsInternal
+  ): SubscriptionLivenessLimits =
+    internal.transformInto[SubscriptionLivenessLimits]
 }

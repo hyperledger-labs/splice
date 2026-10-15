@@ -6,10 +6,10 @@ package com.digitalasset.canton.participant.store.db
 import cats.data.{EitherT, OptionT}
 import cats.implicits.{toBifunctorOps, toTraverseOps}
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.caching.ScaffeineCache
 import com.digitalasset.canton.config.CantonRequireTypes.String2066
 import com.digitalasset.canton.config.{BatchAggregatorConfig, CacheConfig, ProcessingTimeout}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
@@ -22,7 +22,8 @@ import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.{BatchAggregator, ErrorUtil, MonadUtil}
 import com.digitalasset.canton.{LfPartyId, checked}
-import com.digitalasset.daml.lf.transaction.{CreationTime, TransactionCoder}
+import com.digitalasset.daml.lf.transaction.{ContractInstanceCoder, CreationTime}
+import com.digitalasset.nonempty.NonEmpty
 import com.google.protobuf.ByteString
 import slick.jdbc.canton.SQLActionBuilder
 import slick.jdbc.{GetResult, SetParameter}
@@ -54,7 +55,7 @@ class DbContractStore(
   ): GetResult[PersistedContractInstance] = GetResult { r =>
     PersistedContractInstance(
       internalContractId = r.nextLong(),
-      inst = TransactionCoder
+      inst = ContractInstanceCoder
         .decodeFatContractInstance(ByteString.copyFrom(r.<<[Array[Byte]]))
         .leftMap(e => s"Failed to decode contract instance: $e")
         .flatMap { decoded =>
@@ -315,7 +316,6 @@ class DbContractStore(
                 .queryAndUpdate(query, functionFullName)(
                   traceContext,
                   callerCloseContext,
-                  _.nonEmpty, // There's an entry for every row inserted
                 )
                 .map(_.toMap)
               insertedData = items.view
@@ -378,7 +378,6 @@ class DbContractStore(
               .queryAndUpdate(action, s"$queryBaseName update")(
                 traceContext,
                 self.closeContext,
-                { case (_, insertedData) => insertedData.nonEmpty },
               )
               .map { case (foundData, insertedData) =>
                 processBatchResults(
@@ -483,7 +482,7 @@ class DbContractStore(
   ): EitherT[FutureUnlessShutdown, UnknownContracts, Map[LfContractId, Set[LfPartyId]]] =
     lookupMetadata(ids).map(_.view.mapValues(_.signatories).toMap)
 
-  def lookupMetadata(ids: Set[LfContractId])(implicit
+  override def lookupMetadata(ids: Set[LfContractId])(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, UnknownContracts, Map[LfContractId, ContractMetadata]] =
     NonEmpty.from(ids) match {

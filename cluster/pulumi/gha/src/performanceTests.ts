@@ -31,7 +31,7 @@ export function createCloudSQLInstanceForPerformanceTests(
   });
   const zone = GCP_ZONE || config.requireEnv('DB_CLOUDSDK_COMPUTE_ZONE');
   const instance = new gcp.sql.DatabaseInstance('performance-tests-db', {
-    databaseVersion: 'POSTGRES_14',
+    databaseVersion: 'POSTGRES_18',
     deletionProtection: false,
     region: GCP_REGION,
     settings: {

@@ -9,7 +9,6 @@ import cats.syntax.either.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong}
@@ -21,8 +20,9 @@ import com.digitalasset.canton.data.{
   Offset,
 }
 import com.digitalasset.canton.ledger.participant.state.SynchronizerIndex
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
-import com.digitalasset.canton.logging.pretty.PrettyPrinting
+import com.digitalasset.canton.logging.pretty.CanPrettyPrint
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcUSExtended
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection.{
@@ -45,7 +45,12 @@ import com.digitalasset.canton.protocol.messages.CommitmentPeriodState.{
   Matched,
   fromIntValidSentPeriodState,
 }
-import com.digitalasset.canton.protocol.{ContractInstance, LfContractId, ReassignmentId}
+import com.digitalasset.canton.protocol.{
+  ContractInstance,
+  LfContractId,
+  ReassignmentId,
+  SynchronizerLimits,
+}
 import com.digitalasset.canton.pruning.{
   ConfigForSlowCounterParticipants,
   ConfigForSynchronizerThresholds,
@@ -75,6 +80,7 @@ import com.digitalasset.canton.{
   SynchronizerAlias,
 }
 import com.digitalasset.daml.lf.value.Value.ContractId
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 
 import java.time.Instant
@@ -354,6 +360,8 @@ final class SyncStateInspection(
       val openWithErrors = PossiblyIgnoredSequencedEvent.openEnvelopes(closedEvent)(
         psid.protocolVersion,
         state.pureCryptoApi,
+        // This method is called only from tests
+        SynchronizerLimits.defaultFor(psid.protocolVersion),
       )
       if (warnOnDiscardedEnvelopes && openWithErrors.openingErrors.nonEmpty) {
         logger.warn(s"Discarding envelopes with errors: ${openWithErrors.openingErrors}")
@@ -381,6 +389,8 @@ final class SyncStateInspection(
             .openEnvelopes(_)(
               psid.protocolVersion,
               state.pureCryptoApi,
+              // This method is called only from tests
+              SynchronizerLimits.defaultFor(psid.protocolVersion),
             )
             .event
         )
@@ -395,7 +405,7 @@ final class SyncStateInspection(
       counterParticipant: Option[ParticipantId] = None,
   )(implicit
       traceContext: TraceContext
-  ): Iterable[(CommitmentPeriod, ParticipantId, AcsCommitment.HashedCommitmentType)] =
+  ): Iterable[(LegacyCommitmentPeriod, ParticipantId, Digest.HashedDigestType)] =
     timeouts.inspection
       .awaitUS(s"$functionFullName from $start to $end on $synchronizerAlias")(
         getOrFail(getAcsCommitmentStore(synchronizerAlias), synchronizerAlias)
@@ -420,7 +430,7 @@ final class SyncStateInspection(
       start: CantonTimestamp,
       end: CantonTimestamp,
       counterParticipant: Option[ParticipantId] = None,
-  )(implicit traceContext: TraceContext): Iterable[SignedProtocolMessage[AcsCommitment]] =
+  )(implicit traceContext: TraceContext): Iterable[SignedProtocolMessage[LegacyAcsCommitment]] =
     timeouts.inspection
       .awaitUS(s"$functionFullName from $start to $end on $synchronizerAlias")(
         getOrFail(getAcsCommitmentStore(synchronizerAlias), synchronizerAlias)
@@ -571,7 +581,7 @@ final class SyncStateInspection(
       counterParticipant: Option[ParticipantId],
   )(implicit
       traceContext: TraceContext
-  ): Iterable[(CommitmentPeriod, ParticipantId, CommitmentPeriodState)] =
+  ): Iterable[(LegacyCommitmentPeriod, ParticipantId, CommitmentPeriodState)] =
     timeouts.inspection
       .awaitUS(s"$functionFullName from $start to $end on $synchronizerAlias")(
         getOrFail(getAcsCommitmentStore(synchronizerAlias), synchronizerAlias)
@@ -612,7 +622,7 @@ final class SyncStateInspection(
         (for {
           cleanTs <- OptionT(
             participantNodePersistentState.value.ledgerApiStore
-              .cleanSynchronizerIndex(state.synchronizerIdx.synchronizerId)
+              .cleanSynchronizerIndexFromDb(state.synchronizerIdx.synchronizerId)
               .map(_.map(_.recordTime))
           )
           cleanTimeOfRequest <- OptionT(
@@ -621,6 +631,7 @@ final class SyncStateInspection(
         } yield cleanTimeOfRequest).value
       )
 
+  @VisibleForTesting
   def lookupCleanSynchronizerIndex(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Either[String, FutureUnlessShutdown[Option[SynchronizerIndex]]] = syncPersistentStateManager
@@ -628,30 +639,30 @@ final class SyncStateInspection(
     .toRight(s"Unable to find persistent state for $synchronizerAlias")
     .map { state =>
       participantNodePersistentState.value.ledgerApiStore
-        .cleanSynchronizerIndex(state.synchronizerIdx.synchronizerId)
+        .cleanSynchronizerIndexFromDb(state.synchronizerIdx.synchronizerId)
     }
 
+  @VisibleForTesting
   def lookupCleanSequencerCounter(psid: PhysicalSynchronizerId)(implicit
       traceContext: TraceContext
   ): Either[String, FutureUnlessShutdown[Option[SequencerCounter]]] =
     getPersistentState(psid)
       .map(state =>
         participantNodePersistentState.value.ledgerApiStore
-          .cleanSynchronizerIndex(state.synchronizerIdx.synchronizerId)
+          .cleanSynchronizerIndexFromDb(state.synchronizerIdx.synchronizerId)
           .flatMap(
-            _.flatMap(_.sequencerIndex)
-              .traverse(sequencerIndex =>
-                state.sequencedEventStore
-                  .find(ByTimestamp(sequencerIndex))
-                  .value
-                  .map(
-                    _.getOrElse(
-                      ErrorUtil.invalidState(
-                        s"SequencerIndex with timestamp $sequencerIndex is not found in sequenced event store"
-                      )
-                    ).counter
-                  )
-              )
+            _.flatMap(_.sequencerIndex).traverse(sequencerIndex =>
+              state.sequencedEventStore
+                .find(ByTimestamp(sequencerIndex))
+                .value
+                .map(
+                  _.getOrElse(
+                    ErrorUtil.invalidState(
+                      s"SequencerIndex with timestamp $sequencerIndex is not found in sequenced event store"
+                    )
+                  ).counter
+                )
+            )
           )
       )
 
@@ -1006,21 +1017,20 @@ final class SyncStateInspection(
 
     val sequencerCounterF: FutureUnlessShutdown[Option[SequencerCounter]] =
       participantNodePersistentState.value.ledgerApiStore
-        .cleanSynchronizerIndex(persistentState.synchronizerIdx.synchronizerId)
+        .cleanSynchronizerIndexFromDb(persistentState.synchronizerIdx.synchronizerId)
         .flatMap(
-          _.flatMap(_.sequencerIndex)
-            .traverse(sequencerIndex =>
-              persistentState.sequencedEventStore
-                .find(ByTimestamp(sequencerIndex))
-                .value
-                .map(
-                  _.getOrElse(
-                    ErrorUtil.invalidState(
-                      s"SequencerIndex with timestamp $sequencerIndex is not found in sequenced event store"
-                    )
-                  ).counter
-                )
-            )
+          _.flatMap(_.sequencerIndex).traverse(sequencerIndex =>
+            persistentState.sequencedEventStore
+              .find(ByTimestamp(sequencerIndex))
+              .value
+              .map(
+                _.getOrElse(
+                  ErrorUtil.invalidState(
+                    s"SequencerIndex with timestamp $sequencerIndex is not found in sequenced event store"
+                  )
+                ).counter
+              )
+          )
         )
 
     val resultF = sequencerCounterF
@@ -1057,7 +1067,7 @@ object SyncStateInspection {
   private final case class NoSuchSynchronizer(alias: SynchronizerAlias)
       extends SyncStateInspectionError
 
-  private def getOrFail[T, Sync <: PrettyPrinting](opt: Option[T], synchronizer: Sync): T =
+  private def getOrFail[T, Sync <: CanPrettyPrint](opt: Option[T], synchronizer: Sync): T =
     opt.getOrElse(throw new IllegalArgumentException(s"no such synchronizer [$synchronizer]"))
 
   final case class InFlightCount(

@@ -70,7 +70,7 @@ object HashPurpose {
   val _ParticipantStateSignature = HashPurpose(20, "ParticipantStateSignature")
   val _SynchronizerTopologyTransactionMessageSignature =
     HashPurpose(21, "SynchronizerTopologyTransactionMessageSignature")
-  val _AcsCommitment = HashPurpose(22, "AcsCommitment")
+  val AcsCommitment = HashPurpose(22, "AcsCommitment")
   val Stakeholders = HashPurpose(23, "Stakeholders")
   val UnassignmentCommonData = HashPurpose(24, "UnassignmentCommonData")
   val UnassignmentView = HashPurpose(25, "UnassignmentView")
@@ -112,6 +112,10 @@ object HashPurpose {
   val AcsContinuationToken = HashPurpose(61, "AcsContinuationToken")
   val LsuSequencingTestMessageContent = HashPurpose(62, "LsuSequencingTestMessageContent")
   val UpdatesPageToken = HashPurpose(63, "UpdatesPageToken")
+  val CiphertextId = HashPurpose(64, "CiphertextId")
+  val SequencerAggregatorAggregation = HashPurpose(65, "SequencerAggregatorAggregation")
+  val AcsCommitmentUpdateId = HashPurpose(66, "AcsCommitmentUpdateId")
+  val AcsCommitmentSummary = HashPurpose(67, "AcsCommitmentSummary")
 
   // Do not use for anything other than testing or "mock" hashes
   // Is not in a testing-only module because it used in traffic cost estimation that requires mock hashes

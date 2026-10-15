@@ -14,6 +14,7 @@ import com.digitalasset.canton.sequencing.protocol.{
   AggregationBySender,
   AggregationId,
   AggregationRule,
+  LegacyUseMemberIdsAsEligibleMembers,
 }
 import com.digitalasset.canton.sequencing.traffic.{TrafficConsumed, TrafficPurchased}
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -171,7 +172,12 @@ object SequencerSnapshot extends VersioningCompanionContext[SequencerSnapshot, P
       for {
         aggregationId <- AggregationId.fromProtoPrimitive(aggregationIdP)
         aggregationRule <- ProtoConverter.parseRequired(
-          AggregationRule.fromProtoV30(expectedProtocolVersion, _),
+          AggregationRule
+            .fromProtoV30(
+              ProtocolVersionValidation(expectedProtocolVersion),
+              LegacyUseMemberIdsAsEligibleMembers(expectedProtocolVersion),
+              _,
+            ),
           "v30.SequencerSnapshot.InFlightAggregationWithId.aggregation_rule",
           aggregationRuleP,
         )
@@ -223,8 +229,12 @@ object SequencerSnapshot extends VersioningCompanionContext[SequencerSnapshot, P
       inFlightAggregations <- request.inFlightAggregations
         .traverse(parseInFlightAggregationWithId)
         .map(_.toMap)
-      trafficPurchased <- request.trafficPurchased.traverse(TrafficPurchased.fromProtoV30)
-      trafficConsumed <- request.trafficConsumed.traverse(TrafficConsumed.fromProtoV30)
+      trafficPurchased <- request.trafficPurchased.traverse(
+        TrafficPurchased.fromProtoV30(ProtocolVersionValidation(expectedProtocolVersion), _)
+      )
+      trafficConsumed <- request.trafficConsumed.traverse(
+        TrafficConsumed.fromProtoV30(ProtocolVersionValidation(expectedProtocolVersion), _)
+      )
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
     } yield SequencerSnapshot(
       lastTs,

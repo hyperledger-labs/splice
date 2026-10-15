@@ -8,9 +8,11 @@ import cats.syntax.functor.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
+  LifeCycle,
   PromiseUnlessShutdown,
 }
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -87,9 +89,9 @@ class GarbageCollectedShardedSequentialProcessingQueue[Ident](implicit ec: Execu
           case Some(`processingFuture`) =>
             // if the "processing queue" still contains the same future that we put in, we can remove the entry from the map
             None
-          case Some(other) =>
+          case other @ Some(_) =>
             // some other future was put into the map, retain it
-            Some(other)
+            other
           case None =>
             // the entry was already removed, nothing to do
             None
@@ -170,5 +172,6 @@ class NonGarbageCollectedShardedSequentialProcessingQueue[Ident: Pretty](
     )
 
   override protected def onClosed(): Unit =
-    processingQueues.readOnlySnapshot().values.foreach(_.onClosed())
+    // close() (not onClosed()) so each shard queue flushes and runs its close hooks
+    LifeCycle.close(processingQueues.readOnlySnapshot().values)(logger)
 }

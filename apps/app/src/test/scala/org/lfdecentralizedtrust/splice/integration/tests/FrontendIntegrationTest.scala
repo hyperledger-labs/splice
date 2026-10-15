@@ -393,8 +393,9 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       timeUntilSuccess: FiniteDuration = 20.seconds,
       maxPollInterval: FiniteDuration = 100.millis,
       retryOnTestFailuresOnly: Boolean = true,
+      logElapsed: Option[String] = None,
   )(testCode: => T): T =
-    super.eventually(timeUntilSuccess, maxPollInterval, retryOnTestFailuresOnly) {
+    super.eventually(timeUntilSuccess, maxPollInterval, retryOnTestFailuresOnly, logElapsed) {
       try {
         testCode
       } catch {
@@ -918,7 +919,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
         // one digit at a time that fails and it resets it to Feb 28th. Luckily,
         // this does not happen very often …
         dateTimePicker.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
-        eventually()(
+        eventually(5.seconds)(
           dateTimePicker.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
         )
       }
@@ -980,6 +981,8 @@ object FrontendIntegrationTest {
           case "url" => {
             url = input.read[String](classOf[String])
           }
+          // fields we don't use, e.g. userContext, which newer Firefox versions send
+          case _ => input.skipValue()
         }
       }
       input.endObject()

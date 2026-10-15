@@ -15,6 +15,8 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.Po
 import com.digitalasset.canton.topology.transaction.{SignedTopologyTransaction, TopologyChangeOp}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
+import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
+import com.digitalasset.canton.validation.ProtoValidation
 import com.digitalasset.canton.version.ProtocolVersionValidation
 import io.grpc.StatusRuntimeException
 
@@ -41,28 +43,43 @@ class GrpcIdentityInitializationService(
     )
   else {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-    val adminProto.InitIdRequest(identifier, namespace, certificatesP) = request
+    val adminProto.InitIdRequest(identifierP, namespaceP, certificatesP) = request
     def handleProtoFailure[T](
         either: Either[ProtoDeserializationError, T]
     ): EitherT[Future, StatusRuntimeException, T] =
       EitherT.fromEither[Future](
-        either.leftMap(err => ProtoDeserializationFailure.WrapNoLogging(err).asGrpcError)
+        either.leftMap(err => ProtoDeserializationFailure.WrapNoLogging(err).toGrpcError)
       )
     val ret = for {
+      identifier <- handleProtoFailure(
+        ProtoValidation
+          .validate(identifierP, "identifier", ProtocolVersionValidation.AlwaysValidation)
+      )
+      namespace <- handleProtoFailure(
+        ProtoValidation
+          .validate(namespaceP, "namespace", ProtocolVersionValidation.AlwaysValidation)
+      )
       // parse topology transactions
       certificates <- handleProtoFailure(
-        MonadUtil
-          .sequentialTraverse(certificatesP)(
-            SignedTopologyTransaction
-              // we don't validate the protocol version as the local manager doesn't have one
-              .fromProtoV30(ProtocolVersionValidation.NoValidation, _)
-              .flatMap { tx =>
-                tx.selectOp[TopologyChangeOp.Replace]
-                  .toRight(
-                    ProtoDeserializationError
-                      .OtherError("Topology transaction is not a replace but a remove")
-                  )
-              }
+        ProtoValidation
+          .validateLength(
+            certificatesP,
+            "certificates",
+            ProtocolVersionValidation.AlwaysValidation,
+            ProtoValidation.MaxCollectionSize,
+          )
+          .flatMap(certs =>
+            MonadUtil.sequentialTraverse(certs)(
+              SignedTopologyTransaction
+                .fromProtoV30(ProtocolVersionValidation.AlwaysValidation, _)
+                .flatMap { tx =>
+                  tx.selectOp[TopologyChangeOp.Replace]
+                    .toRight(
+                      ProtoDeserializationError
+                        .OtherError("Topology transaction is not a replace but a remove")
+                    )
+                }
+            )
           )
       )
       _ <- bootstrap
@@ -79,7 +96,7 @@ class GrpcIdentityInitializationService(
     Future.successful(
       adminProto.GetIdResponse(
         initialized = bootstrap.isInitialized,
-        uniqueIdentifier = id.map(_.toProtoPrimitive).getOrElse(""),
+        uniqueIdentifier = id.map(_.toProtoPrimitive).getOrElse("").toProtoUnvalidated,
       )
     )
   }

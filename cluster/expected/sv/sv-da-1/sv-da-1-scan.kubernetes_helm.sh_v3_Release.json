@@ -1,0 +1,141 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "scan",
+    "namespace": "sv-da-1",
+    "timeout": 600,
+    "values": {
+      "additionalEnvVars": [
+        {
+          "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+          "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+        },
+        {
+          "name": "ADDITIONAL_CONFIG_CLIENT_IP_HEADERS",
+          "value": "canton.scan-apps.scan-app.parameters.rate-limiting.client-ip-headers = [\"x-envoy-external-address\"]\n"
+        },
+        {
+          "name": "ADDITIONAL_CONFIG_SCAN_RATE_LIMITS",
+          "value": "canton.scan-apps.scan-app.parameters.rate-limiting = {\"global\":{\"rate-per-second\":400,\"sustained-rate-per-second\":200,\"per-client-ip\":{\"enabled\":true,\"limit\":{\"rate-per-second\":100,\"sustained-rate-per-second\":50}}}}"
+        }
+      ],
+      "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomScanAppJvmFlag",
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "apiRequestLogLevel": "DEBUG",
+      "bulkStorage": {
+        "committed": {
+          "bucketName": "mock-sv-da-1-bulk-committed",
+          "endpoint": "https://storage.googleapis.com",
+          "region": "europe-west6",
+          "secretName": "splice-app-bulk-storage-credentials"
+        },
+        "staging": {
+          "bucketName": "mock-sv-da-1-bulk-staging",
+          "endpoint": "https://storage.googleapis.com",
+          "region": "europe-west6",
+          "secretName": "splice-app-bulk-storage-credentials"
+        }
+      },
+      "cluster": {
+        "dnsName": "mock.global.canton.network.digitalasset.com",
+        "fixedTokens": false,
+        "hostname": "mock.global.canton.network.digitalasset.com",
+        "name": "cn-mocknet"
+      },
+      "enablePostgresMetrics": true,
+      "failOnAppVersionMismatch": true,
+      "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+      "isFirstSv": false,
+      "logAsyncFlush": false,
+      "logLevel": "INFO",
+      "metrics": {
+        "enable": true
+      },
+      "participantAddress": "participant",
+      "persistence": {
+        "databaseName": "scan_sv_da_1",
+        "port": 5432,
+        "postgresName": "cn-apps-pg",
+        "schema": "scan_sv_da_1",
+        "secretName": "cn-apps-pg-secrets",
+        "user": "cnadmin"
+      },
+      "publicUrl": "https://scan.sv-1.mock.global.canton.network.digitalasset.com",
+      "resources": {
+        "limits": {
+          "memory": "2048Mi"
+        },
+        "requests": {
+          "cpu": "0.5",
+          "memory": "1536Mi"
+        }
+      },
+      "spliceInstanceNames": {
+        "amuletName": "Amulet",
+        "amuletNameAcronym": "AMT",
+        "nameServiceName": "Amulet Name Service",
+        "nameServiceNameAcronym": "ANS",
+        "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+        "networkName": "Splice"
+      },
+      "sponsorScanUrl": "http://scan-app.sv-1:5012",
+      "synchronizers": {
+        "current": {
+          "cantonBft": {
+            "p2pUrl": "https://sequencer-p2p-9.sv-1.mock.global.canton.network.digitalasset.com"
+          },
+          "mediator": "global-domain-9-mediator",
+          "sequencer": "global-domain-9-sequencer"
+        },
+        "legacy": {
+          "mediator": "global-domain-8-mediator",
+          "sequencer": "global-domain-8-sequencer"
+        },
+        "successor": {
+          "cantonBft": {
+            "p2pUrl": "https://sequencer-p2p-10.sv-1.mock.global.canton.network.digitalasset.com"
+          },
+          "mediator": "global-domain-10-mediator",
+          "sequencer": "global-domain-10-sequencer"
+        }
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "0.3.20"
+  },
+  "name": "sv-da-1-scan",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

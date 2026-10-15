@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "role": "roles/logging.viewer"
+  },
+  "name": "mock-grafana-roles/logging.viewer-iam",
+  "provider": "",
+  "type": "gcp:projects/iAMMember:IAMMember"
+}

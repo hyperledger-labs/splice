@@ -3,13 +3,13 @@
 
 package com.digitalasset.canton.crypto
 
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.metrics.{DecryptionMetrics, SigningMetrics}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.serialization.DeserializationError
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.HasToByteString
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 
@@ -29,6 +29,9 @@ final class SynchronizerCryptoPureApi(
 
   override def signatureVerificationParallelism: PositiveInt =
     pureCrypto.signatureVerificationParallelism
+
+  override def encryptionParallelism: PositiveInt =
+    pureCrypto.encryptionParallelism
 
   override def verifySignature(
       hash: Hash,
@@ -64,7 +67,7 @@ final class SynchronizerCryptoPureApi(
       _ <- pureCrypto.verifySignature(bytes, publicKey, signature, usage)
     } yield ()
 
-  override private[crypto] def decryptWithInternal[M](
+  override def decryptWith[M](
       encrypted: AsymmetricEncrypted[M],
       privateKey: EncryptionPrivateKey,
   )(
@@ -76,7 +79,7 @@ final class SynchronizerCryptoPureApi(
         Some(privateKey.keySpec),
         encrypted.encryptionAlgorithmSpec,
       )
-      res <- pureCrypto.decryptWithInternal(encrypted, privateKey)(deserialize)
+      res <- pureCrypto.decryptWith(encrypted, privateKey)(deserialize)
     } yield res
 
   override def defaultSymmetricKeyScheme: SymmetricKeyScheme = pureCrypto.defaultSymmetricKeyScheme
@@ -150,12 +153,15 @@ final class SynchronizerCryptoPureApi(
 
   override def signingMetrics: SigningMetrics = pureCrypto.signingMetrics
 
-  override private[crypto] def signBytesInternal(
+  override private[crypto] def signBytes(
       bytes: ByteString,
       signingKey: SigningPrivateKey,
       usage: NonEmpty[Set[SigningKeyUsage]],
       signingAlgorithmSpec: SigningAlgorithmSpec = signingAlgorithmSpecs.default,
   )(implicit traceContext: TraceContext): Either[SigningError, Signature] =
     pureCrypto.signBytes(bytes, signingKey, usage, signingAlgorithmSpec)
+
+  override def toJwk(publicKey: SigningPublicKey): Either[JwksError, Jwk] =
+    pureCrypto.toJwk(publicKey)
 
 }

@@ -8,6 +8,7 @@ import com.daml.metrics.api.MetricsContext
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -19,7 +20,6 @@ import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.LoggerUtil
 
 import scala.concurrent.ExecutionContext
 
@@ -63,10 +63,8 @@ class SequencerBasedRegisterTopologyTransactionHandle(
     )
       .biSemiflatMap(
         { sendAsyncClientError =>
-          val logLevel = SendAsyncClientError.logLevel(sendAsyncClientError)
-          LoggerUtil.logAtLevel(
-            logLevel,
-            s"Failed broadcasting topology transactions: $sendAsyncClientError. This will be retried automatically.",
+          logger.info(
+            s"Failed broadcasting topology transactions: $sendAsyncClientError. This will be retried automatically."
           )
           FutureUnlessShutdown.pure[TopologyTransactionsBroadcast.State](
             TopologyTransactionsBroadcast.State.Failed

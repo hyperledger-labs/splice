@@ -71,7 +71,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
 
   const curSvVote: SvVote | undefined = votesQuery.data.find(v => v.voter === svPartyId);
 
-  const allVotes = [...votesQuery.data].sort((a, b) => {
+  const allVotes = votesQuery.data.toSorted((a, b) => {
     return b.expiresAt.valueOf() - a.expiresAt.valueOf();
   });
 

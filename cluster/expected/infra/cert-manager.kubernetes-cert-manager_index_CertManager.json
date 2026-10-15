@@ -1,0 +1,112 @@
+{
+  "custom": false,
+  "id": "",
+  "inputs": {
+    "affinity": {
+      "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+          "nodeSelectorTerms": [
+            {
+              "matchExpressions": [
+                {
+                  "key": "cn_infra",
+                  "operator": "Exists"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "cainjector": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_infra",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "helmOptions": {
+      "namespace": "cert-manager",
+      "version": "1.18.2"
+    },
+    "installCRDs": true,
+    "startupapicheck": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_infra",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "tolerations": [
+      {
+        "effect": "NoSchedule",
+        "key": "cn_infra",
+        "operator": "Exists"
+      }
+    ],
+    "webhook": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_infra",
+          "operator": "Exists"
+        }
+      ]
+    }
+  },
+  "name": "cert-manager",
+  "provider": "",
+  "type": "kubernetes-cert-manager:index:CertManager"
+}

@@ -138,6 +138,18 @@
           "legendFormat": "topology {{rejection_type}} {{namespace}}",
           "range": true,
           "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (namespace, rejection_type)(rate(daml_sequencer_throughput_cap_confirmation_response_rejections_total{namespace=~\"$namespace\",job=~\"$job\"}[$__rate_interval]))",
+          "instant": false,
+          "legendFormat": "confirmation-response {{rejection_type}} {{namespace}}",
+          "range": true,
+          "refId": "C"
         }
       ],
       "title": "Throughput Cap Rejection Rate",

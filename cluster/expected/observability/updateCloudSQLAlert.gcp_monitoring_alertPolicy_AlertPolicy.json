@@ -1,0 +1,45 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "alertStrategy": {
+      "autoClose": "3600s",
+      "notificationChannelStrategies": [
+        {
+          "notificationChannelNames": [
+            null
+          ],
+          "renotifyInterval": "14400s"
+        }
+      ]
+    },
+    "combiner": "OR",
+    "conditions": [
+      {
+        "conditionThreshold": {
+          "aggregations": [
+            {
+              "alignmentPeriod": "600s",
+              "crossSeriesReducer": "REDUCE_SUM",
+              "perSeriesAligner": "ALIGN_SUM"
+            }
+          ],
+          "comparison": "COMPARISON_GT",
+          "duration": "60s",
+          "filter": "resource.type=\"cloudsql_database\" AND metric.type = \"logging.googleapis.com/user/log_gke_cloudsql_update_mock\"",
+          "trigger": {
+            "count": 1
+          }
+        },
+        "displayName": "Possible CloudSQL maintenance going on in mock"
+      }
+    ],
+    "displayName": "Possible CloudSQL maintenance going on in mock",
+    "notificationChannels": [
+      null
+    ]
+  },
+  "name": "updateCloudSQLAlert",
+  "provider": "",
+  "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+}

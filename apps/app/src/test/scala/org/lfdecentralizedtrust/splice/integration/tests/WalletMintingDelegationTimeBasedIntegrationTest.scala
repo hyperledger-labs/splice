@@ -481,7 +481,8 @@ class WalletMintingDelegationTimeBasedIntegrationTest
       val delayedDevelopmentFundAmount = BigDecimal(400.0)
       val rewardCouponV2Amount = BigDecimal(1000.0)
       val svRewardWeight = 5L
-      val mintDelay = Duration.ofHours(24)
+      val mintDelay = Duration.ofMinutes(45)
+      val mintAfter = env.environment.clock.now.plus(mintDelay).toInstant
 
       // For ValidatorRewardCoupon, we need ValidatorRight for beneficiary
       aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
@@ -613,7 +614,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
                 delayedDevelopmentFundAmount.bigDecimal,
                 env.environment.clock.now.plus(Duration.ofDays(30)).toInstant,
                 "delayed test development fund coupon",
-                java.util.Optional.of(env.environment.clock.now.plus(mintDelay).toInstant),
+                java.util.Optional.of(mintAfter),
               ).create,
             )
 
@@ -677,8 +678,8 @@ class WalletMintingDelegationTimeBasedIntegrationTest
       actualIncrease shouldBe expectedTotalReward
 
       actAndCheck(
-        "Advance past the delayed coupon's mintAfter",
-        advanceTime(mintDelay.plus(Duration.ofHours(1))),
+        "Advance past the delayed coupon's mintAfter, one round at a time",
+        advanceRoundsUntil(mintAfter),
       )(
         "The delayed development fund coupon is collected",
         _ => {

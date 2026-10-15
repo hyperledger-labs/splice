@@ -21,6 +21,8 @@ import {
   CREATE_PROPOSAL_CONFIG_INPUT_WIDTH,
   CREATE_PROPOSAL_FIELD_BODY_SX,
 } from '../../constants/createProposalLayout';
+import { isSwitchOverField } from '../forms/formValidators';
+import { SwitchOverTimesValue } from '../governance/SwitchOverTimesValue';
 
 dayjs.extend(relativeTime);
 
@@ -236,18 +238,24 @@ export const PendingConfigDisplay: React.FC<PendingConfigDisplayProps> = ({ pend
         sx={{ display: 'block', textAlign: 'left' }}
       >
         Pending Configuration:{' '}
-        <Box
-          component="strong"
-          title={pendingValue}
-          sx={{
-            display: 'inline',
-            overflowWrap: 'anywhere',
-            wordBreak: 'break-word',
-            fontWeight: 700,
-          }}
-        >
-          {pendingValue}
-        </Box>
+        {isSwitchOverField(fieldName) ? (
+          <Box component="span" sx={{ display: 'inline-block', verticalAlign: 'top' }}>
+            <SwitchOverTimesValue value={pendingValue} />
+          </Box>
+        ) : (
+          <Box
+            component="strong"
+            title={pendingValue}
+            sx={{
+              display: 'inline',
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
+              fontWeight: 700,
+            }}
+          >
+            {pendingValue}
+          </Box>
+        )}
       </Typography>
       <Typography
         variant="caption"

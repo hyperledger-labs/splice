@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
 import {
   DecentralizedSynchronizerUpgradeConfig,
@@ -104,6 +105,8 @@ export const ScanBigQueryConfigSchema = z
     dataset: z.string(),
     prefix: z.string(),
     functionsDataset: z.string().optional(),
+    silverDataset: z.string().optional(),
+    goldDataset: z.string().optional(),
     enableLegacyDatastream: z.boolean().default(true),
     enableStagProdDatastream: z.boolean().default(false),
     legacyDesiredState: z.enum(['RUNNING', 'PAUSED']).default('RUNNING'),
@@ -250,12 +253,11 @@ export const configForSv = (svName: string): SingleSvConfiguration => {
 
 export const allSvsConfiguration: SingleSvConfiguration[] = allConfiguredSvs.map(sv => {
   const svConfig = configForSv(sv);
-  console.error(
-    `Loaded ${sv} config`,
-    util.inspect(svConfig, {
+  void pulumi.log.debug(
+    `Loaded ${sv} config ${util.inspect(svConfig, {
       depth: null,
       maxStringLength: null,
-    })
+    })}`
   );
   return svConfig;
 });

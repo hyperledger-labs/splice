@@ -1,0 +1,11 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "location": "europe-west6",
+    "name": "mock-sv-da-1-bulk-staging"
+  },
+  "name": "mock-sv-da-1-bulk-staging",
+  "provider": "",
+  "type": "gcp:storage/bucket:Bucket"
+}

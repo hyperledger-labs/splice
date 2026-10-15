@@ -54,6 +54,15 @@ import com.digitalasset.canton.tracing.TracingConfig.Propagation
   *   more stable and predictable system behavior.
   * @param useNewConnectionPool
   *   Use the new sequencer connection pool instead of the former transports.
+  * @param useNewAggregator
+  *   Use the new BFT sequencer aggregator instead of the former one.
+  * @param pastEventsCacheSize
+  *   If a subscription receives an event for aggregation which has already been decided, a cache of
+  *   past successfully aggregated events is used to determine whether this is legitimate (possibly
+  *   due to load or catching up) or not. Only the [[pastEventsCacheSize]] most recent events are
+  *   kept in the cache. Must be at least 1. Larger values reduce the likelihood of falsely
+  *   classifying an old event as illegitimate, at the cost of more memory consumption. Only
+  *   effective if [[useNewAggregator]] is enabled.
   * @param timeReadingsRetention
   *   The duration for which sequencing time readings are retained. This setting depends on the
   *   assumptions about dynamic faults and ensures that faulty time readings skewed towards the
@@ -72,7 +81,13 @@ import com.digitalasset.canton.tracing.TracingConfig.Propagation
   * @param channelMaxInboundMessageSize
   *   max inbound request size for the grpc channel to the sequencer.
   * @param channelFlowControlWindow
-  *   flow control window for the grpc channel to the sequencer.
+  *   switches to manual gRPC flow control and sets its window; if `None`, then it is not configured
+  *   and the implementation default is used. Switches to automatic gRPC flow control and sets its
+  *   initial window; if `None`, then it is not
+  * @param channelInitialFlowControlWindow
+  *   Switches to automatic gRPC flow control and sets its initial window; if `None`, then it is not
+  *   configured and the implementation default is used. If present, it is set after the
+  *   `flowControlWindow` parameter, so it overrides it.
   */
 final case class SequencerClientConfig(
     eventInboxSize: PositiveInt = PositiveInt.tryCreate(100),
@@ -99,18 +114,22 @@ final case class SequencerClientConfig(
     overrideMaxRequestSize: Option[NonNegativeInt] = None,
     maximumInFlightEventBatches: PositiveInt = PositiveInt.tryCreate(20),
     useNewConnectionPool: Boolean = true,
+    useNewAggregator: Boolean = true,
+    pastEventsCacheSize: PositiveInt = PositiveInt.tryCreate(1000),
     timeReadingsRetention: PositiveFiniteDuration = PositiveFiniteDuration.ofMinutes(5),
     enableAmplificationImprovements: Boolean = true,
     amplifyOnMaxSequencingTimeTooFar: Boolean = true,
     channelMaxInboundMessageSize: NonNegativeInt = ClientChannelParams.DefaultMaxInboundMessageSize,
-    channelFlowControlWindow: PositiveInt = ClientChannelParams.DefaultFlowControlWindow,
+    channelFlowControlWindow: Option[PositiveInt] = ClientChannelParams.DefaultFlowControlWindow,
+    channelInitialFlowControlWindow: Option[PositiveInt] =
+      ClientChannelParams.DefaultInitialFlowControlWindow,
 ) {
 
   def clientChannelParams(tracePropagation: Propagation): ClientChannelParams = ClientChannelParams(
     maxInboundMessageSize = channelMaxInboundMessageSize,
     keepAliveClient = keepAliveClient,
     flowControlWindow = channelFlowControlWindow,
+    initialFlowControlWindow = channelInitialFlowControlWindow,
     traceContextPropagation = tracePropagation,
   )
-
 }

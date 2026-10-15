@@ -10,6 +10,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage.DbAction.ReadOnly
 import com.digitalasset.canton.resource.DbStorage.Profile.{H2, Postgres}
@@ -251,7 +252,7 @@ class DbOutputMetadataStore(
             bft_ts
           from ord_metadata_output_blocks
           where bft_ts <= $timestamp
-          order by block_number desc
+          order by bft_ts desc
           limit 1
           """.as[OutputBlockMetadata]
     val future = () => storage.query(query, functionFullName).map(_.headOption)

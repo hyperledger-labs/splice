@@ -1,0 +1,21 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "data": {
+      "PGDATA": "/var/lib/postgresql/data/pgdata",
+      "POSTGRES_DB": "cantonnet",
+      "POSTGRES_INITDB_ARGS": "--data-checksums",
+      "POSTGRES_USER": "cnadmin"
+    },
+    "kind": "ConfigMap",
+    "metadata": {
+      "name": "postgres-helmless-configuration",
+      "namespace": "validator"
+    }
+  },
+  "name": "validator-postgres-helmless-configuration",
+  "provider": "",
+  "type": "kubernetes:core/v1:ConfigMap"
+}

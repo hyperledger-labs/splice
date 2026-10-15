@@ -1,0 +1,218 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-sv-node",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "sv-app",
+    "namespace": "sv",
+    "timeout": 600,
+    "values": {
+      "additionalEnvVars": [
+        {
+          "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+          "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+        },
+        {
+          "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+          "value": "canton.sv-apps.sv.bft-sequencer-connection = false"
+        },
+        {
+          "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
+          "value": "canton.sv-apps.sv.local-synchronizer-nodes.current.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
+        },
+        {
+          "name": "ADDITIONAL_CONFIG_CANTON_BFT_PRUNING",
+          "value": "canton.sv-apps.sv.local-synchronizer-nodes.current.sequencer.canton-bft-pruning {\n                    cron = \"0 /10 * * * ?\"\n                    max-duration = \"5m\"\n                    retention = \"15 days\"\n                  }"
+        },
+        {
+          "name": "ADDITIONAL_CONFIG_ADDITIONAL_PACKAGES_TO_UNVET",
+          "value": "canton.sv-apps.sv.additional-packages-to-unvet.\"splice-wallet-payments\" = [\"0.1.15\", \"0.1.16\"]\ncanton.sv-apps.sv.additional-packages-to-unvet.\"splice-amulet\" = [\"0.1.15\"]"
+        },
+        {
+          "name": "ADDITIONAL_CONFIG_CLIENT_IP_HEADERS",
+          "value": "canton.sv-apps.sv.parameters.rate-limiting.client-ip-headers = [\"x-envoy-external-address\"]\n"
+        }
+      ],
+      "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "apiRequestLogLevel": "DEBUG",
+      "approvedSvIdentities": [
+        {
+          "name": "Digital-Asset-2",
+          "publicKey": "sv1-id-public-key",
+          "rewardWeightBps": 100000
+        },
+        {
+          "name": "SV1",
+          "publicKey": "PUBLIC_KEY_1==",
+          "rewardWeightBps": 1000000
+        },
+        {
+          "name": "SV2",
+          "publicKey": "PUBLIC_KEY_2==",
+          "rewardWeightBps": 150000
+        },
+        {
+          "name": "Digital-Asset-1",
+          "publicKey": "svda1-mock-id-public-key",
+          "rewardWeightBps": 150000
+        },
+        {
+          "name": "DA-Helm-Test-Node",
+          "publicKey": "sv-id-public-key",
+          "rewardWeightBps": 10000
+        }
+      ],
+      "auth": {
+        "audience": "https://sv.example.com/api",
+        "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
+      },
+      "contactPoint": "sv-support@digitalasset.com",
+      "decentralizedSynchronizerUrl": "https://sequencer-9.sv-2.mock.global.canton.network.digitalasset.com",
+      "disableOnboardingParticipantPromotionDelay": false,
+      "enablePostgresMetrics": true,
+      "extraBeneficiaries": [
+        {
+          "beneficiary": "dummy::partyId",
+          "weight": 3333
+        }
+      ],
+      "failOnAppVersionMismatch": true,
+      "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+      "initialAmuletPrice": "0.0517",
+      "joinWithKeyOnboarding": {
+        "sponsorApiUrl": "https://sv.sv-2.mock.global.canton.network.digitalasset.com",
+        "sponsorScanUrl": "https://scan.sv-2.mock.global.canton.network.digitalasset.com"
+      },
+      "logAsyncFlush": false,
+      "logLevel": "WARN",
+      "maxVettingDelay": "1m",
+      "metrics": {
+        "enable": true
+      },
+      "nodeIdentifier": "DA-Helm-Test-Node",
+      "onboardingName": "DA-Helm-Test-Node",
+      "participantAddress": "participant",
+      "permissionedSynchronizer": false,
+      "persistence": {
+        "postgresName": "apps-pg",
+        "secretName": "apps-pg-secret"
+      },
+      "pvc": {
+        "volumeName": "sv-app-global-domain-migration-hd-pvc",
+        "volumeStorageClass": "hyperdisk-standard-rwo"
+      },
+      "resources": {
+        "limits": {
+          "memory": "2Gi"
+        },
+        "requests": {
+          "cpu": "1",
+          "memory": "1Gi"
+        }
+      },
+      "scan": {
+        "internalUrl": "http://scan-app.sv:5012",
+        "publicUrl": "https://scan.sv.mock.global.canton.network.digitalasset.com"
+      },
+      "spliceInstanceNames": {
+        "amuletName": "Amulet",
+        "amuletNameAcronym": "AMT",
+        "nameServiceName": "Amulet Name Service",
+        "nameServiceNameAcronym": "ANS",
+        "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+        "networkName": "Splice"
+      },
+      "synchronizers": {
+        "additionalLegacy": [
+          {
+            "cometBFT": {
+              "connectionUri": "http://global-domain-7-cometbft-cometbft-rpc:26657",
+              "enabled": true
+            },
+            "mediatorAddress": "global-domain-7-mediator",
+            "sequencerAddress": "global-domain-7-sequencer",
+            "sequencerPruningConfig": {
+              "enabled": true,
+              "pruningInterval": "1 hour",
+              "retentionPeriod": "30 days"
+            },
+            "sequencerPublicUrl": "https://sequencer-7.sv.mock.global.canton.network.digitalasset.com"
+          }
+        ],
+        "current": {
+          "enableBftSequencer": true,
+          "mediatorAddress": "global-domain-9-mediator",
+          "sequencerAddress": "global-domain-9-sequencer",
+          "sequencerPruningConfig": {
+            "enabled": true,
+            "pruningInterval": "1 hour",
+            "retentionPeriod": "30 days"
+          },
+          "sequencerPublicUrl": "https://sequencer-9.sv.mock.global.canton.network.digitalasset.com"
+        },
+        "legacy": {
+          "cometBFT": {
+            "connectionUri": "http://global-domain-8-cometbft-cometbft-rpc:26657",
+            "enabled": true
+          },
+          "mediatorAddress": "global-domain-8-mediator",
+          "sequencerAddress": "global-domain-8-sequencer",
+          "sequencerPruningConfig": {
+            "enabled": true,
+            "pruningInterval": "1 hour",
+            "retentionPeriod": "30 days"
+          },
+          "sequencerPublicUrl": "https://sequencer-8.sv.mock.global.canton.network.digitalasset.com"
+        },
+        "skipInitialization": true,
+        "successor": {
+          "enableBftSequencer": true,
+          "mediatorAddress": "global-domain-10-mediator",
+          "sequencerAddress": "global-domain-10-sequencer",
+          "sequencerPruningConfig": {
+            "enabled": true,
+            "pruningInterval": "1 hour",
+            "retentionPeriod": "30 days"
+          },
+          "sequencerPublicUrl": "https://sequencer-10.sv.mock.global.canton.network.digitalasset.com"
+        }
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ]
+    },
+    "version": "0.3.20"
+  },
+  "name": "sv-app",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

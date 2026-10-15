@@ -4,9 +4,10 @@ let
   sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
   cometbftDriverSources = builtins.fromJSON (builtins.readFile ./cometbft-driver-sources.json);
   dpmSdkSources = builtins.fromJSON (builtins.readFile ./dpm-sdk-sources.json);
+  ghaRunnerSources = builtins.fromJSON (builtins.readFile ./gha-runner-sources.json);
 
   # No macOS support for firefox
-  linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 rust-parallel util-linux ];
+  linuxOnly = if stdenv.hostPlatform.isDarwin then [ ] else with pkgs; [ firefox iproute2 rust-parallel util-linux ];
 
   standard_packages = with pkgs; [
 
@@ -63,6 +64,7 @@ let
     python3Packages.dockerfile-parse
     python3Packages.flask
     python3Packages.gitpython
+    python3Packages.junit2html
     python3Packages.google-cloud-bigquery
     python3Packages.google-cloud-storage
     python3Packages.gql
@@ -80,7 +82,6 @@ let
     python3Packages.requests
     python3Packages.rich
     python3Packages.pulumi
-    python3Packages.pypandoc
     python3Packages.google-cloud-storage
     python3Packages.requests-toolbelt
     python3Packages.semver
@@ -126,6 +127,7 @@ let
     jq
     nodejs
     openapi-generator-cli
+    pigz
     pre-commit
     python3
     python3Packages.dockerfile-parse
@@ -153,9 +155,11 @@ in pkgs.mkShell {
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
   COMETBFT_IMAGE_SHA256 = "${cometbftDriverSources.image_sha256}";
   COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
+  GHA_RUNNER_VERSION = "${ghaRunnerSources.version}";
+  GHA_RUNNER_DIGEST = "${ghaRunnerSources.digest}";
   PULUMI_HOME = "${pkgs.pulumi-bin}";
   # Avoid sbt-assembly falling over. See https://github.com/sbt/sbt-assembly/issues/496
-  LC_ALL = if stdenv.isDarwin then "" else "C.UTF-8";
+  LC_ALL = if stdenv.hostPlatform.isDarwin then "" else "C.UTF-8";
   # Avoid "warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)"
   # warnings in damlc.
   LOCALE_ARCHIVE_2_27 = if pkgs.stdenv.hostPlatform.libc == "glibc"

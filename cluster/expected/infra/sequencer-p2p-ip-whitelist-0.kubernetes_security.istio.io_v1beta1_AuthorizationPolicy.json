@@ -1,0 +1,72 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "security.istio.io/v1beta1",
+    "kind": "AuthorizationPolicy",
+    "metadata": {
+      "name": "sequencer-p2p-ip-whitelist-0",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "action": "ALLOW",
+      "rules": [
+        {
+          "from": [
+            {
+              "source": {
+                "remoteIpBlocks": [
+                  "<internal IPs>",
+                  "1.2.3.4/32",
+                  "5.6.7.8/32",
+                  "11.12.13.14/32",
+                  "2.3.4.5/32"
+                ]
+              }
+            }
+          ],
+          "to": [
+            {
+              "operation": {
+                "hosts": [
+                  "sequencer-p2p-9.sv-2.mock.network.canton.global",
+                  "sequencer-p2p-9.sv-2.mock.network.canton.global:*",
+                  "sequencer-p2p-9.sv-2.mock.global.canton.network.digitalasset.com",
+                  "sequencer-p2p-9.sv-2.mock.global.canton.network.digitalasset.com:*",
+                  "sequencer-p2p-10.sv-2.mock.network.canton.global",
+                  "sequencer-p2p-10.sv-2.mock.network.canton.global:*",
+                  "sequencer-p2p-10.sv-2.mock.global.canton.network.digitalasset.com",
+                  "sequencer-p2p-10.sv-2.mock.global.canton.network.digitalasset.com:*",
+                  "sequencer-p2p-9.sv-1.mock.network.canton.global",
+                  "sequencer-p2p-9.sv-1.mock.network.canton.global:*",
+                  "sequencer-p2p-9.sv-1.mock.global.canton.network.digitalasset.com",
+                  "sequencer-p2p-9.sv-1.mock.global.canton.network.digitalasset.com:*",
+                  "sequencer-p2p-10.sv-1.mock.network.canton.global",
+                  "sequencer-p2p-10.sv-1.mock.network.canton.global:*",
+                  "sequencer-p2p-10.sv-1.mock.global.canton.network.digitalasset.com",
+                  "sequencer-p2p-10.sv-1.mock.global.canton.network.digitalasset.com:*",
+                  "sequencer-p2p-9.sv.mock.network.canton.global",
+                  "sequencer-p2p-9.sv.mock.network.canton.global:*",
+                  "sequencer-p2p-9.sv.mock.global.canton.network.digitalasset.com",
+                  "sequencer-p2p-9.sv.mock.global.canton.network.digitalasset.com:*",
+                  "sequencer-p2p-10.sv.mock.network.canton.global",
+                  "sequencer-p2p-10.sv.mock.network.canton.global:*",
+                  "sequencer-p2p-10.sv.mock.global.canton.network.digitalasset.com",
+                  "sequencer-p2p-10.sv.mock.global.canton.network.digitalasset.com:*"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "selector": {
+        "matchLabels": {
+          "app": "istio-ingress"
+        }
+      }
+    }
+  },
+  "name": "sequencer-p2p-ip-whitelist-0",
+  "provider": "",
+  "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
+}

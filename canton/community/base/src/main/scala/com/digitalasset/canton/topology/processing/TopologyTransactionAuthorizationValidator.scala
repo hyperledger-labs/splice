@@ -5,11 +5,11 @@ package com.digitalasset.canton.topology.processing
 
 import cats.syntax.either.*
 import cats.syntax.foldable.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.{CryptoPureApi, Fingerprint, Hash, SigningPublicKey}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.cache.TopologyStateLookupByNamespace
@@ -25,6 +25,7 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.Ge
 import com.digitalasset.canton.topology.transaction.TopologyMapping.ReferencedAuthorizations
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherUtil, ErrorUtil}
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.concurrent.ExecutionContext
 
@@ -66,6 +67,7 @@ class TopologyTransactionAuthorizationValidator[+PureCrypto <: CryptoPureApi](
     val pureCrypto: PureCrypto,
     override val lookup: TopologyStateLookupByNamespace,
     validationIsFinal: Boolean,
+    override val warnAboutDanglingKeys: Boolean,
     val loggerFactory: NamedLoggerFactory,
 )(implicit override val executionContext: ExecutionContext)
     extends NamedLogging

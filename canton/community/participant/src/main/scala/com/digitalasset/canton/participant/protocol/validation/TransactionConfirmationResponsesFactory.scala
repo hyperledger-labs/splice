@@ -4,10 +4,10 @@
 package com.digitalasset.canton.participant.protocol.validation
 
 import cats.syntax.parallel.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.TransactionError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.ProcessingSteps
 import com.digitalasset.canton.participant.protocol.ProtocolProcessor.MalformedPayload
@@ -17,6 +17,7 @@ import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{LfPartyId, checked}
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.concurrent.ExecutionContext
 
@@ -139,6 +140,8 @@ class TransactionConfirmationResponsesFactory(
 
         internalConsistencyResultE <- transactionValidationResult.internalConsistencyResultET.value
 
+        externalCallCheckResult <- transactionValidationResult.externalCallCheckResultF
+
         // Rejections due to a failed model conformance check
         // Aborts are logged by the Engine callback when the abort happens
         modelConformanceRejections =
@@ -151,6 +154,7 @@ class TransactionConfirmationResponsesFactory(
             )
           )
 
+        // TODO(#33650) - replace with unboundedTraverseFilter; safe because the number of views is bounded by the transaction's maximum payload size (at worst views are in the hundreds).
         responses <- transactionValidationResult.viewValidationResults.toSeq
           .parTraverseFilter { case (viewPosition, viewValidationResult) =>
             for {
@@ -244,22 +248,57 @@ class TransactionConfirmationResponsesFactory(
                   ).toLocalReject(protocolVersion)
                 )
 
+              // Verdicts due to the external-call check for THIS view: a result recorded in the
+              // view that disagrees with another visible occurrence of the same call, or with
+              // the extension service on re-validation, rejects the view; a recorded result that
+              // could not be re-validated abstains instead of approving, as the participant
+              // cannot vouch for the recorded result while the view is not provably wrong
+              // either. Views without external-call results have no entry and get no verdict
+              // from this check.
+              val externalCallVerdicts =
+                externalCallCheckResult.get(viewPosition) match {
+                  case Some(ExternalCallCheck.Rejected(description)) =>
+                    Some(
+                      logged(
+                        requestId,
+                        LocalRejectError.ConsistencyRejections.ExternalCallResultDisagreement
+                          .Reject(description),
+                      ).toLocalReject(protocolVersion)
+                    )
+                  case Some(ExternalCallCheck.CannotValidate(reason)) =>
+                    Some(
+                      logged(
+                        requestId,
+                        LocalAbstainError.CannotPerformAllValidations.Abstain(reason),
+                      ).toLocalAbstain(protocolVersion)
+                    )
+                  case Some(ExternalCallCheck.Passed) | None => None
+                }
+
               // Approve if the consistency check succeeded, reject otherwise.
               val consistencyVerdicts =
                 verdictsForView(viewValidationResult, hostedConfirmingParties)
 
               val localVerdicts: Seq[LocalVerdict] =
                 consistencyVerdicts.toList ++ timeValidationRejections ++ contractConsistencyRejections ++
-                  authenticationRejections ++ authorizationRejections ++
+                  externalCallVerdicts ++ authenticationRejections ++ authorizationRejections ++
                   modelConformanceRejections ++ internalConsistencyRejections ++
                   replayRejections
 
+              // Any rejection, wherever it ranks in the verdicts, takes precedence over the
+              // abstention.
               val localVerdictAndPartiesO = localVerdicts
                 .collectFirst[(LocalVerdict, Set[LfPartyId])] {
                   case malformed: LocalReject if malformed.isMalformed => malformed -> Set.empty
                   case localReject: LocalReject if hostedConfirmingParties.nonEmpty =>
                     localReject -> hostedConfirmingParties
                 }
+                .orElse(
+                  localVerdicts.collectFirst[(LocalVerdict, Set[LfPartyId])] {
+                    case abstain: LocalAbstain if hostedConfirmingParties.nonEmpty =>
+                      abstain -> hostedConfirmingParties
+                  }
+                )
                 .orElse(
                   Option.when(hostedConfirmingParties.nonEmpty)(
                     LocalApprove(protocolVersion) -> hostedConfirmingParties

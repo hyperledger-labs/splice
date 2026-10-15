@@ -8,7 +8,7 @@ import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.TransactionRoutingError
@@ -16,10 +16,7 @@ import com.digitalasset.canton.error.TransactionRoutingError.ConfigurationErrors
   InvalidPrescribedSynchronizerId,
   SubmissionSynchronizerNotReady,
 }
-import com.digitalasset.canton.error.TransactionRoutingError.TopologyErrors.{
-  NotConnectedToAllContractSynchronizers,
-  SubmitterAlwaysStakeholder,
-}
+import com.digitalasset.canton.error.TransactionRoutingError.TopologyErrors.NotConnectedToAllContractSynchronizers
 import com.digitalasset.canton.error.TransactionRoutingError.{
   MalformedInputErrors,
   RoutingInternalError,
@@ -31,6 +28,7 @@ import com.digitalasset.canton.ledger.participant.state.{
   SynchronizerRank,
   TransactionMeta,
 }
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
@@ -38,7 +36,7 @@ import com.digitalasset.canton.participant.protocol.TransactionProcessor.{
   TransactionSubmissionError,
   TransactionSubmissionResult,
 }
-import com.digitalasset.canton.participant.protocol.submission.routing.TransactionRoutingProcessor.inputContractsStakeholders
+import com.digitalasset.canton.participant.protocol.submission.routing.TransactionRoutingProcessor.inputContractIds
 import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore
 import com.digitalasset.canton.participant.sync.ConnectedSynchronizersLookup
 import com.digitalasset.canton.protocol.*
@@ -46,9 +44,9 @@ import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
-import com.digitalasset.canton.{LfGlobalKeyMapping, LfPartyId, checked}
 import com.digitalasset.daml.lf.data.ImmArray
 import com.digitalasset.daml.lf.transaction.CreationTime
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.concurrent.ExecutionContext
 
@@ -79,7 +77,6 @@ class TransactionRoutingProcessor(
       synchronizerState: RoutingSynchronizerState,
       wfTransaction: WellFormedTransaction[WithoutSuffixes],
       transactionMeta: TransactionMeta,
-      keyResolver: LfGlobalKeyMapping,
       explicitlyDisclosedContracts: ImmArray[LfFatContractInst],
   )(implicit
       traceContext: TraceContext
@@ -126,7 +123,6 @@ class TransactionRoutingProcessor(
           .submitTransaction(
             submitterInfo,
             transactionMeta,
-            keyResolver,
             wfTransaction,
             inputDisclosedContracts.view.map(sc => sc.contractId -> sc).toMap,
             topologySnapshot,
@@ -154,8 +150,8 @@ class TransactionRoutingProcessor(
     SynchronizerRank,
   ] =
     for {
-      contractsStakeholders <- EitherT.rightT[FutureUnlessShutdown, TransactionRoutingError](
-        inputContractsStakeholders(transaction)
+      contractIds <- EitherT.rightT[FutureUnlessShutdown, TransactionRoutingError](
+        inputContractIds(transaction)
       )
 
       psidO <- EitherT.fromEither[FutureUnlessShutdown](
@@ -174,7 +170,7 @@ class TransactionRoutingProcessor(
         transaction = transaction,
         ledgerTime = ledgerTime,
         synchronizerState = synchronizerState,
-        inputContractStakeholders = contractsStakeholders,
+        inputContractIds = contractIds,
         disclosedContracts = disclosedContractIds,
         prescribedSynchronizerO = psidO,
       )
@@ -243,7 +239,7 @@ class TransactionRoutingProcessor(
             transaction = transaction,
             ledgerTime = metadata.ledgerTime,
             synchronizerState = routingSynchronizerState,
-            inputContractStakeholders = inputContractsStakeholders(transaction),
+            inputContractIds = inputContractIds(transaction),
             disclosedContracts = disclosedContractIds,
             prescribedSynchronizerO = None, // Not used here
           )
@@ -324,36 +320,27 @@ class TransactionRoutingProcessor(
       }
     }
 
-    // Check that at least one party listed in actAs or readAs is a stakeholder so that we can reassign the contract if needed.
-    // This check is overly strict on behalf of contracts that turn out not to need to be reassigned.
-    val readerNotBeingStakeholder = contractData.filter { data =>
-      data.stakeholders.all.intersect(transactionData.readers).isEmpty
-    }
+    // Check: connected synchronizers
+    //
+    // Note: we intentionally do not require the submitter to be a stakeholder of every input
+    // contract here. The submitter only needs to be a stakeholder of the contracts that actually
+    // need to be reassigned to the target synchronizer. That requirement is enforced per-contract
+    // by SynchronizerRankComputation.findReaderThatCanReassignContract, which is only applied to
+    // contracts that are not already on the target synchronizer.
+    EitherTUtil
+      .condUnitET[FutureUnlessShutdown](
+        contractsSynchronizerNotConnected.isEmpty, {
+          val contractsAndSynchronizers: Map[String, PhysicalSynchronizerId] =
+            contractsSynchronizerNotConnected.map { contractData =>
+              contractData.id.show -> contractData.synchronizerId
+            }.toMap
 
-    for {
-      // Check: reader
-      _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-        readerNotBeingStakeholder.isEmpty,
-        SubmitterAlwaysStakeholder.Error(readerNotBeingStakeholder.map(_.id)),
+          NotConnectedToAllContractSynchronizers.Error(
+            contractsAndSynchronizers.view.mapValues(_.logical).toMap
+          )
+        },
       )
-
-      // Check: connected synchronizers
-      _ <- EitherTUtil
-        .condUnitET[FutureUnlessShutdown](
-          contractsSynchronizerNotConnected.isEmpty, {
-            val contractsAndSynchronizers: Map[String, PhysicalSynchronizerId] =
-              contractsSynchronizerNotConnected.map { contractData =>
-                contractData.id.show -> contractData.synchronizerId
-              }.toMap
-
-            NotConnectedToAllContractSynchronizers.Error(
-              contractsAndSynchronizers.view.mapValues(_.logical).toMap
-            )
-          },
-        )
-        .leftWiden[TransactionRoutingError]
-
-    } yield ()
+      .leftWiden[TransactionRoutingError]
   }
 
   private def wrapSubmissionError[T](synchronizerId: PhysicalSynchronizerId)(
@@ -419,33 +406,7 @@ object TransactionRoutingProcessor {
     maybePriority.getOrElse(Integer.MIN_VALUE)
   }
 
-  private[routing] def inputContractsStakeholders(
-      tx: LfVersionedTransaction
-  ): Map[LfContractId, Stakeholders] = {
-
-    val keyLookupMap = tx.nodes.values
-      .collect { case LfNodeQueryByKey(_, _, _, key, result, _) =>
-        result.filterNot(tx.localContractIds.contains) -> checked(
-          Stakeholders.tryCreate(stakeholders = key.maintainers, signatories = Set.empty)
-        )
-      }
-      .flatMap { case (cids, stakeholders) => cids.map(_ -> stakeholders) }
-      .toMap
-
-    val mainMap = tx.nodes.values.collect {
-      case n: LfNodeFetch if !tx.localContractIds.contains(n.coid) =>
-        val stakeholders = checked(
-          Stakeholders.tryCreate(signatories = n.signatories, stakeholders = n.stakeholders)
-        )
-        n.coid -> stakeholders
-      case n: LfNodeExercises if !tx.localContractIds.contains(n.targetCoid) =>
-        val stakeholders = checked(
-          Stakeholders.tryCreate(signatories = n.signatories, stakeholders = n.stakeholders)
-        )
-        n.targetCoid -> stakeholders
-    }.toMap
-
-    keyLookupMap ++ mainMap
-  }
+  private[routing] def inputContractIds(tx: LfVersionedTransaction): Seq[LfContractId] =
+    tx.inputContracts.toSeq
 
 }

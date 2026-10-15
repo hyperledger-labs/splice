@@ -18,10 +18,8 @@ export const CloudSqlConfigSchema = z.object({
   tier: z.string(),
   enterprisePlus: z.boolean(),
   flags: z.record(z.string(), z.string()).default({}),
-  // https://cloud.google.com/sql/docs/mysql/backup-recovery/backups#retained-backups
-  // controls the number of automated gcp sql backups to retain
-  backupsToRetain: z.number().optional(),
-  databaseVersion: z.string().default('POSTGRES_14'),
+  enableAutoBackups: z.boolean().default(true),
+  databaseVersion: z.string().default('POSTGRES_18'),
 });
 export type CloudSqlConfig = z.infer<typeof CloudSqlConfigSchema>;
 

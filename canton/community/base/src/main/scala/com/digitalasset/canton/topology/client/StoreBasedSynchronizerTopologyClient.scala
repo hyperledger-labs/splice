@@ -8,9 +8,11 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
+  HasCloseContext,
   LifeCycle,
   UnlessShutdown,
 }
@@ -38,7 +40,7 @@ import scala.math.Ordering.Implicits.*
 import scala.util.Success
 import scala.util.control.NonFatal
 
-trait TopologyAwaiter extends FlagCloseable {
+trait TopologyAwaiter extends FlagCloseable with HasCloseContext {
 
   this: SynchronizerTopologyClientWithInit =>
 
@@ -94,8 +96,9 @@ trait TopologyAwaiter extends FlagCloseable {
     if (!isClosing) {
       if (timeout.isFinite) {
         clock
-          .scheduleAfter(
+          .scheduleAfterCancelledOnShutdown(
             _ => waiter.promise.trySuccess(UnlessShutdown.Outcome(false)).discard,
+            s"${getClass.getName}: scheduled await",
             JDuration.ofMillis(timeout.toMillis),
           )
           .discard
@@ -441,6 +444,7 @@ class StoreBasedSynchronizerTopologyClient(
   override def updateKnownTimestampsDuringStartup(
       sequencerSnapshotTimestamp: Option[SequencedTime],
       synchronizerUpgradeTime: Option[SequencedTime],
+      cleanSynchronizerRecordTime: Option[CantonTimestamp],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     logger.debug("Updating the topology client with known timestamps from the topology store")
     for {
@@ -537,18 +541,25 @@ class StoreBasedSynchronizerTopologyClient(
               s"Taking into account adjusted store max timestamp $sequencingTime, $effectiveTime"
             )
           }
-          val upgradeTimes = synchronizerUpgradeTime.map { sequencedTime =>
+          val upgradeTime = synchronizerUpgradeTime.map { sequencedTime =>
             logger.debug(s"Taking into account synchronizer upgrade at $sequencedTime")
             (
               sequencedTime,
               EffectiveTime(sequencedTime.value) + staticSynchronizerParameters.topologyChangeDelay,
             )
           }
+          val synchronizerRecordTime = cleanSynchronizerRecordTime.map { recordTime =>
+            logger.debug(s"Taking into account clean synchronizer record time $recordTime")
+            (
+              SequencedTime(recordTime),
+              EffectiveTime(recordTime) + staticSynchronizerParameters.topologyChangeDelay,
+            )
+          }
           val initialHeadTimestamps =
-            (adjustedStoreMaxTimestamp.toList ++ upgradeTimes.toList).maxByOption {
-              case (_, effectiveTime: EffectiveTime) =>
+            (adjustedStoreMaxTimestamp.toList ++ upgradeTime ++ synchronizerRecordTime)
+              .maxByOption { case (_, effectiveTime: EffectiveTime) =>
                 effectiveTime
-            }
+              }
 
           updateLatestTopologyChange()
           initialHeadTimestamps.foreach { case (sequencedTime, effectiveTime) =>

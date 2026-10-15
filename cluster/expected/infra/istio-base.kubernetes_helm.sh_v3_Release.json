@@ -1,0 +1,23 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "base",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "istio-base",
+    "namespace": "istio-system",
+    "repositoryOpts": {
+      "repo": "https://blob.istio.io/istio-release/charts"
+    },
+    "values": {
+      "global": {
+        "istioNamespace": "cluster-ingress"
+      }
+    },
+    "version": "1.30.5"
+  },
+  "name": "istio-base",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

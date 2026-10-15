@@ -4,7 +4,6 @@
 package com.digitalasset.canton.data
 
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError.{
   FieldNotSet,
   OtherError,
@@ -15,10 +14,8 @@ import com.digitalasset.canton.protocol.ContractIdSyntax.*
 import com.digitalasset.canton.protocol.LfHashSyntax.*
 import com.digitalasset.canton.protocol.RefIdentifierSyntax.*
 import com.digitalasset.canton.protocol.{
-  GlobalKeySerialization,
   LfActionNode,
   LfContractId,
-  LfGlobalKey,
   LfHash,
   LfNodeCreate,
   LfNodeExercises,
@@ -32,7 +29,9 @@ import com.digitalasset.canton.protocol.{
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.util.NoCopy
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
+import com.digitalasset.canton.validation.ProtoValidation
+import com.digitalasset.canton.version.ProtocolVersionValidation
 import com.digitalasset.canton.{LfChoiceName, LfInterfaceId, LfPackageId, LfPartyId, LfVersioned}
 import com.digitalasset.daml.lf.value.{Value, ValueCoder, ValueOuterClass}
 import com.google.common.annotations.VisibleForTesting
@@ -122,6 +121,7 @@ object ActionDescription {
             exerciseResult,
             _key,
             byKey,
+            _externalCallResults,
             version,
           ) =>
         for {
@@ -171,22 +171,26 @@ object ActionDescription {
     }
 
   private def fromCreateProtoV30(
-      c: v30.ActionDescription.CreateActionDescription
+      pvv: ProtocolVersionValidation,
+      c: v30.ActionDescription.CreateActionDescription,
   ): ParsingResult[CreateActionDescription] = {
     val v30.ActionDescription.CreateActionDescription(contractIdP, seedP) = c
     for {
-      contractId <- ProtoConverter.parseLfContractId(contractIdP)
+      contractId <- ProtoValidation.validateThen(contractIdP, "contract_id", pvv)(
+        ProtoConverter.parseLfContractId
+      )
       seed <- LfHash.fromProtoPrimitive("node_seed", seedP)
     } yield CreateActionDescription(contractId, seed)
   }
 
-  private def choiceFromProto(choiceP: String): ParsingResult[LfChoiceName] =
+  private def choiceFromProto(choiceP: String, field: String): ParsingResult[LfChoiceName] =
     LfChoiceName
       .fromString(choiceP)
-      .leftMap(err => ValueDeserializationError("choice", err))
+      .leftMap(err => ValueDeserializationError(err, field))
 
   private def fromExerciseProtoV30(
-      e: v30.ActionDescription.ExerciseActionDescription
+      pvv: ProtocolVersionValidation,
+      e: v30.ActionDescription.ExerciseActionDescription,
   ): ParsingResult[ExerciseActionDescription] = {
     val v30.ActionDescription.ExerciseActionDescription(
       inputContractIdP,
@@ -201,18 +205,37 @@ object ActionDescription {
       packagePreferenceP,
     ) = e
     for {
-      inputContractId <- ProtoConverter.parseLfContractId(inputContractIdP)
-      templateId <- RefIdentifierSyntax.fromProtoPrimitive(templateIdP)
-      packagePreference <- packagePreferenceP.traverse(ProtoConverter.parsePackageId).map(_.toSet)
-      choice <- choiceFromProto(choiceP)
-      interfaceId <- interfaceIdP.traverse(RefIdentifierSyntax.fromProtoPrimitive)
+      inputContractId <- ProtoValidation.validateThen(inputContractIdP, "input_contract_id", pvv)(
+        ProtoConverter.parseLfContractId
+      )
+      templateId <- ProtoValidation.validateThen(templateIdP, "template_id", pvv)(
+        RefIdentifierSyntax.fromProtoPrimitive
+      )
+      packagePreference <- ProtoValidation
+        .validateThen(
+          packagePreferenceP,
+          "package_preference",
+          pvv,
+          ProtoValidation.MaxCollectionSize,
+        )(
+          ProtoConverter.parsePackageId
+        )
+        .map(_.toSet)
+      choice <- ProtoValidation.validateThen(choiceP, "choice", pvv)(choiceFromProto)
+      interfaceId <- ProtoValidation.validateThen(interfaceIdP, "interface_id", pvv)(
+        RefIdentifierSyntax.fromProtoPrimitive
+      )
       chosenValueP <- ProtoConverter.protoParser(ValueOuterClass.VersionedValue.parseFrom)(
         chosenValueB
       )
       chosenValue <- ValueCoder
         .decodeVersionedValue(chosenValueP)
-        .leftMap(err => ValueDeserializationError("chosen_value", err.errorMessage))
-      actors <- actorsP.traverse(ProtoConverter.parseLfPartyId(_, field = "actors")).map(_.toSet)
+        .leftMap(err => ValueDeserializationError(err.errorMessage, "chosen_value"))
+      actors <- ProtoValidation
+        .validateThen(actorsP, "actors", pvv, ProtoValidation.MaxCollectionSize)(
+          ProtoConverter.parseLfPartyId
+        )
+        .map(_.toSet)
       seed <- LfHash.fromProtoPrimitive("node_seed", seedP)
       actionDescription <- ExerciseActionDescription
         .create(
@@ -231,22 +254,9 @@ object ActionDescription {
     } yield actionDescription
   }
 
-  private def fromLookupByKeyProtoV30(
-      k: v30.ActionDescription.LookupByKeyActionDescription
-  ): ParsingResult[LookupByKeyActionDescription] = {
-    val v30.ActionDescription.LookupByKeyActionDescription(keyP) = k
-    for {
-      key <- ProtoConverter
-        .required("key", keyP)
-        .flatMap(GlobalKeySerialization.fromProtoV30)
-      actionDescription <- LookupByKeyActionDescription
-        .create(key)
-        .leftMap(err => OtherError(err.message))
-    } yield actionDescription
-  }
-
   private def fromFetchProtoV30(
-      f: v30.ActionDescription.FetchActionDescription
+      pvv: ProtocolVersionValidation,
+      f: v30.ActionDescription.FetchActionDescription,
   ): ParsingResult[FetchActionDescription] = {
     val v30.ActionDescription.FetchActionDescription(
       inputContractIdP,
@@ -256,38 +266,49 @@ object ActionDescription {
       interfaceIdP,
     ) = f
     for {
-      inputContractId <- ProtoConverter.parseLfContractId(inputContractIdP)
-      actors <- actorsP.traverse(ProtoConverter.parseLfPartyId(_, field = "actors")).map(_.toSet)
-      templateId <- RefIdentifierSyntax.fromProtoPrimitive(templateIdP)
-      interfaceId <- interfaceIdP.traverse(RefIdentifierSyntax.fromProtoPrimitive)
+      inputContractId <- ProtoValidation.validateThen(inputContractIdP, "input_contract_id", pvv)(
+        ProtoConverter.parseLfContractId
+      )
+      actors <- ProtoValidation
+        .validateThen(actorsP, "actors", pvv, ProtoValidation.MaxCollectionSize)(
+          ProtoConverter.parseLfPartyId
+        )
+        .map(_.toSet)
+      templateId <- ProtoValidation.validateThen(templateIdP, "template_id", pvv)(
+        RefIdentifierSyntax.fromProtoPrimitive
+      )
+      interfaceId <- ProtoValidation.validateThen(interfaceIdP, "interface_id", pvv)(
+        RefIdentifierSyntax.fromProtoPrimitive
+      )
     } yield FetchActionDescription(inputContractId, actors, byKey, templateId, interfaceId)
   }
 
   private[data] def fromProtoV30(
-      actionDescriptionP: v30.ActionDescription
+      pvv: ProtocolVersionValidation,
+      actionDescriptionP: v30.ActionDescription,
   ): ParsingResult[ActionDescription] = {
     import v30.ActionDescription.Description.*
     val v30.ActionDescription(description) = actionDescriptionP
 
     description match {
-      case Create(create) => fromCreateProtoV30(create)
-      case Exercise(exercise) => fromExerciseProtoV30(exercise)
-      case Fetch(fetch) => fromFetchProtoV30(fetch)
-      case LookupByKey(lookup) => fromLookupByKeyProtoV30(lookup)
+      case Create(create) => fromCreateProtoV30(pvv, create)
+      case Exercise(exercise) => fromExerciseProtoV30(pvv, exercise)
+      case Fetch(fetch) => fromFetchProtoV30(pvv, fetch)
       case Empty => Left(FieldNotSet("description"))
     }
   }
 
   private[data] def fromProtoV31(
-      actionDescriptionP: v31.ActionDescription
+      pvv: ProtocolVersionValidation,
+      actionDescriptionP: v31.ActionDescription,
   ): ParsingResult[ActionDescription] = {
     import v31.ActionDescription.Description.*
     val v31.ActionDescription(description) = actionDescriptionP
 
     description match {
-      case Create(create) => fromCreateProtoV30(create)
-      case Exercise(exercise) => fromExerciseProtoV30(exercise)
-      case Fetch(fetch) => fromFetchProtoV30(fetch)
+      case Create(create) => fromCreateProtoV30(pvv, create)
+      case Exercise(exercise) => fromExerciseProtoV30(pvv, exercise)
+      case Fetch(fetch) => fromFetchProtoV30(pvv, fetch)
       case Empty => Left(FieldNotSet("description"))
     }
 
@@ -356,11 +377,11 @@ object ActionDescription {
       v30.ActionDescription.ExerciseActionDescription(
         inputContractId = inputContractId.toProtoPrimitive,
         templateId = new RefIdentifierSyntax(templateId).toProtoPrimitive,
-        packagePreference = packagePreference.toSeq,
+        packagePreference = packagePreference.toSeq.map(_.toProtoUnvalidated),
         choice = choice,
         interfaceId = interfaceId.map(i => new RefIdentifierSyntax(i).toProtoPrimitive),
         chosenValue = serializedChosenValue,
-        actors = actors.toSeq,
+        actors = actors.toSeq.map(_.toProtoUnvalidated),
         byKey = byKey,
         nodeSeed = seed.toProtoPrimitive,
         failed = failed,
@@ -378,8 +399,9 @@ object ActionDescription {
       paramIfTrue("failed", _.failed),
     )
 
+    /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
     @VisibleForTesting
-    private[data] def copy(
+    def copy(
         inputContractId: LfContractId = this.inputContractId,
         templateId: LfTemplateId = this.templateId,
         choice: LfChoiceName = this.choice,
@@ -467,6 +489,8 @@ object ActionDescription {
         GenLens[ExerciseActionDescription].apply(_.templateId)
       val choiceUnsafe: Lens[ExerciseActionDescription, LfChoiceName] =
         GenLens[ExerciseActionDescription].apply(_.choice)
+      val inputContractIdUnsafe: Lens[ExerciseActionDescription, LfContractId] =
+        GenLens[ExerciseActionDescription].apply(_.inputContractId)
     }
   }
 
@@ -488,7 +512,7 @@ object ActionDescription {
     private def toFetchActionDescriptionV30: v30.ActionDescription.FetchActionDescription =
       v30.ActionDescription.FetchActionDescription(
         inputContractId = inputContractId.toProtoPrimitive,
-        actors = actors.toSeq,
+        actors = actors.toSeq.map(_.toProtoUnvalidated),
         byKey = byKey,
         templateId = new RefIdentifierSyntax(templateId).toProtoPrimitive,
         interfaceId = interfaceId.map(i => new RefIdentifierSyntax(i).toProtoPrimitive),
@@ -506,47 +530,6 @@ object ActionDescription {
       paramIfTrue("by key", _.byKey),
       paramIfDefined("interface id", _.interfaceId),
     )
-  }
-
-  final case class LookupByKeyActionDescription(key: LfVersioned[LfGlobalKey])
-      extends ActionDescription {
-
-    private val serializedKey =
-      GlobalKeySerialization
-        .toProtoV30(key)
-        .valueOr(err => throw InvalidActionDescription(s"Failed to serialize key: $err"))
-
-    override def byKey: Boolean = true
-
-    override def seedOption: Option[LfHash] = None
-
-    protected def toProtoDescriptionV30: v30.ActionDescription.Description.LookupByKey =
-      v30.ActionDescription.Description.LookupByKey(
-        v30.ActionDescription.LookupByKeyActionDescription(
-          key = Some(serializedKey)
-        )
-      )
-
-    override protected def toProtoDescriptionV31: v31.ActionDescription.Description =
-      throw InvalidActionDescription(
-        s"LookupByKey is not supported as root view action in ${ProtocolVersion.v35} or above"
-      )
-
-    override protected def pretty: Pretty[LookupByKeyActionDescription] = prettyOfClass(
-      param("key", _.key)
-    )
-
-  }
-
-  object LookupByKeyActionDescription {
-    def tryCreate(key: LfVersioned[LfGlobalKey]): LookupByKeyActionDescription =
-      new LookupByKeyActionDescription(key)
-
-    def create(
-        key: LfVersioned[LfGlobalKey]
-    ): Either[InvalidActionDescription, LookupByKeyActionDescription] =
-      Either.catchOnly[InvalidActionDescription](tryCreate(key))
-
   }
 
   @VisibleForTesting

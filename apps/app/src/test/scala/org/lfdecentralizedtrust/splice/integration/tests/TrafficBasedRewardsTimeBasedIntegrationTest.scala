@@ -822,6 +822,12 @@ abstract class TrafficBasedRewardsTimeBasedIntegrationTestBase
         sv1ScanBackend.getAllocationCancelContext(bobAllocationId)
       }
     }
+    waitForAllocationsOnParticipant(
+      splitwellValidatorBackend.participantClientWithAdminToken,
+      venueParty,
+      aliceAllocationId,
+      bobAllocationId,
+    )
 
     clue("Settlement venue settles the trade") {
       val aliceContext = sv1ScanBackend.getAllocationTransferContext(aliceAllocationId)

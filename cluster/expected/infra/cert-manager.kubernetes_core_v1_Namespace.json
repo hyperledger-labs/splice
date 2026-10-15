@@ -1,0 +1,14 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "kind": "Namespace",
+    "metadata": {
+      "name": "cert-manager"
+    }
+  },
+  "name": "cert-manager",
+  "provider": "",
+  "type": "kubernetes:core/v1:Namespace"
+}

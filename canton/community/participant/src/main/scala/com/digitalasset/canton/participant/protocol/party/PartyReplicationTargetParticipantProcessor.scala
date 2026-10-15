@@ -11,6 +11,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.party.PartyReplicator.AddPartyRequestId
 import com.digitalasset.canton.participant.admin.party.{
@@ -45,8 +46,6 @@ import scala.concurrent.ExecutionContext
   *   - requests contracts in a strictly increasing contract ordinal order,
   *   - and sends only deserializable payloads.
   *
-  * @param partyId
-  *   The party that is being replicated.
   * @param requestId
   *   The "add party" request id that this replication is associated with.
   * @param psid
@@ -70,7 +69,6 @@ import scala.concurrent.ExecutionContext
   *   Test interceptor only alters behavior in integration tests.
   */
 class PartyReplicationTargetParticipantProcessor(
-    partyId: PartyId,
     requestId: AddPartyRequestId,
     protected val psid: PhysicalSynchronizerId,
     partyOnboardingAt: EffectiveTime,
@@ -87,7 +85,6 @@ class PartyReplicationTargetParticipantProcessor(
     protected val testOnlyInterceptor: PartyReplicationTestInterceptor,
 )(implicit override val executionContext: ExecutionContext)
     extends TargetParticipantAcsPersistence(
-      partyId,
       requestId,
       psid,
       partyOnboardingAt,
@@ -183,18 +180,27 @@ class PartyReplicationTargetParticipantProcessor(
     // Skip progress check if more than one other task is already queued that performs this same progress check or
     // is going to schedule a progress check.
     if (executionQueue.isAtMostOneTaskScheduled) {
-      executeAsync(s"Respond to source participant if needed")(
-        EitherTUtil.ifThenET(
-          isChannelOpenForCommunication &&
-            replicationProgressState
-              .getAcsReplicationProgress(requestId)
-              .exists(progress =>
-                testOnlyInterceptor.onTargetParticipantProgress(
-                  progress
-                ) == PartyReplicationTestInterceptor.Proceed
-              )
-        )(respondToSourceParticipant())
-      )
+      executeAsync(s"Respond to source participant if needed") {
+
+        val interceptorAction = Option
+          .when(isChannelOpenForCommunication)(requestId)
+          .flatMap(replicationProgressState.getAcsReplicationProgress)
+          .map(testOnlyInterceptor.onTargetParticipantProgress)
+
+        interceptorAction match {
+
+          case Some(PartyReplicationTestInterceptor.Proceed) =>
+            respondToSourceParticipant()
+
+          case Some(PartyReplicationTestInterceptor.Fail(reason)) =>
+            // Actively fail the asynchronous task and propagate the error
+            EitherT.leftT[FutureUnlessShutdown, Unit](reason)
+
+          case _ =>
+            // Covers Wait, None, or closed channel
+            EitherT.rightT[FutureUnlessShutdown, String](())
+        }
+      }
     }
 
   private def respondToSourceParticipant()(implicit
@@ -295,7 +301,6 @@ object PartyReplicationTargetParticipantProcessor {
       connectedSynchronizer.synchronizerHandle.syncPersistentState.partyReplicationIndexingStoreIfOnPREnabled
         .getOrElse(throw new IllegalStateException("Expect store when OnPR enabled"))
     new PartyReplicationTargetParticipantProcessor(
-      partyId,
       requestId,
       connectedSynchronizer.psid,
       partyOnboardingAt,

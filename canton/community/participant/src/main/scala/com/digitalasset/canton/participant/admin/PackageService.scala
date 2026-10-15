@@ -14,6 +14,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.ledger.api.*
 import com.digitalasset.canton.ledger.error.PackageServiceErrors
 import com.digitalasset.canton.ledger.participant.state.PackageDescription
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
@@ -285,13 +286,13 @@ class PackageService(
       opts: ListVettedPackagesOpts
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, RpcError, Seq[EnrichedVettedPackages]] = {
+  ): EitherT[FutureUnlessShutdown, RpcError, VettedPackagesPage[EnrichedVettedPackages]] = {
     val snapshot = getPackageMetadataView.getSnapshot
     val packagePredicate = opts.toPackagePredicate(snapshot)
     packageOps
       .getVettedPackages(opts)
       .leftWiden[RpcError]
-      .map(_.flatMap(pkgs => filterAndEnrich(pkgs, predicate = packagePredicate)))
+      .map(_.mapResults(_.flatMap(pkgs => filterAndEnrich(pkgs, predicate = packagePredicate))))
   }
 
   private def enrichVettedPackages(vetted: ParticipantVettedPackages)(implicit
@@ -383,10 +384,7 @@ class PackageService(
     //     - Already un-vetted
     //     - Or can be automatically un-vetted, by revoking a vetting transaction corresponding to all packages in the DAR
 
-    val packages = {
-      import scalaz.syntax.traverse.*
-      dar.map(readPackageId)
-    }
+    val packages = dar.map(readPackageId)
 
     val mainPkg = readPackageId(dar.main)
     for {

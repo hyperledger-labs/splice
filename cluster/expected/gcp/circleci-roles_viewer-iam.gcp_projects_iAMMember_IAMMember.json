@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "role": "roles/viewer"
+  },
+  "name": "circleci-roles/viewer-iam",
+  "provider": "",
+  "type": "gcp:projects/iAMMember:IAMMember"
+}

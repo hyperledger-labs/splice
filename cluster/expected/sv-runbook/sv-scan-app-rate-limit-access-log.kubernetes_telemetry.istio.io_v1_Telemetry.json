@@ -1,0 +1,34 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "telemetry.istio.io/v1",
+    "kind": "Telemetry",
+    "metadata": {
+      "name": "scan-app-rate-limit-access-log",
+      "namespace": "sv"
+    },
+    "spec": {
+      "accessLogging": [
+        {
+          "filter": {
+            "expression": "response.code == 429"
+          },
+          "providers": [
+            {
+              "name": "envoy"
+            }
+          ]
+        }
+      ],
+      "selector": {
+        "matchLabels": {
+          "app": "scan-app"
+        }
+      }
+    }
+  },
+  "name": "sv-scan-app-rate-limit-access-log",
+  "provider": "",
+  "type": "kubernetes:telemetry.istio.io/v1:Telemetry"
+}

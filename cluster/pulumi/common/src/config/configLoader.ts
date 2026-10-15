@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import * as Yaml from 'js-yaml';
 import { readFileSync } from 'fs';
 import { mergeWith } from 'lodash';
@@ -24,9 +25,7 @@ export function readAndParseYaml(
   } else {
     try {
       context.pathStack.push(resolvedPath);
-      // TODO(#3231) The following breaks the config dumper from `make cluster/pulumi/test` but
-      //             according to the design we want it.
-      // console.log(`Loading configuration from [${resolvedPath}].`);
+      void pulumi.log.debug(`Loading configuration from [${resolvedPath}].`);
       const config = Yaml.load(readFileSync(resolvedPath, 'utf-8'), { schema: context.schema });
       context.loadedFilesByPath[resolvedPath] = config;
       return config;

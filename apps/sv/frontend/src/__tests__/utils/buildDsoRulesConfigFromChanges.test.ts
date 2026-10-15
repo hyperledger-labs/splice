@@ -134,3 +134,28 @@ describe('buildDsoRulesConfigFromChanges', () => {
     expect(result.voteCooldownTime).toEqual({ microseconds: '300000' });
   });
 });
+
+describe('buildDsoRulesConfigFromChanges switch-over times', () => {
+  const switchOverChange = (value: string) => ({
+    fieldName: 'svOperationsSwitchOverTimes',
+    label: 'SV operations switch-over times',
+    currentValue: '',
+    newValue: value,
+  });
+
+  it('is null when the switch-over field is absent', () => {
+    expect(buildDsoRulesConfigFromChanges([]).svOperationsSwitchOverTimes).toBeNull();
+  });
+
+  it('is null when the switch-over field value is empty', () => {
+    const result = buildDsoRulesConfigFromChanges([switchOverChange('')]);
+    expect(result.svOperationsSwitchOverTimes).toBeNull();
+  });
+
+  it('parses the serialized map back into a switch-over map', () => {
+    const result = buildDsoRulesConfigFromChanges([
+      switchOverChange('{"amulet-v2":"2026-09-06T00:00:00Z"}'),
+    ]);
+    expect(result.svOperationsSwitchOverTimes).toEqual({ 'amulet-v2': '2026-09-06T00:00:00Z' });
+  });
+});

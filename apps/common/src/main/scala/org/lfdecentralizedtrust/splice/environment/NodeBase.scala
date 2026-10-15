@@ -94,12 +94,15 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
   protected def packagesForJsonDecoding =
     DarResources.amulet.all ++ DarResources.TokenStandard.allPackageResources.flatMap(_.all)
 
-  lazy private val packageSignatures = {
-    ResourceTemplateDecoder.loadPackageSignaturesFromResources(packagesForJsonDecoding)
+  private def loadPackageSignatures() = {
+    logger.debug("Loading package signatures from resources")(TraceContext.empty)
+    val sigs = ResourceTemplateDecoder.loadPackageSignaturesFromResources(packagesForJsonDecoding)
+    logger.debug("Finished loading package signatures from resources")(TraceContext.empty)
+    sigs
   }
 
   lazy protected implicit val templateDecoder: TemplateJsonDecoder =
-    new ResourceTemplateDecoder(packageSignatures, loggerFactory)
+    new ResourceTemplateDecoder(loadPackageSignatures(), loggerFactory)
 
   private val httpExt = Http()(ac)
 

@@ -15,7 +15,6 @@ import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { AggregationType, MeterProvider } from "@opentelemetry/sdk-metrics";
 import { Counter, Gauge, Histogram } from "@opentelemetry/api";
 import { performance } from "perf_hooks"; // Use high-resolution monotonic clock
-import pLimit from "p-limit";
 
 async function timed<T>(metric: Histogram, operation: () => Promise<T>) {
   const startTime = performance.now();
@@ -304,6 +303,12 @@ function setupMetrics(): Metrics {
   };
 }
 
+function* partyIndexGenerator(from: number, until: number): Generator<number> {
+  for (let index = from; index < until; index++) {
+    yield index;
+  }
+}
+
 async function main() {
   const metrics = setupMetrics();
   logger.info(`Running with config: ${JSON.stringify(redactedConfig(config))}`);
@@ -332,37 +337,25 @@ async function main() {
   // This is idempotent so we just always grant it. We don't revoke it at the end as keeping it doesn't do any harm
   await client.grantExecuteAndReadAsAnyPartyRights(config.userId);
 
-  // We process batches of config.batchSize with parallelism of config.parallelism.
-  // Batch size is really just there to limit memory usage from unresolved promises.
-  const limit = pLimit(config.parallelism);
+  const queue = partyIndexGenerator(maxIndex, config.maxParties);
+  let maxPartyAllocated = maxIndex;
 
-  let index = maxIndex;
-  let maxPartyAllocated = index;
-  while (index < config.maxParties) {
-    metrics.totalPartiesAllocated.record(index);
-    logger.info(`Processing batch starting at ${index}`);
-    const batchSize = Math.min(config.batchSize, config.maxParties - index);
-    const batch = Array.from({ length: batchSize }, (_, i) => {
-      const partyIndex = index + i;
-      return limit(async () =>
-        setupParty(
-          metrics,
-          client,
-          config.userId,
-          synchronizerId,
-          partyIndex,
-          validatorPartyId,
-        ).then(() => {
-          metrics.partiesAllocatedCounter.add(1);
-          maxPartyAllocated = Math.max(maxPartyAllocated, partyIndex);
-          metrics.totalPartiesAllocated.record(maxPartyAllocated);
-        }),
+  const worker = async () => {
+    for (const partyIndex of queue) {
+      await setupParty(
+        metrics,
+        client,
+        config.userId,
+        synchronizerId,
+        partyIndex,
+        validatorPartyId,
       );
-    });
-    await Promise.all(batch);
-    logger.info(`Completed batch`);
-    index += batchSize;
-  }
+      metrics.partiesAllocatedCounter.add(1);
+      maxPartyAllocated = Math.max(maxPartyAllocated, partyIndex);
+      metrics.totalPartiesAllocated.record(maxPartyAllocated);
+    }
+  };
+  await Promise.all(Array.from({ length: config.parallelism }, () => worker()));
   logger.info(`Party allocator, completed. Sleeping`);
   // sleep forever so k8s doesn't restart it over and over.
   // For some reason, nodejs is too smart and await new Promise(() => {}) does not actually work.

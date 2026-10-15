@@ -1,0 +1,43 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "alertStrategy": {
+      "autoClose": "3600s",
+      "notificationChannelStrategies": [
+        {
+          "notificationChannelNames": [
+            null
+          ],
+          "renotifyInterval": "14400s"
+        }
+      ]
+    },
+    "combiner": "OR",
+    "conditions": [
+      {
+        "conditionPrometheusQueryLanguage": {
+          "duration": "0s",
+          "evaluationInterval": "30s",
+          "query": "sum by (gateway_name) (router_googleapis_com:nat_nat_allocation_failed{monitored_resource=\"nat_gateway\", gateway_name=~\"nat-mock-gw.*\"}) > 0"
+        },
+        "displayName": "NAT allocation failed in mock"
+      }
+    ],
+    "displayName": "NAT allocation failed in mock",
+    "documentation": {
+      "content": "Cloud NAT failed to allocate IPs or ports for at least one VM in cluster mock. This typically indicates NAT IP or port exhaustion.",
+      "mimeType": "text/markdown",
+      "subject": "NAT allocation failed in mock"
+    },
+    "notificationChannels": [
+      null
+    ],
+    "userLabels": {
+      "cluster": "mock"
+    }
+  },
+  "name": "natAllocationFailedAlert",
+  "provider": "",
+  "type": "gcp:monitoring/alertPolicy:AlertPolicy"
+}

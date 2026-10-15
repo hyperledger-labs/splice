@@ -1,0 +1,89 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "networking.istio.io/v1alpha3",
+    "kind": "VirtualService",
+    "metadata": {
+      "name": "direct-loopback-through-ingress-gateway",
+      "namespace": "validator"
+    },
+    "spec": {
+      "exportTo": [
+        "."
+      ],
+      "gateways": [
+        "mesh"
+      ],
+      "hosts": [
+        "mock.global.canton.network.digitalasset.com",
+        "validator.mock.global.canton.network.digitalasset.com",
+        "*.validator.mock.global.canton.network.digitalasset.com",
+        "validator1.mock.global.canton.network.digitalasset.com",
+        "*.validator1.mock.global.canton.network.digitalasset.com",
+        "splitwell.mock.global.canton.network.digitalasset.com",
+        "*.splitwell.mock.global.canton.network.digitalasset.com",
+        "sv-2.mock.global.canton.network.digitalasset.com",
+        "*.sv-2.mock.global.canton.network.digitalasset.com",
+        "sv-1.mock.global.canton.network.digitalasset.com",
+        "*.sv-1.mock.global.canton.network.digitalasset.com",
+        "sv.mock.global.canton.network.digitalasset.com",
+        "*.sv.mock.global.canton.network.digitalasset.com"
+      ],
+      "http": [
+        {
+          "match": [
+            {
+              "gateways": [
+                "mesh"
+              ]
+            }
+          ],
+          "route": [
+            {
+              "destination": {
+                "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+              }
+            }
+          ]
+        }
+      ],
+      "tls": [
+        {
+          "match": [
+            {
+              "gateways": [
+                "mesh"
+              ],
+              "sniHosts": [
+                "mock.global.canton.network.digitalasset.com",
+                "validator.mock.global.canton.network.digitalasset.com",
+                "*.validator.mock.global.canton.network.digitalasset.com",
+                "validator1.mock.global.canton.network.digitalasset.com",
+                "*.validator1.mock.global.canton.network.digitalasset.com",
+                "splitwell.mock.global.canton.network.digitalasset.com",
+                "*.splitwell.mock.global.canton.network.digitalasset.com",
+                "sv-2.mock.global.canton.network.digitalasset.com",
+                "*.sv-2.mock.global.canton.network.digitalasset.com",
+                "sv-1.mock.global.canton.network.digitalasset.com",
+                "*.sv-1.mock.global.canton.network.digitalasset.com",
+                "sv.mock.global.canton.network.digitalasset.com",
+                "*.sv.mock.global.canton.network.digitalasset.com"
+              ]
+            }
+          ],
+          "route": [
+            {
+              "destination": {
+                "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "name": "loopback-virtual-service-validator",
+  "provider": "",
+  "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
+}

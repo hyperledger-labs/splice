@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import {
   activeVersion,
   Auth0Client,
@@ -97,6 +98,6 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
       { dependsOn: imagePullDeps.concat(dependencies).concat(loopback) }
     );
   } else {
-    console.log('K6 load test is disabled for this cluster. Skipping...');
+    void pulumi.log.info('K6 load test is disabled for this cluster. Skipping...');
   }
 }

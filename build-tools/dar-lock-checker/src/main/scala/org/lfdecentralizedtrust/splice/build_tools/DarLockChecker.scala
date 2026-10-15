@@ -178,7 +178,8 @@ object DarLockChecker {
   ): Unit = {
     val lastReleaseNumber = File("LATEST_RELEASE").contentAsString.strip
     val branch = s"release-line-$lastReleaseNumber"
-    val ref = s"refs/remotes/origin/$branch"
+    val remote = resolveRemoteRef(branch)
+    val ref = s"refs/remotes/$remote/$branch"
     ensureRefAvailable(branch)
     val lastReleaseDarLock =
       s"git show $ref:daml/dars.lock".!!
@@ -357,12 +358,30 @@ object DarLockChecker {
   }
 
   // Default: the release line ref used by checkPackageIdsImmutable, e.g.
-  // `refs/remotes/origin/release-line-0.6.0`. Override via the `--base=<ref>` flag
+  // `refs/remotes/upstream/release-line-0.6.0`. Override via the `--base=<ref>` flag
   // (e.g. `--base=origin/main`) for long-running branches that are not targeting
   // the next release.
   private def defaultCompareRef(): String = {
     val lastReleaseNumber = File("LATEST_RELEASE").contentAsString.strip
-    s"refs/remotes/origin/release-line-$lastReleaseNumber"
+    val branch = s"release-line-$lastReleaseNumber"
+    val remote = resolveRemoteRef(branch)
+    s"refs/remotes/$remote/$branch"
+  }
+
+  private[build_tools] def resolveRemoteRef(
+      branch: String,
+      remotes: Seq[String] = Seq("origin", "upstream"),
+      availableRefs: Option[Set[String]] = None,
+  ): String = {
+    val refs = availableRefs.getOrElse {
+      remotes.flatMap { remote =>
+        val ref = s"refs/remotes/$remote/$branch"
+        if (s"git rev-parse --verify --quiet $ref".! == 0) Seq(ref) else Seq.empty
+      }.toSet
+    }
+    remotes
+      .find(remote => refs.contains(s"refs/remotes/$remote/$branch"))
+      .getOrElse(remotes.headOption.getOrElse("origin"))
   }
 
   private def fetchCompareDarsLock(ref: String): Map[(PackageName, PackageVersion), String] = {
@@ -379,14 +398,15 @@ object DarLockChecker {
     }
   }
 
-  /** Ensure `refs/remotes/origin/$branch` exists locally
+  /** Ensure `refs/remotes/<remote>/$branch` exists locally.
     */
   private def ensureRefAvailable(branch: String): Unit = {
-    val ref = s"refs/remotes/origin/$branch"
+    val remote = resolveRemoteRef(branch)
+    val ref = s"refs/remotes/$remote/$branch"
     if (s"git rev-parse --verify --quiet $ref".! != 0) {
-      System.err.println(s"Fetching $branch, not present locally")
-      val rc = s"git fetch --no-tags --depth=1 origin $branch:$ref".!
-      if (rc != 0) sys.error(s"git fetch $branch failed (exit $rc)")
+      System.err.println(s"Fetching $branch from $remote, not present locally")
+      val rc = s"git fetch --no-tags --depth=1 $remote $branch:$ref".!
+      if (rc != 0) sys.error(s"git fetch $remote $branch failed (exit $rc)")
     }
   }
 }

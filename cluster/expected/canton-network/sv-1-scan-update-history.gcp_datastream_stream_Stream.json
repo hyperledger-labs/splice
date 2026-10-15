@@ -1,0 +1,56 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "backfillAll": {},
+    "desiredState": "RUNNING",
+    "destinationConfig": {
+      "bigqueryDestinationConfig": {
+        "dataFreshness": "14400s",
+        "singleTargetDataset": {
+          "datasetId": "projects/undefined/datasets/mock_da2_scan"
+        }
+      }
+    },
+    "displayName": "sv-1-scan-update-history",
+    "labels": {
+      "cluster": "mock",
+      "datastream_id": "legacy"
+    },
+    "location": "europe-west6",
+    "sourceConfig": {
+      "postgresqlSourceConfig": {
+        "includeObjects": {
+          "postgresqlSchemas": [
+            {
+              "postgresqlTables": [
+                {
+                  "table": "update_history_creates"
+                },
+                {
+                  "table": "update_history_exercises"
+                },
+                {
+                  "table": "scan_verdict_store"
+                },
+                {
+                  "table": "scan_verdict_transaction_view_store"
+                },
+                {
+                  "table": "app_activity_record_store"
+                }
+              ],
+              "schema": "scan_sv_1"
+            }
+          ]
+        },
+        "publication": "update_history_datastream_pub",
+        "replicationSlot": "update_history_datastream_r_slot"
+      }
+    },
+    "streamId": "sv-1-scan-update-history"
+  },
+  "name": "sv-1-scan-update-history",
+  "provider": "",
+  "type": "gcp:datastream/stream:Stream"
+}

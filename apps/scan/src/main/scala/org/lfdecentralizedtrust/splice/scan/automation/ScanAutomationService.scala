@@ -28,6 +28,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
 }
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanAppRewardsStore, DbScanVerdictStore}
+import org.lfdecentralizedtrust.splice.scan.store.historystart.ScanHistoryStart
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
@@ -89,6 +90,9 @@ class ScanAutomationService(
       )
     )
 
+  def registerHistoryStartTrigger(historyStart: ScanHistoryStart): Unit =
+    registerTrigger(new ScanHistoryStartTrigger(historyStart, triggerContext))
+
   def registerPruneRewardAccountingTrigger(
       rewardsReferenceStore: ScanRewardsReferenceStore,
       verdictStore: DbScanVerdictStore,
@@ -143,9 +147,18 @@ class ScanAutomationService(
       snapshotStore,
       updateHistory,
       scanStorageConfigV1,
+      config.perAcsSnapshotTablesEnabled,
       triggerContext,
     )
   )
+  if (config.perAcsSnapshotTablesEnabled) {
+    registerTrigger(
+      new AcsSnapshotIndexTrigger(
+        snapshotStore,
+        triggerContext,
+      )
+    )
+  }
   // The acs snapshot backfilling trigger should not attempt to backfill snapshots unless the
   // backfilling UpdateHistory is fully enabled and complete.
   if (config.updateHistoryBackfillEnabled && config.updateHistoryBackfillImportUpdatesEnabled) {

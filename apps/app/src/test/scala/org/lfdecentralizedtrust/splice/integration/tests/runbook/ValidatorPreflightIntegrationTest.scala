@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -464,19 +464,12 @@ abstract class ValidatorPreflightIntegrationTestBase
           env.environment.clock.now.toInstant.isAfter(connection.availableAfter.plusSeconds(60))
         }
 
-        val availableConnections = if (connections.forall(_.serial.isEmpty)) {
-          val latestMigrationId = connections.map(_.migrationId).max
-          connections.filter(connection =>
-            connection.migrationId == latestMigrationId &&
-              connection.url != "" &&
-              isAvailable(connection)
-          )
-        } else {
-          connections.filter(connection =>
-            connection.serial.contains(migrationId) &&
-              isAvailable(connection)
-          )
-        }
+        val latestSerial = connections.map(_.serial).max
+        val availableConnections = connections.filter(connection =>
+          connection.serial == latestSerial &&
+            connection.url != "" &&
+            isAvailable(connection)
+        )
         val (expectedSequencerConnections, _) =
           Endpoint
             .fromUris(NonEmpty.from(availableConnections.map(conn => new URI(conn.url))).value)
@@ -606,10 +599,12 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
         val synchronizerNodeConfig =
           nodeState.state.synchronizerNodes.asScala.values.headOption.value
         val svSequencerUrl = synchronizerNodeConfig.physicalSynchronizers.toScala
-          .flatMap(_.asScala.get(migrationId).flatMap(_.sequencer.map(_.url).toScala))
-          .getOrElse(
-            synchronizerNodeConfig.sequencer.toScala.value.url
+          .flatMap(
+            _.asScala.toSeq
+              .maxByOption(_._1.longValue())
+              .flatMap(_._2.sequencer.map(_.url).toScala)
           )
+          .value
         val (svSequencerEndpoint, _) = Endpoint
           .fromUris(
             NonEmpty.from(Seq(new URI(svSequencerUrl))).value

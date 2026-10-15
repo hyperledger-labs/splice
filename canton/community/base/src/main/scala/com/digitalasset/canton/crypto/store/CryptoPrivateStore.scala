@@ -4,7 +4,6 @@
 package com.digitalasset.canton.crypto.store
 
 import cats.data.EitherT
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
@@ -14,12 +13,14 @@ import com.digitalasset.canton.crypto.store.db.DbCryptoPrivateStore
 import com.digitalasset.canton.crypto.store.memory.InMemoryCryptoPrivateStore
 import com.digitalasset.canton.error.{CantonBaseError, CantonErrorGroups}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.replica.ReplicaManager
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ReleaseProtocolVersion
+import com.digitalasset.canton.version.{ProtocolVersion, ReleaseProtocolVersion}
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.concurrent.ExecutionContext
 
@@ -240,6 +241,14 @@ object CryptoPrivateStoreError extends CantonErrorGroups.CommandErrorGroup {
   final case class FailedToGetWrapperKeyId(reason: String) extends CryptoPrivateStoreError {
     override protected def pretty: Pretty[FailedToGetWrapperKeyId] = prettyOfClass(
       unnamedParam(_.reason.unquoted)
+    )
+  }
+
+  final case class FailedToSerializeKey(reason: String, pv: ProtocolVersion)
+      extends CryptoPrivateStoreError {
+    override protected def pretty: Pretty[FailedToSerializeKey] = prettyOfClass(
+      param("protocol version", _.pv),
+      param("reason", _.reason.unquoted),
     )
   }
 

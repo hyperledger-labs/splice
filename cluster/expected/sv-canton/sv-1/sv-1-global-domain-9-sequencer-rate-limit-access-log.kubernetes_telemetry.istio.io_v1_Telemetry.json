@@ -1,0 +1,34 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "telemetry.istio.io/v1",
+    "kind": "Telemetry",
+    "metadata": {
+      "name": "global-domain-9-sequencer-rate-limit-access-log",
+      "namespace": "sv-1"
+    },
+    "spec": {
+      "accessLogging": [
+        {
+          "filter": {
+            "expression": "response.grpc_status == 8"
+          },
+          "providers": [
+            {
+              "name": "envoy"
+            }
+          ]
+        }
+      ],
+      "selector": {
+        "matchLabels": {
+          "app": "global-domain-9-sequencer"
+        }
+      }
+    }
+  },
+  "name": "sv-1-global-domain-9-sequencer-rate-limit-access-log",
+  "provider": "",
+  "type": "kubernetes:telemetry.istio.io/v1:Telemetry"
+}

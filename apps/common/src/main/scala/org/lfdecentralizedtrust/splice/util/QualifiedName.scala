@@ -45,6 +45,14 @@ object PackageQualifiedName {
       QualifiedName(companion.TEMPLATE_ID.getModuleName, companion.TEMPLATE_ID.getEntityName),
     )
   }
+
+  def assertFromString(s: String): PackageQualifiedName = {
+    val segments = s.split(":")
+    if (segments.length != 3) {
+      throw new IllegalArgumentException(s"Expect qualified name with two identifiers but got $s")
+    }
+    PackageQualifiedName(segments(0), QualifiedName(segments(1), segments(2)))
+  }
 }
 
 object QualifiedName {

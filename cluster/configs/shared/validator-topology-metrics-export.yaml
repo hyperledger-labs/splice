@@ -1,0 +1,5 @@
+validatorApp:
+  additionalEnvVars: !append
+    - name: ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT
+      value: |
+        canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 10m

@@ -1,0 +1,23 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "ClusterRoleBinding",
+    "roleRef": {
+      "apiGroup": "rbac.authorization.k8s.io",
+      "kind": "ClusterRole",
+      "name": "cluster-admin"
+    },
+    "subjects": [
+      {
+        "kind": "ServiceAccount",
+        "name": "sv-canton.sv-da-1-migration-9-sa",
+        "namespace": "operator"
+      }
+    ]
+  },
+  "name": "sv-canton.sv-da-1-migration-9:cluster-admin",
+  "provider": "",
+  "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+}

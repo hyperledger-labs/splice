@@ -1,0 +1,174 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: acs commitment pv36
+      folder: canton
+      interval: 1m
+      rules:
+        - uid: ffghab4ms1ds0e
+          title: ACS Commitment Checkpoint Delay (PV >= 36)
+          condition: acs commitment checkpoint delay threshold exceeded
+          data:
+            - refId: acs commitment checkpoint delay
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: prometheus
+              model:
+                editorMode: code
+                expr: min by (namespace, job) (timestamp(daml_participant_sync_commitments_checkpoint_watermark) - (daml_participant_sync_commitments_checkpoint_watermark > 0) / 1e6)
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: acs commitment checkpoint delay
+            - refId: acs commitment checkpoint delay threshold exceeded
+              datasourceUid: __expr__
+              model:
+                conditions:
+                  - evaluator:
+                      params:
+                        - $ACS_COMMITMENT_CHECKPOINT_DELAY_THRESHOLD_SECONDS
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params:
+                        - C
+                    reducer:
+                      params: []
+                      type: last
+                    type: query
+                datasource:
+                  type: __expr__
+                  uid: __expr__
+                expression: acs commitment checkpoint delay
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: acs commitment checkpoint delay threshold exceeded
+                type: threshold
+          dashboardUid: cnpqrxx
+          panelId: 11
+          noDataState: Alerting
+          execErrState: Alerting
+          for: 5m
+          annotations:
+            __dashboardUid__: cnpqrxx
+            __panelId__: "11"
+            severity: critical
+            summary: The job {{ $labels.job }} in namespace {{ $labels.namespace }} is reporting an ACS commitment checkpoint delay
+          labels: {}
+          isPaused: false
+        - uid: ffghab4ms1ds0f
+          title: ACS Commitment Delay (PV >= 36)
+          condition: acs commitment delay threshold exceeded
+          data:
+            - refId: acs commitment delay
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: prometheus
+              model:
+                editorMode: code
+                expr: min by (namespace, job) (timestamp(daml_participant_sync_commitments_tick_watermark) - (daml_participant_sync_commitments_tick_watermark > 0) / 1e6)
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: acs commitment delay
+            - refId: acs commitment delay threshold exceeded
+              datasourceUid: __expr__
+              model:
+                conditions:
+                  - evaluator:
+                      params:
+                        - $ACS_COMMITMENT_DELAY_THRESHOLD_SECONDS
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params:
+                        - C
+                    reducer:
+                      params: []
+                      type: last
+                    type: query
+                datasource:
+                  type: __expr__
+                  uid: __expr__
+                expression: acs commitment delay
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: acs commitment delay threshold exceeded
+                type: threshold
+          dashboardUid: cnpqrxx
+          panelId: 10
+          noDataState: Alerting
+          execErrState: Alerting
+          for: 5m
+          annotations:
+            __dashboardUid__: cnpqrxx
+            __panelId__: "10"
+            severity: critical
+            summary: The job {{ $labels.job }} in namespace {{ $labels.namespace }} is reporting an ACS commitment delay
+          labels: {}
+          isPaused: false
+        # 2 = started so outside_range [2, 2] matches everything but started.
+        - uid: ffghab4ms1ds0g
+          title: ACS Commitment Component Failed (PV >= 36)
+          condition: acs commitment component is not in state started
+          data:
+            - refId: acs commitment component health
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: prometheus
+              model:
+                editorMode: code
+                expr: max by (namespace, job, component) (label_replace({__name__=~"daml_participant_sync_commitments_(digest_processor|matcher|tick_signaller)_health"}, "component", "$1", "__name__", "daml_participant_sync_commitments_(.*)_health"))
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: acs commitment component health
+            - refId: acs commitment component is not in state started
+              datasourceUid: __expr__
+              model:
+                conditions:
+                  - evaluator:
+                      params:
+                        - 2
+                        - 2
+                      type: outside_range
+                    operator:
+                      type: and
+                    query:
+                      params:
+                        - C
+                    reducer:
+                      params: []
+                      type: last
+                    type: query
+                datasource:
+                  type: __expr__
+                  uid: __expr__
+                expression: acs commitment component health
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: acs commitment component is not in state started
+                type: threshold
+          dashboardUid: cnpqrxx
+          panelId: 13
+          noDataState: Alerting
+          execErrState: Alerting
+          for: 5m
+          annotations:
+            __dashboardUid__: cnpqrxx
+            __panelId__: "13"
+            severity: critical
+            summary: The ACS commitment {{ $labels.component }} of the job {{ $labels.job }} in namespace {{ $labels.namespace }} is not in state started.
+          labels: {}
+          isPaused: false

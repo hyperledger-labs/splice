@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.data
 
-import cats.syntax.traverse.*
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.ProtoDeserializationError.FieldNotSet
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -11,6 +10,9 @@ import com.digitalasset.canton.protocol.ContractIdSyntax.*
 import com.digitalasset.canton.protocol.{LfContractId, v30}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
+import com.digitalasset.canton.validation.ProtoValidation
+import com.digitalasset.canton.version.ProtocolVersionValidation
 
 sealed trait LegacyKeyResolution extends Product with Serializable with PrettyPrinting {
   def resolution: Option[LfContractId]
@@ -48,17 +50,20 @@ sealed trait LegacySerializableKeyResolution extends LegacyKeyResolution {
 
 object LegacySerializableKeyResolution {
   def fromProtoOneOfV30(
-      resolutionP: v30.ViewParticipantData.ResolvedKey.Resolution
+      pvv: ProtocolVersionValidation,
+      resolutionP: v30.ViewParticipantData.ResolvedKey.Resolution,
   ): ParsingResult[LegacySerializableKeyResolution] =
     resolutionP match {
       case v30.ViewParticipantData.ResolvedKey.Resolution.ContractId(contractIdP) =>
-        ProtoConverter
-          .parseLfContractId(contractIdP)
+        ProtoValidation
+          .validateThen(contractIdP, "contract_id", pvv)(ProtoConverter.parseLfContractId)
           .map(LegacyAssignedKey.apply)
       case v30.ViewParticipantData.ResolvedKey.Resolution
             .Free(v30.ViewParticipantData.FreeKey(maintainersP)) =>
-        maintainersP
-          .traverse(ProtoConverter.parseLfPartyId(_, "maintainers"))
+        ProtoValidation
+          .validateThen(maintainersP, "maintainers", pvv, ProtoValidation.MaxCollectionSize)(
+            ProtoConverter.parseLfPartyId
+          )
           .map(maintainers => LegacyFreeKey(maintainers.toSet))
       case v30.ViewParticipantData.ResolvedKey.Resolution.Empty =>
         Left(FieldNotSet("ViewParticipantData.ResolvedKey.resolution"))
@@ -86,7 +91,8 @@ final case class LegacyFreeKey(override val maintainers: Set[LfPartyId])
 
   override def toProtoOneOfV30: v30.ViewParticipantData.ResolvedKey.Resolution =
     v30.ViewParticipantData.ResolvedKey.Resolution.Free(
-      value = v30.ViewParticipantData.FreeKey(maintainers = maintainers.toSeq)
+      value =
+        v30.ViewParticipantData.FreeKey(maintainers = maintainers.toSeq.map(_.toProtoUnvalidated))
     )
 
   override def asSerializable: LegacySerializableKeyResolution = this

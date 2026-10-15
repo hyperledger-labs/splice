@@ -1,0 +1,12 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "description": "Drops the load balancer request logs of requests accepted by the Cloud Armor policy waf-whitelist-throttle-ban-mock",
+    "filter": "resource.type=(\"http_external_regional_lb_rule\" OR \"http_load_balancer\")\njsonPayload.enforcedSecurityPolicy.name=\"waf-whitelist-throttle-ban-mock\"\njsonPayload.enforcedSecurityPolicy.outcome=\"ACCEPT\"\n(NOT jsonPayload.previewSecurityPolicy:* OR jsonPayload.previewSecurityPolicy.outcome=\"ACCEPT\")",
+    "name": "cloud-armor-accepted-requests-mock"
+  },
+  "name": "cloud-armor-accepted-requests-mock",
+  "provider": "",
+  "type": "gcp:logging/projectExclusion:ProjectExclusion"
+}

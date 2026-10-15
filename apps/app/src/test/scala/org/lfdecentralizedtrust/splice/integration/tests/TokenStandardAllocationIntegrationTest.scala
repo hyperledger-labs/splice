@@ -400,6 +400,12 @@ class TokenStandardAllocationIntegrationTest
         sv1ScanBackend.getAllocationCancelContext(bobAllocationId)
       }
     }
+    waitForAllocationsOnParticipant(
+      splitwellValidatorBackend.participantClientWithAdminToken,
+      venueParty,
+      aliceAllocationId,
+      bobAllocationId,
+    )
 
     AllocatedOtcTrade(
       venueParty = venueParty,

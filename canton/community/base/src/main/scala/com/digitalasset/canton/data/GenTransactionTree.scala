@@ -7,7 +7,6 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.crypto.*
@@ -16,6 +15,7 @@ import com.digitalasset.canton.data.MerkleTree.*
 import com.digitalasset.canton.data.ViewPosition.MerkleSeqIndexFromRoot
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.protocol.{v30, *}
 import com.digitalasset.canton.sequencing.protocol.Recipients
@@ -25,7 +25,9 @@ import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.version.*
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
+import com.google.protobuf.ByteString
 import monocle.Lens
 import monocle.macros.GenLens
 
@@ -72,9 +74,9 @@ final case class GenTransactionTree private (
     go(this)
   }
 
+  /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
   @VisibleForTesting
-  // Private, because it does not check object invariants and is therefore unsafe.
-  private[data] def copy(
+  def copy(
       submitterMetadata: MerkleTree[SubmitterMetadata] = this.submitterMetadata,
       commonMetadata: MerkleTree[CommonMetadata] = this.commonMetadata,
       participantMetadata: MerkleTree[ParticipantMetadata] = this.participantMetadata,
@@ -256,6 +258,11 @@ final case class GenTransactionTree private (
   )
 }
 
+final case class GenTransactionTreeDeserializationContext(
+    hashOps: HashOps,
+    synchronizerLimits: SynchronizerLimits,
+)
+
 object GenTransactionTree {
 
   /** @throws GenTransactionTree$.InvalidGenTransactionTree
@@ -284,29 +291,34 @@ object GenTransactionTree {
     ).validated
 
   /** Indicates an attempt to create an invalid [[GenTransactionTree]]. */
-  final case class InvalidGenTransactionTree(message: String) extends RuntimeException(message) {}
+  final case class InvalidGenTransactionTree(message: String) extends RuntimeException(message)
 
+  /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
   @VisibleForTesting
-  val submitterMetadataUnsafe: Lens[GenTransactionTree, MerkleTree[SubmitterMetadata]] =
-    GenLens[GenTransactionTree](_.submitterMetadata)
-
-  @VisibleForTesting
-  val rootViewsUnsafe: Lens[GenTransactionTree, MerkleSeq[TransactionView]] =
-    GenLens[GenTransactionTree](_.rootViews)
+  object Optics {
+    val rootViewsUnsafe: Lens[GenTransactionTree, MerkleSeq[TransactionView]] =
+      GenLens[GenTransactionTree](_.rootViews)
+  }
 
   def fromProtoV30(
-      context: (HashOps, ProtocolVersion),
+      context: (GenTransactionTreeDeserializationContext, ProtocolVersion),
       protoTransactionTree: v30.GenTransactionTree,
   ): ParsingResult[GenTransactionTree] = {
-    val (hashOps, expectedProtocolVersion) = context
+    val (
+      GenTransactionTreeDeserializationContext(hashOps, synchronizerLimits),
+      expectedProtocolVersion,
+    ) = context
     for {
       submitterMetadata <- MerkleTree
-        .fromProtoOptionV30(
+        .fromProtoOptionV30NoMerkleSeq(
           protoTransactionTree.submitterMetadata,
-          SubmitterMetadata.fromByteString(expectedProtocolVersion, hashOps),
+          SubmitterMetadata.fromByteString(
+            expectedProtocolVersion,
+            SubmitterMetadataDeserializationContext(hashOps, synchronizerLimits),
+          ),
         )
       commonMetadata <- MerkleTree
-        .fromProtoOptionV30(
+        .fromProtoOptionV30NoMerkleSeq(
           protoTransactionTree.commonMetadata,
           CommonMetadata.fromByteString(expectedProtocolVersion, hashOps),
         )
@@ -314,7 +326,7 @@ object GenTransactionTree {
         InvariantViolation(field = "GenTransactionTree.commonMetadata", error = "is blinded")
       )
       participantMetadata <- MerkleTree
-        .fromProtoOptionV30(
+        .fromProtoOptionV30NoMerkleSeq(
           protoTransactionTree.participantMetadata,
           ParticipantMetadata.fromByteString(expectedProtocolVersion, hashOps),
         )
@@ -324,8 +336,15 @@ object GenTransactionTree {
         (
           (
             hashOps,
-            TransactionView
-              .fromByteString(expectedProtocolVersion, (hashOps, expectedProtocolVersion)),
+            (bytes: ByteString, depthCounter: DepthCounter) =>
+              TransactionView.fromByteString(
+                expectedProtocolVersion,
+                (hashOps, depthCounter, expectedProtocolVersion),
+              )(bytes),
+            DepthCounter.withLimit(
+              expectedProtocolVersion,
+              synchronizerLimits.transactionProtocolLimits.maxTransactionTreeDepth.value,
+            ),
           ),
           expectedProtocolVersion,
         ),

@@ -1,8 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.plugins
 
 import cats.data.Chain
-import com.digitalasset.canton.ScalaFuturesWithPatience
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.scalatest.ScalaFuturesWithPatience
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_AddSv
 import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson

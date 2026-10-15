@@ -1,0 +1,17 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "kind": "Namespace",
+    "metadata": {
+      "labels": {
+        "istio-injection": "disabled"
+      },
+      "name": "observability"
+    }
+  },
+  "name": "observability",
+  "provider": "",
+  "type": "kubernetes:core/v1:Namespace"
+}

@@ -1,0 +1,60 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "allowedLogoutUrls": [
+      "https://wallet.validator1.mock.network.canton.global",
+      "https://wallet.validator1.mock.global.canton.network.digitalasset.com",
+      "https://cns.validator1.mock.network.canton.global",
+      "https://cns.validator1.mock.global.canton.network.digitalasset.com",
+      "https://splitwell.validator1.mock.network.canton.global",
+      "https://splitwell.validator1.mock.global.canton.network.digitalasset.com"
+    ],
+    "allowedOrigins": [
+      "https://wallet.validator1.mock.network.canton.global",
+      "https://wallet.validator1.mock.global.canton.network.digitalasset.com",
+      "https://cns.validator1.mock.network.canton.global",
+      "https://cns.validator1.mock.global.canton.network.digitalasset.com",
+      "https://splitwell.validator1.mock.network.canton.global",
+      "https://splitwell.validator1.mock.global.canton.network.digitalasset.com"
+    ],
+    "appType": "spa",
+    "callbacks": [
+      "https://wallet.validator1.mock.network.canton.global",
+      "https://wallet.validator1.mock.global.canton.network.digitalasset.com",
+      "https://cns.validator1.mock.network.canton.global",
+      "https://cns.validator1.mock.global.canton.network.digitalasset.com",
+      "https://splitwell.validator1.mock.network.canton.global",
+      "https://splitwell.validator1.mock.global.canton.network.digitalasset.com"
+    ],
+    "crossOriginAuth": false,
+    "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, ANS and Splitwell UIs for the standalone Validator1",
+    "grantTypes": [
+      "authorization_code",
+      "implicit",
+      "refresh_token"
+    ],
+    "name": "Validator1 UI (Pulumi managed, test-stack)",
+    "oidcConformant": true,
+    "refreshToken": {
+      "expirationType": "expiring",
+      "idleTokenLifetime": 259200,
+      "infiniteIdleTokenLifetime": false,
+      "infiniteTokenLifetime": false,
+      "leeway": 5,
+      "rotationType": "rotating",
+      "tokenLifetime": 604800
+    },
+    "webOrigins": [
+      "https://wallet.validator1.mock.network.canton.global",
+      "https://wallet.validator1.mock.global.canton.network.digitalasset.com",
+      "https://cns.validator1.mock.network.canton.global",
+      "https://cns.validator1.mock.global.canton.network.digitalasset.com",
+      "https://splitwell.validator1.mock.network.canton.global",
+      "https://splitwell.validator1.mock.global.canton.network.digitalasset.com"
+    ]
+  },
+  "name": "validator1UiApp",
+  "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+  "type": "auth0:index/client:Client"
+}

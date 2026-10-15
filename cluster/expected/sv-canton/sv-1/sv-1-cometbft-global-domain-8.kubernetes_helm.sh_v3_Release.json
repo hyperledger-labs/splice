@@ -1,0 +1,119 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cometbft",
+    "compat": "true",
+    "maxHistory": 10,
+    "name": "cometbft-global-domain-8",
+    "namespace": "sv-1",
+    "timeout": 600,
+    "values": {
+      "affinity": {
+        "nodeAffinity": {
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "cn_apps",
+                    "operator": "Exists"
+                  },
+                  {
+                    "key": "cn_apps",
+                    "operator": "In",
+                    "values": [
+                      "hyperdisk"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "cluster": {
+        "dnsName": "mock.global.canton.network.digitalasset.com",
+        "fixedTokens": false,
+        "hostname": "mock.global.canton.network.digitalasset.com",
+        "name": "cn-mocknet"
+      },
+      "db": {
+        "pvcName": "cometbft-migration-8-hd-pvc",
+        "volumeStorageClass": "hyperdisk-standard-rwo"
+      },
+      "genesis": {
+        "chainId": "mock-8",
+        "chainIdSuffix": "4"
+      },
+      "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+      "istioVirtualService": {
+        "enabled": true,
+        "gateway": "cluster-ingress/cn-apps-gateway",
+        "port": 26816
+      },
+      "logLevel": "debug",
+      "mempool": {
+        "size": 4000
+      },
+      "metrics": {
+        "enable": true,
+        "labels": [
+          {
+            "key": "active_migration",
+            "value": false
+          }
+        ],
+        "migration": {
+          "active": false,
+          "id": 8
+        }
+      },
+      "node": {
+        "enableTimeoutCommit": false,
+        "externalAddress": "cometbft.mock.global.canton.network.digitalasset.com:26816",
+        "id": "5af57aa83abcec085c949323ed8538108757be9c",
+        "identifier": "global-domain-8-cometbft",
+        "istioPort": 26816,
+        "keysSecret": "",
+        "privateKey": "sv1-cometbft-keys-node-private-key",
+        "retainBlocks": 5040000,
+        "validator": {
+          "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "privateKey": "sv1-cometbft-keys-validator-private-key",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+        }
+      },
+      "nodeName": "Digital-Asset-2",
+      "serviceAccountName": "sv-canton-migration-8",
+      "stateSync": {
+        "enable": false,
+        "rpcServers": "https://sv.sv-2.mock.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.mock.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
+      },
+      "sv1": {
+        "externalAddress": "cometbft.mock.global.canton.network.digitalasset.com:26816",
+        "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+        "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
+        "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+      },
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cn_apps",
+          "operator": "Exists"
+        }
+      ],
+      "watchdog": {
+        "enabled": true,
+        "evaluationIntervalSeconds": 900,
+        "mediatorMetricsUrl": "http://global-domain-8-mediator:10013/metrics",
+        "sequencerMetricsUrl": "http://global-domain-8-sequencer:10013/metrics",
+        "threshold": 2
+      }
+    },
+    "version": "0.3.20"
+  },
+  "name": "sv-1-cometbft-global-domain-8",
+  "provider": "",
+  "type": "kubernetes:helm.sh/v3:Release"
+}

@@ -1,0 +1,15 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "condition": {
+      "description": "(managed by Pulumi)",
+      "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_mock\")",
+      "title": "\"validator1_mock\" keyring"
+    },
+    "role": "roles/cloudkms.cryptoOperator"
+  },
+  "name": "mock-validator1-kms-roles/cloudkms.cryptoOperator-\"validator1_mock\"-keyring-iam",
+  "provider": "",
+  "type": "gcp:projects/iAMMember:IAMMember"
+}

@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.config
 
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.{RateLimitersConfig as _, *}
 import org.lfdecentralizedtrust.splice.store.{ChoiceContextContractFetcher, HardLimit, Limit}
 
 final case class SpliceParametersConfig(
@@ -23,6 +23,7 @@ final case class SpliceParametersConfig(
     databaseDefaultLimit: NonNegativeInt = NonNegativeInt.tryCreate(Limit.DefaultMaxPageSize),
 ) extends LocalNodeParametersConfig {
   override def alphaVersionSupport: Boolean = false
+  override def devVersionSupport = false
 
   override def watchdog: Option[WatchdogConfig] = None
 

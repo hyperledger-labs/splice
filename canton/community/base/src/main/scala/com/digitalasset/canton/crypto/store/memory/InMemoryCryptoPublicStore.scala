@@ -9,11 +9,12 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.store.{CryptoPublicStore, CryptoPublicStoreError}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.canton.util.collection.TrieMapUtil
+import com.digitalasset.canton.util.collection.MapsUtil
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext
@@ -38,7 +39,7 @@ class InMemoryCryptoPublicStore(override protected val loggerFactory: NamedLogge
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] =
     FutureUnlessShutdown.wrap {
-      TrieMapUtil
+      MapsUtil
         .insertIfAbsent(
           storedSigningKeyMap,
           key.id,
@@ -66,7 +67,7 @@ class InMemoryCryptoPublicStore(override protected val loggerFactory: NamedLogge
       implicit traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] =
     FutureUnlessShutdown.wrap {
-      TrieMapUtil
+      MapsUtil
         .insertIfAbsent(
           storedEncryptionKeyMap,
           key.id,

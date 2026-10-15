@@ -77,6 +77,11 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ScanStore,
 }
 import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
+import org.lfdecentralizedtrust.splice.scan.store.historystart.{
+  KvHistoryStartStore,
+  ParticipantHistoryStartSources,
+  ScanHistoryStart,
+}
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbAppActivityRecordStore,
   DbScanAppRewardsStore,
@@ -231,6 +236,7 @@ class ScanApp(
         store.acsContractFilter.ingestionFilter.primaryParty,
         BackfillingRequirement.NeedsBackfilling,
         internedStringStore,
+        config.analyzableTimeWindow.duration,
         loggerFactory,
         enableissue12777Workaround = true,
         enableImportUpdateBackfill = config.updateHistoryBackfillImportUpdatesEnabled,
@@ -259,6 +265,23 @@ class ScanApp(
       )
       kvStore <- ScanKeyValueStore(dsoParty, participantId, storage, loggerFactory)
       kvProvider = new ScanKeyValueProvider(kvStore, loggerFactory)
+      historyStart = new ScanHistoryStart(
+        new KvHistoryStartStore(kvProvider),
+        new ParticipantHistoryStartSources(
+          config.isFirstSv,
+          config.updateHistoryBackfillEnabled && config.updateHistoryBackfillImportUpdatesEnabled,
+          updateHistory,
+          domainMigrationId,
+          participantAdminConnection,
+          config.globalSynchronizerAlias,
+          participantId,
+          dsoParty,
+        ),
+        loggerFactory,
+      )
+      _ <-
+        if (config.bulkStorage.debugReresolveHistoryStart) historyStart.forgetRecorded()
+        else Future.unit
       bulkStorage <- (config.bulkStorage.staging, config.bulkStorage.committed).tupled.traverse(_ =>
         appInitStep("Initialize bulk storage") {
           BulkStorage(
@@ -268,6 +291,7 @@ class ScanApp(
             updateHistory,
             currentMigrationId = domainMigrationId,
             kvProvider,
+            historyStart,
             retryProvider.metricsFactory,
             config.automation,
             backoffClock = new WallClock(retryProvider.timeouts, loggerFactory),
@@ -328,6 +352,7 @@ class ScanApp(
         amuletAppParameters.upgradesConfig,
         packageVersionSupport,
       )
+      _ = automation.registerHistoryStartTrigger(historyStart)
       scanVerdictStore = DbScanVerdictStore(
         storage,
         updateHistory,
@@ -409,6 +434,7 @@ class ScanApp(
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         config.enableForcedAcsSnapshots,
+        config.perAcsSnapshotTablesEnabled,
         clock,
         loggerFactory,
         packageVersionSupport,
@@ -546,6 +572,7 @@ class ScanApp(
         store,
         automation,
         bulkStorage,
+        historyStart,
         verdictAutomation,
         scanEventStore,
         rewardsReferenceStore,
@@ -620,6 +647,7 @@ object ScanApp {
       store: ScanStore,
       automation: ScanAutomationService,
       bulkStorage: Option[BulkStorage],
+      historyStart: ScanHistoryStart,
       verdictAutomation: ScanVerdictAutomationService,
       eventStore: ScanEventStore,
       rewardsReferenceStore: ScanRewardsReferenceStore,

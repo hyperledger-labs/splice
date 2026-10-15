@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "create": "bash SPLICE_ROOT/cluster/pulumi/operator/pulumi-operator-crd-update.sh 2.6.0"
+  },
+  "name": "update-pulumi-operator-crd-2.6.0",
+  "provider": "",
+  "type": "command:local:Command"
+}

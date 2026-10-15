@@ -12,6 +12,7 @@ import com.digitalasset.canton.common.sequencer.SequencerConnectClient.{
   SynchronizerClientBootstrapInfo,
 }
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.{
@@ -33,7 +34,9 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.Ge
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry
 import com.digitalasset.canton.util.retry.{AllExceptionRetryPolicy, Success}
+import com.digitalasset.canton.validation.ProtoValidation
 import com.digitalasset.canton.version.HandshakeErrors.DeprecatedProtocolVersion
+import com.digitalasset.canton.version.ProtocolVersionValidation
 import io.grpc.ClientInterceptors
 
 import scala.concurrent.ExecutionContextExecutor
@@ -96,13 +99,21 @@ class GrpcSequencerConnectClient(
         .leftMap(err => Error.Transport(err.toString))
 
       psid <- EitherT.fromEither[FutureUnlessShutdown](
-        PhysicalSynchronizerId
-          .fromProtoPrimitive(response.physicalSynchronizerId, "physical_synchronizer_id")
+        ProtoValidation
+          .validateThen(
+            response.physicalSynchronizerId,
+            "physical_synchronizer_id",
+            ProtocolVersionValidation.AlwaysValidation,
+          )(PhysicalSynchronizerId.fromProtoPrimitive)
           .leftMap[Error](err => Error.DeserializationFailure(err.toString))
       )
 
-      sequencerId = UniqueIdentifier
-        .fromProtoPrimitive(response.sequencerUid, "sequencer_uid")
+      sequencerId = ProtoValidation
+        .validateThen(
+          response.sequencerUid,
+          "sequencer_uid",
+          ProtocolVersionValidation.AlwaysValidation,
+        )(UniqueIdentifier.fromProtoPrimitive)
         .leftMap[Error](err => Error.DeserializationFailure(err.toString))
         .map(SequencerId(_))
 

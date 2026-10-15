@@ -5,6 +5,7 @@ import {
   DisableConditionally,
   Loading,
   SvClientProvider,
+  retryOnRateLimit,
 } from '@canton-network/splice-common-frontend';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useMutation } from '@tanstack/react-query';
@@ -44,6 +45,8 @@ const ValidatorOnboardingSecrets: React.FC = () => {
     mutationFn: (partyHint: string) => {
       return prepareValidatorOnboarding(ONBOARDING_SECRET_EXPIRY_IN_SECOND, partyHint);
     },
+    retry: retryOnRateLimit,
+    onSuccess: () => setPartyHint(''),
   });
 
   if (validatorOnboardingsQuery.isPending) {
@@ -102,9 +105,7 @@ const ValidatorOnboardingSecrets: React.FC = () => {
           variant="pill"
           fullWidth
           size="large"
-          onClick={() => {
-            prepareOnboardingMutation.mutateAsync(partyHint).then(() => setPartyHint(''));
-          }}
+          onClick={() => prepareOnboardingMutation.mutate(partyHint)}
         >
           Create a validator onboarding secret
         </Button>

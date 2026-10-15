@@ -12,6 +12,7 @@ abstract class BaseParticipantClientConfig(
 ) extends BaseParticipantConfig {
   override def clientAdminApi: FullClientConfig = adminApi
   override def clientLedgerApi: FullClientConfig = ledgerApi.clientConfig
+  override def httpHealthClientConfig = None
 
   def participantClientConfigWithAdminToken: RemoteParticipantConfig =
     RemoteParticipantConfig(

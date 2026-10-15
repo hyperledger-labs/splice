@@ -1,0 +1,49 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "gateway.networking.k8s.io/v1",
+    "kind": "HTTPRoute",
+    "metadata": {
+      "name": "cn-gke-l7-gateway-no-cloud-armor-route",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "hostnames": [
+        "sequencer-p2p-9.sv-2.mock.network.canton.global",
+        "sequencer-p2p-9.sv-2.mock.global.canton.network.digitalasset.com",
+        "sequencer-p2p-10.sv-2.mock.network.canton.global",
+        "sequencer-p2p-10.sv-2.mock.global.canton.network.digitalasset.com",
+        "sequencer-p2p-9.sv-1.mock.network.canton.global",
+        "sequencer-p2p-9.sv-1.mock.global.canton.network.digitalasset.com",
+        "sequencer-p2p-10.sv-1.mock.network.canton.global",
+        "sequencer-p2p-10.sv-1.mock.global.canton.network.digitalasset.com",
+        "sequencer-p2p-9.sv.mock.network.canton.global",
+        "sequencer-p2p-9.sv.mock.global.canton.network.digitalasset.com",
+        "sequencer-p2p-10.sv.mock.network.canton.global",
+        "sequencer-p2p-10.sv.mock.global.canton.network.digitalasset.com"
+      ],
+      "parentRefs": [
+        {
+          "name": "cn-gke-l7-gateway",
+          "namespace": "cluster-ingress",
+          "sectionName": "listen-https"
+        }
+      ],
+      "rules": [
+        {
+          "backendRefs": [
+            {
+              "name": "cn-gke-l7-gateway-no-cloud-armor",
+              "namespace": "cluster-ingress",
+              "port": 80
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "name": "cn-gke-l7-gateway-no-cloud-armor-route",
+  "provider": "",
+  "type": "kubernetes:gateway.networking.k8s.io/v1:HTTPRoute"
+}

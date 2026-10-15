@@ -5,7 +5,6 @@ package com.digitalasset.canton.synchronizer.sequencer.block
 
 import com.daml.metrics.api.MetricsContext
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveDouble}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -27,6 +26,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{Member, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Mutex
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.actor.{Cancellable, Scheduler}
 
@@ -81,6 +81,10 @@ class BlockSequencerThroughputCap(
         config.messages.topology,
         SubmissionRequestType.TopologyTransaction,
       ),
+      SubmissionRequestType.ConfirmationResponse -> makeIndividualCap(
+        config.messages.confirmationResponse,
+        SubmissionRequestType.ConfirmationResponse,
+      ),
     )
   )
 
@@ -91,6 +95,7 @@ class BlockSequencerThroughputCap(
     new IndividualBlockSequencerThroughputCap(
       config.observationPeriodSeconds,
       config.strict,
+      config.delayedActivation,
       config.thresholds,
       config.updateEveryMs,
       individualConfig,
@@ -246,6 +251,7 @@ object BlockSequencerThroughputCap {
   class IndividualBlockSequencerThroughputCap(
       observationPeriodSeconds: Int,
       strict: Boolean,
+      delayedActivation: Boolean,
       thresholdsConfig: NonEmpty[Seq[PositiveDouble]],
       updateEveryMs: NonNegativeInt,
       val config: IndividualThroughputCapConfig,
@@ -257,7 +263,7 @@ object BlockSequencerThroughputCap {
   ) extends NamedLogging
       with FlagCloseable {
 
-    private var initialized: Boolean = false
+    private var initialized: Boolean = !delayedActivation
 
     private val thresholds = thresholdsConfig.sorted.reverse.zipWithIndex
     private val maximumGlobalTransactionsPerObservationPeriod =
@@ -299,7 +305,6 @@ object BlockSequencerThroughputCap {
           Right(())
         case _ =>
           val key = ThroughputCapKey(member)
-
           if (!initialized) Right(())
           else
             for {
@@ -317,7 +322,7 @@ object BlockSequencerThroughputCap {
 
       def explain(criteria: String) =
         "You are experiencing backpressure because your validator is exceeding the rate limits for a single validator " +
-          "as configured by the synchronizer operators. If you need more bandwidth, please reach out to the operators. " +
+          s"as configured by the synchronizer operators for the request type '$requestType'. If you need more bandwidth, please reach out to the operators. " +
           "The limit enforced is: " + criteria
 
       val result = for {
@@ -371,7 +376,7 @@ object BlockSequencerThroughputCap {
 
         def explain(criteria: String, globalCap: Double, individualUse: Long) =
           "You are experiencing backpressure because the network is congested and exceeds the " +
-            s"configured global limits on the sequencer. Therefore, the sequencer is " +
+            s"configured global limits on the sequencer for the request type '$requestType'. Therefore, the sequencer is " +
             s"allocating the same bandwidth of ${f"$globalCap%.1f"} $criteria over $observationPeriodSeconds seconds to all " +
             s"$vActive active validators until the global usage rate drops again below the enforcement level. " +
             s"Please wait a few seconds and retry, as your current rate is $individualUse $criteria over $observationPeriodSeconds seconds."

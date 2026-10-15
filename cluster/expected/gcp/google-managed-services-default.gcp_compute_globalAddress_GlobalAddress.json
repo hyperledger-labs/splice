@@ -1,0 +1,14 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "addressType": "INTERNAL",
+    "name": "google-managed-services-default",
+    "network": "projects/da-cn-example-project-id/global/networks/default",
+    "prefixLength": 20,
+    "purpose": "VPC_PEERING"
+  },
+  "name": "google-managed-services-default",
+  "provider": "",
+  "type": "gcp:compute/globalAddress:GlobalAddress"
+}

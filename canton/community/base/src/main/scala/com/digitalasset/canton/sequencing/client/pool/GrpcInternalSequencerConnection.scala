@@ -7,13 +7,13 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.api.MetricsContext
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.{AtomicHealthElement, CompositeHealthElement, HealthListener}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   HasRunOnClosing,
@@ -38,6 +38,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{FutureUnlessShutdownUtil, Mutex, SingleUseCell}
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.nonempty.NonEmpty
 import org.apache.pekko.stream.Materializer
 
 import java.util.concurrent.atomic.AtomicReference
@@ -412,7 +413,7 @@ class GrpcInternalSequencerConnection private[sequencing] (
 
   override def onClosed(): Unit = {
     val toClose = userConnectionRef.get.toList :+ validationLimiter
-    LifeCycle.close(toClose*)(logger)
+    LifeCycle.close(toClose)(logger)
   }
 
   override protected def pretty: Pretty[GrpcInternalSequencerConnection] =

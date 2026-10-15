@@ -5,11 +5,11 @@ import {
   theme,
   UserProvider,
   ErrorRouterPage,
+  QueryDevtools,
   retryQuery,
 } from '@canton-network/splice-common-frontend';
 import { replaceEqualDeep } from '@canton-network/splice-common-frontend-utils';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import React from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from 'react-router';
@@ -42,7 +42,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   return (
     <AuthProvider authConf={config.auth}>
       <QueryClientProvider client={queryClient}>
-        <ReactQueryDevtools initialIsOpen={false} />
+        <QueryDevtools />
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
           <WalletClientProvider url={config.services.validator.url}>
             <ValidatorScanProxyClientProvider validatorUrl={config.services.validator.url}>

@@ -1,0 +1,74 @@
+{
+  "custom": false,
+  "id": "",
+  "inputs": {
+    "appLabel": "global-domain-8-sequencer",
+    "globalLimits": {
+      "fillInterval": "60s",
+      "maxTokens": 200000,
+      "tokensPerFill": 200000
+    },
+    "globalPerIpLimits": {
+      "fillInterval": "60s",
+      "maxTokens": 10000,
+      "tokensPerFill": 10000
+    },
+    "inboundPort": 5008,
+    "namespace": "sv-da-1",
+    "protocol": "grpc",
+    "rateLimits": {
+      "/com.digitalasset.canton.sequencer.api.v30.SequencerAuthenticationService/": {
+        "fillInterval": "60s",
+        "maxTokens": 10000,
+        "name": "sequencer-authentication",
+        "perIpLimits": {
+          "fillInterval": "60s",
+          "maxTokens": 100,
+          "tokensPerFill": 100
+        },
+        "tokensPerFill": 10000,
+        "type": "limited"
+      },
+      "/com.digitalasset.canton.sequencer.api.v30.SequencerConnectService/": {
+        "fillInterval": "60s",
+        "maxTokens": 10000,
+        "name": "sequencer-connect",
+        "perIpLimits": {
+          "fillInterval": "60s",
+          "maxTokens": 100,
+          "tokensPerFill": 100
+        },
+        "tokensPerFill": 10000,
+        "type": "limited"
+      },
+      "/com.digitalasset.canton.sequencer.api.v30.SequencerService/DownloadTopologyStateForInit": {
+        "fillInterval": "60s",
+        "maxTokens": 600,
+        "name": "sequencer-download-topology-state-for-init",
+        "perIpLimits": {
+          "fillInterval": "60s",
+          "maxTokens": 20,
+          "tokensPerFill": 20
+        },
+        "tokensPerFill": 600,
+        "type": "limited"
+      },
+      "/com.digitalasset.canton.sequencer.api.v30.SequencerService/Subscribe": {
+        "fillInterval": "60s",
+        "maxTokens": 10000,
+        "name": "sequencer-subscribe",
+        "perIpLimits": {
+          "fillInterval": "60s",
+          "maxTokens": 100,
+          "tokensPerFill": 100
+        },
+        "tokensPerFill": 10000,
+        "type": "limited"
+      }
+    },
+    "xffNumTrustedHops": 2
+  },
+  "name": "splice-sv-da-1-global-domain-8-sequencer-rate-limit",
+  "provider": "",
+  "type": "splice:RateLimit"
+}

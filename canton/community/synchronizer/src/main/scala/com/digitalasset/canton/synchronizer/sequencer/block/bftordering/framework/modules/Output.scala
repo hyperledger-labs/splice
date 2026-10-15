@@ -7,13 +7,25 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
   BlockNumber,
   EpochNumber,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.CompleteBlockData
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability.{
+  BatchId,
+  OrderingBlock,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.OrderedBlockForOutput
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.snapshot.SequencerSnapshotAdditionalInfo
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.{
+  Membership,
+  OrderingTopology,
+  SequencingParameters,
+}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.{
+  CompleteBlockData,
+  OrderingRequestBatch,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
   Env,
   Module,
@@ -26,11 +38,37 @@ object Output {
 
   final case object Start extends Message[Nothing]
 
+  sealed trait Admin extends Message[Nothing]
+  object Admin {
+    final case class GetOrderingTopologyResponse(
+        epochNumber: EpochNumber,
+        nodes: Set[BftNodeId],
+        leaders: Seq[BftNodeId],
+        blacklisted: Seq[BftNodeId],
+        sequencingParameters: SequencingParameters,
+    )
+
+    final case class GetOrderingTopology(callback: GetOrderingTopologyResponse => Unit)
+        extends Admin
+    final case class SetPerformanceMetricsEnabled(enabled: Boolean) extends Admin
+  }
+
   /** Sent by the sequencer core subscription to the output module when processing may be able to be
     * resumed after a sequencer core slowdown in consuming blocks, allowing to always and timely
     * resume ordering.
     */
   final case object ProcessNewEpochTopologyMessagesIfPossible extends Message[Nothing]
+
+  /** From local consensus to let output module know that consensus has started on that block and
+    * that the output module can start fetching the data for it before waiting for the block to be
+    * ordered. This is an optimization to reduce the time between consensus ordering a block and the
+    * output module being able to move to the next epoch.
+    */
+  final case class BlockConsensusStarted(
+      blockNumber: BlockNumber,
+      originalLeader: BftNodeId,
+      block: OrderingBlock,
+  ) extends Message[Nothing]
 
   // From local consensus
   final case class BlockOrdered(orderedBlockForOutput: OrderedBlockForOutput)
@@ -38,6 +76,11 @@ object Output {
 
   // From local availability storage
   final case class BlockDataFetched(data: CompleteBlockData) extends Message[Nothing]
+  // From local availability storage
+  final case class EarlyBlockDataFetched(
+      blockNumber: BlockNumber,
+      batches: Seq[(BatchId, OrderingRequestBatch)],
+  ) extends Message[Nothing]
 
   final case class BlockDataStored(
       orderedBlockData: CompleteBlockData,
@@ -58,7 +101,7 @@ object Output {
 
   final case class MetadataStoredForNewEpoch[E <: Env[E]](
       newEpochNumber: EpochNumber,
-      orderingTopology: OrderingTopology,
+      membership: Membership,
       cryptoProvider: CryptoProvider[E],
   ) extends Message[E]
 
@@ -92,4 +135,5 @@ trait Output[E <: Env[E]] extends Module[E, Output.Message[E]] with FlagCloseabl
 
   def availability: ModuleRef[Availability.Message[E]]
   def consensus: ModuleRef[Consensus.Message[E]]
+  def mempool: ModuleRef[Mempool.Message]
 }

@@ -4,11 +4,11 @@
 package com.digitalasset.canton.participant.protocol
 
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.SubmissionTrackerData
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{
   AsyncOrSyncCloseable,
   FlagCloseableAsync,
@@ -23,6 +23,7 @@ import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{ErrorUtil, FutureUtil}
+import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
 import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.concurrent.TrieMap

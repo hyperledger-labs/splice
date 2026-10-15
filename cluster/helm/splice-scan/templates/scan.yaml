@@ -97,6 +97,13 @@ spec:
               tx-log-backfill-batch-size = "{{ .batchSize }}"
             }
         {{- end }}
+        {{- with .Values.analyzableTimeWindowDuration }}
+        - name: ADDITIONAL_CONFIG_ANALYZABLE_TIME_WINDOW_DURATION
+          value: |
+            canton.scan-apps.scan-app {
+              analyzable-time-window.duration = "{{ . }}"
+            }
+        {{- end }}
         {{- with .Values.sponsorScanUrl }}
         - name: ADDITIONAL_CONFIG_SPONSOR_SCAN_URL
           value: |

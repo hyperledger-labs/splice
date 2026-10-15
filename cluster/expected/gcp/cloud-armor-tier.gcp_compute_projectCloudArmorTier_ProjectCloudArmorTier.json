@@ -1,0 +1,11 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "cloudArmorTier": "CA_STANDARD",
+    "project": "da-cn-example-project-id"
+  },
+  "name": "cloud-armor-tier",
+  "provider": "",
+  "type": "gcp:compute/projectCloudArmorTier:ProjectCloudArmorTier"
+}

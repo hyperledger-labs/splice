@@ -8,6 +8,7 @@ import cats.data.EitherT
 import cats.syntax.traverse.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
@@ -55,13 +56,11 @@ final class CommitmentsService(
   ): FutureUnlessShutdown[Either[String, Option[CantonTimestamp]]] =
     // retry until timeout, namely retry every second for maximum `timeout.duration.getSeconds` times
     retry
-      .Backoff(
+      .Pause(
         logger,
         this,
-        // we retry every second
         maxRetries = timeout.duration.getSeconds.intValue,
-        1.second,
-        1.second,
+        delay = 1.second,
         "retrieving status of commitment reinitialization",
       )
       .unlessShutdown(
@@ -81,7 +80,7 @@ final class CommitmentsService(
         NoExceptionRetryPolicy,
       )
 
-  def reinitializeCommitmentsUsingAcs(
+  def reinitializeLegacyCommitmentsUsingAcs(
       paramSynchronizerIds: Set[SynchronizerId],
       filterCounterParticipants: Seq[ParticipantId],
       filterParties: Seq[PartyId],
@@ -105,19 +104,20 @@ final class CommitmentsService(
 
     val resultPerSynchronizer = synchronizers.map { synchronizer =>
       val synchronizerId = synchronizer.psid.logical
+      val synchronizerIndex = ledgerApiIndexer.value.ledgerApiStore
+        .cleanSynchronizerIndex(
+          synchronizerId
+        )
+      val reinitRecordTime = SyncEphemeralStateFactory.currentTimeOfChange(synchronizerIndex)
       val statusPerSynchronizer =
         for {
-          synchronizerIndex <- EitherT
-            .right(
-              ledgerApiIndexer.value.ledgerApiStore.value
-                .cleanSynchronizerIndex(
-                  synchronizerId
-                )
-            )
-          reinitTimeOfChange = SyncEphemeralStateFactory.currentTimeOfChange(synchronizerIndex)
+          processor <- EitherT.fromOption[FutureUnlessShutdown](
+            synchronizer.acsCommitmentProcessorO,
+            s"Commitment reinitialization is disabled for ${synchronizer.psid} because the old ACS commitment processor is turned off.",
+          )
 
           _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-            synchronizer.acsCommitmentProcessor.reinitializeCommitments(reinitTimeOfChange),
+            processor.reinitializeCommitments(reinitRecordTime),
             s"Reinitialization is already scheduled or in progress for ${synchronizer.psid}.",
           )
 
@@ -138,7 +138,7 @@ final class CommitmentsService(
           res <- EitherT(
             readCommitmentRepairStatus(
               persistentState,
-              reinitTimeOfChange.timestamp,
+              reinitRecordTime.timestamp,
               timeoutSeconds,
             )
           )

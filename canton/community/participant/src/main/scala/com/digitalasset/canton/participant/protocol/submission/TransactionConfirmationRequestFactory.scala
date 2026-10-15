@@ -3,16 +3,14 @@
 
 package com.digitalasset.canton.participant.protocol.submission
 
-import cats.data.EitherT
+import cats.data.{Chain, EitherT}
 import cats.instances.either.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
-import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.*
 import com.digitalasset.canton.config.LoggingConfig
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
 import com.digitalasset.canton.data.*
@@ -21,6 +19,7 @@ import com.digitalasset.canton.data.ViewType.TransactionViewType
 import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
 import com.digitalasset.canton.ledger.participant.state.SubmitterInfo.ExternallySignedSubmission
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.submission.EncryptedViewMessageFactory.{
@@ -50,10 +49,11 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.IdUtil.catsSemigroupForIdLeftBias
 import com.digitalasset.canton.util.{ContractHasher, ErrorUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.nonempty.NonEmpty
 
+import scala.annotation.unused
 import scala.concurrent.ExecutionContext
 
 /** Factory class for creating transaction confirmation requests from Daml-LF transactions.
@@ -75,7 +75,7 @@ class TransactionConfirmationRequestFactory(
     executionContext: ExecutionContext
 ) extends NamedLogging {
 
-  /** Creates a confirmation request from a wellformed transaction.
+  /** Creates a confirmation request from a well-formed transaction.
     *
     * @param cryptoSnapshot
     *   used to determine participants of parties and for signing and encryption
@@ -89,7 +89,6 @@ class TransactionConfirmationRequestFactory(
       wfTransaction: WellFormedTransaction[WithoutSuffixes],
       submitterInfo: SubmitterInfo,
       workflowId: Option[WorkflowId],
-      keyResolver: LfGlobalKeyMapping,
       mediator: MediatorGroupRecipient,
       cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
       approximateTimestampForSigning: CantonTimestamp,
@@ -97,6 +96,7 @@ class TransactionConfirmationRequestFactory(
       contractInstanceOfId: ContractInstanceOfId,
       maxSequencingTime: CantonTimestamp,
       protocolVersion: ProtocolVersion,
+      limitConfig: TransactionViewLimitConfig,
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -129,9 +129,9 @@ class TransactionConfirmationRequestFactory(
           transactionUuid,
           cryptoSnapshot.ipsSnapshot,
           contractInstanceOfId,
-          keyResolver,
           maxSequencingTime,
           validatePackageVettings = true,
+          limitConfig = limitConfig,
         )
         .leftMap(TransactionTreeFactoryError.apply)
 
@@ -172,13 +172,6 @@ class TransactionConfirmationRequestFactory(
     TransactionConfirmationRequest,
   ] =
     for {
-      transactionViewEnvelopes <- createTransactionViewEnvelopes(
-        transactionTree,
-        cryptoSnapshot,
-        signingTimestampOverrides,
-        sessionKeyStore,
-        protocolVersion,
-      )
       submittingParticipantSignature <- cryptoSnapshot
         .sign(
           transactionTree.rootHash.unwrap,
@@ -186,6 +179,13 @@ class TransactionConfirmationRequestFactory(
           signingTimestampOverrides,
         )
         .leftMap[TransactionConfirmationRequestCreationError](TransactionSigningError.apply)
+      transactionViewEnvelopes <- createTransactionViewEnvelopes(
+        transactionTree,
+        submittingParticipantSignature,
+        cryptoSnapshot,
+        sessionKeyStore,
+        protocolVersion,
+      )
     } yield {
       if (loggingConfig.eventDetails) {
         logger.debug(
@@ -284,8 +284,8 @@ class TransactionConfirmationRequestFactory(
 
   private def createTransactionViewEnvelopes(
       transactionTree: GenTransactionTree,
+      submittingParticipantSignature: Signature,
       cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      signingTimestampOverrides: Option[SigningTimestampOverrides],
       sessionKeyStore: SessionKeyStore,
       protocolVersion: ProtocolVersion,
   )(implicit
@@ -316,12 +316,187 @@ class TransactionConfirmationRequestFactory(
       }
     }
 
-    def createOpenEnvelopesWithTransaction(
+    @unused
+    /* Creates encrypted open envelopes for transaction views using Ciphertext ID-based encryption
+     * (PV36+).
+     *
+     * This version replaces view-hash-based references with ciphertext IDs derived from the encrypted payload,
+     * ensuring correctness even when view hashes are not unique during decryption. Ciphertext IDs correspond
+     * to the hash of the ciphertext and the position of the view in the encrypted list of views.
+     * This provides a unique, stable, and non-duplicable reference to an encrypted view, which can be
+     * used by parent views to refer to their subviews.
+     *
+     * Only supported for protocol versions >= `ProtocolVersion.transparency`.
+     */
+    def createOpenEnvelopesWithTransactionV2(
         viewsWithWitnessesAndRecipients: NonEmpty[Seq[ViewWithWitnessesAndRecipients]],
         viewKeyDataMap: ViewKeyDataMap,
     ): EitherT[FutureUnlessShutdown, TransactionConfirmationRequestCreationError, Seq[
       OpenEnvelope[EncryptedViewMessage[TransactionViewType.type]]
     ]] = {
+      require(
+        protocolVersion >= ProtocolVersion.transparency,
+        s"Ciphertext ID-based subview references are only supported for protocol " +
+          s"versions >= v${ProtocolVersion.transparency} (got $protocolVersion)",
+      )
+
+      // Accumulator for ciphertext IDs + final envelopes
+      case class ViewEncryptionAccumulator(
+          byCiphertextIdMap: Map[ViewHash, ByCiphertextId],
+          envelopes: Chain[OpenEnvelope[EncryptedViewMessage[TransactionViewType.type]]],
+      )
+
+      // Build light view trees for a recipient group, using the subview references generated for
+      // the previous groups when it's necessary to refer to subviews.
+      def createLightTransactionViewTreesWithSameRecipients(
+          viewsWithSameRecipients: NonEmpty[Seq[ViewWithWitnessesAndRecipients]],
+          byCiphertextIdMap: Map[ViewHash, ByCiphertextId],
+      ): Either[
+        TransactionConfirmationRequestCreationError,
+        NonEmpty[Seq[LightTransactionViewTree]],
+      ] =
+        viewsWithSameRecipients.toNEF.traverse { viewWithSameRecipients =>
+          val subviewsRandomness = viewWithSameRecipients.view.subviewHashes
+            .map(subviewHash => viewKeyDataMap.randomnessByHash(subviewHash))
+
+          LightTransactionViewTree
+            .fromTransactionViewTreeUsingCiphertextIdReference(
+              viewWithSameRecipients.view,
+              subviewsRandomness,
+              byCiphertextIdMap,
+              protocolVersion,
+            )
+            .leftMap[TransactionConfirmationRequestCreationError](
+              LightTransactionViewTreeCreationError.apply
+            )
+        }
+
+      // Create `LightTransactionViewTrees` and encrypt a list of views that share the same recipient tree group.
+      def processGroupOfRecipients(
+          state: ViewEncryptionAccumulator,
+          grouped: (Recipients, NonEmpty[Seq[ViewWithWitnessesAndRecipients]]),
+      ): EitherT[
+        FutureUnlessShutdown,
+        TransactionConfirmationRequestCreationError,
+        (
+            Seq[(ViewHash, ByCiphertextId)],
+            OpenEnvelope[EncryptedViewMessage[TransactionViewType.type]],
+        ),
+      ] = {
+
+        val (recipients, views) = grouped
+
+        for {
+
+          // Build light transaction view trees (lvt) for each view
+          lightTrees <- EitherT.fromEither[FutureUnlessShutdown](
+            createLightTransactionViewTreesWithSameRecipients(
+              views,
+              state.byCiphertextIdMap,
+            )
+          )
+
+          // Encrypt all views together
+          encrypted <- EncryptedViewMessageFactory
+            .encryptGroupedViews(TransactionViewType)(
+              lightTrees,
+              viewKeyDataMap.keyAndEncryptedRandomnessByRecipients(recipients),
+              submittingParticipantSignature,
+              cryptoSnapshot,
+              protocolVersion,
+            )
+            .leftMap[TransactionConfirmationRequestCreationError](
+              EncryptedViewMessageCreationError.apply
+            )
+
+          ciphertextId = encrypted.encryptedViews.computeCiphertextId(pureCrypto)
+
+          ids = lightTrees.zipWithIndex.map { case (lvt, i) =>
+            // To use it as a view reference, we combine this ciphertext ID with the relative
+            // position of the view within the encrypted list of views.
+            lvt.viewHash -> ByCiphertextId(
+              ciphertextId = ciphertextId,
+              index = NonNegativeInt.tryCreate(i),
+            )
+          }
+        } yield (ids.forgetNE, OpenEnvelope(encrypted, recipients)(protocolVersion))
+      }
+
+      if (!viewsWithWitnessesAndRecipients.forall(_.recipients.trees.lengthCompare(1) == 0))
+        ErrorUtil.invalidState("Expected all views to have exactly one recipient tree in Phase 1")
+
+      // Group views by recipient tree depth, largest first (i.e. post-order), to ensure that when encrypting a view with
+      // subviews, the ciphertext IDs for all subviews are already generated by the time they are referenced.
+      // Ordering is non-deterministic within the same group, but that doesn't matter since views with the same
+      // recipient tree depth can't reference each other.
+      val groupedByRecipients =
+        viewsWithWitnessesAndRecipients
+          .groupBy(_.recipients)
+          .toSeq
+
+      val groupedByDecreasingDepth =
+        groupedByRecipients
+          // all views must have exactly one recipient tree in Phase 1
+          .groupBy { case (recipients, _) => recipients.trees.head1.depth }
+          .toSeq
+          .sortBy(_._1)(Ordering[Int].reverse)
+
+      // Fold over groups of recipients and accumulate ciphertext IDs and envelopes, ensuring that groups with larger
+      // recipient trees are processed first (i.e. post-order).
+      MonadUtil
+        .foldLeftM(
+          initialState = ViewEncryptionAccumulator(Map.empty, Chain.empty),
+          groupedByDecreasingDepth,
+        ) { case (acc, (_, groupsWithSameDepth)) =>
+          val results =
+            if (parallel)
+              // Process all groups (including encryption) of the same depth in parallel
+              MonadUtil
+                .parTraverseWithLimit(pureCrypto.encryptionParallelism)(groupsWithSameDepth.toNEF) {
+                  group =>
+                    processGroupOfRecipients(acc, group)
+                }
+            else
+              // The only reason for ordering the views within a group by their string representation and processing
+              // these groups sequentially is to maintain a deterministic order of the resulting envelopes, and this
+              // is only used for testing.
+              MonadUtil.sequentialTraverse(
+                groupsWithSameDepth.sortBy { case (recipients, _) => recipients.toString }.toNEF
+              ) { group =>
+                processGroupOfRecipients(acc, group)
+              }
+
+          // Merge resulting encrypted views and computed ciphertext IDs.
+          results.map {
+            _.foldLeft(acc) { case (merged, (ids, envelope)) =>
+              ViewEncryptionAccumulator(
+                merged.byCiphertextIdMap ++ ids,
+                merged.envelopes :+ envelope,
+              )
+            }
+          }
+        }
+        .map(_.envelopes.toList)
+    }
+
+    /* Creates encrypted open envelopes for transaction views using viewHash-based references.
+     *
+     * This is the legacy encryption flow where subviews are referenced using their viewHash. It
+     * assumes view hashes are unique and stable during decryption.
+     *
+     * Used for protocol versions < `ProtocolVersion.transparency`.
+     */
+    def createOpenEnvelopesWithTransactionV1(
+        viewsWithWitnessesAndRecipients: NonEmpty[Seq[ViewWithWitnessesAndRecipients]],
+        viewKeyDataMap: ViewKeyDataMap,
+    ): EitherT[FutureUnlessShutdown, TransactionConfirmationRequestCreationError, Seq[
+      OpenEnvelope[EncryptedViewMessage[TransactionViewType.type]]
+    ]] = {
+      require(
+        protocolVersion < ProtocolVersion.transparency,
+        s"ViewHash-based encryption is only supported for protocol versions < v${ProtocolVersion.transparency} (got $protocolVersion)",
+      )
+
       def makeLightTransactionViewTreeWithRecipient(
           viewWithWitnessesAndRecipients: ViewWithWitnessesAndRecipients
       ): Either[
@@ -332,7 +507,7 @@ class TransactionConfirmationRequestFactory(
           .map(subviewHash => viewKeyDataMap.randomnessByHash(subviewHash))
 
         LightTransactionViewTree
-          .fromTransactionViewTree(
+          .fromTransactionViewTreeUsingViewHashReference(
             viewWithWitnessesAndRecipients.view,
             randomness,
             protocolVersion,
@@ -345,6 +520,7 @@ class TransactionConfirmationRequestFactory(
           }
       }
 
+      @SuppressWarnings(Array("org.wartremover.warts.PartialFunctionApply"))
       def createOpenEnvelopes(
           lightTreesByRecipients: Seq[(Recipients, NonEmpty[Seq[LightTransactionViewTree]])]
       ): EitherT[FutureUnlessShutdown, TransactionConfirmationRequestCreationError, Seq[
@@ -359,8 +535,8 @@ class TransactionConfirmationRequestFactory(
               .encryptGroupedViews(TransactionViewType)(
                 lightTrees,
                 viewKeyDataMap.keyAndEncryptedRandomnessByRecipients(recipients),
+                submittingParticipantSignature,
                 cryptoSnapshot,
-                signingTimestampOverrides,
                 protocolVersion,
               )
               .leftMap[TransactionConfirmationRequestCreationError](
@@ -368,29 +544,20 @@ class TransactionConfirmationRequestFactory(
               )
           } yield OpenEnvelope(viewMessage, recipients)(protocolVersion)
 
-        if (parallel) {
-          lightTreesByRecipients
-            .parTraverse { case (recipients, lightTrees) =>
+        if (parallel)
+          MonadUtil.parTraverseWithLimit(pureCrypto.encryptionParallelism)(lightTreesByRecipients) {
+            case (recipients, lightTrees) =>
               encryptViews(lightTrees, recipients)
-            }
-        } else {
+          }
+        else
           MonadUtil
             .sequentialTraverse(lightTreesByRecipients) { case (recipients, lightTrees) =>
               encryptViews(lightTrees, recipients)
             }
-        }
       }
 
-      val lightTreesWithRecipientsE =
-        if (parallel) {
-          viewsWithWitnessesAndRecipients.toNEF
-            .parTraverse(
-              makeLightTransactionViewTreeWithRecipient
-            )
-        } else {
-          viewsWithWitnessesAndRecipients.toNEF
-            .traverse(makeLightTransactionViewTreeWithRecipient)
-        }
+      val lightTreesWithRecipientsE = viewsWithWitnessesAndRecipients.toNEF
+        .traverse(makeLightTransactionViewTreeWithRecipient)
 
       if (protocolVersion >= ProtocolVersion.v35) {
         val lightTreesByRecipientsE =
@@ -412,8 +579,8 @@ class TransactionConfirmationRequestFactory(
             .encryptNonGroupedViews(TransactionViewType)(
               lightTreeWithRecipients,
               viewKeyDataMap,
+              submittingParticipantSignature,
               cryptoSnapshot,
-              signingTimestampOverrides,
               protocolVersion,
               parallel,
             )
@@ -460,10 +627,18 @@ class TransactionConfirmationRequestFactory(
           )
       )
 
-      envelopes <- createOpenEnvelopesWithTransaction(
-        viewsWithWitnessesAndRecipientsNE,
-        viewsKeyDataMap,
-      )
+      envelopes <-
+        if (protocolVersion < ProtocolVersion.transparency)
+          createOpenEnvelopesWithTransactionV1(
+            viewsWithWitnessesAndRecipientsNE,
+            viewsKeyDataMap,
+          )
+        else
+          createOpenEnvelopesWithTransactionV2(
+            viewsWithWitnessesAndRecipientsNE,
+            viewsKeyDataMap,
+          )
+
     } yield envelopes
   }
 }
@@ -511,15 +686,6 @@ object TransactionConfirmationRequestFactory {
   final case class ParticipantAuthorizationError(message: String)
       extends TransactionConfirmationRequestCreationError {
     override protected def pretty: Pretty[ParticipantAuthorizationError] = prettyOfClass(
-      unnamedParam(_.message.unquoted)
-    )
-  }
-
-  /** Indicates that the given transaction is malformed in some way, e.g., it has cycles.
-    */
-  final case class MalformedLfTransaction(message: String)
-      extends TransactionConfirmationRequestCreationError {
-    override protected def pretty: Pretty[MalformedLfTransaction] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }

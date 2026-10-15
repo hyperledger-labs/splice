@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import org.lfdecentralizedtrust.splice.scan.store.AppActivityStore
 import org.lfdecentralizedtrust.splice.scan.store.AppActivityStore.RoundIngestionStatus
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
@@ -106,6 +106,7 @@ class DbAppActivityRecordStore(
     with HasCloseContext
     with org.lfdecentralizedtrust.splice.store.db.AcsQueries { self =>
 
+  private implicit val dbProfile: DbStorage.Profile = storage.profile
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
 
   override protected def timeouts = new ProcessingTimeout

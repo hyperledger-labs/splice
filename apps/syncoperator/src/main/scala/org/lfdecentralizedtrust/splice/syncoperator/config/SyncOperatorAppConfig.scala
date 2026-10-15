@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.syncoperator.config
 import com.digitalasset.canton.admin.api.client.data.{
   SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
+  SubscriptionLivenessLimits,
   SynchronizerLimits,
 }
 import com.digitalasset.canton.config.*
@@ -43,6 +44,7 @@ case class SyncOperatorMediatorConfig(
       SubmissionRequestAmplification.NoAmplification,
     sequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
       SequencerConnectionPoolDelays.default,
+    subscriptionLivenessLimits: SubscriptionLivenessLimits = SubscriptionLivenessLimits.default,
 )
 
 /** A synchronizer node this operator runs, as a sequencer and mediator pair. */

@@ -1,0 +1,11 @@
+apiVersion: 1
+deleteRules:
+  - orgId: 1
+    # ACS Commitment Checkpoint Delay
+    uid: ffghab4ms1ds0b
+  - orgId: 1
+    # ACS Commitment Delay
+    uid: ffghab4ms1ds0c
+  - orgId: 1
+    # ACS Commitment Compute Duration
+    uid: ffghab4ms1ds0d

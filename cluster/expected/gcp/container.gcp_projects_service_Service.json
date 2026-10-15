@@ -1,0 +1,11 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "disableDependentServices": true,
+    "service": "container.googleapis.com"
+  },
+  "name": "container",
+  "provider": "",
+  "type": "gcp:projects/service:Service"
+}

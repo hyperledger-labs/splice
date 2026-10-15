@@ -339,7 +339,7 @@ class SvOffboardingIntegrationTest
                 .svNodeStates
                 .values
                 .flatMap(_.payload.state.synchronizerNodes.values().asScala)
-                .flatMap(_.sequencer.toScala)
+                .flatMap(_.sequencerIdentity.toScala)
                 .map(_.sequencerId)
                 .flatMap(sequencerId =>
                   SequencerId

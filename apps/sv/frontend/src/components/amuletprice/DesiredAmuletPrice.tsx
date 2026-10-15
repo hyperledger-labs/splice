@@ -82,7 +82,7 @@ const DesiredAmuletPrice: React.FC<DesiredAmuletPriceProps> = ({ canEditVote }) 
   const filteredVotes = canEditVote
     ? amuletPriceVotesQuery.data.filter(v => v.sv !== svPartyId)
     : amuletPriceVotesQuery.data;
-  const otherAmuletPriceVotes = filteredVotes?.sort((a, b) => {
+  const otherAmuletPriceVotes = filteredVotes?.toSorted((a, b) => {
     return b.lastUpdatedAt.valueOf() - a.lastUpdatedAt.valueOf();
   });
 

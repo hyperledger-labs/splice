@@ -31,8 +31,6 @@ import com.digitalasset.canton.util.collection.BoundedQueue.DropStrategy
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
-import scala.util.Random
-
 import EpochState.Epoch
 
 final class PreIssConsensusModule[E <: Env[E]](
@@ -42,10 +40,14 @@ final class PreIssConsensusModule[E <: Env[E]](
     clock: Clock,
     metrics: BftOrderingMetrics,
     segmentModuleRefFactory: SegmentModuleRefFactory[E],
-    random: Random,
     override val dependencies: ConsensusModuleDependencies[E],
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
+    // Monotonic elapsed-time source (nanoseconds) for the retransmission request rate limiter.
+    //  Defaults to `System.nanoTime()` (real, monotonic), which ensures that rate limiting allows retransmissions
+    //  to be sent even if the main clock is a SimClock and is not advancing, which in turn ensures that view
+    //  changes can make progress.
+    rateLimiterNanoTime: () => Long = () => System.nanoTime(),
 )(implicit
     synchronizerProtocolVersion: ProtocolVersion,
     override val config: BftBlockOrdererConfig,
@@ -53,8 +55,10 @@ final class PreIssConsensusModule[E <: Env[E]](
 ) extends Consensus[E]
     with HasDelayedInit[Consensus.Message[E]] {
 
-  override def ready(self: ModuleRef[Consensus.Message[E]]): Unit =
-    self.asyncSendNoTrace(Consensus.Init.KickOff)
+  override def ready(self: ModuleRef[Consensus.Message[E]])(implicit
+      traceContext: TraceContext
+  ): Unit =
+    self.asyncSend(Consensus.Init.KickOff)
 
   override protected def receiveInternal(message: Consensus.Message[E])(implicit
       context: E#ActorContextT[Consensus.Message[E]],
@@ -101,13 +105,14 @@ final class PreIssConsensusModule[E <: Env[E]](
               abort,
               previousEpochsCommitCerts,
               metrics,
-              clock,
               loggerFactory,
+              config.consensusEnableLogEndOfEpochProgress,
+              rateLimiterNanoTime = rateLimiterNanoTime,
             ),
-            random,
             dependencies,
             loggerFactory,
             timeouts,
+            rateLimiterNanoTime = rateLimiterNanoTime,
             futurePbftMessageQueue =
               new FairBoundedQueue[ConsensusMessage.PbftUnverifiedNetworkMessage](
                 config.consensusQueueMaxSize,
@@ -115,7 +120,7 @@ final class PreIssConsensusModule[E <: Env[E]](
                 // Drop newest to ensure continuity of messages (and fall back to retransmissions or state transfer later if needed)
                 DropStrategy.DropNewest,
               ),
-          )()()
+          )(initTraceContext = traceContext)()
         context.become(consensus)
 
         // This will send all queued messages to the proper Consensus module.
@@ -159,7 +164,13 @@ final class PreIssConsensusModule[E <: Env[E]](
   ): Unit =
     context.pipeToSelf(
       context.futureContext.zipFuture(
-        epochStore.loadEpochProgress(latestEpoch.info),
+        epochStore.loadEpochProgress(
+          Epoch(
+            latestEpoch.info,
+            bootstrapTopologyInfo.currentMembership,
+            bootstrapTopologyInfo.previousMembership,
+          )
+        ),
         epochStore.loadCompleteBlocks(
           EpochNumber(
             latestCompletedEpoch.info.number - RetransmissionsManager.HowManyEpochsToKeep + 1
@@ -182,7 +193,11 @@ final class PreIssConsensusModule[E <: Env[E]](
       latestCompletedEpochLastCommits: Seq[SignedMessage[Commit]],
       latestEpochFromStore: EpochStore.Epoch,
       epochInProgress: EpochStore.EpochInProgress,
-  )(implicit mc: MetricsContext, context: E#ActorContextT[Consensus.Message[E]]): EpochState[E] = {
+  )(implicit
+      mc: MetricsContext,
+      context: E#ActorContextT[Consensus.Message[E]],
+      traceContext: TraceContext,
+  ): EpochState[E] = {
     val epoch = Epoch(
       latestEpochFromStore.info,
       bootstrapTopologyInfo.currentMembership,
@@ -192,7 +207,7 @@ final class PreIssConsensusModule[E <: Env[E]](
     new EpochState(
       epoch,
       clock,
-      abort(_)(context, TraceContext.empty),
+      abort(_)(context, traceContext),
       metrics,
       segmentModuleRefFactory(
         context,
@@ -200,6 +215,7 @@ final class PreIssConsensusModule[E <: Env[E]](
         bootstrapTopologyInfo.currentCryptoProvider,
         latestCompletedEpochLastCommits,
         epochInProgress,
+        traceContext,
       ),
       epochInProgress.completedBlocks,
       loggerFactory = loggerFactory,

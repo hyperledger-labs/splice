@@ -1,0 +1,34 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "networking.gke.io/v1",
+    "kind": "GCPBackendPolicy",
+    "metadata": {
+      "name": "cn-gke-l7-gateway-cloud-armor-link",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "default": {
+        "connectionDraining": {
+          "drainingTimeoutSec": 60
+        },
+        "logging": {
+          "enabled": true,
+          "sampleRate": 1000000
+        },
+        "securityPolicy": "waf-whitelist-throttle-ban-mock",
+        "timeoutSec": 3600
+      },
+      "targetRef": {
+        "group": "",
+        "kind": "Service",
+        "name": "istio-ingress",
+        "namespace": "cluster-ingress"
+      }
+    }
+  },
+  "name": "cn-gke-l7-gateway-cloud-armor-link",
+  "provider": "",
+  "type": "kubernetes:networking.gke.io/v1:GCPBackendPolicy"
+}

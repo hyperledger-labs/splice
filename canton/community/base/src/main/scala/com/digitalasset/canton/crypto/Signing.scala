@@ -8,7 +8,6 @@ import cats.data.EitherT
 import cats.instances.order.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
@@ -22,7 +21,12 @@ import com.digitalasset.canton.crypto.store.{CryptoPrivateStoreError, CryptoPriv
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.{CantonBaseError, CantonErrorGroups}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.metrics.SigningMetrics
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{
@@ -32,16 +36,19 @@ import com.digitalasset.canton.serialization.{
   ProtoConverter,
 }
 import com.digitalasset.canton.store.db.DbDeserializationException
-import com.digitalasset.canton.topology.{Member, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{EitherTUtil, EitherUtil}
+import com.digitalasset.canton.util.EitherUtil
+import com.digitalasset.canton.validation.{ProtoUnvalidatedSeq, ProtoValidation}
 import com.digitalasset.canton.version.*
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.x509.{AlgorithmIdentifier, SubjectPublicKeyInfo}
+import org.bouncycastle.jcajce.spec.MLDSAParameterSpec
 import slick.jdbc.GetResult
 
 import java.time.Duration
@@ -70,28 +77,12 @@ trait SigningOps extends SigningMetricsSupport {
       usage: NonEmpty[Set[SigningKeyUsage]],
       signingAlgorithmSpec: SigningAlgorithmSpec = signingAlgorithmSpecs.default,
   )(implicit traceContext: TraceContext): Either[SigningError, Signature] =
-    signingMetrics.signingLatency.time(
-      signBytesInternal(hash.getCryptographicEvidence, signingKey, usage, signingAlgorithmSpec)
-    )
+    signBytes(hash.getCryptographicEvidence, signingKey, usage, signingAlgorithmSpec)
 
   /** Signs raw bytes using the private signing key. Convenience wrapper used when signing
     * non-hashed data.
     */
-  protected[crypto] def signBytes(
-      bytes: ByteString,
-      signingKey: SigningPrivateKey,
-      usage: NonEmpty[Set[SigningKeyUsage]],
-      signingAlgorithmSpec: SigningAlgorithmSpec = signingAlgorithmSpecs.default,
-  )(implicit traceContext: TraceContext): Either[SigningError, Signature] =
-    signingMetrics.signingLatency.time(
-      signBytesInternal(bytes, signingKey, usage, signingAlgorithmSpec)
-    )
-
-  /** Internal signing primitive implemented by concrete backends. Performs the actual cryptographic
-    * signing of raw bytes. This bypasses higher-level wrappers (e.g. metrics and validation) and
-    * should only be used by internal signing logic.
-    */
-  private[crypto] def signBytesInternal(
+  private[crypto] def signBytes(
       bytes: ByteString,
       signingKey: SigningPrivateKey,
       usage: NonEmpty[Set[SigningKeyUsage]],
@@ -120,24 +111,18 @@ trait SigningPrivateOps extends SigningMetricsSupport {
 
   def signingSchemes: SigningCryptoSchemes
 
-  /** Signs the given hash using the referenced private signing key. Latency of the signing
-    * operation is recorded for all outcomes (successful signatures and signing failures).
-    */
+  /** Signs the given hash using the referenced private signing key. */
   def sign(
       hash: Hash,
       signingKeyId: Fingerprint,
       usage: NonEmpty[Set[SigningKeyUsage]],
       signingAlgorithmSpec: SigningAlgorithmSpec = signingSchemes.algorithmSpecs.default,
   )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
+      tc: TraceContext
   ): EitherT[FutureUnlessShutdown, SigningError, Signature] =
-    EitherTUtil.timed(signingMetrics.signingLatency)(
-      signBytesInternal(hash.getCryptographicEvidence, signingKeyId, usage, signingAlgorithmSpec)
-    )
+    signBytes(hash.getCryptographicEvidence, signingKeyId, usage, signingAlgorithmSpec)
 
-  /** Signs the byte string directly, however it is encouraged to sign a hash. Latency of the
-    * signing operation is recorded for all outcomes (successful signatures and signing failures).
+  /** Signs the byte string directly, however it is encouraged to sign a hash.
     */
   def signBytes(
       bytes: ByteString,
@@ -145,23 +130,8 @@ trait SigningPrivateOps extends SigningMetricsSupport {
       usage: NonEmpty[Set[SigningKeyUsage]],
       signingAlgorithmSpec: SigningAlgorithmSpec = signingSchemes.algorithmSpecs.default,
   )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): EitherT[FutureUnlessShutdown, SigningError, Signature] =
-    EitherTUtil.timed(signingMetrics.signingLatency)(
-      signBytesInternal(bytes, signingKeyId, usage, signingAlgorithmSpec)
-    )
-
-  /** Internal signing primitive that produces a signature for the given bytes. This bypasses
-    * higher-level wrappers (e.g. metrics and validation) and should only be used by internal
-    * signing logic.
-    */
-  private[crypto] def signBytesInternal(
-      bytes: ByteString,
-      signingKeyId: Fingerprint,
-      usage: NonEmpty[Set[SigningKeyUsage]],
-      signingAlgorithmSpec: SigningAlgorithmSpec = signingSchemes.algorithmSpecs.default,
-  )(implicit tc: TraceContext): EitherT[FutureUnlessShutdown, SigningError, Signature]
+      tc: TraceContext
+  ): EitherT[FutureUnlessShutdown, SigningError, Signature]
 
   /** Generates a new signing key pair with the given scheme and optional name, stores the private
     * key and returns the public key.
@@ -190,7 +160,7 @@ trait SigningPrivateStoreOps extends SigningPrivateOps {
 
   protected val signingOps: SigningOps
 
-  override private[crypto] def signBytesInternal(
+  override def signBytes(
       bytes: ByteString,
       signingKeyId: Fingerprint,
       usage: NonEmpty[Set[SigningKeyUsage]],
@@ -241,14 +211,14 @@ trait SigningPrivateStoreOps extends SigningPrivateOps {
   *   through a signature created by a long-term key. This allows the session key to be used for
   *   signing the original message without always relying on the long-term key.
   */
-final case class Signature private (
+final case class Signature(
     format: SignatureFormat,
     private val signature: ByteString,
     private[crypto] val signedBy: Fingerprint,
     signingAlgorithmSpec: Option[SigningAlgorithmSpec],
     signatureDelegation: Option[SignatureDelegation],
 ) extends HasVersionedWrapper[Signature]
-    with PrettyPrinting {
+    with PrettyPrintingFromCompanion {
 
   override protected def companionObj: Signature.type = Signature
 
@@ -280,7 +250,8 @@ final case class Signature private (
       val newFormat = signingAlgorithmSpec match {
         case Some(algo) =>
           algo match {
-            case SigningAlgorithmSpec.EcDsaSha256 | SigningAlgorithmSpec.EcDsaSha384 =>
+            case SigningAlgorithmSpec.EcDsaSha256 | SigningAlgorithmSpec.EcDsaSha384 |
+                SigningAlgorithmSpec.MlDsa65 =>
               SignatureFormat.Der
             case SigningAlgorithmSpec.Ed25519 => SignatureFormat.Concat
           }
@@ -319,7 +290,7 @@ final case class Signature private (
     case SignatureFormat.Raw => throw new IllegalStateException("Original signature has Raw format")
   })
 
-  override protected def pretty: Pretty[Signature] = Signature.prettyInstance
+  override def prettyCompanion: PrettyPrintingCompanion[Signature] = Signature
 
   /** Access to the raw signature, must NOT be used for serialization */
   private[crypto] def unwrap: ByteString = signature
@@ -331,10 +302,10 @@ final case class Signature private (
 
 object Signature
     extends HasVersionedMessageCompanion[Signature]
-    with HasVersionedMessageCompanionDbHelpers[Signature] {
+    with HasVersionedMessageCompanionDbHelpers[Signature]
+    with PrettyPrintingCompanion[Signature] {
 
-  private val prettyInstance = {
-    import com.digitalasset.canton.logging.pretty.PrettyUtil.*
+  val pretty: Pretty[Signature] =
     prettyOfClass[Signature](
       param("signature", _.signature),
       param("format", _.format),
@@ -342,7 +313,6 @@ object Signature
       param("signingAlgorithmSpec", _.signingAlgorithmSpec),
       param("signatureDelegation", _.signatureDelegation, _.signatureDelegation.isDefined),
     )
-  }
 
   def authorizingLongTermKey(
       signedBy: Fingerprint,
@@ -370,9 +340,14 @@ object Signature
 
   def fromProtoV30(signatureP: v30.Signature): ParsingResult[Signature] =
     for {
-      format <- SignatureFormat.fromProtoEnum("format", signatureP.format)
+      format <- SignatureFormat.fromProtoEnum(signatureP.format, "format")
       signature = signatureP.signature
-      longTermKeyId <- Fingerprint.fromProtoPrimitive(signatureP.signedBy)
+      // TODO(#34479): validate the crypto key fingerprint once the negotiated pvv is threaded here.
+      longTermKeyId <- ProtoValidation.validateThen(
+        signatureP.signedBy,
+        "signed_by",
+        ProtocolVersionValidation.NoValidation,
+      )(Fingerprint.fromProtoPrimitive)
       // ensures compatibility with previous signature versions where the signing algorithm specification is not set
       signingAlgorithmSpecO <- SigningAlgorithmSpec.fromProtoEnumOption(
         "signing_algorithm_spec",
@@ -418,6 +393,15 @@ object Signature
 
 }
 
+/** This is a variation of Signature without signedBy, used when we don't know which key was used to
+  * sign.
+  */
+final case class SignatureWithoutSigner(
+    val format: SignatureFormat,
+    val signature: ByteString,
+    val signingAlgorithmSpec: SigningAlgorithmSpec,
+)
+
 /** Defines the validity period of a session signing key delegation within a specific synchronizer
   * timeframe. This period starts at a creation 'from' timestamp and extends for a specified
   * duration.
@@ -430,7 +414,7 @@ object Signature
 final case class SignatureDelegationValidityPeriod(
     fromInclusive: CantonTimestamp,
     periodLength: PositiveFiniteDuration,
-) extends PrettyPrinting
+) extends PrettyPrintingFromCompanion
     // we never deserialize this object from a byte string, so we don't need to define a fromByteString method in the companion object
     with HasCryptographicEvidence {
 
@@ -442,11 +426,8 @@ final case class SignatureDelegationValidityPeriod(
   def covers(timestamp: CantonTimestamp): Boolean =
     timestamp >= fromInclusive && timestamp < toExclusive
 
-  override protected def pretty: Pretty[SignatureDelegationValidityPeriod] =
-    prettyOfClass(
-      param("fromInclusive", _.fromInclusive),
-      param("periodLength", _.periodLength),
-    )
+  override def prettyCompanion: PrettyPrintingCompanion[SignatureDelegationValidityPeriod] =
+    SignatureDelegationValidityPeriod
 
   /** Encodes the start time and period length deterministically. This is later used together with
     * the synchronizer ID and session key fingerprint to generate the signature delegation hash.
@@ -472,6 +453,15 @@ final case class SignatureDelegationValidityPeriod(
     else (this.fromInclusive, this.toExclusive)
 }
 
+object SignatureDelegationValidityPeriod
+    extends PrettyPrintingCompanion[SignatureDelegationValidityPeriod] {
+  override protected val pretty: Pretty[SignatureDelegationValidityPeriod] =
+    prettyOfClass(
+      param("fromInclusive", _.fromInclusive),
+      param("periodLength", _.periodLength),
+    )
+}
+
 /** An extension to the signature to accommodate the necessary information to be able to use session
   * signing keys for protocol messages.
   *
@@ -491,7 +481,7 @@ final case class SignatureDelegation private[crypto] (
     signature: Signature,
 ) extends Product
     with Serializable
-    with PrettyPrinting {
+    with PrettyPrintingFromCompanion {
 
   // All session signing keys must be an ASN.1 + DER-encoding of X.509 SubjectPublicKeyInfo structure and be
   // set to be used for protocol messages
@@ -522,15 +512,16 @@ final case class SignatureDelegation private[crypto] (
       signingAlgorithmSpec = SigningAlgorithmSpec.toProtoEnumOption(signature.signingAlgorithmSpec),
     )
 
-  override protected def pretty: Pretty[SignatureDelegation] =
+  override def prettyCompanion: PrettyPrintingCompanion[SignatureDelegation] = SignatureDelegation
+}
+
+object SignatureDelegation extends PrettyPrintingCompanion[SignatureDelegation] {
+  override protected val pretty: Pretty[SignatureDelegation] =
     prettyOfClass(
       param("sessionKey", _.sessionKey),
       param("validityPeriod", _.validityPeriod),
       param("signature", _.signature),
     )
-}
-
-object SignatureDelegation {
 
   /** Constructs a [[SignatureDelegation]] using a session key, validity period, and signature.
     * These components are constructed in
@@ -585,17 +576,20 @@ object SignatureDelegation {
       synchronizerId: SynchronizerId,
       sessionKey: SigningPublicKey,
       validityPeriod: SignatureDelegationValidityPeriod,
-  ): Hash = {
+  ): Either[String, Hash] = {
     val hashBuilder =
       HashBuilderFromMessageDigest(HashAlgorithm.Sha256, HashPurpose.SessionKeyDelegation)
-    hashBuilder
-      .addString(sessionKey.id.unwrap)
-      .addInt(sessionKey.keySpec.toProtoEnum.value)
-      .addInt(sessionKey.format.toProtoEnum.value)
-      .addByteString(encodeUsageForHash(sessionKey.usage))
-      .addByteString(validityPeriod.getCryptographicEvidence)
-      .addString(synchronizerId.toProtoPrimitive)
-      .finish()
+
+    encodeUsageForHash(sessionKey.usage).map { usage =>
+      hashBuilder
+        .addString(sessionKey.id.unwrap)
+        .addInt(sessionKey.keySpec.toProtoEnum.value)
+        .addInt(sessionKey.format.toProtoEnum.value)
+        .addByteString(usage)
+        .addByteString(validityPeriod.getCryptographicEvidence)
+        .addString(synchronizerId.toProtoPrimitive)
+        .finish()
+    }
   }
 
   def fromProtoV30(
@@ -603,7 +597,7 @@ object SignatureDelegation {
       longTermKeyId: Fingerprint,
   ): ParsingResult[SignatureDelegation] =
     for {
-      scheme <- SigningKeySpec.fromProtoEnum("session_key_spec", signatureP.sessionKeySpec)
+      scheme <- SigningKeySpec.fromProtoEnum(signatureP.sessionKeySpec, "session_key_spec")
       sessionKey <- SigningPublicKey
         .create(
           CryptoKeyFormat.DerX509Spki,
@@ -629,7 +623,7 @@ object SignatureDelegation {
       // so calling Positive.create method here is unnecessary.
       periodLength = PositiveFiniteDuration.ofSeconds(validityPeriodDurationSeconds.value.toLong)
       signatureRaw = signatureP.signature
-      signatureFormat <- SignatureFormat.fromProtoEnum("format", signatureP.format)
+      signatureFormat <- SignatureFormat.fromProtoEnum(signatureP.format, "format")
       signatureAlgorithmSpecO <- SigningAlgorithmSpec.fromProtoEnumOption(
         "signing_algorithm_spec",
         signatureP.signingAlgorithmSpec,
@@ -660,13 +654,15 @@ object SignatureDelegation {
     } yield signatureDelegation
 }
 
-sealed trait SignatureFormat extends Product with Serializable with PrettyPrinting {
+sealed trait SignatureFormat extends Product with Serializable with PrettyPrintingFromCompanion {
   def name: String
   def toProtoEnum: v30.SignatureFormat
-  override protected def pretty: Pretty[this.type] = prettyOfString(_.name)
+
+  override def prettyCompanion: PrettyPrintingCompanion[SignatureFormat] = SignatureFormat
 }
 
-object SignatureFormat {
+object SignatureFormat extends PrettyPrintingCompanion[SignatureFormat] {
+  override protected val pretty: Pretty[SignatureFormat] = prettyOfString(_.name)
 
   /** ASN.1 + DER-encoding of the `r` and `s` integers, as defined in
     * https://datatracker.ietf.org/doc/html/rfc3279#section-2.2.3
@@ -714,14 +710,15 @@ object SignatureFormat {
 
   def fromSigningAlgoSpec(signingAlgoSpec: SigningAlgorithmSpec): SignatureFormat =
     signingAlgoSpec match {
-      case SigningAlgorithmSpec.EcDsaSha256 | SigningAlgorithmSpec.EcDsaSha384 =>
+      case SigningAlgorithmSpec.EcDsaSha256 | SigningAlgorithmSpec.EcDsaSha384 |
+          SigningAlgorithmSpec.MlDsa65 =>
         SignatureFormat.Der
       case SigningAlgorithmSpec.Ed25519 => SignatureFormat.Concat
     }
 
   def fromProtoEnum(
-      field: String,
       formatP: v30.SignatureFormat,
+      field: String,
   ): ParsingResult[SignatureFormat] =
     formatP match {
       case v30.SignatureFormat.SIGNATURE_FORMAT_UNSPECIFIED =>
@@ -739,7 +736,7 @@ object SignatureFormat {
 /** Only intended to be used for signing keys to distinguish keys used for generating the namespace,
   * for identity delegations, authenticate members to a sequencer and signing protocol messages.
   */
-sealed trait SigningKeyUsage extends Product with Serializable with PrettyPrinting {
+sealed trait SigningKeyUsage extends Product with Serializable with PrettyPrintingFromCompanion {
 
   // A unique identifier that is used to differentiate different key usages and that is usually embedded in a key
   // name to identify existing keys on bootstrap.
@@ -749,12 +746,14 @@ sealed trait SigningKeyUsage extends Product with Serializable with PrettyPrinti
   // NOTE: If you add a new dbType, add them also to `function debug.key_usage` in sql for debugging
   def dbType: Byte
 
-  def toProtoEnum: v30.SigningKeyUsage
+  def toProtoEnumV30: Either[String, v30.SigningKeyUsage]
+  def toProtoEnumV31: Either[String, v31.SigningKeyUsage]
 
-  override def pretty: Pretty[SigningKeyUsage.this.type] = prettyOfString(_.identifier)
+  override def prettyCompanion: PrettyPrintingCompanion[SigningKeyUsage] = SigningKeyUsage
 }
 
-object SigningKeyUsage {
+object SigningKeyUsage extends PrettyPrintingCompanion[SigningKeyUsage] {
+  override protected val pretty: Pretty[SigningKeyUsage] = prettyOfString(_.identifier)
 
   val All: NonEmpty[Set[SigningKeyUsage]] =
     NonEmpty.mk(
@@ -764,6 +763,11 @@ object SigningKeyUsage {
       Protocol,
       ProofOfOwnership,
     )
+
+  def all(protocolVersion: ProtocolVersion): NonEmpty[Set[SigningKeyUsage]] =
+    // TODO(i32231): Update this to actually branch on protocolVersion, but we need the versioningTable to be
+    // included, since otherwise we will use proto v30 with protocol version 36.
+    protocolVersion match { case _ => All }
 
   val NamespaceOnly: NonEmpty[Set[SigningKeyUsage]] = NonEmpty.mk(Set, Namespace)
   val NamespaceOrProofOfOwnership: NonEmpty[Set[SigningKeyUsage]] =
@@ -807,17 +811,20 @@ object SigningKeyUsage {
   /** Encodes a non-empty set of signing key usages into a ByteString for hashing. The usages are
     * converted to their proto enum integer values and sorted to ensure determinism.
     */
-  def encodeUsageForHash(usage: NonEmpty[Set[SigningKeyUsage]]): ByteString = {
-    val orderedUsages = usage.forgetNE.toSeq.map(_.toProtoEnum.value).sorted
-    DeterministicEncoding.encodeSeqWith(orderedUsages)(usageInt =>
-      DeterministicEncoding.encodeInt(usageInt)
-    )
-  }
+  def encodeUsageForHash(usages: NonEmpty[Set[SigningKeyUsage]]): Either[String, ByteString] =
+    usages.forgetNE.toSeq.traverse(_.toProtoEnumV30.map(_.value)).map(_.sorted).map {
+      orderedUsages =>
+        DeterministicEncoding
+          .encodeSeqWith(orderedUsages)(usageInt => DeterministicEncoding.encodeInt(usageInt))
+    }
 
   case object Namespace extends SigningKeyUsage {
     override val identifier: String = "namespace"
     override val dbType: Byte = 0
-    override def toProtoEnum: v30.SigningKeyUsage = v30.SigningKeyUsage.SIGNING_KEY_USAGE_NAMESPACE
+    override def toProtoEnumV30: Either[String, v30.SigningKeyUsage] =
+      v30.SigningKeyUsage.SIGNING_KEY_USAGE_NAMESPACE.asRight
+    override def toProtoEnumV31: Either[String, v31.SigningKeyUsage] =
+      v31.SigningKeyUsage.SIGNING_KEY_USAGE_NAMESPACE.asRight
   }
 
   // IdentifyDelegation (dbType = 1) usage was deprecated and has now been removed.
@@ -825,8 +832,10 @@ object SigningKeyUsage {
   case object SequencerAuthentication extends SigningKeyUsage {
     override val identifier: String = "sequencer-auth"
     override val dbType: Byte = 2
-    override def toProtoEnum: v30.SigningKeyUsage =
-      v30.SigningKeyUsage.SIGNING_KEY_USAGE_SEQUENCER_AUTHENTICATION
+    override def toProtoEnumV30: Either[String, v30.SigningKeyUsage] =
+      v30.SigningKeyUsage.SIGNING_KEY_USAGE_SEQUENCER_AUTHENTICATION.asRight
+    override def toProtoEnumV31: Either[String, v31.SigningKeyUsage] =
+      v31.SigningKeyUsage.SIGNING_KEY_USAGE_SEQUENCER_AUTHENTICATION.asRight
   }
 
   case object Protocol extends SigningKeyUsage {
@@ -834,8 +843,10 @@ object SigningKeyUsage {
     // that we use to search for keys during node bootstrap.
     override val identifier: String = "signing"
     override val dbType: Byte = 3
-    override def toProtoEnum: v30.SigningKeyUsage =
-      v30.SigningKeyUsage.SIGNING_KEY_USAGE_PROTOCOL
+    override def toProtoEnumV30: Either[String, v30.SigningKeyUsage] =
+      v30.SigningKeyUsage.SIGNING_KEY_USAGE_PROTOCOL.asRight
+    override def toProtoEnumV31: Either[String, v31.SigningKeyUsage] =
+      v31.SigningKeyUsage.SIGNING_KEY_USAGE_PROTOCOL.asRight
   }
 
   /** Internal type used to identify keys that can self-sign to prove ownership, required for
@@ -845,18 +856,28 @@ object SigningKeyUsage {
   case object ProofOfOwnership extends SigningKeyUsage {
     override val identifier: String = "proof-of-ownership"
     override val dbType: Byte = 4
-    override def toProtoEnum: v30.SigningKeyUsage =
-      v30.SigningKeyUsage.SIGNING_KEY_USAGE_PROOF_OF_OWNERSHIP
+    override def toProtoEnumV30: Either[String, v30.SigningKeyUsage] =
+      v30.SigningKeyUsage.SIGNING_KEY_USAGE_PROOF_OF_OWNERSHIP.asRight
+    override def toProtoEnumV31: Either[String, v31.SigningKeyUsage] =
+      v31.SigningKeyUsage.SIGNING_KEY_USAGE_PROOF_OF_OWNERSHIP.asRight
+  }
 
+  private case object PartyJWTAuthentication extends SigningKeyUsage {
+    override val identifier: String = "party-jwt"
+    override val dbType: Byte = 5
+    override def toProtoEnumV30: Either[String, v30.SigningKeyUsage] =
+      Left("party-jwt key usage is not supported in proto v30")
+    override def toProtoEnumV31: Either[String, v31.SigningKeyUsage] =
+      v31.SigningKeyUsage.SIGNING_KEY_USAGE_PARTY_JWT_AUTHENTICATION.asRight
   }
 
   /** Ignores the identity_delegation usage by returning None. We can do this because, up until now,
     * identity_delegation has never been the sole usage of a key.
     */
   @nowarn("msg=SIGNING_KEY_USAGE_IDENTITY_DELEGATION in object SigningKeyUsage is deprecated")
-  def fromProtoEnum(
-      field: String,
+  def fromProtoEnumV30(
       usageP: v30.SigningKeyUsage,
+      field: String,
   ): ParsingResult[Option[SigningKeyUsage]] =
     usageP match {
       case v30.SigningKeyUsage.SIGNING_KEY_USAGE_UNSPECIFIED =>
@@ -873,21 +894,73 @@ object SigningKeyUsage {
       case v30.SigningKeyUsage.SIGNING_KEY_USAGE_PROOF_OF_OWNERSHIP => Right(Some(ProofOfOwnership))
     }
 
+  def fromProtoEnumV31(
+      usageP: v31.SigningKeyUsage,
+      field: String,
+  ): ParsingResult[Option[SigningKeyUsage]] =
+    usageP match {
+      case v31.SigningKeyUsage.SIGNING_KEY_USAGE_UNSPECIFIED =>
+        Left(ProtoDeserializationError.FieldNotSet(field))
+      case v31.SigningKeyUsage.Unrecognized(value) =>
+        Left(ProtoDeserializationError.UnrecognizedEnum(field, value))
+      case v31.SigningKeyUsage.SIGNING_KEY_USAGE_NAMESPACE =>
+        Right(Some(Namespace))
+      case v31.SigningKeyUsage.SIGNING_KEY_USAGE_SEQUENCER_AUTHENTICATION =>
+        Right(Some(SequencerAuthentication))
+      case v31.SigningKeyUsage.SIGNING_KEY_USAGE_PROTOCOL => Right(Some(Protocol))
+      case v31.SigningKeyUsage.SIGNING_KEY_USAGE_PROOF_OF_OWNERSHIP => Right(Some(ProofOfOwnership))
+      case v31.SigningKeyUsage.SIGNING_KEY_USAGE_PARTY_JWT_AUTHENTICATION =>
+        Right(Some(PartyJWTAuthentication))
+    }
+
   /** When deserializing the usages for a signing key, if the usages are empty, we default to
     * allowing all usages to maintain backward compatibility.
     */
-  def fromProtoListWithDefault(
-      usages: Seq[v30.SigningKeyUsage]
+  def fromProtoListWithDefaultV30(
+      usages: ProtoUnvalidatedSeq[v30.SigningKeyUsage]
   ): ParsingResult[NonEmpty[Set[SigningKeyUsage]]] =
-    usages
-      .traverse(usageAux => SigningKeyUsage.fromProtoEnum("usage", usageAux))
+    ProtoValidation
+      // TODO(#34479): validate the crypto key usage once the negotiated pvv is threaded here.
+      .validateLengthThen(
+        usages,
+        "usage",
+        ProtocolVersionValidation.NoValidation,
+        ProtoValidation.MaxCollectionSize,
+      )(SigningKeyUsage.fromProtoEnumV30)
       .map(listUsages => NonEmpty.from(listUsages.flatten.toSet).getOrElse(SigningKeyUsage.All))
 
-  def fromProtoListWithoutDefault(
-      usages: Seq[v30.SigningKeyUsage]
+  /** Deserializes signing key usages without applying a default. Fails if no usages are specified.
+    * This is used for command requests, where `usage` is mandatory.
+    */
+  def fromProtoListWithoutDefaultV30(
+      usages: ProtoUnvalidatedSeq[v30.SigningKeyUsage]
   ): ParsingResult[NonEmpty[Set[SigningKeyUsage]]] =
-    usages
-      .traverse(usageAux => SigningKeyUsage.fromProtoEnum("usage", usageAux))
+    ProtoValidation
+      // TODO(#34479): validate the crypto key usage once the negotiated pvv is threaded here.
+      .validateLengthThen(
+        usages,
+        "usage",
+        ProtocolVersionValidation.NoValidation,
+        ProtoValidation.MaxCollectionSize,
+      )(SigningKeyUsage.fromProtoEnumV30)
+      .flatMap(listUsages =>
+        // for commands, we should not default to All; instead, the request should fail because usage is now a mandatory parameter.
+        NonEmpty
+          .from(listUsages.flatten.toSet)
+          .toRight(ProtoDeserializationError.FieldNotSet("usage"))
+      )
+
+  def fromProtoListWithoutDefaultV31(
+      usages: ProtoUnvalidatedSeq[v31.SigningKeyUsage]
+  ): ParsingResult[NonEmpty[Set[SigningKeyUsage]]] =
+    ProtoValidation
+      // TODO(#34479): validate the crypto key usage once the negotiated pvv is threaded here.
+      .validateLengthThen(
+        usages,
+        "usage",
+        ProtocolVersionValidation.NoValidation,
+        ProtoValidation.MaxCollectionSize,
+      )(SigningKeyUsage.fromProtoEnumV31)
       .flatMap(listUsages =>
         // for commands, we should not default to All; instead, the request should fail because usage is now a mandatory parameter.
         NonEmpty
@@ -936,13 +1009,19 @@ object SigningKeyUsage {
 }
 
 /** A signing key specification. */
-sealed trait SigningKeySpec extends Product with Serializable with PrettyPrinting {
+sealed trait SigningKeySpec
+    extends CryptoSpec
+    with Product
+    with Serializable
+    with PrettyPrintingFromCompanion {
   def name: String
   def toProtoEnum: v30.SigningKeySpec
-  override val pretty: Pretty[this.type] = prettyOfString(_.name)
+
+  override def prettyCompanion: PrettyPrintingCompanion[SigningKeySpec] = SigningKeySpec
 }
 
-object SigningKeySpec {
+object SigningKeySpec extends PrettyPrintingCompanion[SigningKeySpec] {
+  override protected val pretty: Pretty[SigningKeySpec] = prettyOfString(_.name)
 
   implicit val signingKeySpecOrder: Order[SigningKeySpec] =
     Order.by[SigningKeySpec, String](_.name)
@@ -955,6 +1034,7 @@ object SigningKeySpec {
       v30.SigningKeySpec.SIGNING_KEY_SPEC_EC_CURVE25519
     // Name of the elliptic curve as expected by Java's ECGenParameterSpec (JCA standard name)
     override val jcaCurveName: String = "Ed25519"
+    override val experimental: Boolean = false
   }
 
   /** Elliptic Curve Key from the P-256 curve (aka secp256r1) as defined in
@@ -965,6 +1045,7 @@ object SigningKeySpec {
     override def toProtoEnum: v30.SigningKeySpec =
       v30.SigningKeySpec.SIGNING_KEY_SPEC_EC_P256
     override val jcaCurveName: String = "secp256r1"
+    override val experimental: Boolean = false
   }
 
   /** Elliptic Curve Key from the P-384 curve (aka secp384r1) as defined in
@@ -975,6 +1056,7 @@ object SigningKeySpec {
     override def toProtoEnum: v30.SigningKeySpec =
       v30.SigningKeySpec.SIGNING_KEY_SPEC_EC_P384
     override val jcaCurveName: String = "secp384r1"
+    override val experimental: Boolean = false
   }
 
   /** Elliptic Curve Key from SECG P256k1 curve (aka secp256k1) commonly used in bitcoin and
@@ -985,11 +1067,25 @@ object SigningKeySpec {
     override def toProtoEnum: v30.SigningKeySpec =
       v30.SigningKeySpec.SIGNING_KEY_SPEC_EC_SECP256K1
     override val jcaCurveName: String = "secp256k1"
+    override val experimental: Boolean = false
+  }
+
+  /** PQC Signing key spec for ML-DSA-65 as defined in https://doi.org/10.6028/NIST.FIPS.204
+    *
+    * Considered experimental until we have more confidence in the security of the scheme and its
+    * implementation.
+    */
+  case object MlDsa65 extends SigningKeySpec with MlDsaKeySpec {
+    override val name: String = "ML-DSA-65"
+    override def toProtoEnum: v30.SigningKeySpec =
+      v30.SigningKeySpec.SIGNING_KEY_SPEC_ML_DSA_65
+    override def jcaParameterSpec: MLDSAParameterSpec = MLDSAParameterSpec.ml_dsa_65
+    override val experimental: Boolean = true
   }
 
   def fromProtoEnum(
-      field: String,
       schemeP: v30.SigningKeySpec,
+      field: String,
   ): ParsingResult[SigningKeySpec] =
     schemeP match {
       case v30.SigningKeySpec.SIGNING_KEY_SPEC_UNSPECIFIED =>
@@ -1004,12 +1100,14 @@ object SigningKeySpec {
         Right(SigningKeySpec.EcP384)
       case v30.SigningKeySpec.SIGNING_KEY_SPEC_EC_SECP256K1 =>
         Right(SigningKeySpec.EcSecp256k1)
+      case v30.SigningKeySpec.SIGNING_KEY_SPEC_ML_DSA_65 =>
+        Right(SigningKeySpec.MlDsa65)
     }
 
   /** If keySpec is unspecified, use the old SigningKeyScheme from the key */
   def fromProtoEnumWithDefaultScheme(
       keySpecP: v30.SigningKeySpec,
-      keySchemeP: v30.SigningKeyScheme,
+      keySchemeP: v30.SigningKeyScheme = v30.SigningKeyScheme.SIGNING_KEY_SCHEME_UNSPECIFIED,
   ): ParsingResult[SigningKeySpec] =
     // return better error if neither field is set
     if (
@@ -1017,9 +1115,9 @@ object SigningKeySpec {
     )
       Left(ProtoDeserializationError.FieldNotSet("key_spec and scheme"))
     else
-      SigningKeySpec.fromProtoEnum("key_spec", keySpecP).leftFlatMap {
+      SigningKeySpec.fromProtoEnum(keySpecP, "key_spec").leftFlatMap {
         case ProtoDeserializationError.FieldNotSet(_) =>
-          SigningKeySpec.fromProtoEnumSigningKeyScheme("scheme", keySchemeP)
+          SigningKeySpec.fromProtoEnumSigningKeyScheme(keySchemeP, "scheme")
         case err => Left(err)
       }
 
@@ -1027,8 +1125,8 @@ object SigningKeySpec {
     * with existing data.
     */
   private def fromProtoEnumSigningKeyScheme(
-      field: String,
       schemeP: v30.SigningKeyScheme,
+      field: String,
   ): ParsingResult[SigningKeySpec] =
     schemeP match {
       case v30.SigningKeyScheme.SIGNING_KEY_SCHEME_UNSPECIFIED =>
@@ -1045,7 +1143,11 @@ object SigningKeySpec {
 }
 
 /** Algorithm schemes for signing. */
-sealed trait SigningAlgorithmSpec extends Product with Serializable with PrettyPrinting {
+sealed trait SigningAlgorithmSpec
+    extends CryptoSpec
+    with Product
+    with Serializable
+    with PrettyPrintingFromCompanion {
   def name: String
   def supportedSigningKeySpecs: NonEmpty[Set[SigningKeySpec]]
   def supportedSignatureFormats: NonEmpty[Set[SignatureFormat]]
@@ -1058,10 +1160,12 @@ sealed trait SigningAlgorithmSpec extends Product with Serializable with PrettyP
 
   /** Name of the signing algorithm as expected by Java's getInstance (JCA standard name) */
   def jcaAlgorithmName: String
-  override val pretty: Pretty[this.type] = prettyOfString(_.name)
+
+  override def prettyCompanion: PrettyPrintingCompanion[SigningAlgorithmSpec] = SigningAlgorithmSpec
 }
 
-object SigningAlgorithmSpec {
+object SigningAlgorithmSpec extends PrettyPrintingCompanion[SigningAlgorithmSpec] {
+  override protected val pretty: Pretty[SigningAlgorithmSpec] = prettyOfString(_.name)
 
   implicit val signingAlgorithmSpecOrder: Order[SigningAlgorithmSpec] =
     Order.by[SigningAlgorithmSpec, String](_.name)
@@ -1078,6 +1182,7 @@ object SigningAlgorithmSpec {
       v30.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_ED25519
     override def approximateSignatureSize: Int = 64
     override def jcaAlgorithmName: String = "Ed25519"
+    override def experimental: Boolean = false
   }
 
   /** Elliptic Curve Digital Signature Algorithm with SHA256 as defined in
@@ -1093,6 +1198,7 @@ object SigningAlgorithmSpec {
       v30.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_EC_DSA_SHA_256
     override def approximateSignatureSize: Int = 64
     override def jcaAlgorithmName: String = "SHA256withECDSA"
+    override def experimental: Boolean = false
   }
 
   /** Elliptic Curve Digital Signature Algorithm with SHA384 as defined in
@@ -1108,6 +1214,25 @@ object SigningAlgorithmSpec {
       v30.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_EC_DSA_SHA_384
     override def approximateSignatureSize: Int = 96
     override def jcaAlgorithmName: String = "SHA384withECDSA"
+    override def experimental: Boolean = false
+  }
+
+  /** PQC Signing algorithm spec for ML-DSA-65 as defined in https://doi.org/10.6028/NIST.FIPS.204
+    *
+    * Considered experimental until we have more confidence in the security of the scheme and its
+    * implementation.
+    */
+  case object MlDsa65 extends SigningAlgorithmSpec {
+    override val name: String = "ML-DSA-65"
+    override val supportedSigningKeySpecs: NonEmpty[Set[SigningKeySpec]] =
+      NonEmpty.mk(Set, SigningKeySpec.MlDsa65)
+    override val supportedSignatureFormats: NonEmpty[Set[SignatureFormat]] =
+      NonEmpty.mk(Set, SignatureFormat.Der)
+    override def toProtoEnum: v30.SigningAlgorithmSpec =
+      v30.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_ML_DSA_65
+    override def approximateSignatureSize: Int = 3309
+    override def jcaAlgorithmName: String = "ML-DSA-65"
+    override def experimental: Boolean = true
   }
 
   def toProtoEnumOption(
@@ -1135,11 +1260,13 @@ object SigningAlgorithmSpec {
         Right(Some(SigningAlgorithmSpec.EcDsaSha256))
       case v30.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_EC_DSA_SHA_384 =>
         Right(Some(SigningAlgorithmSpec.EcDsaSha384))
+      case v30.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_ML_DSA_65 =>
+        Right(Some(SigningAlgorithmSpec.MlDsa65))
     }
 
   def fromProtoEnum(
-      field: String,
       schemeP: v30.SigningAlgorithmSpec,
+      field: String,
   ): ParsingResult[SigningAlgorithmSpec] =
     schemeP match {
       case v30.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_UNSPECIFIED =>
@@ -1152,6 +1279,8 @@ object SigningAlgorithmSpec {
         Right(SigningAlgorithmSpec.EcDsaSha256)
       case v30.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_EC_DSA_SHA_384 =>
         Right(SigningAlgorithmSpec.EcDsaSha384)
+      case v30.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_ML_DSA_65 =>
+        Right(SigningAlgorithmSpec.MlDsa65)
     }
 }
 
@@ -1167,34 +1296,46 @@ final case class RequiredSigningSpecs(
     keys: NonEmpty[Set[SigningKeySpec]],
 ) extends Product
     with Serializable
-    with PrettyPrinting {
+    with PrettyPrintingFromCompanion {
   def toProtoV30: v30.RequiredSigningSpecs =
     v30.RequiredSigningSpecs(
       algorithms.forgetNE.map(_.toProtoEnum).toSeq,
       keys.forgetNE.map(_.toProtoEnum).toSeq,
     )
-  override val pretty: Pretty[this.type] = prettyOfClass(
+
+  override def prettyCompanion: PrettyPrintingCompanion[RequiredSigningSpecs] = RequiredSigningSpecs
+}
+
+object RequiredSigningSpecs extends PrettyPrintingCompanion[RequiredSigningSpecs] {
+  override protected val pretty: Pretty[RequiredSigningSpecs] = prettyOfClass(
     param("algorithms", _.algorithms),
     param("keys", _.keys),
   )
-}
-
-object RequiredSigningSpecs {
   def fromProtoV30(
-      requiredSigningSpecsP: v30.RequiredSigningSpecs
+      pvv: ProtocolVersionValidation,
+      requiredSigningSpecsP: v30.RequiredSigningSpecs,
   ): ParsingResult[RequiredSigningSpecs] =
     for {
-      keySpecs <- requiredSigningSpecsP.keys.traverse(keySpec =>
-        SigningKeySpec.fromProtoEnum("keys", keySpec)
-      )
-      algorithmSpecs <- requiredSigningSpecsP.algorithms
-        .traverse(algorithmSpec => SigningAlgorithmSpec.fromProtoEnum("algorithms", algorithmSpec))
+      keySpecs <- ProtoValidation
+        .validateLengthThen(
+          requiredSigningSpecsP.keys,
+          "keys",
+          pvv,
+          ProtoValidation.MaxCollectionSize,
+        )(SigningKeySpec.fromProtoEnum)
+      algorithmSpecs <- ProtoValidation
+        .validateLengthThen(
+          requiredSigningSpecsP.algorithms,
+          "algorithms",
+          pvv,
+          ProtoValidation.MaxCollectionSize,
+        )(SigningAlgorithmSpec.fromProtoEnum)
       keySpecsNE <- NonEmpty
         .from(keySpecs.toSet)
         .toRight(
           ProtoDeserializationError.InvariantViolation(
             "keys",
-            "no required signing algorithm specification",
+            "no required signing key specification",
           )
         )
       algorithmSpecsNE <- NonEmpty
@@ -1202,7 +1343,7 @@ object RequiredSigningSpecs {
         .toRight(
           ProtoDeserializationError.InvariantViolation(
             "algorithms",
-            "no required signing key specification",
+            "no required signing algorithm specification",
           )
         )
     } yield RequiredSigningSpecs(algorithmSpecsNE, keySpecsNE)
@@ -1235,11 +1376,11 @@ final case class SigningKeyPair private (publicKey: SigningPublicKey, privateKey
       privateKey = privateKey.replaceId(publicKey.id),
     )
 
-  protected def toProtoV30: v30.SigningKeyPair =
-    v30.SigningKeyPair(Some(privateKey.toProtoV30))
+  protected def toProtoV30: Either[String, v30.SigningKeyPair] =
+    privateKey.toProtoV30.map(proto => v30.SigningKeyPair(Some(proto)))
 
-  protected def toProtoCryptoKeyPairPairV30: v30.CryptoKeyPair.Pair =
-    v30.CryptoKeyPair.Pair.SigningKeyPair(toProtoV30)
+  protected def toProtoCryptoKeyPairPairV30: Either[String, v30.CryptoKeyPair.Pair] =
+    toProtoV30.map(v30.CryptoKeyPair.Pair.SigningKeyPair.apply)
 }
 
 object SigningKeyPair {
@@ -1318,8 +1459,8 @@ final case class SigningPublicKey private (
 )(
     override val migrated: Boolean = false
 ) extends PublicKey
-    with PrettyPrinting
-    with HasVersionedWrapper[SigningPublicKey] {
+    with PrettyPrintingFromCompanion
+    with HasVersionedWrapperE[SigningPublicKey] {
 
   override type K = SigningPublicKey
 
@@ -1340,26 +1481,37 @@ final case class SigningPublicKey private (
       )
       .map(_ => this)
 
-  def toProtoV30: v30.SigningPublicKey =
-    v30.SigningPublicKey(
-      format = format.toProtoEnum,
-      publicKey = key,
-      // we no longer use this field so we set this scheme as unspecified
-      scheme = v30.SigningKeyScheme.SIGNING_KEY_SCHEME_UNSPECIFIED,
-      keySpec = keySpec.toProtoEnum,
-      usage = usage.map(_.toProtoEnum).toSeq,
-    )
+  override def toByteStringE(version: ProtocolVersion): Either[String, ByteString] =
+    toByteString(version)
 
-  override protected def toProtoPublicKeyKeyV30: v30.PublicKey.Key =
-    v30.PublicKey.Key.SigningPublicKey(toProtoV30)
+  def toProtoV30: Either[String, v30.SigningPublicKey] =
+    usage.toSeq.forgetNE.traverse(_.toProtoEnumV30).map { usage =>
+      v30.SigningPublicKey(
+        format = format.toProtoEnum,
+        publicKey = key,
+        // we no longer use this field so we set this scheme as unspecified
+        scheme = v30.SigningKeyScheme.SIGNING_KEY_SCHEME_UNSPECIFIED,
+        keySpec = keySpec.toProtoEnum,
+        usage = usage,
+      )
+    }
 
-  override protected def pretty: Pretty[SigningPublicKey] =
-    prettyOfClass(
-      param("id", _.id),
-      param("format", _.format),
-      param("keySpec", _.keySpec),
-      param("usage", _.usage),
-    )
+  def toProtoV31: Either[String, v31.SigningPublicKey] =
+    usage.toSeq.forgetNE.traverse(_.toProtoEnumV31).map { usage =>
+      v31.SigningPublicKey(
+        format = format.toProtoEnum,
+        publicKey = key,
+        keySpec = keySpec.toProtoEnum,
+        usage = usage,
+      )
+    }
+
+  override protected def toProtoPublicKeyKeyV30: Either[String, v30.PublicKey.Key] =
+    toProtoV30.map(v30.PublicKey.Key.SigningPublicKey.apply)
+  override protected def toProtoPublicKeyKeyV31: Either[String, v31.PublicKey.Key] =
+    toProtoV31.map(v31.PublicKey.Key.SigningPublicKey.apply)
+
+  override def prettyCompanion: PrettyPrintingCompanion[SigningPublicKey] = SigningPublicKey
 
   @nowarn("msg=Der in object CryptoKeyFormat is deprecated")
   private def migrate(): Either[KeyParseAndValidateError, Option[SigningPublicKey]] = {
@@ -1382,7 +1534,8 @@ final case class SigningPublicKey private (
         mkNewKeyO(ByteString.copyFrom(subjectPublicKeyInfo))
 
       case (SigningKeySpec.EcP256, CryptoKeyFormat.Der) |
-          (SigningKeySpec.EcP384, CryptoKeyFormat.Der) =>
+          (SigningKeySpec.EcP384, CryptoKeyFormat.Der) |
+          (SigningKeySpec.MlDsa65, CryptoKeyFormat.Der) =>
         mkNewKeyO(key)
 
       case _ => Right(None)
@@ -1408,7 +1561,8 @@ final case class SigningPublicKey private (
         )
 
       case (SigningKeySpec.EcP256, CryptoKeyFormat.DerX509Spki) |
-          (SigningKeySpec.EcP384, CryptoKeyFormat.DerX509Spki) =>
+          (SigningKeySpec.EcP384, CryptoKeyFormat.DerX509Spki) |
+          (SigningKeySpec.MlDsa65, CryptoKeyFormat.DerX509Spki) =>
         Some(
           SigningPublicKey(CryptoKeyFormat.Der, key, keySpec, usage, dataForFingerprintO = None)()
         )
@@ -1426,8 +1580,8 @@ final case class SigningPublicKey private (
 }
 
 object SigningPublicKey
-    extends HasVersionedMessageCompanion[SigningPublicKey]
-    with HasVersionedMessageCompanionDbHelpers[SigningPublicKey] {
+    extends HasVersionedMessageCompanionE[SigningPublicKey]
+    with PrettyPrintingCompanion[SigningPublicKey] {
   override def name: String = "signing public key"
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
@@ -1437,6 +1591,14 @@ object SigningPublicKey
       _.toProtoV30,
     )
   )
+
+  override protected val pretty: Pretty[SigningPublicKey] =
+    prettyOfClass(
+      param("id", _.id),
+      param("format", _.format),
+      param("keySpec", _.keySpec),
+      param("usage", _.usage),
+    )
 
   private def getDataForFingerprint(
       keySpec: SigningKeySpec,
@@ -1500,12 +1662,33 @@ object SigningPublicKey
       publicKeyP: v30.SigningPublicKey
   ): ParsingResult[SigningPublicKey] =
     for {
-      format <- CryptoKeyFormat.fromProtoEnum("format", publicKeyP.format)
+      format <- CryptoKeyFormat.fromProtoEnum(publicKeyP.format, "format")
       keySpec <- SigningKeySpec.fromProtoEnumWithDefaultScheme(
         publicKeyP.keySpec,
         publicKeyP.scheme,
       )
-      usage <- SigningKeyUsage.fromProtoListWithDefault(publicKeyP.usage)
+      usage <- SigningKeyUsage.fromProtoListWithDefaultV30(publicKeyP.usage)
+      signingPublicKey <- SigningPublicKey
+        .create(
+          format,
+          publicKeyP.publicKey,
+          keySpec,
+          usage,
+        )
+        .leftMap[ProtoDeserializationError](err =>
+          ProtoDeserializationError.CryptoDeserializationError(
+            CryptoParseAndValidationError(err.toString)
+          )
+        )
+    } yield signingPublicKey
+
+  def fromProtoV31(
+      publicKeyP: v31.SigningPublicKey
+  ): ParsingResult[SigningPublicKey] =
+    for {
+      format <- CryptoKeyFormat.fromProtoEnum(publicKeyP.format, "format")
+      keySpec <- SigningKeySpec.fromProtoEnumWithDefaultScheme(publicKeyP.keySpec)
+      usage <- SigningKeyUsage.fromProtoListWithoutDefaultV31(publicKeyP.usage)
       signingPublicKey <- SigningPublicKey
         .create(
           format,
@@ -1530,17 +1713,19 @@ final case class SigningPublicKeyWithName(
     override val publicKey: SigningPublicKey,
     override val name: Option[KeyName],
 ) extends PublicKeyWithName
-    with PrettyPrinting {
+    with PrettyPrintingFromCompanion {
 
   type PK = SigningPublicKey
 
   override val id: Fingerprint = publicKey.id
 
-  override protected def pretty: Pretty[SigningPublicKeyWithName] =
-    prettyOfClass(param("publicKey", _.publicKey), param("name", _.name))
+  override def prettyCompanion: PrettyPrintingCompanion[SigningPublicKeyWithName] =
+    SigningPublicKeyWithName
 }
 
-object SigningPublicKeyWithName {
+object SigningPublicKeyWithName extends PrettyPrintingCompanion[SigningPublicKeyWithName] {
+  override protected val pretty: Pretty[SigningPublicKeyWithName] =
+    prettyOfClass(param("publicKey", _.publicKey), param("name", _.name))
   implicit def getResultSigningPublicKeyWithName(implicit
       getResultByteArray: GetResult[Array[Byte]]
   ): GetResult[SigningPublicKeyWithName] = GetResult { r =>
@@ -1557,7 +1742,7 @@ final case class SigningPrivateKey private (
 )(
     override val migrated: Boolean = false
 ) extends PrivateKey
-    with HasVersionedWrapper[SigningPrivateKey] {
+    with HasVersionedWrapperE[SigningPrivateKey] {
 
   override type K = SigningPrivateKey
 
@@ -1573,21 +1758,37 @@ final case class SigningPrivateKey private (
       )
       .map(_ => this)
 
-  def toProtoV30: v30.SigningPrivateKey =
-    v30.SigningPrivateKey(
-      id = id.toProtoPrimitive,
-      format = format.toProtoEnum,
-      privateKey = key,
-      // we no longer use this field so we set this scheme as unspecified
-      scheme = v30.SigningKeyScheme.SIGNING_KEY_SCHEME_UNSPECIFIED,
-      keySpec = keySpec.toProtoEnum,
-      usage = usage.map(_.toProtoEnum).toSeq,
-    )
+  override def toByteStringE(version: ProtocolVersion): Either[String, ByteString] =
+    toByteString(version)
+
+  def toProtoV30: Either[String, v30.SigningPrivateKey] =
+    usage.toSeq.forgetNE.traverse(_.toProtoEnumV30).map { usage =>
+      v30.SigningPrivateKey(
+        id = id.toProtoPrimitive,
+        format = format.toProtoEnum,
+        privateKey = key,
+        // we no longer use this field so we set this scheme as unspecified
+        scheme = v30.SigningKeyScheme.SIGNING_KEY_SCHEME_UNSPECIFIED,
+        keySpec = keySpec.toProtoEnum,
+        usage = usage,
+      )
+    }
+
+  def toProtoV31: Either[String, v31.SigningPrivateKey] =
+    usage.toSeq.forgetNE.traverse(_.toProtoEnumV31).map { usage =>
+      v31.SigningPrivateKey(
+        id = id.toProtoPrimitive,
+        format = format.toProtoEnum,
+        privateKey = key,
+        keySpec = keySpec.toProtoEnum,
+        usage = usage,
+      )
+    }
 
   override def purpose: KeyPurpose = KeyPurpose.Signing
 
-  override protected def toProtoPrivateKeyKeyV30: v30.PrivateKey.Key =
-    v30.PrivateKey.Key.SigningPrivateKey(toProtoV30)
+  override protected def toProtoPrivateKeyKeyV30: Either[String, v30.PrivateKey.Key] =
+    toProtoV30.map(v30.PrivateKey.Key.SigningPrivateKey.apply)
 
   @nowarn("msg=Der in object CryptoKeyFormat is deprecated")
   private[crypto] def migrate(): Either[String, Option[SigningPrivateKey]] = {
@@ -1601,7 +1802,8 @@ final case class SigningPrivateKey private (
         // Encode the private key with a PKCS#8 DER-encoded PrivateKeyInfo structure
         JcePrivateCrypto.encodeEd25519PrivateKey(key).map(mkNewKeyO)
       case (SigningKeySpec.EcP256, CryptoKeyFormat.Der) |
-          (SigningKeySpec.EcP384, CryptoKeyFormat.Der) =>
+          (SigningKeySpec.EcP384, CryptoKeyFormat.Der) |
+          (SigningKeySpec.MlDsa65, CryptoKeyFormat.Der) =>
         Right(mkNewKeyO(key))
 
       case _ => Right(None)
@@ -1628,7 +1830,8 @@ final case class SigningPrivateKey private (
         )
 
       case (SigningKeySpec.EcP256, CryptoKeyFormat.DerPkcs8Pki) |
-          (SigningKeySpec.EcP384, CryptoKeyFormat.DerPkcs8Pki) =>
+          (SigningKeySpec.EcP384, CryptoKeyFormat.DerPkcs8Pki) |
+          (SigningKeySpec.MlDsa65, CryptoKeyFormat.DerPkcs8Pki) =>
         Some(
           SigningPrivateKey(id, CryptoKeyFormat.Der, key, keySpec, usage)()
         )
@@ -1650,7 +1853,7 @@ final case class SigningPrivateKey private (
 
 }
 
-object SigningPrivateKey extends HasVersionedMessageCompanion[SigningPrivateKey] {
+object SigningPrivateKey extends HasVersionedMessageCompanionE[SigningPrivateKey] {
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
       ProtocolVersion.v34,
@@ -1695,13 +1898,40 @@ object SigningPrivateKey extends HasVersionedMessageCompanion[SigningPrivateKey]
       privateKeyP: v30.SigningPrivateKey
   ): ParsingResult[SigningPrivateKey] =
     for {
-      id <- Fingerprint.fromProtoPrimitive(privateKeyP.id)
-      format <- CryptoKeyFormat.fromProtoEnum("format", privateKeyP.format)
+      // TODO(#34479): validate the crypto key fingerprint once the negotiated pvv is threaded here.
+      id <- ProtoValidation.validateThen(
+        privateKeyP.id,
+        "id",
+        ProtocolVersionValidation.NoValidation,
+      )(Fingerprint.fromProtoPrimitive)
+      format <- CryptoKeyFormat.fromProtoEnum(privateKeyP.format, "format")
       keySpec <- SigningKeySpec.fromProtoEnumWithDefaultScheme(
         privateKeyP.keySpec,
         privateKeyP.scheme,
       )
-      usage <- SigningKeyUsage.fromProtoListWithDefault(privateKeyP.usage)
+      usage <- SigningKeyUsage.fromProtoListWithDefaultV30(privateKeyP.usage)
+      key <- SigningPrivateKey
+        .create(id, format, privateKeyP.privateKey, keySpec, usage)
+        .leftMap(err =>
+          ProtoDeserializationError.CryptoDeserializationError(
+            CryptoParseAndValidationError(err.show)
+          )
+        )
+    } yield key
+
+  def fromProtoV31(
+      privateKeyP: v31.SigningPrivateKey
+  ): ParsingResult[SigningPrivateKey] =
+    for {
+      // TODO(#34479): validate the crypto key fingerprint once the negotiated pvv is threaded here.
+      id <- ProtoValidation.validateThen(
+        privateKeyP.id,
+        "id",
+        ProtocolVersionValidation.NoValidation,
+      )(Fingerprint.fromProtoPrimitive)
+      format <- CryptoKeyFormat.fromProtoEnum(privateKeyP.format, "format")
+      keySpec <- SigningKeySpec.fromProtoEnumWithDefaultScheme(privateKeyP.keySpec)
+      usage <- SigningKeyUsage.fromProtoListWithoutDefaultV31(privateKeyP.usage)
       key <- SigningPrivateKey
         .create(id, format, privateKeyP.privateKey, keySpec, usage)
         .leftMap(err =>
@@ -1713,21 +1943,30 @@ object SigningPrivateKey extends HasVersionedMessageCompanion[SigningPrivateKey]
 
 }
 
-sealed trait SigningError extends Product with Serializable with PrettyPrinting
+sealed trait SigningError extends Product with Serializable with PrettyPrintingFromCompanion
 object SigningError {
 
   final case class GeneralError(error: Exception) extends SigningError {
-    override protected def pretty: Pretty[GeneralError] = prettyOfClass(unnamedParam(_.error))
+    override def prettyCompanion: PrettyPrintingCompanion[GeneralError] = GeneralError
+  }
+  object GeneralError extends PrettyPrintingCompanion[GeneralError] {
+    override protected val pretty: Pretty[GeneralError] = prettyOfClass(unnamedParam(_.error))
   }
 
   final case class InvariantViolation(error: String) extends SigningError {
-    override protected def pretty: Pretty[InvariantViolation] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[InvariantViolation] = InvariantViolation
+  }
+  object InvariantViolation extends PrettyPrintingCompanion[InvariantViolation] {
+    override protected val pretty: Pretty[InvariantViolation] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
 
   final case class InvalidSigningKey(error: String) extends SigningError {
-    override protected def pretty: Pretty[InvalidSigningKey] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[InvalidSigningKey] = InvalidSigningKey
+  }
+  object InvalidSigningKey extends PrettyPrintingCompanion[InvalidSigningKey] {
+    override protected val pretty: Pretty[InvalidSigningKey] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
@@ -1736,7 +1975,11 @@ object SigningError {
       algorithmSpec: SigningAlgorithmSpec,
       supportedAlgorithmSpecs: Set[SigningAlgorithmSpec],
   ) extends SigningError {
-    override def pretty: Pretty[UnsupportedAlgorithmSpec] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedAlgorithmSpec] =
+      UnsupportedAlgorithmSpec
+  }
+  object UnsupportedAlgorithmSpec extends PrettyPrintingCompanion[UnsupportedAlgorithmSpec] {
+    override protected val pretty: Pretty[UnsupportedAlgorithmSpec] = prettyOfClass(
       param("algorithmSpec", _.algorithmSpec),
       param("supportedAlgorithmSpecs", _.supportedAlgorithmSpecs),
     )
@@ -1746,7 +1989,11 @@ object SigningError {
       keyFormat: CryptoKeyFormat,
       supportedKeyFormats: Set[CryptoKeyFormat],
   ) extends SigningError {
-    override def pretty: Pretty[UnsupportedKeyFormat] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedKeyFormat] =
+      UnsupportedKeyFormat
+  }
+  object UnsupportedKeyFormat extends PrettyPrintingCompanion[UnsupportedKeyFormat] {
+    override protected val pretty: Pretty[UnsupportedKeyFormat] = prettyOfClass(
       param("keyFormat", _.keyFormat),
       param("supportedKeyFormats", _.supportedKeyFormats),
     )
@@ -1757,7 +2004,11 @@ object SigningError {
       algorithmSpec: SigningAlgorithmSpec,
       supportedKeySpecsByAlgo: Set[SigningKeySpec],
   ) extends SigningError {
-    override def pretty: Pretty[KeyAlgoSpecsMismatch] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[KeyAlgoSpecsMismatch] =
+      KeyAlgoSpecsMismatch
+  }
+  object KeyAlgoSpecsMismatch extends PrettyPrintingCompanion[KeyAlgoSpecsMismatch] {
+    override protected val pretty: Pretty[KeyAlgoSpecsMismatch] = prettyOfClass(
       param("signingKeySpec", _.signingKeySpec),
       param("algorithmSpec", _.algorithmSpec),
       param("supportedKeySpecsByAlgo", _.supportedKeySpecsByAlgo),
@@ -1765,7 +2016,11 @@ object SigningError {
   }
 
   final case class NoMatchingAlgorithmSpec(message: String) extends SigningError {
-    override protected def pretty: Pretty[NoMatchingAlgorithmSpec] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[NoMatchingAlgorithmSpec] =
+      NoMatchingAlgorithmSpec
+  }
+  object NoMatchingAlgorithmSpec extends PrettyPrintingCompanion[NoMatchingAlgorithmSpec] {
+    override protected val pretty: Pretty[NoMatchingAlgorithmSpec] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
@@ -1775,7 +2030,10 @@ object SigningError {
       keyUsage: Set[SigningKeyUsage],
       expectedKeyUsage: Set[SigningKeyUsage],
   ) extends SigningError {
-    override def pretty: Pretty[InvalidKeyUsage] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[InvalidKeyUsage] = InvalidKeyUsage
+  }
+  object InvalidKeyUsage extends PrettyPrintingCompanion[InvalidKeyUsage] {
+    override protected val pretty: Pretty[InvalidKeyUsage] = prettyOfClass(
       param("keyId", _.keyId),
       param("keyUsage", _.keyUsage),
       param("expectedKeyUsage", _.expectedKeyUsage),
@@ -1783,21 +2041,31 @@ object SigningError {
   }
 
   final case class UnknownSigningKey(keyId: Fingerprint) extends SigningError {
-    override protected def pretty: Pretty[UnknownSigningKey] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnknownSigningKey] = UnknownSigningKey
+  }
+  object UnknownSigningKey extends PrettyPrintingCompanion[UnknownSigningKey] {
+    override protected val pretty: Pretty[UnknownSigningKey] = prettyOfClass(
       param("keyId", _.keyId)
     )
   }
 
   final case class FailedToSign(error: String) extends SigningError {
-    override protected def pretty: Pretty[FailedToSign] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[FailedToSign] = FailedToSign
+  }
+  object FailedToSign extends PrettyPrintingCompanion[FailedToSign] {
+    override protected val pretty: Pretty[FailedToSign] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
 
   final case class KeyStoreError(error: String) extends SigningError {
-    override protected def pretty: Pretty[KeyStoreError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[KeyStoreError] = KeyStoreError
+  }
+  object KeyStoreError extends PrettyPrintingCompanion[KeyStoreError] {
+    override protected val pretty: Pretty[KeyStoreError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
+
   }
 }
 
@@ -1806,7 +2074,10 @@ object SigningError {
   * This means creating key material from scratch. Different from errors that happen when creating
   * keys from existing key material.
   */
-sealed trait SigningKeyGenerationError extends Product with Serializable with PrettyPrinting
+sealed trait SigningKeyGenerationError
+    extends Product
+    with Serializable
+    with PrettyPrintingFromCompanion
 object SigningKeyGenerationError extends CantonErrorGroups.CommandErrorGroup {
 
   @Explanation("This error indicates that a signing key could not be created.")
@@ -1821,24 +2092,36 @@ object SigningKeyGenerationError extends CantonErrorGroups.CommandErrorGroup {
   }
 
   final case class GeneralError(error: Throwable) extends SigningKeyGenerationError {
-    override protected def pretty: Pretty[GeneralError] = prettyOfClass(unnamedParam(_.error))
+    override def prettyCompanion: PrettyPrintingCompanion[GeneralError] = GeneralError
+  }
+  object GeneralError extends PrettyPrintingCompanion[GeneralError] {
+    override protected val pretty: Pretty[GeneralError] = prettyOfClass(unnamedParam(_.error))
   }
 
   final case class GeneralKmsError(error: String) extends SigningKeyGenerationError {
-    override protected def pretty: Pretty[GeneralKmsError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[GeneralKmsError] = GeneralKmsError
+  }
+  object GeneralKmsError extends PrettyPrintingCompanion[GeneralKmsError] {
+    override protected val pretty: Pretty[GeneralKmsError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
 
   final case class KeyCreationError(error: SigningKeyCreationError)
       extends SigningKeyGenerationError {
-    override protected def pretty: Pretty[KeyCreationError] = prettyOfParam(
+    override def prettyCompanion: PrettyPrintingCompanion[KeyCreationError] = KeyCreationError
+  }
+  object KeyCreationError extends PrettyPrintingCompanion[KeyCreationError] {
+    override protected val pretty: Pretty[KeyCreationError] = prettyOfParam(
       _.error
     )
   }
 
   final case class FingerprintError(error: String) extends SigningKeyGenerationError {
-    override protected def pretty: Pretty[FingerprintError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[FingerprintError] = FingerprintError
+  }
+  object FingerprintError extends PrettyPrintingCompanion[FingerprintError] {
+    override protected val pretty: Pretty[FingerprintError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
@@ -1847,7 +2130,10 @@ object SigningKeyGenerationError extends CantonErrorGroups.CommandErrorGroup {
       keySpec: SigningKeySpec,
       supportedKeySpecs: Set[SigningKeySpec],
   ) extends SigningKeyGenerationError {
-    override protected def pretty: Pretty[UnsupportedKeySpec] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedKeySpec] = UnsupportedKeySpec
+  }
+  object UnsupportedKeySpec extends PrettyPrintingCompanion[UnsupportedKeySpec] {
+    override protected val pretty: Pretty[UnsupportedKeySpec] = prettyOfClass(
       param("keySpec", _.keySpec),
       param("supportedKeySpecs", _.supportedKeySpecs),
     )
@@ -1855,7 +2141,11 @@ object SigningKeyGenerationError extends CantonErrorGroups.CommandErrorGroup {
 
   final case class SigningPrivateStoreError(error: CryptoPrivateStoreError)
       extends SigningKeyGenerationError {
-    override protected def pretty: Pretty[SigningPrivateStoreError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[SigningPrivateStoreError] =
+      SigningPrivateStoreError
+  }
+  object SigningPrivateStoreError extends PrettyPrintingCompanion[SigningPrivateStoreError] {
+    override protected val pretty: Pretty[SigningPrivateStoreError] = prettyOfClass(
       unnamedParam(_.error)
     )
   }
@@ -1867,7 +2157,10 @@ object SigningKeyGenerationError extends CantonErrorGroups.CommandErrorGroup {
   * This includes parsing, validating, or checking the key data. Different from errors that happen
   * during key generation (creating new key material).
   */
-sealed trait SigningKeyCreationError extends Product with Serializable with PrettyPrinting
+sealed trait SigningKeyCreationError
+    extends Product
+    with Serializable
+    with PrettyPrintingFromCompanion
 object SigningKeyCreationError extends CantonErrorGroups.CommandErrorGroup {
 
   @Explanation("This error indicates that an encryption key could not be created.")
@@ -1887,28 +2180,43 @@ object SigningKeyCreationError extends CantonErrorGroups.CommandErrorGroup {
   final case class InvalidKeyUsage(
       keyUsage: Set[SigningKeyUsage]
   ) extends SigningKeyCreationError {
-    override def pretty: Pretty[InvalidKeyUsage] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[InvalidKeyUsage] = InvalidKeyUsage
+  }
+  object InvalidKeyUsage extends PrettyPrintingCompanion[InvalidKeyUsage] {
+    override protected val pretty: Pretty[InvalidKeyUsage] = prettyOfClass(
       param("keyUsage", _.keyUsage)
     )
   }
   final case class KeyParseAndValidateError(error: String) extends SigningKeyCreationError {
-    override protected def pretty: Pretty[KeyParseAndValidateError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[KeyParseAndValidateError] =
+      KeyParseAndValidateError
+  }
+  object KeyParseAndValidateError extends PrettyPrintingCompanion[KeyParseAndValidateError] {
+    override protected val pretty: Pretty[KeyParseAndValidateError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
   final case class CreatePrivateKeyError(error: String) extends SigningKeyCreationError {
-    override protected def pretty: Pretty[CreatePrivateKeyError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[CreatePrivateKeyError] =
+      CreatePrivateKeyError
+  }
+  object CreatePrivateKeyError extends PrettyPrintingCompanion[CreatePrivateKeyError] {
+    override protected val pretty: Pretty[CreatePrivateKeyError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
   final case class DerivePublicKeyError(error: String) extends SigningKeyCreationError {
-    override protected def pretty: Pretty[DerivePublicKeyError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[DerivePublicKeyError] =
+      DerivePublicKeyError
+  }
+  object DerivePublicKeyError extends PrettyPrintingCompanion[DerivePublicKeyError] {
+    override protected val pretty: Pretty[DerivePublicKeyError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }
 }
 
-sealed trait SignatureCheckError extends Product with Serializable with PrettyPrinting
+sealed trait SignatureCheckError extends Product with Serializable with PrettyPrintingFromCompanion
 object SignatureCheckError extends CantonErrorGroups.AuthorizationChecksErrorGroup {
 
   @Explanation(
@@ -1926,7 +2234,10 @@ object SignatureCheckError extends CantonErrorGroups.AuthorizationChecksErrorGro
 
   final case class MultipleErrors(errors: Seq[SignatureCheckError], message: Option[String] = None)
       extends SignatureCheckError {
-    override protected def pretty: Pretty[MultipleErrors] = prettyOfClass[MultipleErrors](
+    override def prettyCompanion: PrettyPrintingCompanion[MultipleErrors] = MultipleErrors
+  }
+  object MultipleErrors extends PrettyPrintingCompanion[MultipleErrors] {
+    override protected val pretty: Pretty[MultipleErrors] = prettyOfClass[MultipleErrors](
       paramIfDefined("message", _.message.map(_.unquoted)),
       param("errors", _.errors),
     )
@@ -1934,7 +2245,10 @@ object SignatureCheckError extends CantonErrorGroups.AuthorizationChecksErrorGro
 
   final case class InvalidSignature(signature: Signature, bytes: ByteString, error: String)
       extends SignatureCheckError {
-    override protected def pretty: Pretty[InvalidSignature] =
+    override def prettyCompanion: PrettyPrintingCompanion[InvalidSignature] = InvalidSignature
+  }
+  object InvalidSignature extends PrettyPrintingCompanion[InvalidSignature] {
+    override protected val pretty: Pretty[InvalidSignature] =
       prettyOfClass(
         param("signature", _.signature),
         param("bytes", _.bytes),
@@ -1943,7 +2257,11 @@ object SignatureCheckError extends CantonErrorGroups.AuthorizationChecksErrorGro
   }
 
   final case class NoMatchingAlgorithmSpec(message: String) extends SignatureCheckError {
-    override protected def pretty: Pretty[NoMatchingAlgorithmSpec] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[NoMatchingAlgorithmSpec] =
+      NoMatchingAlgorithmSpec
+  }
+  object NoMatchingAlgorithmSpec extends PrettyPrintingCompanion[NoMatchingAlgorithmSpec] {
+    override protected val pretty: Pretty[NoMatchingAlgorithmSpec] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
@@ -1952,7 +2270,11 @@ object SignatureCheckError extends CantonErrorGroups.AuthorizationChecksErrorGro
       algorithmSpec: SigningAlgorithmSpec,
       supportedAlgorithmSpecs: Set[SigningAlgorithmSpec],
   ) extends SignatureCheckError {
-    override def pretty: Pretty[UnsupportedAlgorithmSpec] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedAlgorithmSpec] =
+      UnsupportedAlgorithmSpec
+  }
+  object UnsupportedAlgorithmSpec extends PrettyPrintingCompanion[UnsupportedAlgorithmSpec] {
+    override protected val pretty: Pretty[UnsupportedAlgorithmSpec] = prettyOfClass(
       param("algorithmSpec", _.algorithmSpec),
       param("supportedAlgorithmSpecs", _.supportedAlgorithmSpecs),
     )
@@ -1963,7 +2285,11 @@ object SignatureCheckError extends CantonErrorGroups.AuthorizationChecksErrorGro
       algorithmSpec: SigningAlgorithmSpec,
       supportedKeySpecsByAlgo: Set[SigningKeySpec],
   ) extends SignatureCheckError {
-    override def pretty: Pretty[KeyAlgoSpecsMismatch] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[KeyAlgoSpecsMismatch] =
+      KeyAlgoSpecsMismatch
+  }
+  object KeyAlgoSpecsMismatch extends PrettyPrintingCompanion[KeyAlgoSpecsMismatch] {
+    override protected val pretty: Pretty[KeyAlgoSpecsMismatch] = prettyOfClass(
       param("signingKeySpec", _.signingKeySpec),
       param("algorithmSpec", _.algorithmSpec),
       param("supportedKeySpecsByAlgo", _.supportedKeySpecsByAlgo),
@@ -1974,7 +2300,10 @@ object SignatureCheckError extends CantonErrorGroups.AuthorizationChecksErrorGro
       signingKeySpec: SigningKeySpec,
       supportedKeySpecs: Set[SigningKeySpec],
   ) extends SignatureCheckError {
-    override def pretty: Pretty[UnsupportedKeySpec] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedKeySpec] = UnsupportedKeySpec
+  }
+  object UnsupportedKeySpec extends PrettyPrintingCompanion[UnsupportedKeySpec] {
+    override protected val pretty: Pretty[UnsupportedKeySpec] = prettyOfClass(
       param("signingKeySpec", _.signingKeySpec),
       param("supportedKeySpecs", _.supportedKeySpecs),
     )
@@ -1984,7 +2313,11 @@ object SignatureCheckError extends CantonErrorGroups.AuthorizationChecksErrorGro
       hashAlgorithm: HashAlgorithm,
       supportedHashAlgorithms: Set[HashAlgorithm],
   ) extends SignatureCheckError {
-    override def pretty: Pretty[UnsupportedHashAlgorithm] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedHashAlgorithm] =
+      UnsupportedHashAlgorithm
+  }
+  object UnsupportedHashAlgorithm extends PrettyPrintingCompanion[UnsupportedHashAlgorithm] {
+    override protected val pretty: Pretty[UnsupportedHashAlgorithm] = prettyOfClass(
       param("hashAlgorithm", _.hashAlgorithm),
       param("supportedHashAlgorithms", _.supportedHashAlgorithms),
     )
@@ -1995,7 +2328,10 @@ object SignatureCheckError extends CantonErrorGroups.AuthorizationChecksErrorGro
       keyUsage: Set[SigningKeyUsage],
       expectedKeyUsage: Set[SigningKeyUsage],
   ) extends SignatureCheckError {
-    override def pretty: Pretty[InvalidKeyUsage] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[InvalidKeyUsage] = InvalidKeyUsage
+  }
+  object InvalidKeyUsage extends PrettyPrintingCompanion[InvalidKeyUsage] {
+    override protected val pretty: Pretty[InvalidKeyUsage] = prettyOfClass(
       param("keyId", _.keyId),
       param("keyUsage", _.keyUsage),
       param("expectedKeyUsage", _.expectedKeyUsage),
@@ -2006,7 +2342,11 @@ object SignatureCheckError extends CantonErrorGroups.AuthorizationChecksErrorGro
       signatureFormat: SignatureFormat,
       supportedSignatureFormats: Set[SignatureFormat],
   ) extends SignatureCheckError {
-    override def pretty: Pretty[UnsupportedSignatureFormat] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedSignatureFormat] =
+      UnsupportedSignatureFormat
+  }
+  object UnsupportedSignatureFormat extends PrettyPrintingCompanion[UnsupportedSignatureFormat] {
+    override protected val pretty: Pretty[UnsupportedSignatureFormat] = prettyOfClass(
       param("signatureFormat", _.signatureFormat),
       param("supportedSignatureFormats", _.supportedSignatureFormats),
     )
@@ -2016,42 +2356,78 @@ object SignatureCheckError extends CantonErrorGroups.AuthorizationChecksErrorGro
       keyFormat: CryptoKeyFormat,
       supportedKeyFormats: Set[CryptoKeyFormat],
   ) extends SignatureCheckError {
-    override def pretty: Pretty[UnsupportedKeyFormat] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedKeyFormat] =
+      UnsupportedKeyFormat
+  }
+  object UnsupportedKeyFormat extends PrettyPrintingCompanion[UnsupportedKeyFormat] {
+    override protected val pretty: Pretty[UnsupportedKeyFormat] = prettyOfClass(
       param("keyFormat", _.keyFormat),
       param("supportedKeyFormats", _.supportedKeyFormats),
     )
   }
 
   final case class InvalidKeyError(message: String) extends SignatureCheckError {
-    override protected def pretty: Pretty[InvalidKeyError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[InvalidKeyError] = InvalidKeyError
+  }
+  object InvalidKeyError extends PrettyPrintingCompanion[InvalidKeyError] {
+    override protected val pretty: Pretty[InvalidKeyError] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
 
   final case class MemberGroupDoesNotExist(message: String) extends SignatureCheckError {
-    override protected def pretty: Pretty[MemberGroupDoesNotExist] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[MemberGroupDoesNotExist] =
+      MemberGroupDoesNotExist
+  }
+  object MemberGroupDoesNotExist extends PrettyPrintingCompanion[MemberGroupDoesNotExist] {
+    override protected val pretty: Pretty[MemberGroupDoesNotExist] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
 
   final case class GeneralError(error: Exception) extends SignatureCheckError {
-    override protected def pretty: Pretty[GeneralError] = prettyOfClass(unnamedParam(_.error))
+    override def prettyCompanion: PrettyPrintingCompanion[GeneralError] = GeneralError
+  }
+  object GeneralError extends PrettyPrintingCompanion[GeneralError] {
+    override protected val pretty: Pretty[GeneralError] = prettyOfClass(unnamedParam(_.error))
   }
 
   final case class SignatureWithWrongKey(message: String) extends SignatureCheckError {
-    override protected def pretty: Pretty[SignatureWithWrongKey] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[SignatureWithWrongKey] =
+      SignatureWithWrongKey
+  }
+  object SignatureWithWrongKey extends PrettyPrintingCompanion[SignatureWithWrongKey] {
+    override protected val pretty: Pretty[SignatureWithWrongKey] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
 
   final case class SignerHasNoValidKeys(message: String) extends SignatureCheckError {
-    override protected def pretty: Pretty[SignerHasNoValidKeys] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[SignerHasNoValidKeys] =
+      SignerHasNoValidKeys
+  }
+  object SignerHasNoValidKeys extends PrettyPrintingCompanion[SignerHasNoValidKeys] {
+    override protected val pretty: Pretty[SignerHasNoValidKeys] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
 
   final case class InvalidSignatureDelegation(message: String) extends SignatureCheckError {
-    override protected def pretty: Pretty[InvalidSignatureDelegation] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[InvalidSignatureDelegation] =
+      InvalidSignatureDelegation
+  }
+  object InvalidSignatureDelegation extends PrettyPrintingCompanion[InvalidSignatureDelegation] {
+    override protected val pretty: Pretty[InvalidSignatureDelegation] = prettyOfClass(
+      unnamedParam(_.message.unquoted)
+    )
+  }
+
+  final case class DelegationHashingError(message: String) extends SignatureCheckError {
+    override def prettyCompanion: PrettyPrintingCompanion[DelegationHashingError] =
+      DelegationHashingError
+  }
+  object DelegationHashingError extends PrettyPrintingCompanion[DelegationHashingError] {
+    override val pretty: Pretty[DelegationHashingError] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
@@ -2061,15 +2437,51 @@ object SignatureCheckError extends CantonErrorGroups.AuthorizationChecksErrorGro
     */
   final case class UnsupportedDelegationSignatureError(message: String)
       extends SignatureCheckError {
-    override protected def pretty: Pretty[UnsupportedDelegationSignatureError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnsupportedDelegationSignatureError] =
+      UnsupportedDelegationSignatureError
+  }
+  object UnsupportedDelegationSignatureError
+      extends PrettyPrintingCompanion[UnsupportedDelegationSignatureError] {
+    override protected val pretty: Pretty[UnsupportedDelegationSignatureError] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
 
   final case class MissingDynamicSynchronizerParameters(message: String)
       extends SignatureCheckError {
-    override protected def pretty: Pretty[MissingDynamicSynchronizerParameters] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[MissingDynamicSynchronizerParameters] =
+      MissingDynamicSynchronizerParameters
+  }
+  object MissingDynamicSynchronizerParameters
+      extends PrettyPrintingCompanion[MissingDynamicSynchronizerParameters] {
+    override protected val pretty: Pretty[MissingDynamicSynchronizerParameters] = prettyOfClass(
       unnamedParam(_.message.unquoted)
+    )
+  }
+
+  final case class PartyKeysDoNotExist(partyId: PartyId) extends SignatureCheckError {
+    override def prettyCompanion: PrettyPrintingCompanion[PartyKeysDoNotExist] =
+      PartyKeysDoNotExist
+  }
+  object PartyKeysDoNotExist extends PrettyPrintingCompanion[PartyKeysDoNotExist] {
+    override protected val pretty: Pretty[PartyKeysDoNotExist] = prettyOfClass(
+      param("partyId", _.partyId)
+    )
+  }
+
+  final case class PartyKeysInvalidThreshold(
+      partyId: PartyId,
+      configuredThreshold: PositiveInt,
+      expectedThreshold: PositiveInt,
+  ) extends SignatureCheckError {
+    override def prettyCompanion: PrettyPrintingCompanion[PartyKeysInvalidThreshold] =
+      PartyKeysInvalidThreshold
+  }
+  object PartyKeysInvalidThreshold extends PrettyPrintingCompanion[PartyKeysInvalidThreshold] {
+    override protected val pretty: Pretty[PartyKeysInvalidThreshold] = prettyOfClass(
+      param("partyId", _.partyId),
+      param("configuredThreshold", _.configuredThreshold),
+      param("expectedThreshold", _.expectedThreshold),
     )
   }
 
@@ -2079,10 +2491,27 @@ final case class SigningKeysWithThreshold(
     keys: NonEmpty[Set[SigningPublicKey]],
     threshold: PositiveInt,
 ) {
-  def toProto: v30.SigningKeysWithThreshold = v30.SigningKeysWithThreshold(
-    keys = keys.toSeq.sortBy(_.fingerprint).map(_.toProtoV30),
-    threshold = threshold.value,
-  )
+  def toProtoV30: Either[String, v30.SigningKeysWithThreshold] =
+    keys.toSeq.forgetNE
+      .sortBy(_.fingerprint)
+      .traverse(_.toProtoV30)
+      .map(keys =>
+        v30.SigningKeysWithThreshold(
+          keys = keys,
+          threshold = threshold.value,
+        )
+      )
+
+  def toProtoV31: Either[String, v31.SigningKeysWithThreshold] =
+    keys.toSeq.forgetNE
+      .sortBy(_.fingerprint)
+      .traverse(_.toProtoV31)
+      .map(keys =>
+        v31.SigningKeysWithThreshold(
+          keys = keys,
+          threshold = threshold.value,
+        )
+      )
 
   @VisibleForTesting
   private def copy(
@@ -2121,14 +2550,51 @@ object SigningKeysWithThreshold {
     createFromSeq(keys, threshold).valueOr(err => throw new IllegalArgumentException((err)))
 
   def fromProtoV30(
-      value: v30.SigningKeysWithThreshold
+      pvv: ProtocolVersionValidation,
+      value: v30.SigningKeysWithThreshold,
   ): ParsingResult[SigningKeysWithThreshold] =
     for {
+      keysSeqP <- ProtoValidation
+        .validateLength(
+          value.keys,
+          "keys",
+          pvv,
+          ProtoValidation.MaxCollectionSize,
+        )
       keysNE <-
         ProtoConverter.parseRequiredNonEmpty(
           SigningPublicKey.fromProtoV30,
           "keys",
+          keysSeqP,
+        )
+      threshold <- PositiveInt
+        .create(value.threshold)
+        .leftMap(InvariantViolation.toProtoDeserializationError("threshold", _))
+      signingKeysWithThreshold <- SigningKeysWithThreshold
+        .createFromSeq(
+          keysNE,
+          threshold,
+        )
+        .leftMap(ProtoDeserializationError.InvariantViolation(None, _))
+    } yield signingKeysWithThreshold
+
+  def fromProtoV31(
+      pvv: ProtocolVersionValidation,
+      value: v31.SigningKeysWithThreshold,
+  ): ParsingResult[SigningKeysWithThreshold] =
+    for {
+      keysSeqP <- ProtoValidation
+        .validateLength(
           value.keys,
+          "keys",
+          pvv,
+          ProtoValidation.MaxCollectionSize,
+        )
+      keysNE <-
+        ProtoConverter.parseRequiredNonEmpty(
+          SigningPublicKey.fromProtoV31,
+          "keys",
+          keysSeqP,
         )
       threshold <- PositiveInt
         .create(value.threshold)

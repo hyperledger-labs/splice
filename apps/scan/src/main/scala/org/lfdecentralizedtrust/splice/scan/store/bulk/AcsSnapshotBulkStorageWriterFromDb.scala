@@ -35,9 +35,15 @@ class AcsSnapshotBulkStorageWriterFromDb(
   override def getNextSnapshotTimestampAfter(
       last: TimestampWithMigrationId
   )(implicit tc: TraceContext): Future[Option[TimestampWithMigrationId]] =
-    OptionT(acsSnapshotStore.lookupSnapshotAfter(last.migrationId, last.timestamp))
-      .map(snapshot => TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId))
-      .value
+    OptionT(acsSnapshotStore.lookupSnapshotAfter(last.migrationId, last.timestamp)).subflatMap {
+      snapshot =>
+        if (snapshot.indexesCreated) {
+          Some(TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId))
+        } else {
+          logger.debug(s"Snapshot $snapshot is not yet indexed, so we cannot query it.")
+          None
+        }
+    }.value
 
   override def shouldProcessSnapshotAt(ts: TimestampWithMigrationId)(implicit
       tc: TraceContext

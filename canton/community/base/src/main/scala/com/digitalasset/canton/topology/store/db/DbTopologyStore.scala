@@ -6,13 +6,13 @@ package com.digitalasset.canton.topology.store.db
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.{String185, String300}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.crypto.topology.TopologyStateHash
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.resource.DbStorage.{DbAction, Profile, SQLActionBuilderChain}
@@ -45,14 +45,16 @@ import com.digitalasset.canton.topology.transaction.TopologyTransaction.{
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import slick.jdbc.canton.SQLActionBuilder
-import slick.jdbc.{GetResult, SetParameter, TransactionIsolation}
+import slick.jdbc.{GetResult, TransactionIsolation}
 
 import java.util.concurrent.atomic.AtomicReference
+import scala.collection.{immutable, mutable}
 import scala.concurrent.ExecutionContext
 import scala.math.Ordering.Implicits.*
 
@@ -77,8 +79,6 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
       : GetResult[GenericSignedTopologyTransaction] =
     SignedTopologyTransaction.createGetResultSynchronizerTopologyTransaction
 
-  override def onClosed(): Unit = super.onClosed()
-
   override def fetchAllDescending(
       items: Seq[StateKeyFetch]
   )(implicit
@@ -101,10 +101,6 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
       )
     }
     import DbStorage.Implicits.BuilderChain.*
-
-    // No idea why but without this the compiler remained unhappy
-    implicit val setParameterArrayString: SetParameter[Array[String]] =
-      com.digitalasset.canton.resource.DbStorage.Implicits.setParameterArrayString
 
     val codesA = codes.toArray
     val nssA = nss.toArray
@@ -145,25 +141,26 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
   override def findLatestTransactionsAndProposalsByTxHash(hashes: Set[TxHash])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Seq[GenericSignedTopologyTransaction]] =
-    if (hashes.isEmpty) FutureUnlessShutdown.pure(Seq.empty)
-    else {
-      logger.debug(s"Querying transactions for tx hashes ${LoggerUtil.limitForLogging(hashes)}")
-      MonadUtil.batchedSequentialTraverse(
-        parallelism = batchingConfig.parallelism,
-        chunkSize = batchingConfig.maxItemsInBatch,
-      )(hashes.toSeq) { batch =>
-        toStoredTopologyTransactions(
-          storage.query(
-            buildQueryForTransactions(
-              sql" AND (" ++ batch
-                .map(txHash => sql"tx_hash = ${txHash.hash}")
-                .toList
-                .intercalate(sql" OR ") ++ sql")"
-            ),
-            operationName = "transactionsByTxHash",
-          )
-        ).map(_.collectLatestByTxHash.result.map(_.transaction))
-      }
+    NonEmpty.from(hashes: immutable.Iterable[TxHash]) match {
+      case None =>
+        FutureUnlessShutdown.pure(Seq.empty)
+
+      case Some(neHashes) =>
+        logger.debug(s"Querying transactions for tx hashes ${LoggerUtil.limitForLogging(neHashes)}")
+
+        MonadUtil.batchedSequentialTraverseNE(
+          parallelism = batchingConfig.parallelism,
+          chunkSize = batchingConfig.maxItemsInBatch,
+        )(neHashes) { batch =>
+          toStoredTopologyTransactions(
+            storage.query(
+              buildQueryForTransactions(
+                sql" AND " ++ DbStorage.toInClause("tx_hash", batch.map(_.hash))
+              ),
+              operationName = "transactionsByTxHash",
+            )
+          ).map(_.collectLatestByTxHash.result.map(_.transaction))
+        }
     }
 
   override def findTransactionsForMapping(
@@ -175,20 +172,19 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
     logger.debug(
       s"Querying transactions for mapping hashes ${LoggerUtil.limitForLogging(hashes)} as of $asOfExclusive"
     )
-    MonadUtil.batchedSequentialTraverse(
+
+    MonadUtil.batchedSequentialTraverseNE(
       parallelism = batchingConfig.parallelism,
       chunkSize = batchingConfig.maxItemsInBatch,
-    )(hashes.toSeq) { batch =>
+    )(hashes: NonEmpty[immutable.Iterable[MappingHash]]) { batch =>
       toSignedTopologyTransactions(
         storage.query(
           buildQueryForTransactions(
             asOfQuery(
               asOfExclusive.value,
               asOfInclusive = false,
-            ) ++ sql" AND is_proposal = false AND (" ++ batch
-              .map(mappingHash => sql"mapping_key_hash = ${mappingHash.hash}")
-              .toList
-              .intercalate(sql" OR ") ++ sql")"
+            ) ++ sql" AND is_proposal = false AND " ++
+              DbStorage.toInClause("mapping_key_hash", batch.map(_.hash))
           ),
           operationName = "transactionsForMapping",
         )
@@ -587,9 +583,11 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
         sql" OR "
       ) ++ sql")"
 
+    // a mutable non-synchronized collection works here, because the query below is executed sequentially
+    val partiesFoundSoFar = new mutable.LinkedHashSet[PartyId]
+
     def inspectKnownPartiesRec(
-        idOffset: Option[Long],
-        partiesFoundSoFar: Vector[PartyId],
+        idOffset: Option[Long]
     ): FutureUnlessShutdown[Set[PartyId]] = {
       val query = buildQueryForTransactionsWithId[QueryResult](
         selectFields = TxEntryWithIdFields,
@@ -599,6 +597,7 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
         orderBy = " order by id ",
         includeRejected = false,
       )
+
       storage.query(query, operationName = functionFullName).flatMap { rows =>
         val mappings = rows.map { case (_, (tx, _, _, _, _)) => tx.mapping }
         val parties = TopologyStore.determineValidParties(
@@ -607,29 +606,28 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
           filterParticipant = filterParticipant,
           limit = limit,
         )
-        val result = (partiesFoundSoFar ++ parties).distinct
+        partiesFoundSoFar.addAll(parties)
         // no need to recurse, if
         // * enough parties have been found
         // * the current query didn't yield any results
         // * the current query didn't fill the batch size, therefore there are no more results
         if (
-          result.sizeIs >= limit || rows.isEmpty || rows.sizeIs < batchingConfig.maxItemsInBatch.value
+          partiesFoundSoFar.sizeIs >= limit || rows.isEmpty || rows.sizeIs < batchingConfig.maxItemsInBatch.value
         ) {
           // only converting to a Set with the final result, to return the parties as they are found in id-order.
           // additionally, since we could have fetched more parties, we need to respect the user provided limit.
-          FutureUnlessShutdown.pure(result.distinct.take(limit).toSet)
+          FutureUnlessShutdown.pure(partiesFoundSoFar.iterator.take(limit).toSet)
         } else {
           // the results are ordered by id, so we can just take the last instead of the max
           val highestIdFound = rows.lastOption.map { case (id, _) => id }
           inspectKnownPartiesRec(
-            highestIdFound,
-            result,
+            highestIdFound
           )
         }
       }
     }
 
-    inspectKnownPartiesRec(None, Vector.empty)
+    inspectKnownPartiesRec(None)
   }
 
   override def findPositiveTransactions(
@@ -1008,6 +1006,47 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
     ).map(_.result.lastOption)
   }
 
+  override def filterProvidesAdditionalSignatures(
+      transactions: Seq[GenericSignedTopologyTransaction]
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Seq[GenericSignedTopologyTransaction]] =
+    NonEmpty.from(transactions) match {
+      case None =>
+        FutureUnlessShutdown.pure(Seq.empty)
+
+      case Some(neTransactions) =>
+        // NOTE: The `transactions` sequence is most likely already pre-batched by the upstream outbox
+        // using `topologyConfig.broadcastBatchSize` (optimizing for gRPC network transmission).
+        // However, we apply a second layer of defensive batching.
+
+        logger.debug(s"Filtering additional signatures for ${neTransactions.size} transactions")
+
+        MonadUtil
+          .batchedSequentialTraverseNE(
+            parallelism = batchingConfig.parallelism,
+            chunkSize = batchingConfig.maxItemsInBatch,
+          )(neTransactions) { batch =>
+            val query = buildQueryForTransactions(
+              sql" AND " ++ DbStorage.toInClause("tx_hash", batch.map(_.hash.hash))
+            )
+
+            toStoredTopologyTransactions(
+              storage.query(query, operationName = "filterProvidesAdditionalSignatures")
+            ).map { storedTxs =>
+              val latestInStore = storedTxs.result.iterator
+                .map(tx => tx.transaction.hash -> tx)
+                .toMap
+
+              batch.filter { tx =>
+                latestInStore.get(tx.hash).forall { inStore =>
+                  TopologyStore.providesAdditionalSignatures(tx, inStore)
+                }
+              }
+            }
+          }
+    }
+
   override def findParticipantOnboardingTransactions(
       participantId: ParticipantId,
       synchronizerId: SynchronizerId,
@@ -1075,6 +1114,15 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
     ).asUpdate
   }
 
+  // Same as SQL `ORDER BY identifier, namespace`
+  private val paginationOrdering: Ordering[GenericStoredTopologyTransaction] =
+    Ordering.by { t =>
+      (
+        t.mapping.maybeUid.map(_.identifier).getOrElse(String185.empty).toProtoPrimitive,
+        t.mapping.namespace.toProtoPrimitive,
+      )
+    }
+
   // Helper to break up large uid-filters into batches to limit the size of sql "in-clauses".
   // Fashioned to reuse lessons learned in 2.x-based DbTopologyStore
   private def findTransactionsBatchingUidFilter(
@@ -1122,27 +1170,15 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
     if (filterNamespace.isEmpty && explicitUidFilters.isEmpty) {
       forwardBatch(None, None)
     } else {
-      // split both filters into batches. we need to jump through a few hoops to go
-      // from Option[NonEmpty[Seq[X]]] to
-      // Seq[ // collection containing the batches
-      //   Option[ // we need to retain optionality, so that we can zip the filters together and allow for a different number of uid/namespaces filter batches
-      //     NonEmpty[Seq[X]] // finally the actual batch
-      //   ]
-      // ]
-      // because grouped doesn't return NonEmpty collections.
-      val chunkedUids = explicitUidFilters.flatTraverse(uids =>
+      // split both filters into batches
+      val chunkedUids = explicitUidFilters.traverse(uids =>
         uids
-          .grouped(batchingConfig.maxItemsInBatch.value)
+          .grouped1(batchingConfig.maxItemsInBatch.value)
           .toSeq
-          .map[Option[NonEmpty[Seq[UniqueIdentifier]]]](NonEmpty.from)
       )
       val chunkedNamespaces =
-        filterNamespace.flatTraverse(ns =>
-          ns.grouped(batchingConfig.maxItemsInBatch.value)
-            .toSeq
-            .map[Option[NonEmpty[Seq[Namespace]]]](NonEmpty.from)
-        )
-      // since the filters are ORed in the query, we can simply interlace them in the same chunk.
+        filterNamespace.traverse(ns => ns.grouped1(batchingConfig.maxItemsInBatch.value).toSeq)
+      // since the filters are effectively ORed in the query, we can simply interlace them in the same chunk.
       // if one of the filters has fewer chunks, we simply pad with None
       val chunkedFilters = chunkedUids.zipAll(chunkedNamespaces, None, None)
 
@@ -1156,7 +1192,14 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
           ).map(_.result)
         }
         .map { chunkedResult =>
-          StoredTopologyTransactions(chunkedResult.flatten)
+          val merged = chunkedResult.flatten
+          // Every chunk has its own LIMIT, so re-sort and trim the merged results.
+          pagination match {
+            case Some((_, pageLimit)) if chunkedFilters.sizeIs > 1 =>
+              StoredTopologyTransactions(merged.sorted(paginationOrdering).take(pageLimit))
+            case _ =>
+              StoredTopologyTransactions(merged)
+          }
         }
     }
   }
@@ -1173,7 +1216,6 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[GenericStoredTopologyTransactions] = {
-    val hasUidFilter = filterUid.nonEmpty || filterNamespace.nonEmpty
     val filterUidStr = filterUid.map(f => s"uids ${f.mkString(", ")}")
     val filterNamespaceStr = filterNamespace.map(f => s"namespaces ${f.mkString(", ")}")
     val filterOpStr = filterOp.map(f => s"op $f")
@@ -1187,18 +1229,26 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
     val isProposalFilter = sql" AND is_proposal = $isProposal"
     val changeOpFilter = filterOp.fold(sql"")(op => sql" AND operation = $op")
     val mappingTypeFilter = typeFilter(types)
-    val uidNamespaceFilter =
-      if (hasUidFilter) {
-        val namespaceFilter = filterNamespace.toList.flatMap(_.map(ns => sql"namespace = $ns"))
-        val uidFilter =
-          filterUid.toList.flatten.map(uid =>
-            sql"(identifier = ${uid.identifier} AND namespace = ${uid.namespace})"
-          )
-        sql" AND (" ++ (namespaceFilter ++ uidFilter).intercalate(sql" OR ") ++ sql")"
-      } else SQLActionBuilderChain(sql"")
+
+    val nsFilter = filterNamespace.map { namespacesToFilter =>
+      val namespaces = namespacesToFilter.map(_.unwrap).toArray
+      (
+        sql" unnest($namespaces) as namespaces(ns) ",
+        sql" namespaces.ns = namespace ",
+      )
+    }
+
+    val uidFilter = filterUid.map { uidsToFilter =>
+      val namespaces = uidsToFilter.map(_.namespace.unwrap).toArray
+      val idents: Array[String185] = uidsToFilter.map(_.identifier).toArray
+      (
+        sql" unnest($namespaces, $idents) as uids(ns, ident) ",
+        sql" uids.ns = namespace AND uids.ident = identifier ",
+      )
+    }
 
     val nonPaginationFilters =
-      timeRangeFilter ++ isProposalFilter ++ changeOpFilter ++ mappingTypeFilter ++ uidNamespaceFilter
+      timeRangeFilter ++ isProposalFilter ++ changeOpFilter ++ mappingTypeFilter
     val query = pagination match {
       case Some((participantStartExclusive, pageLimit)) =>
         val paginationFilter = participantStartExclusive match {
@@ -1212,10 +1262,14 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
           nonPaginationFilters ++ paginationFilter,
           limit = s" LIMIT $pageLimit ",
           orderBy = " ORDER BY identifier, namespace ",
+          uidFilter = uidFilter,
+          nsFilter = nsFilter,
         )
       case _ =>
         buildQueryForTransactions(
-          nonPaginationFilters
+          nonPaginationFilters,
+          uidFilter = uidFilter,
+          nsFilter = nsFilter,
         )
     }
 
@@ -1276,12 +1330,34 @@ class DbTopologyStore[+StoreId <: TopologyStoreId](
       limit: String = "",
       orderBy: String = " ORDER BY id ",
       includeRejected: Boolean = false,
+      uidFilter: Option[(SQLActionBuilder, SQLActionBuilder)] = None,
+      nsFilter: Option[(SQLActionBuilder, SQLActionBuilder)] = None,
   ): QueryAction = {
-    val query =
-      sql"SELECT instance, sequenced, valid_from, valid_until, rejection_reason FROM common_topology_transactions WHERE store_id = $storeIndex" ++
-        subQuery ++ (if (!includeRejected) sql" AND rejection_reason IS NULL"
-                     else sql"") ++ sql" #$orderBy #$limit"
-    query.as[QueryResult]
+
+    def baseQuery(targetTable: SQLActionBuilder) =
+      sql"SELECT instance, sequenced, valid_from, valid_until, rejection_reason, id FROM " ++ targetTable ++ sql" WHERE store_id = $storeIndex" ++
+        subQuery ++ (if (!includeRejected) sql" AND rejection_reason IS NULL" else sql"")
+
+    def queryWithFilter(filter: (SQLActionBuilder, SQLActionBuilder)) = {
+      val (leftTable, onFilter) = filter
+      val targetTable = leftTable ++ sql" JOIN common_topology_transactions ON " ++ onFilter
+      baseQuery(targetTable)
+    }
+
+    val query = (uidFilter, nsFilter) match {
+      case (None, None) => baseQuery(sql" common_topology_transactions ")
+      case (Some(uids), None) => queryWithFilter(uids)
+      case (None, Some(namespaces)) => queryWithFilter(namespaces)
+      case (Some(uids), Some(namespaces)) =>
+        val uidQuery = queryWithFilter(uids)
+        val nsQuery = queryWithFilter(namespaces)
+
+        sql"select all_results.* from (" ++ uidQuery ++ sql" union all " ++ nsQuery ++ sql") all_results"
+    }
+
+    val queryWithOrderByAndLimit = query ++ sql" #$orderBy #$limit"
+
+    queryWithOrderByAndLimit.as[QueryResult]
   }
 
   private val TxEntryWithIdFields =

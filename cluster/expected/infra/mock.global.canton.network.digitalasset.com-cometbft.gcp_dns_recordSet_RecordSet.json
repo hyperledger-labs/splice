@@ -1,0 +1,17 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "managedZone": "prod-networks",
+    "name": "cometbft.mock.global.canton.network.digitalasset.com.",
+    "project": "da-gcp-canton-domain",
+    "rrdatas": [
+      null
+    ],
+    "ttl": 60,
+    "type": "A"
+  },
+  "name": "mock.global.canton.network.digitalasset.com-cometbft",
+  "provider": "",
+  "type": "gcp:dns/recordSet:RecordSet"
+}

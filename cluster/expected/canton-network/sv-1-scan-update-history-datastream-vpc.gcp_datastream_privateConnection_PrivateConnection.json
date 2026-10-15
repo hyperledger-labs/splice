@@ -1,0 +1,19 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "displayName": "sv-1-scan-update-history-datastream-vpc",
+    "labels": {
+      "cluster": "mock"
+    },
+    "location": "europe-west6",
+    "privateConnectionId": "sv-1-scan-update-history-datastream-vpc",
+    "vpcPeeringConfig": {
+      "subnet": "1.2.3.16/29",
+      "vpc": "projects/test-project/global/networks/default"
+    }
+  },
+  "name": "sv-1-scan-update-history-datastream-vpc",
+  "provider": "",
+  "type": "gcp:datastream/privateConnection:PrivateConnection"
+}

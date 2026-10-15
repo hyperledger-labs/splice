@@ -1,0 +1,16 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "resourceServerIdentifier": "https://ledger_api.sv-1.test-stack.canton.network",
+    "scopes": [
+      {
+        "description": "Access to the Ledger API",
+        "name": "daml_ledger_api"
+      }
+    ]
+  },
+  "name": "LedgerApiScopessv1",
+  "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+  "type": "auth0:index/resourceServerScopes:ResourceServerScopes"
+}

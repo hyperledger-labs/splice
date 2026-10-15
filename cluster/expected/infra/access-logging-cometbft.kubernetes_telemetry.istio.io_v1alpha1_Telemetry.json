@@ -1,0 +1,31 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "telemetry.istio.io/v1alpha1",
+    "kind": "Telemetry",
+    "metadata": {
+      "name": "access-logging-cometbft",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "accessLogging": [
+        {
+          "providers": [
+            {
+              "name": "envoy"
+            }
+          ]
+        }
+      ],
+      "selector": {
+        "matchLabels": {
+          "app": "istio-ingress-cometbft"
+        }
+      }
+    }
+  },
+  "name": "access-logging-cometbft",
+  "provider": "",
+  "type": "kubernetes:telemetry.istio.io/v1alpha1:Telemetry"
+}

@@ -5,12 +5,12 @@ package com.digitalasset.canton.synchronizer.block.update
 
 import cats.syntax.either.*
 import cats.syntax.functorFilter.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{SyncCryptoApi, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.CantonBaseError
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.{LsuSequencingTestMessage, ProtocolMessage}
@@ -19,6 +19,7 @@ import com.digitalasset.canton.sequencing.protocol.{
   AggregationRule,
   AllMembersOfSynchronizer,
   Batch,
+  DecompressionPolicy,
   MediatorGroupRecipient,
   MemberRecipientOrBroadcast,
   SequencersOfSynchronizer,
@@ -42,8 +43,9 @@ import com.digitalasset.canton.synchronizer.sequencer.{AnnouncedLsu, SubmissionO
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
 import com.digitalasset.canton.util.collection.IterableUtil
-import com.digitalasset.canton.util.{MaxBytesToDecompress, MonadUtil, TracedPossiblyPrevalidated}
+import com.digitalasset.canton.util.{MonadUtil, TracedPossiblyPrevalidated}
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.nonempty.NonEmpty
 import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.immutable
@@ -192,6 +194,7 @@ class BlockUpdateGeneratorImpl(
         val (openEnvelopes, errors) = Batch.openEnvelopes(signedSubmissionRequest.content.batch)(
           protocolVersion,
           synchronizerSyncCryptoApi.pureCrypto,
+          synchronizerSyncCryptoApi.ips.getSynchronizerLimits,
         )
 
         val lsuSequencingTestMessages = openEnvelopes.envelopes.mapFilter(
@@ -221,9 +224,20 @@ class BlockUpdateGeneratorImpl(
 
       val ledgerBlockEvents = block.events.mapFilter { tracedEvent =>
         withSpan("BlockUpdateGenerator.extractBlockEvents") { implicit traceContext => _ =>
-          // TODO(i29003): Defer decompression to addSnapshotsAndValidateSubmissions
-          val maxBytesToDecompress = MaxBytesToDecompress.HardcodedDefault
-          LedgerBlockEvent.fromRawBlockEvent(protocolVersion, maxBytesToDecompress)(
+          // At this point no sequencing timestamp is assigned yet, so we cannot resolve the
+          // topology snapshot the dynamic `maxRequestSize` depends on. We therefore use the
+          // hardcoded value, which only bounds the eager decompression of the recipients (needed
+          // for chunking). The envelope contents are decompressed later, in the block chunk
+          // processor, with the dynamic `maxRequestSize` value (for protocol versions >= 36).
+          val decompressionPolicy = DecompressionPolicy.HardcodedDefault
+          // Synchronizer limits for collection sizes are part of the static synchronizer parameters,
+          // so they can be applied here before we resolve the topology snapshot for this event.
+          val synchronizerLimits = synchronizerSyncCryptoApi.ips.getSynchronizerLimits
+          LedgerBlockEvent.fromRawBlockEvent(
+            protocolVersion,
+            decompressionPolicy,
+            synchronizerLimits,
+          )(
             tracedEvent.value
           ) match {
             case Left(error) =>

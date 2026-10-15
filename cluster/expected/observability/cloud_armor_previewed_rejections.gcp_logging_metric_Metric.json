@@ -1,0 +1,25 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "description": "Requests that would be rejected by a previewed Cloud Armor rule",
+    "filter": "resource.type=(\"http_external_regional_lb_rule\" OR \"http_load_balancer\")\njsonPayload.previewSecurityPolicy.name=\"waf-whitelist-throttle-ban-mock\" AND jsonPayload.previewSecurityPolicy.outcome=\"DENY\"\n",
+    "labelExtractors": {
+      "rule_priority": "EXTRACT(jsonPayload.previewSecurityPolicy.priority)"
+    },
+    "metricDescriptor": {
+      "labels": [
+        {
+          "description": "Priority of the previewed Cloud Armor rule that matched",
+          "key": "rule_priority"
+        }
+      ],
+      "metricKind": "DELTA",
+      "valueType": "INT64"
+    },
+    "name": "cloud_armor_previewed_rejections_mock"
+  },
+  "name": "cloud_armor_previewed_rejections",
+  "provider": "",
+  "type": "gcp:logging/metric:Metric"
+}

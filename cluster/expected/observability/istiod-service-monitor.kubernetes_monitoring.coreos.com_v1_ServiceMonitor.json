@@ -1,0 +1,34 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "monitoring.coreos.com/v1",
+    "kind": "ServiceMonitor",
+    "metadata": {
+      "labels": {
+        "release": "prometheus-grafana-monitoring"
+      },
+      "name": "istiod-service-monitor",
+      "namespace": "observability"
+    },
+    "spec": {
+      "endpoints": [
+        {
+          "honorLabels": true,
+          "port": "http-monitoring"
+        }
+      ],
+      "namespaceSelector": {
+        "any": true
+      },
+      "selector": {
+        "matchLabels": {
+          "istio": "pilot"
+        }
+      }
+    }
+  },
+  "name": "istiod-service-monitor",
+  "provider": "",
+  "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+}

@@ -6,7 +6,6 @@ package com.digitalasset.canton.integration.plugins
 import better.files.File
 import com.daml.ledger.api.testtool.CliParser
 import com.daml.ledger.api.testtool.runner.{AvailableTests, Config, ConfiguredTests, TestRunner}
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.{
   CantonConfig,
   ClientConfig,
@@ -25,17 +24,16 @@ import com.digitalasset.canton.integration.{
   TestConsoleEnvironment,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
-import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.version.ReleaseVersion
 import com.digitalasset.daml.lf.language.LanguageVersion
+import com.digitalasset.nonempty.NonEmpty
 import monocle.macros.syntax.lens.*
 import org.scalatest.Assertions
 import org.scalatest.concurrent.ScalaFutures.*
 import org.scalatest.time.{Seconds, Span}
 
 import scala.concurrent.blocking
-import scala.util.{Failure, Success, Try}
 
 /** Plugin to provide the LedgerApiTestTool to a
   * [[com.digitalasset.canton.integration.BaseIntegrationTest]] instance for
@@ -83,19 +81,24 @@ class UseLedgerApiTestTool(
           LanguageVersion.stableLfVersions.takeWhile(_ < lfVersion)
         else List.empty
 
+      val allLfVersions = lfVersion :: otherLfVersions
       // find and download test tool with the higher stable LF version
       otherLfVersions
         .foldRight(getOrDownloadTestTool(testToolRelease, lfVersion)) { (otherLfVersion, res) =>
-          res.recoverWith {
-            case error if isMissingArtifact(error) =>
-              logger.info(
-                s"LAPITT for LF $lfVersion is not published for release $testToolRelease. " +
-                  s"Falling back to LF $otherLfVersion. This is NOT a test failure."
-              )
-              getOrDownloadTestTool(testToolRelease, otherLfVersion).orElse(Failure(error))
+          res.orElse {
+            logger.info(
+              s"LAPITT for LF $lfVersion is not published for release $testToolRelease. " +
+                s"Falling back to LF $otherLfVersion. This is NOT a test failure."
+            )
+            getOrDownloadTestTool(testToolRelease, otherLfVersion)
           }
         }
-        .fold(throw _, identity)
+        .getOrElse(
+          sys.error(
+            s"Cannot download test tool for version $testToolRelease. Tried LF versions: ${allLfVersions
+                .mkString(", ")}."
+          )
+        )
     }
 
     testTool = version match {
@@ -104,11 +107,21 @@ class UseLedgerApiTestTool(
       case LAPITTVersion.Explicit(release) => tryDownload(release)
     }
 
-    // ensure we use production seeding setting in ledger api conformance and performance tests
-    (ConfigTransforms.updateContractIdSeeding(Seeding.Weak) andThen
-      // static time tests require this
-      (_.focus(_.monitoring.logging.delayLoggingThreshold)
-        .replace(NonNegativeFiniteDurationConfig.ofSeconds(1000))))(config)
+    // static time tests require this
+    val withDelayLogging = config
+      .focus(_.monitoring.logging.delayLoggingThreshold)
+      .replace(NonNegativeFiniteDurationConfig.ofSeconds(1000))
+
+    // Integration tests use a tiny ACHS aggregation threshold (see `ConfigTransforms.enableAchs`).
+    // `LimitsIT` can commit thousands of events at once, so ACHS processes only a few ids per DB round trip.
+    // That can fill the buffer and stall the in-memory ledger end for tens of seconds, making unrelated
+    // conformance tests time out on participant1 (#33462). A larger threshold keeps catch-up to a few rounds.
+    ConfigTransforms.updateAllParticipantConfigs_(
+      _.focus(_.parameters.ledgerApiServer.indexer.achsConfig)
+        .modify(
+          _.map(_.copy(aggregationThreshold = UseLedgerApiTestTool.achsAggregationThreshold))
+        )
+    )(withDelayLogging)
   }
 
   override def afterEnvironmentDestroyed(config: CantonConfig): Unit =
@@ -151,6 +164,7 @@ class UseLedgerApiTestTool(
       exclude: Seq[String],
       concurrentTestRuns: Int = 4,
       useJson: Boolean,
+      onlyMultiParticipantTests: Boolean = false,
   )(implicit
       env: TestConsoleEnvironment
   ): Unit = {
@@ -163,7 +177,9 @@ class UseLedgerApiTestTool(
           .map(_.trim)
       case LedgerTestTool.Local(tests) => ConfiguredTests(tests, Config.default).allTestNames
     }
-    val filteredTests = allTests
+    val selectedTests =
+      if (onlyMultiParticipantTests) retainMultiParticipantTests(allTests) else allTests
+    val filteredTests = selectedTests
       .filter(line => exclude.forall(not => !line.contains(not)))
       .zipWithIndex
       .collect { case (test, idx) if idx % numShards == shard => test }
@@ -178,11 +194,27 @@ class UseLedgerApiTestTool(
     )
   }
 
+  private def retainMultiParticipantTests(allTests: Seq[String]): Seq[String] = {
+    val multiParticipantTests =
+      ConfiguredTests(AvailableTests(lfVersion), Config.default).multiParticipantTestNames.toSet
+    val (retained, dropped) = allTests.partition(multiParticipantTests.contains)
+    logger.info(
+      s"Restricting the run to multi-participant test cases: retaining ${retained.size} of ${allTests.size} test cases."
+    )
+    logger.info(s"Test cases skipped as single-participant ones: ${dropped.mkString(", ")}")
+    if (retained.isEmpty)
+      // Fine to use the scalatest cancel here as this method is expected to be invoked from a ScalaTest case.
+      Assertions.cancel(
+        "After restricting the run to multi-participant test cases no tests remain to be run."
+      )
+    retained
+  }
+
   @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   private def getOrDownloadTestTool(
       release: ReleaseVersion,
       lfVersion: LanguageVersion,
-  ): Try[LedgerTestTool.Assembly] = {
+  ): Option[LedgerTestTool.Assembly] = {
     val testToolName: String = s"ledger-api-test-tool-$lfVersion"
     val filename = s"$testToolName-${release.fullVersion}.jar"
     val destination =
@@ -192,16 +224,12 @@ class UseLedgerApiTestTool(
       if (!destination.exists) {
         logger.info(s"Downloading $filename from S3.")
         destination.parent.createDirectoryIfNotExists(createParents = true)
-        LAPITTResolver.download(release, lfVersion, destination, logger)
-      } else Success(())
-    }).map(_ => LedgerTestTool.Assembly(destination))
+        LAPITTResolver
+          .download(release, lfVersion, destination, logger)
+          .map(LedgerTestTool.Assembly(_))
+      } else Some(LedgerTestTool.Assembly(destination))
+    })
   }
-
-  private def isMissingArtifact(error: Throwable): Boolean =
-    Option(error.getMessage).exists { msg =>
-      val lower = msg.toLowerCase
-      msg.contains("404") || lower.contains("not found")
-    }
 
   private def runTestsInternal(
       concurrentTestRuns: Int,
@@ -285,6 +313,10 @@ class UseLedgerApiTestTool(
 }
 
 object UseLedgerApiTestTool {
+  // Small enough that ACHS maintenance still runs many times per conformance shard, large enough
+  // that the biggest LimitsIT transaction is absorbed in a few rounds.
+  val achsAggregationThreshold: Long = 1000L
+
   sealed trait TestInclusions extends Product with Serializable {
     def testCaseEnabled(testCaseName: String): Boolean
   }

@@ -4,6 +4,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {
   appsKubernetesScheduling,
+  CACHE_GHCR,
   DOCKER_REPO,
   ExactNamespace,
   HELM_MAX_HISTORY_SIZE,
@@ -12,6 +13,7 @@ import {
   K8sResourceSchema,
   SingleK8sResourceSchema,
 } from '@canton-network/splice-pulumi-common';
+import { spliceEnvConfig } from '@canton-network/splice-pulumi-common/src/config/envConfig';
 import { DockerConfig } from '@canton-network/splice-pulumi-common/src/dockerConfig';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { ConfigMap, Namespace, PersistentVolumeClaim, Secret } from '@pulumi/kubernetes/core/v1';
@@ -23,6 +25,9 @@ import yaml from 'js-yaml';
 import { createCachePvc } from './cache';
 import { ghaConfig } from './config';
 import { createCloudSQLInstanceForPerformanceTests, PerformanceTestDb } from './performanceTests';
+
+const runnerVersion = spliceEnvConfig.requireEnv('GHA_RUNNER_VERSION');
+const runnerDigest = spliceEnvConfig.requireEnv('GHA_RUNNER_DIGEST');
 
 const localnetHostAliases = [
   {
@@ -95,7 +100,7 @@ function installDockerRunnerScaleSet(
             initContainers: [
               {
                 name: 'init-dind-externals',
-                image: 'ghcr.io/actions/actions-runner:latest',
+                image: `${CACHE_GHCR}/actions/actions-runner:${runnerVersion}@${runnerDigest}`,
                 command: ['cp', '-r', '-v', '/home/runner/externals/.', '/home/runner/tmpDir/'],
                 volumeMounts: [
                   {
@@ -448,7 +453,7 @@ function installK8sRunnerScaleSet(
               {
                 name: 'runner',
                 image: runnerImage,
-                imagePullPolicy: 'dirty'.indexOf(runnerImage) ? 'Always' : 'IfNotPresent',
+                imagePullPolicy: runnerImage.includes('dirty') ? 'Always' : 'IfNotPresent',
                 command: ['/home/runner/run.sh'],
                 env: [
                   {

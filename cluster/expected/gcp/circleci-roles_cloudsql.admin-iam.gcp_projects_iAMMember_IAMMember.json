@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "role": "roles/cloudsql.admin"
+  },
+  "name": "circleci-roles/cloudsql.admin-iam",
+  "provider": "",
+  "type": "gcp:projects/iAMMember:IAMMember"
+}

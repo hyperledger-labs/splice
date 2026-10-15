@@ -6,10 +6,9 @@ package com.digitalasset.canton.participant.sync
 import cats.Eval
 import cats.data.EitherT
 import cats.syntax.either.*
-import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
-import com.daml.nonempty.NonEmpty
+import cats.syntax.traverse.*
 import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.*
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
@@ -24,6 +23,7 @@ import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.*
 import com.digitalasset.canton.ledger.participant.state.SyncService.ConnectedSynchronizerResponse
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   NamedLoggerFactory,
@@ -36,10 +36,12 @@ import com.digitalasset.canton.participant.admin.data.{LateLsuRequest, ManualLsu
 import com.digitalasset.canton.participant.admin.party.{
   OnboardingClearanceScheduler,
   PartyReplicationTopologyWorkflow,
+  PartyReplicationTriggers,
 }
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentCoordination
+import com.digitalasset.canton.participant.protocol.validation.ExternalCallValidator
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore.UnknownAlias
@@ -57,6 +59,7 @@ import com.digitalasset.canton.participant.sync.SynchronizerConnectionsManager.{
   ConnectSynchronizer,
   ConnectedSynchronizers,
   ConnectionListener,
+  ConnectionListenerHandle,
   NoAutomaticLsuHandler,
   PerformLsuHandler,
 }
@@ -78,11 +81,13 @@ import com.digitalasset.canton.topology.client.{
   SynchronizerTopologyClientWithInit,
   TopologySnapshot,
 }
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.OptionUtils.OptionExtension
 import com.digitalasset.canton.util.retry.Backoff
 import com.digitalasset.daml.lf.engine.Engine
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.collect.{BiMap, HashBiMap}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -136,6 +141,7 @@ private[sync] class SynchronizerConnectionsManager(
     parameters: ParticipantNodeParameters,
     connectedSynchronizerFactory: ConnectedSynchronizer.Factory[ConnectedSynchronizer],
     pendingLsuOperationsStore: PendingLsuOperation.Store,
+    pendingOnboardingTransactionsStore: PendingOnboardingTransactions.Store,
     metrics: ParticipantMetrics,
     sequencerInfoLoader: SequencerInfoLoader,
     isActive: () => Boolean,
@@ -145,6 +151,8 @@ private[sync] class SynchronizerConnectionsManager(
     testingConfig: TestingConfigInternal,
     ledgerApiIndexer: LifeCycleContainer[LedgerApiIndexer],
     connectedSynchronizersLookupContainer: ConnectedSynchronizersLookupContainer,
+    externalCallValidator: ExternalCallValidator,
+    partyReplicationTriggersO: Option[PartyReplicationTriggers],
 )(implicit ec: ExecutionContextExecutor, mat: Materializer, val tracer: Tracer)
     extends FlagCloseable
     with Spanning
@@ -168,8 +176,16 @@ private[sync] class SynchronizerConnectionsManager(
   // Listeners to synchronizer connections
   // The listeners are notified only if the connection starts synchronizer processing
   private val connectionListeners = new AtomicReference[List[ConnectionListener]](List.empty)
-  def subscribeToConnections(subscriber: ConnectionListener): Unit =
+
+  /** @return
+    *   a handle that can be closed to unsubscribe the subscriber
+    */
+  def subscribeToConnections(subscriber: ConnectionListener): ConnectionListenerHandle = {
     connectionListeners.updateAndGet(subscriber :: _).discard
+    new ConnectionListenerHandle(() =>
+      connectionListeners.updateAndGet(_.filter(_ != subscriber)).discard
+    )
+  }
 
   protected def timeouts: ProcessingTimeout = parameters.processingTimeouts
 
@@ -179,7 +195,6 @@ private[sync] class SynchronizerConnectionsManager(
 
   private val reassignmentCoordination: ReassignmentCoordination =
     ReassignmentCoordination(
-      reassignmentsConfig = parameters.reassignmentsConfig,
       syncPersistentStateManager = syncPersistentStateManager,
       submissionHandles = connectedSynchronizers.get,
       synchronizerId =>
@@ -190,6 +205,9 @@ private[sync] class SynchronizerConnectionsManager(
       loggerFactory,
     )(ec)
 
+  /** Used primarily to chain connect and disconnects. Is additionally used to schedule operations
+    * that should not be interleaved with a (dis)connect operation (e.g., LSU, repair, ...).
+    */
   private[sync] val connectQueue = {
     val queueName = "sync-service-connect-and-repair-queue"
 
@@ -201,6 +219,22 @@ private[sync] class SynchronizerConnectionsManager(
       crashOnFailure = parameters.exitOnFatalFailures,
     )
   }
+
+  /** Used to chain pure handshakes per physical synchronizer id
+    *
+    * As the pure handshake is mostly without side effects (except the creation of the persistent
+    * state that is guarded by a lock), we avoid using the connectQueue which means that a pure
+    * handshake does not block a (dis)connect.
+    */
+  private val pureHandshakesQueue =
+    new NonGarbageCollectedShardedSequentialProcessingQueue[PhysicalSynchronizerId](
+      name = "pure-handshakes-queue",
+      futureSupervisor = futureSupervisor,
+      timeouts = timeouts,
+      loggerFactory = loggerFactory,
+      logTaskTiming = false,
+      failureMode = FailureMode.ContinueAfterFailure,
+    )
 
   // Track synchronizers we would like to "keep on reconnecting until available"
   private val attemptReconnect: TrieMap[SynchronizerAlias, AttemptReconnect] = TrieMap.empty
@@ -329,6 +363,7 @@ private[sync] class SynchronizerConnectionsManager(
               con,
               connectSynchronizer = ConnectSynchronizer.ReconnectSynchronizers,
               skipStatusCheck = false,
+              onboardingTransactions = None,
             ).transform {
               case Left(SyncServiceFailedSynchronizerConnection(_, parent)) if ignoreFailures =>
                 // if the error is retryable, we'll reschedule an automatic retry so this synchronizer gets connected eventually
@@ -484,6 +519,7 @@ private[sync] class SynchronizerConnectionsManager(
       keepRetrying: Boolean,
       connectSynchronizer: ConnectSynchronizer,
       logLevelFailureInitialAttempt: Level = Level.WARN,
+      onboardingTransactions: Option[NonEmpty[Seq[GenericSignedTopologyTransaction]]],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncServiceError, Option[PhysicalSynchronizerId]] = {
@@ -519,6 +555,7 @@ private[sync] class SynchronizerConnectionsManager(
           initial = initial,
           connectSynchronizer = connectSynchronizer,
           logLevelFailureInitialAttempt = logLevelFailureInitialAttempt,
+          onboardingTransactions = onboardingTransactions,
         )
       }
   }
@@ -535,6 +572,7 @@ private[sync] class SynchronizerConnectionsManager(
       initial: Boolean,
       connectSynchronizer: ConnectSynchronizer,
       logLevelFailureInitialAttempt: Level = Level.WARN,
+      onboardingTransactions: Option[NonEmpty[Seq[GenericSignedTopologyTransaction]]],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncServiceError, Option[PhysicalSynchronizerId]] =
@@ -546,6 +584,7 @@ private[sync] class SynchronizerConnectionsManager(
           synchronizerAlias,
           connectSynchronizer,
           skipStatusCheck = false,
+          onboardingTransactions = onboardingTransactions,
         ).transform {
           case Left(SyncServiceError.SyncServiceFailedSynchronizerConnection(_, err))
               if keepRetrying && err.retryable.nonEmpty =>
@@ -612,6 +651,7 @@ private[sync] class SynchronizerConnectionsManager(
             keepRetrying = true,
             initial = false,
             connectSynchronizer = connectSynchronizer,
+            onboardingTransactions = None,
           ),
           s"Background reconnect to $synchronizerAlias",
         )
@@ -619,7 +659,13 @@ private[sync] class SynchronizerConnectionsManager(
       nextO.foreach(scheduleReconnectAttempt(_, connectSynchronizer))
     }
 
-    clock.scheduleAt(reconnectAttempt, timestamp).discard
+    clock
+      .scheduleAtCancelledOnShutdown(
+        reconnectAttempt,
+        s"${getClass.getName}: scheduling reconnection",
+        timestamp,
+      )
+      .discard
   }
 
   /** Get the synchronizer connection corresponding to the alias. Fail if no connection can be
@@ -684,6 +730,7 @@ private[sync] class SynchronizerConnectionsManager(
       synchronizerAlias: SynchronizerAlias,
       connectSynchronizer: ConnectSynchronizer,
       skipStatusCheck: Boolean,
+      onboardingTransactions: Option[NonEmpty[Seq[GenericSignedTopologyTransaction]]],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncServiceError, PhysicalSynchronizerId] =
@@ -692,12 +739,14 @@ private[sync] class SynchronizerConnectionsManager(
         performHandshake(
           synchronizerAlias,
           skipStatusCheck = skipStatusCheck,
+          onboardingTransactions = onboardingTransactions,
         )
       case _ =>
         performSynchronizerConnection(
           synchronizerAlias,
           startConnectedSynchronizerProcessing = connectSynchronizer.startConnectedSynchronizer,
           skipStatusCheck = skipStatusCheck,
+          onboardingTransactions = onboardingTransactions,
         )
     }
 
@@ -723,6 +772,7 @@ private[sync] class SynchronizerConnectionsManager(
   private def performHandshake(
       synchronizerAlias: SynchronizerAlias,
       skipStatusCheck: Boolean,
+      onboardingTransactions: Option[NonEmpty[Seq[GenericSignedTopologyTransaction]]],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncServiceError, PhysicalSynchronizerId] =
@@ -745,8 +795,19 @@ private[sync] class SynchronizerConnectionsManager(
           _ = logger.debug(
             s"Performing handshake with synchronizer with id ${synchronizerConnectionConfig.configuredPsid} and config: ${synchronizerConnectionConfig.config}"
           )
+          effectiveOnboardingTransactions <- EitherT.right(
+            onboardingTransactions.fold(loadPersistedOnboardingTransactions(synchronizerAlias))(
+              transactions => FutureUnlessShutdown.pure(Option(transactions))
+            )
+          )
+          // whether the transactions were loaded from the pending store (and thus need clearing)
+          loadedFromStore =
+            onboardingTransactions.isEmpty && effectiveOnboardingTransactions.isDefined
           synchronizerHandle <- EitherT(
-            synchronizerRegistry.connect(synchronizerConnectionConfig)
+            synchronizerRegistry.connect(
+              synchronizerConnectionConfig,
+              onboardingTransactions = effectiveOnboardingTransactions,
+            )
           )
             .leftMap[SyncServiceError](err =>
               SyncServiceError.SyncServiceFailedSynchronizerConnection(synchronizerAlias, err)
@@ -763,10 +824,51 @@ private[sync] class SynchronizerConnectionsManager(
                 .Error(synchronizerAlias, psid, err.message)
             )
 
+          _ <- EitherT.right(
+            if (loadedFromStore) clearPersistedOnboardingTransactions(synchronizerAlias, psid)
+            else FutureUnlessShutdown.unit
+          )
+
           _ = syncCrypto.remove(psid)
           _ = synchronizerHandle.close()
         } yield psid
     }
+
+  /** Loads the onboarding transactions persisted at registration for the given alias, if any. */
+  private def loadPersistedOnboardingTransactions(
+      synchronizerAlias: SynchronizerAlias
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[NonEmpty[Seq[GenericSignedTopologyTransaction]]]] =
+    // The synchronizer id is not yet known at this point (pre-handshake), so we look up by alias
+    // only. The alias uniquely identifies a connection, so at most one entry is expected.
+    pendingOnboardingTransactionsStore
+      .getAll(
+        PendingOnboardingTransactions.operationName,
+        operationKey = Some(PendingOnboardingTransactions.operationKey(synchronizerAlias)),
+      )
+      .map { pending =>
+        if (pending.sizeIs > 1)
+          ErrorUtil.invalidState(
+            s"Found ${pending.size} persisted onboarding transaction entries for alias $synchronizerAlias, expected at most one."
+          )
+        pending.headOption.map(_.operation.transactions)
+      }
+
+  /** Deletes the onboarding transactions persisted at registration, as they are obsolete once the
+    * participant connects to the synchronizer.
+    */
+  private def clearPersistedOnboardingTransactions(
+      synchronizerAlias: SynchronizerAlias,
+      psid: PhysicalSynchronizerId,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Unit] =
+    pendingOnboardingTransactionsStore.delete(
+      psid.logical,
+      PendingOnboardingTransactions.operationKey(synchronizerAlias),
+      PendingOnboardingTransactions.operationName,
+    )
 
   /** Perform a handshake with the given synchronizer. Does only the static (protocol version,
     * crypto schemes) unlike `performHandshake` above. In particular: does not download the
@@ -783,13 +885,14 @@ private[sync] class SynchronizerConnectionsManager(
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncServiceError, StaticSynchronizerParameters] =
-    connectQueue.executeEUS(
+    pureHandshakesQueue.executeEUS(psid)(
       connectedSynchronizers.get(psid) match {
         case Some(sync) =>
           logger.debug(
             s"Already connected to $psid, skipping pure handshake and returning cached static parameters."
           )
           EitherT.rightT[FutureUnlessShutdown, SyncServiceError](sync.staticSynchronizerParameters)
+
         case None =>
           logger.debug(s"About to perform pure handshake with synchronizer: $psid")
 
@@ -819,7 +922,8 @@ private[sync] class SynchronizerConnectionsManager(
                 )
               )
 
-            _ = if (isLsu) metrics.setLsuStatus(ParticipantMetrics.LsuStatus.HandshakeDone, psid)
+            _ = if (isLsu)
+              metrics.setLsuStatus(ParticipantMetrics.LsuStatus.HandshakeDone, psid.opaque)
 
           } yield connectionInfo.staticSynchronizerParameters
       },
@@ -904,17 +1008,6 @@ private[sync] class SynchronizerConnectionsManager(
     } yield logger.info(s"Successfully performed pending LSU operation for $successorPsid")
   }
 
-  /** Used to chain handshakes per successor physical synchronizer id */
-  private val lsuHandshakesQueue =
-    new NonGarbageCollectedShardedSequentialProcessingQueue[PhysicalSynchronizerId](
-      name = "lsu-handshake-successor",
-      futureSupervisor = futureSupervisor,
-      timeouts = timeouts,
-      loggerFactory = loggerFactory,
-      logTaskTiming = false,
-      failureMode = FailureMode.ContinueAfterFailure,
-    )
-
   /** Performs handshake with the successor synchronizer. Retry until the handshake is successful.
     */
   private def performLsuHandshakeWithRetries(
@@ -990,10 +1083,7 @@ private[sync] class SynchronizerConnectionsManager(
         )
         .pipe(EitherT(_))
 
-    lsuHandshakesQueue.executeEUS(successorPsid)(
-      task(),
-      s"lsu-handshake-with-$successorPsid",
-    )
+    task()
   }
 
   /** Connect the sync service to the given synchronizer. */
@@ -1001,19 +1091,33 @@ private[sync] class SynchronizerConnectionsManager(
       synchronizerAlias: SynchronizerAlias,
       startConnectedSynchronizerProcessing: Boolean,
       skipStatusCheck: Boolean,
+      onboardingTransactions: Option[NonEmpty[Seq[GenericSignedTopologyTransaction]]],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncServiceError, PhysicalSynchronizerId] = {
+    // returns the synchronizer handle and whether the onboarding transactions were loaded from the
+    // pending store (and thus need clearing)
     def connect(
         config: StoredSynchronizerConnectionConfig
     ): EitherT[
       FutureUnlessShutdown,
       SyncServiceFailedSynchronizerConnection,
-      SynchronizerHandle,
+      (SynchronizerHandle, Boolean),
     ] =
-      EitherT(synchronizerRegistry.connect(config)).leftMap(err =>
-        SyncServiceError.SyncServiceFailedSynchronizerConnection(synchronizerAlias, err)
-      )
+      for {
+        effectiveOnboardingTransactions <- EitherT.right(
+          onboardingTransactions.fold(loadPersistedOnboardingTransactions(synchronizerAlias))(
+            transactions => FutureUnlessShutdown.pure(Option(transactions))
+          )
+        )
+        loadedFromStore =
+          onboardingTransactions.isEmpty && effectiveOnboardingTransactions.isDefined
+        handle <- EitherT(
+          synchronizerRegistry.connect(config, effectiveOnboardingTransactions)
+        ).leftMap(err =>
+          SyncServiceError.SyncServiceFailedSynchronizerConnection(synchronizerAlias, err)
+        )
+      } yield (handle, loadedFromStore)
 
     def handleCloseDegradation(connectedSynchronizer: ConnectedSynchronizer, fatal: Boolean)(
         err: RpcError
@@ -1034,7 +1138,8 @@ private[sync] class SynchronizerConnectionsManager(
 
       case None =>
         logger.debug(s"About to connect to synchronizer: ${synchronizerAlias.unwrap}")
-        val connectedSynchronizerMetrics = metrics.connectedSynchronizerMetrics(synchronizerAlias)
+        val connectedSynchronizerMetrics =
+          metrics.connectedSynchronizerMetrics(synchronizerAlias, participantId)
 
         val ret: EitherT[FutureUnlessShutdown, SyncServiceError, PhysicalSynchronizerId] = for {
 
@@ -1048,7 +1153,8 @@ private[sync] class SynchronizerConnectionsManager(
           _ = logger.debug(
             s"Connecting to synchronizer with id ${synchronizerConnectionConfig.configuredPsid} config: ${synchronizerConnectionConfig.config}"
           )
-          synchronizerHandle <- connect(synchronizerConnectionConfig)
+          connectResult <- connect(synchronizerConnectionConfig)
+          (synchronizerHandle, loadedFromStore) = connectResult
           psid = synchronizerHandle.psid
 
           _ = logger.debug(
@@ -1060,6 +1166,11 @@ private[sync] class SynchronizerConnectionsManager(
               SyncServiceError.SyncServicePhysicalIdRegistration
                 .Error(synchronizerAlias, psid, err.message)
             )
+
+          _ <- EitherT.right(
+            if (loadedFromStore) clearPersistedOnboardingTransactions(synchronizerAlias, psid)
+            else FutureUnlessShutdown.unit
+          )
 
           synchronizerLoggerFactory = loggerFactory.append("psid", psid.toString)
           persistent = synchronizerHandle.syncPersistentState
@@ -1110,25 +1221,15 @@ private[sync] class SynchronizerConnectionsManager(
             syncEphemeralStateFactory
               .createFromPersistent(
                 persistent,
+                synchronizerHandle,
                 synchronizerCrypto,
                 ledgerApiIndexer.asEval,
                 participantNodePersistentState.map(_.contractStore),
                 participantNodeEphemeralState,
-                synchronizerConnectionConfig.predecessor,
-                () => {
-                  val tracker = SynchronizerTimeTracker(
-                    synchronizerConnectionConfig.config.timeTracker,
-                    clock,
-                    synchronizerHandle.sequencerClient,
-                    timeouts,
-                    synchronizerLoggerFactory,
-                  )
-                  synchronizerHandle.topologyClient.setSynchronizerTimeTracker(tracker)
-                  tracker
-                },
                 promiseUSFactory,
                 connectedSynchronizerMetrics,
                 parameters.cachingConfigs.sessionEncryptionKeyCache,
+                synchronizerConnectionConfig,
                 onboardingClearanceScheduler,
                 participantId,
                 synchronizerLoggerFactory,
@@ -1185,10 +1286,12 @@ private[sync] class SynchronizerConnectionsManager(
                   synchronizerHandle.topologyClient,
                   ephemeral.recordOrderPublisher,
                   pendingLsuOperationsStore = pendingLsuOperationsStore,
+                  synchronizerConnectionConfigStore = synchronizerConnectionConfigStore,
                   persistent.pendingOnboardingClearanceStore,
                   synchronizerHandle.syncPersistentState.sequencedEventStore,
                   synchronizerConnectionConfig.predecessor,
-                  ledgerApiIndexer.asEval.value.ledgerApiStore.value,
+                  ledgerApiIndexer.asEval.value.ledgerApiStore,
+                  partyReplicationTriggersO,
                   metrics,
                 ),
               missingKeysAlerter,
@@ -1202,6 +1305,7 @@ private[sync] class SynchronizerConnectionsManager(
               futureSupervisor,
               synchronizerLoggerFactory,
               testingConfig,
+              externalCallValidator,
             )
           )
 
@@ -1213,9 +1317,18 @@ private[sync] class SynchronizerConnectionsManager(
             connectedSynchronizer.sequencerClient.getConnectionPoolHealthStatus
           )
 
-          _ = acsCommitmentProcessorHealth.set(
-            connectedSynchronizer.acsCommitmentProcessor.healthComponent
-          )
+          _ = connectedSynchronizer.acsCommitmentProcessorO match {
+            case Some(acsCommitmentProcessor) =>
+              acsCommitmentProcessorHealth.set(acsCommitmentProcessor.healthComponent)
+            case None =>
+              acsCommitmentProcessorHealth.set(
+                new com.digitalasset.canton.health.HealthComponent.AlwaysHealthyComponent(
+                  AcsCommitmentProcessor.healthName,
+                  logger,
+                )
+              )
+          }
+
           _ = connectedSynchronizer.resolveUnhealthy()
 
           _ = connectedSynchronizers.tryAdd(connectedSynchronizer)
@@ -1353,32 +1466,34 @@ private[sync] class SynchronizerConnectionsManager(
       synchronizerAlias: SynchronizerAlias
   )(implicit traceContext: TraceContext): Either[SyncServiceError, Unit] = {
     logger.info(show"Disconnecting from $synchronizerAlias")
-    (for {
-      synchronizerId <- aliasManager.synchronizerIdForAlias(synchronizerAlias)
-    } yield {
-      val removedO = connectedSynchronizers.psidFor(synchronizerId).flatMap { psid =>
-        syncCrypto.remove(psid)
-        connectedSynchronizers.remove(psid)
+
+    aliasManager
+      .synchronizerIdForAlias(synchronizerAlias)
+      .map { synchronizerId =>
+        val removedO = connectedSynchronizers.psidFor(synchronizerId).flatMap { psid =>
+          syncCrypto.remove(psid)
+          connectedSynchronizers.remove(psid)
+        }
+        removedO match {
+          case Some(connectedSynchronizer) =>
+            logger.info(s"Disconnecting connected synchronizer ${connectedSynchronizer.psid}")
+            Try(LifeCycle.close(connectedSynchronizer)(logger)) match {
+              case Success(_) =>
+                logger.info(show"Disconnected from $synchronizerAlias")
+              case Failure(ex) =>
+                if (parameters.exitOnFatalFailures)
+                  FatalError.exitOnFatalError(
+                    show"Failed to disconnect from $synchronizerAlias due to an exception",
+                    ex,
+                    logger,
+                  )
+                else throw ex
+            }
+          case None =>
+            logger.info(show"Nothing to do, as we are not connected to $synchronizerAlias")
+        }
       }
-      removedO match {
-        case Some(connectedSynchronizer) =>
-          logger.info(s"Disconnecting connected synchronizer ${connectedSynchronizer.psid}")
-          Try(LifeCycle.close(connectedSynchronizer)(logger)) match {
-            case Success(_) =>
-              logger.info(show"Disconnected from $synchronizerAlias")
-            case Failure(ex) =>
-              if (parameters.exitOnFatalFailures)
-                FatalError.exitOnFatalError(
-                  show"Failed to disconnect from $synchronizerAlias due to an exception",
-                  ex,
-                  logger,
-                )
-              else throw ex
-          }
-        case None =>
-          logger.info(show"Nothing to do, as we are not connected to $synchronizerAlias")
-      }
-    }).toRight(SyncServiceError.SyncServiceUnknownSynchronizer.Error(synchronizerAlias))
+      .toRight(SyncServiceError.SyncServiceUnknownSynchronizer.Error(synchronizerAlias))
   }
 
   /** Disconnect from all connected synchronizers. */
@@ -1388,6 +1503,7 @@ private[sync] class SynchronizerConnectionsManager(
     connectedSynchronizers.lsids.toList
       .mapFilter(aliasManager.aliasForSynchronizerId)
       .distinct
+      // TODO(#33650) – Replace with unboundedTraverse_; safe because there is one to a few synchronizers ever
       .parTraverse_(disconnectSynchronizer)
 
   /** Start the upgrade of the participant to the successor (automatic workflow).
@@ -1396,7 +1512,7 @@ private[sync] class SynchronizerConnectionsManager(
     *   - Time on the current synchronizer has reached the upgrade time.
     *   - Successor is registered.
     *
-    * Note: The upgrade involve operations that are retried, so the method can take some time to
+    * Note: The upgrade involves operations that are retried, so the method can take some time to
     * complete.
     */
   override def performLsu(
@@ -1404,29 +1520,46 @@ private[sync] class SynchronizerConnectionsManager(
       synchronizerSuccessor: SynchronizerSuccessor,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, Unit] = {
+  ): EitherT[FutureUnlessShutdown, LsuError, Unit] = {
     logger.info(s"Starting upgrade from $currentPsid to ${synchronizerSuccessor.psid}")
 
     for {
       persistentState <- EitherT.fromEither[FutureUnlessShutdown](
         syncPersistentStateManager
           .get(currentPsid)
-          .toRight(s"Unable to get persistent state for $currentPsid")
+          .toRight(LsuError.Internal.Error(s"Unable to get persistent state for $currentPsid"))
       )
 
       alias <- EitherT.fromEither[FutureUnlessShutdown](
         syncPersistentStateManager
           .aliasForSynchronizerId(currentPsid.logical)
-          .toRight(s"Unable to find alias for synchronizer ${currentPsid.logical}")
+          .toRight(
+            LsuError.Internal.Error(s"Unable to find alias for synchronizer ${currentPsid.logical}")
+          )
       )
 
       event <- persistentState.sequencedEventStore
         .find(SearchCriterion.Latest)
-        .leftMap(_ => "The sequencer event store is empty. Was the upgrade performed already?")
+        .leftMap(_ =>
+          LsuError.Internal
+            .Error("The sequencer event store is empty. Was the upgrade performed already?")
+        )
 
       _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
         event.timestamp >= synchronizerSuccessor.upgradeTime,
-        s"Upgrade time ${synchronizerSuccessor.upgradeTime} not reached: last event in the sequenced event store has timestamp ${event.timestamp}",
+        // Internal error because preconditions of the method have been violated
+        LsuError.Internal.Error(
+          s"Upgrade time ${synchronizerSuccessor.upgradeTime} not reached: last event in the sequenced event store has timestamp ${event.timestamp}"
+        ),
+      )
+
+      successorPsid <- EitherT.fromEither[FutureUnlessShutdown](
+        synchronizerSuccessor.psid.parseAsPhysical.leftMap(err =>
+          // Internal error because preconditions of the method have been violated
+          LsuError.Internal.Error(
+            OpaquePhysicalSynchronizerId.unparseablePSIdMessage(synchronizerSuccessor, err)
+          )
+        )
       )
 
       upgrader = new AutomaticLogicalSynchronizerUpgrade(
@@ -1446,13 +1579,15 @@ private[sync] class SynchronizerConnectionsManager(
             Hence, we decrease the level from WARN to INFO.
              */
             logLevelFailureInitialAttempt = Level.INFO,
+            onboardingTransactions = None,
           )(tc),
         disconnectSynchronizer = disconnectSynchronizer(alias)(_),
         metrics,
         pendingLsuOperationsStore,
         parameters.lsuConfig,
         loggerFactory.append("lsu", synchronizerSuccessor.psid.suffix),
-      )(FullAutomaticLsuRequest(alias, currentPsid, synchronizerSuccessor))
+        parameters.acsCommitments.disableOldAcsCommitmentProcessor,
+      )(FullAutomaticLsuRequest(alias, currentPsid, synchronizerSuccessor, successorPsid))
 
       _ <- upgrader.upgrade()
     } yield ()
@@ -1469,12 +1604,13 @@ private[sync] class SynchronizerConnectionsManager(
     */
   def performLateLsu(
       request: LateLsuRequest
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, LsuError, Unit] =
     for {
       _ <- validateSequencerConnection(
         request.successorConfig,
         request.successorConnectionValidation,
-      ).leftMap(_.toString)
+      )
+        .leftMap(err => LsuError.SynchronizerConnection.Error(err.toString))
       _ <-
         new UncheckedLateLogicalSynchronizerUpgrade(
           synchronizerConnectionConfigStore,
@@ -1492,12 +1628,15 @@ private[sync] class SynchronizerConnectionsManager(
 
   def performManualLsu(
       manualLsuRequest: ManualLsuRequest
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, LsuError, Unit] =
     for {
       alias <- EitherT.fromEither[FutureUnlessShutdown](
         syncPersistentStateManager
           .aliasForSynchronizerId(manualLsuRequest.lsid)
-          .toRight(s"Unable to find alias for synchronizer ${manualLsuRequest.lsid}")
+          .toRight(
+            LsuError.MalformedRequest
+              .Error(s"Unable to find alias for synchronizer ${manualLsuRequest.lsid}")
+          )
       )
 
       _ <- ManualLogicalSynchronizerUpgrade.upgrade(
@@ -1510,6 +1649,7 @@ private[sync] class SynchronizerConnectionsManager(
             alias,
             keepRetrying = true,
             connectSynchronizer = ConnectSynchronizer.Connect,
+            onboardingTransactions = None,
           )(tc),
         disconnectSynchronizer = disconnectSynchronizer(alias)(_),
         metrics,
@@ -1552,15 +1692,17 @@ private[sync] class SynchronizerConnectionsManager(
   }
 
   override def onClosed(): Unit = {
-    val instances = (connectQueue +: connectedSynchronizers.snapshot.values.toSeq) ++ Seq(
+
+    val queues = Seq(connectQueue, pureHandshakesQueue)
+
+    val instances = queues ++ connectedSynchronizers.snapshot.values.toSeq ++ Seq(
       connectedSynchronizerHealth,
       ephemeralHealth,
       sequencerClientHealth,
       acsCommitmentProcessorHealth,
-      lsuHandshakesQueue,
     )
 
-    LifeCycle.close(instances*)(logger)
+    LifeCycle.close(instances)(logger)
   }
 
   override def toString: String = s"SynchronizerConnectionsManager($participantId)"
@@ -1590,7 +1732,7 @@ private[sync] class SynchronizerConnectionsManager(
           for {
             topology <- getSnapshot(synchronizerAlias, synchronizerId)
             // Find the attributes for the party if one is passed in, and if we can find it in topology
-            attributesO <- request.party.parFlatTraverse(party =>
+            attributesO <- request.party.flatTraverse(party =>
               topology
                 .hostedOn(
                   Set(party),
@@ -1624,6 +1766,12 @@ private[sync] class SynchronizerConnectionsManager(
 
 object SynchronizerConnectionsManager {
   type ConnectionListener = Traced[SynchronizerId] => Unit
+
+  /** A handle to remove/unsubscribe the synchronizer connection listener
+    */
+  class ConnectionListenerHandle(closeAction: () => Unit) extends AutoCloseable {
+    override def close(): Unit = closeAction()
+  }
 
   sealed trait ConnectSynchronizer extends Product with Serializable {
 
@@ -1743,7 +1891,7 @@ object SynchronizerConnectionsManager {
     def performLsu(
         psid: PhysicalSynchronizerId,
         successor: SynchronizerSuccessor,
-    )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit]
+    )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, LsuError, Unit]
   }
 
   final case class NoAutomaticLsuHandler(logger: TracedLogger)(implicit ec: ExecutionContext)
@@ -1751,13 +1899,13 @@ object SynchronizerConnectionsManager {
     override def performLsu(
         psid: PhysicalSynchronizerId,
         successor: SynchronizerSuccessor,
-    )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = {
+    )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, LsuError, Unit] = {
       logger.info(
         """Automatic logical synchronizer upgrade is disabled, so the upgrade will not be performed automatically.
           |Adjust `<node>.parameters.automatically-perform-lsu = true` and restart the node
           |or consult the documentation to perform manual upgrade.""".stripMargin
       )
-      EitherT.pure[FutureUnlessShutdown, String](())
+      EitherT.pure[FutureUnlessShutdown, LsuError](())
     }
   }
 }

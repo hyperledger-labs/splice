@@ -36,7 +36,6 @@ import com.google.protobuf.ByteString
 import com.google.rpc.Code
 import io.scalaland.chimney.Transformer
 import io.scalaland.chimney.dsl.*
-import ujson.StringRenderer
 import ujson.circe.CirceJson
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -98,9 +97,11 @@ class ProtocolConverters(
   ], com.google.protobuf.timestamp.Timestamp] =
     _.getOrElse(com.google.protobuf.timestamp.Timestamp.defaultInstance)
 
+  // We are doing safe conversion from Circe to ujson on input
   implicit def fromCirce(js: io.circe.Json): ujson.Value =
-    ujson.read(CirceJson.transform(js, StringRenderer()).toString)
+    CirceToUJson.transform(js)
 
+  // Responses are converted using default mechanism -> no need for extra safety here
   implicit def toCirce(js: ujson.Value): io.circe.Json = CirceJson(js)
 
   object Command {
@@ -155,7 +156,7 @@ class ProtocolConverters(
             contractKey <-
               schemaProcessors.keyArgFromJsonToProto(
                 template = cmd.templateId.withDecodingPackageId,
-                protoArgs = cmd.contractKey,
+                jsonArgsValue = cmd.contractKey,
               )
           } yield lapi.commands.Command.Command.ExerciseByKey(
             lapi.commands.ExerciseByKeyCommand(
@@ -443,6 +444,13 @@ class ProtocolConverters(
               .map(Hash.assertFromByteArray)
               .map(_.toHexString),
           )
+          .withFieldComputed(
+            _.transactionHash,
+            _.transactionHash
+              .map(_.toByteArray)
+              .map(Hash.assertFromByteArray)
+              .map(_.toHexString),
+          )
           .transform
       }
 
@@ -456,6 +464,10 @@ class ProtocolConverters(
       .withFieldComputed(
         _.externalTransactionHash,
         _.externalTransactionHash.map(ByteString.fromHex),
+      )
+      .withFieldComputed(
+        _.transactionHash,
+        _.transactionHash.map(ByteString.fromHex),
       )
       .transform
   }
@@ -1537,18 +1549,48 @@ class ProtocolConverters(
         .map(Some(_))
         .map(lapi.contract_service.GetContractResponse(_))
   }
+
+  object GetJwksResponse
+      extends ProtocolConverter[
+        lapi.jose_service.GetJwksResponse,
+        JsJoseService.GetJwksResponse,
+      ] {
+    def toJson(response: lapi.jose_service.GetJwksResponse)(implicit
+        traceContext: TraceContext
+    ): Future[JsJoseService.GetJwksResponse] =
+      response.keys.traverse(io.circe.parser.parse(_)) match {
+        case Left(err) => jsFail(s"Invalid JWK: could not parse JSON: $err")
+        case Right(keys) => Future.successful(JsJoseService.GetJwksResponse(keys.toList))
+      }
+
+    def fromJson(response: JsJoseService.GetJwksResponse)(implicit
+        traceContext: TraceContext
+    ): Future[lapi.jose_service.GetJwksResponse] =
+      Future(
+        lapi.jose_service.GetJwksResponse(
+          response.keys.map(jwk => CirceToUJson.transform(jwk).toString).toSeq
+        )
+      )
+  }
 }
 
 object IdentifierConverter extends ConversionErrorSupport {
-  def fromJson(jsIdentifier: String): lapi.value.Identifier =
+  private[v2] val expectedFormat = "<package>:<moduleName>:<entityName>"
+
+  def fromJsonEither(jsIdentifier: String): Either[String, lapi.value.Identifier] =
     jsIdentifier.split(":").toSeq match {
       case Seq(packageId, moduleName, entityName) =>
-        lapi.value.Identifier(
-          packageId = packageId,
-          moduleName = moduleName,
-          entityName = entityName,
+        Right(
+          lapi.value.Identifier(
+            packageId = packageId,
+            moduleName = moduleName,
+            entityName = entityName,
+          )
         )
-      case _ => invalidArgument(jsIdentifier, "<package>:<moduleName>:<entityName>")
+      case _ =>
+        Left(
+          s"Invalid identifier format ($jsIdentifier) not matching the expected format ($expectedFormat)"
+        )
     }
 
   def toJson(lapiIdentifier: lapi.value.Identifier): String =

@@ -98,7 +98,6 @@ class SequencerPruningTrigger(
       // just wallclock so doesn't work properly with backup/restore and similar stuff.
       // Therefore we just use the last ingested update as an approximation of the latest time.
       // TODO(DACH-NY/cn-test-failures#8065) Remove once Canton transfers safe pruning timestamps on LSU.
-      status <- sequencerAdminConnection.getSequencerPruningStatus()
       highestRecordTimeO <- scanConnection
         .getMigrationInfo(migrationId)
         .map(_.flatMap(_.recordTimeRange.get(synchronizerId.logical).map(_.max)))
@@ -111,7 +110,6 @@ class SequencerPruningTrigger(
             dsoRulesActiveSequencerConfig = rulesAndState.lookupActiveSequencerIdConfigFor(
               rulesAndState.dsoRules.domain,
               clock.now.toInstant,
-              migrationId,
             )
             _ <- dsoRulesActiveSequencerConfig.fold {
               logger.debug(

@@ -17,6 +17,7 @@ import com.digitalasset.canton.crypto.SyncCryptoError.KeyNotAvailable
 import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoApi, SyncCryptoClient}
 import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime, SynchronizerSuccessor}
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.client.SequencedEventValidator.TopologyTimestampVerificationError
@@ -42,6 +43,7 @@ import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.signalling.{EventSignaller, NotificationSignal}
 import com.digitalasset.canton.util.{BatchN, EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import io.opentelemetry.api.trace.Tracer
@@ -106,7 +108,7 @@ class SequencerReader(
     config: SequencerReaderConfig,
     store: SequencerStore,
     syncCryptoApi: SyncCryptoClient[SyncCryptoApi],
-    eventSignaller: EventSignaller,
+    eventSignaller: EventSignaller[SequencerMemberId, Unit],
     topologyClientMember: Member,
     lsuSequencingBounds: Option[LsuSequencingBounds],
     metrics: SequencerMetrics,
@@ -344,9 +346,9 @@ class SequencerReader(
         traceContext: TraceContext
     ): Source[(PreviousEventTimestamp, Sequenced[IdOrPayload]), NotUsed] =
       eventSignaller
-        .readSignalsForMember(member, registeredMember.memberId)
+        .readSignals(registeredMember.memberId, member.toString)
         // always trigger a read upon subscription
-        .prepend(Source.single(ReadSignal))
+        .prepend(Source.single(NotificationSignal.unit))
         .via(
           FetchLatestEventsFlow[
             (PreviousEventTimestamp, Sequenced[IdOrPayload]),
@@ -506,7 +508,7 @@ class SequencerReader(
       import snapshotWithEvent.{previousTimestamp, topologyClientTimestampBefore, unvalidatedEvent}
 
       def validationSuccess(
-          eventF: FutureUnlessShutdown[SequencedEvent[ClosedEnvelope]],
+          eventF: FutureUnlessShutdown[DecompressedSequencedEvent[ClosedEnvelope]],
           signingSnapshot: Option[SyncCryptoApi],
       ): FutureUnlessShutdown[UnsignedEventData] = {
         val topologyClientTimestampAfter =
@@ -680,7 +682,6 @@ class SequencerReader(
           .injectKillSwitch(identity)
           .via(fetchPayloadsForEventsBatch())
 
-      // TODO(#23857): With validated events here we will persist their validation status for re-use by other subscriptions.
       eventsSource
         .viaMat(KillSwitches.single) { case (killSwitch, _) =>
           (killSwitch, FutureUnlessShutdown.pure(Done))
@@ -732,7 +733,7 @@ class SequencerReader(
       }
 
     private def signEvent(
-        event: SequencedEvent[ClosedEnvelope],
+        event: DecompressedSequencedEvent[ClosedEnvelope],
         topologySnapshot: SyncCryptoApi,
     )(implicit traceContext: TraceContext): EitherT[
       FutureUnlessShutdown,
@@ -788,7 +789,7 @@ class SequencerReader(
         ], // None for until the first topology event, otherwise contains the latest topology event timestamp
     )(implicit
         traceContext: TraceContext
-    ): FutureUnlessShutdown[SequencedEvent[ClosedEnvelope]] = {
+    ): FutureUnlessShutdown[DecompressedSequencedEvent[ClosedEnvelope]] = {
       val timestamp = event.timestamp
       val sequencedEventF = event.event match {
         case DeliverStoreEvent(
@@ -840,7 +841,7 @@ class SequencerReader(
               case (groupRecipient, groupMembers) if groupMembers.contains(member) => groupRecipient
             }.toSet
             val filteredBatch = Batch.filterClosedEnvelopesFor(batch, member, memberGroupRecipients)
-            Deliver.create[ClosedEnvelope](
+            Deliver.create[Batch[ClosedEnvelope]](
               previousTimestamp,
               timestamp,
               psid,
@@ -860,7 +861,7 @@ class SequencerReader(
               trafficReceiptO,
             ) =>
           FutureUnlessShutdown.pure(
-            Deliver.create[ClosedUncompressedEnvelope](
+            Deliver.create[Batch[ClosedUncompressedEnvelope]](
               previousTimestamp,
               timestamp,
               psid,
@@ -903,7 +904,7 @@ class SequencerReader(
           logger.info(
             "Delivering an empty event instead of the original, because it was sequenced at or after the upgrade time."
           )
-          Deliver.create[ClosedEnvelope](
+          Deliver.create[Batch[ClosedEnvelope]](
             previousTimestamp,
             timestamp,
             psid,
@@ -988,7 +989,7 @@ object SequencerReader {
   }
 
   private[SequencerReader] final case class UnsignedEventData(
-      event: SequencedEvent[ClosedEnvelope],
+      event: DecompressedSequencedEvent[ClosedEnvelope],
       signingSnapshotO: Option[SyncCryptoApi],
       previousTopologyClientTimestamp: Option[CantonTimestamp],
       latestTopologyClientTimestamp: Option[CantonTimestamp],

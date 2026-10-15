@@ -1,7 +1,7 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-{{- $validatorAppLabel := "validator-app" }}
+{{- $validatorAppLabel := .Values.appLabels.validatorApp | default "validator-app" }}
 {{- $requiresMigrationPvc := and (not .Values.svValidator) (.Values.migration.attachPvc) }}
 apiVersion: apps/v1
 kind: Deployment
@@ -357,7 +357,7 @@ spec:
         - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT
           value: {{ .Values.auth.jwks.readTimeout | quote }}
         {{ end }}
-        {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "validator" "fixedTokens" (.Values.cluster).fixedTokens "secretOverrides" (.Values.auth).secretOverrides) | indent 8}}
+        {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "validator" "fixedTokens" (.Values.cluster).fixedTokens "secretOverrides" (.Values.auth).secretOverrides "secretName" (.Values.auth).secretName) | indent 8}}
         {{- end }}
         ports:
         - containerPort: 5003

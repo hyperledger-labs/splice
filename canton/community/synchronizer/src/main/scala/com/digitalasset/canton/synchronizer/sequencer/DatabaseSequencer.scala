@@ -13,7 +13,13 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeL
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.error.CantonBaseError
-import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
+import com.digitalasset.canton.lifecycle.{
+  FlagCloseable,
+  FutureUnlessShutdown,
+  HasCloseContext,
+  LifeCycle,
+}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.metrics.MetricsHelper
 import com.digitalasset.canton.resource.{DbExceptionRetryPolicy, Storage}
@@ -67,6 +73,7 @@ import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.util.FutureUtil.doNotAwait
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.retry.Pause
+import com.digitalasset.canton.util.signalling.{EventSignaller, LocalEventSignaller}
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
@@ -112,7 +119,8 @@ object DatabaseSequencer {
       config,
       initialState,
       TotalNodeCountValues.SingleSequencerTotalNodeCount,
-      new LocalSequencerStateEventSignaller(
+      new LocalEventSignaller[SequencerMemberId, Unit](
+        "member",
         timeouts,
         loggerFactory,
       ),
@@ -142,7 +150,7 @@ class DatabaseSequencer(
     config: DatabaseSequencerConfig,
     initialState: Option[SequencerInitialState],
     totalNodeCount: PositiveInt,
-    eventSignaller: EventSignaller,
+    eventSignaller: EventSignaller[SequencerMemberId, Unit],
     keepAliveInterval: Option[NonNegativeFiniteDuration],
     onlineSequencerCheckConfig: Option[OnlineSequencerCheckConfig],
     override protected val timeouts: ProcessingTimeout,
@@ -169,7 +177,8 @@ class DatabaseSequencer(
       lsuSequencingBounds,
       disableSubmissionChecksForTesting,
     )
-    with FlagCloseable {
+    with FlagCloseable
+    with HasCloseContext {
 
   private val psid = cryptoApi.psid
   private val protocolVersion: ProtocolVersion = psid.protocolVersion
@@ -241,7 +250,11 @@ class DatabaseSequencer(
       offlineCutoffDuration: NonNegativeFiniteDuration,
   ): Unit = {
     def schedule(): Unit = {
-      val _ = clock.scheduleAfter(_ => markOffline(), checkInterval.unwrap)
+      val _ = clock.scheduleAfterCancelledOnShutdown(
+        _ => markOffline(),
+        s"${getClass.getName}: mark lagging sequencers offline",
+        checkInterval.unwrap,
+      )
     }
 
     def markOfflineF()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {

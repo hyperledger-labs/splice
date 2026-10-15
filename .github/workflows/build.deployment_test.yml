@@ -30,19 +30,19 @@ jobs:
           with_sbt: false
 
       - name: Helm tests
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: make cluster/helm/test
 
       - name: Pulumi tests
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd_retry_count: 5 # Retry in case of dependency download errors
           cmd: make cluster/pulumi/test
           cmd_before_retry: git reset --hard # revert changes before retrying, because make cluster/pulumi/test actually "fixes" the test pulumi files in-place
       
       - name: Check that pinned docker images are multi-arch
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: ./scripts/check-multiarch-images.py
 

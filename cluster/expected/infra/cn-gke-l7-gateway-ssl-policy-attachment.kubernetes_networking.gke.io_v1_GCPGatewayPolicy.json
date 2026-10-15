@@ -1,0 +1,26 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "networking.gke.io/v1",
+    "kind": "GCPGatewayPolicy",
+    "metadata": {
+      "name": "cn-gke-l7-gateway-ssl-policy-attachment",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "default": {
+        "sslPolicy": "cn-gke-l7-gateway-mock-ssl-policy"
+      },
+      "targetRef": {
+        "group": "gateway.networking.k8s.io",
+        "kind": "Gateway",
+        "name": "cn-gke-l7-gateway",
+        "namespace": "cluster-ingress"
+      }
+    }
+  },
+  "name": "cn-gke-l7-gateway-ssl-policy-attachment",
+  "provider": "",
+  "type": "kubernetes:networking.gke.io/v1:GCPGatewayPolicy"
+}

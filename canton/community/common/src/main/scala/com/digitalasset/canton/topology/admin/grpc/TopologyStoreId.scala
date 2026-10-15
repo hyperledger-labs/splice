@@ -6,6 +6,7 @@ package com.digitalasset.canton.topology.admin.grpc
 import cats.syntax.bifunctor.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.CantonRequireTypes.String185
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.admin.v30 as adminProto
@@ -16,13 +17,50 @@ import scala.language.implicitConversions
 sealed trait TopologyStoreId extends Product with Serializable {
   def toProtoV30: adminProto.StoreId
 
+  /** Converts the admin API `grpc.TopologyStoreId` into the internal
+    * `topology.store.TopologyStoreId`. Logical synchronizer ids are resolved to the currently
+    * active physical synchronizer via the provided `PsidLookup`. If no active synchronizer config
+    * can be found, returns the logical synchronizer as `Left`.
+    *
+    * All other store ids are transformed trivially.
+    */
   private[canton] def toInternal(
       lookup: PsidLookup
   ): Either[SynchronizerId, store.TopologyStoreId]
 }
 
 private[canton] trait PsidLookup {
+
+  /** Return the active psid corresponding to the given id, if any. Since at most one synchronizer
+    * connection per lsid can be active, this is well-defined.
+    */
   def activePsidFor(synchronizerId: SynchronizerId): Option[PhysicalSynchronizerId]
+}
+
+object PsidLookup {
+  def empty: PsidLookup = PsidLookupAt.empty
+}
+
+private[canton] trait PsidLookupAt extends PsidLookup {
+  def activePsidAt(
+      synchronizerId: SynchronizerId,
+      timestamp: CantonTimestamp,
+  ): Either[String, PhysicalSynchronizerId]
+}
+
+object PsidLookupAt {
+  def empty: PsidLookupAt = Empty
+  private object Empty extends PsidLookupAt {
+    override def activePsidFor(synchronizerId: SynchronizerId): Option[PhysicalSynchronizerId] =
+      None
+
+    override def activePsidAt(
+        synchronizerId: SynchronizerId,
+        timestamp: CantonTimestamp,
+    ): Either[String, PhysicalSynchronizerId] = Left(
+      s"No active synchronizer found for $synchronizerId at $timestamp"
+    )
+  }
 }
 
 object TopologyStoreId {

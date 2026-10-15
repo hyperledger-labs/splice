@@ -11,14 +11,7 @@ import { configureSequencerWhitelist } from './sequencer';
 export function installAppWhitelisting(
   namespace: k8s.core.v1.Namespace
 ): pulumi.Output<pulumi.Resource[]>[] {
-  if (infraConfig.istio.enableGeneralIpWhitelist) {
-    return [];
-  } else {
-    return [
-      ...configureScanAndSvAppWhitelist(namespace),
-      ...configureSequencerWhitelist(namespace),
-    ];
-  }
+  return [...configureScanAndSvAppWhitelist(namespace), ...configureSequencerWhitelist(namespace)];
 }
 
 export function configureIstioGatewayPolicies(

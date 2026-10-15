@@ -33,8 +33,8 @@ import com.digitalasset.canton.util.ReassignmentTag.Target
 final case class UnassignmentValidationResult(
     unassignmentData: UnassignmentData,
     override val rootHash: RootHash,
-    hostedConfirmingReassigningParties: Set[LfPartyId],
-    // Defined iff the participant is reassigning
+    hostedConfirmingParties: Set[LfPartyId],
+    isReassigningParticipant: Boolean,
     assignmentExclusivity: Option[Target[CantonTimestamp]],
     commonValidationResult: UnassignmentValidationResult.CommonValidationResult,
     reassigningParticipantValidationResult: UnassignmentValidationResult.ReassigningParticipantValidationResult,
@@ -48,31 +48,13 @@ final case class UnassignmentValidationResult(
 
   override def reassignmentId: ReassignmentId = unassignmentData.reassignmentId
 
-  def isReassigningParticipant: Boolean = assignmentExclusivity.isDefined
-
   override def activenessResultIsSuccessful: Boolean =
     commonValidationResult.activenessResult.isSuccessful
 
   def contracts: ContractsReassignmentBatch = unassignmentData.contractsBatch
 
-  def commitSet: CommitSet = CommitSet(
-    archivals = Map.empty,
-    creations = Map.empty,
-    assignments = Map.empty,
-    unassignments = (contracts.contractIdCounters
-      .map { case (contractId, reassignmentCounter) =>
-        (
-          contractId,
-          CommitSet.UnassignmentCommit(
-            targetSynchronizer.map(_.logical),
-            stakeholders,
-            reassignmentCounter,
-          ),
-        )
-      })
-      .toMap
-      .forgetNE,
-  )
+  def commitSet: CommitSet =
+    CommitSet.createForUnassignment(contracts, targetSynchronizer, stakeholders)
 
   def createReassignmentAccepted(
       participantId: ParticipantId,
@@ -124,6 +106,7 @@ final case class UnassignmentValidationResult(
           recordTime = recordTime,
           synchronizerId = sourceSynchronizer.unwrap.logical,
           acsChangeFactory = acsChangeFactory,
+          traceContext = traceContext,
         )
   }
 }
@@ -147,18 +130,15 @@ object UnassignmentValidationResult {
   }
 
   final case class ReassigningParticipantValidationResult(
-      errors: Seq[ReassignmentValidationError]
+      contractAuthenticationResultF: EitherT[
+        FutureUnlessShutdown,
+        ReassignmentValidationError,
+        Unit,
+      ],
+      errors: Seq[ReassignmentValidationError],
   ) extends ReassignmentValidationResult.ReassigningParticipantValidationResult {
-    def isTargetTsValidatable: Boolean = !errors.exists {
-      case UnassignmentValidationError.TargetTimestampTooFarInFuture => true
-      case _ => false
-    }
-  }
-
-  object ReassigningParticipantValidationResult {
-    val TargetTimestampTooFarInFuture: ReassigningParticipantValidationResult =
-      ReassigningParticipantValidationResult(
-        Seq(UnassignmentValidationError.TargetTimestampTooFarInFuture)
-      )
+    // These validations read the target topology at this participant's localTargetTs, which may not
+    // yet reflect recent topology changes, so we abstain on any failure.
+    override def isAbstain: Boolean = true
   }
 }

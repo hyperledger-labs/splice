@@ -14,7 +14,7 @@ import type {
   VoteRequestOutcome,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import type { DsoInfo } from '@canton-network/splice-common-frontend';
-import { type Contract, dateTimeFormatISO } from '@canton-network/splice-common-frontend-utils';
+import { type Contract } from '@canton-network/splice-common-frontend-utils';
 import dayjs, { type Dayjs } from 'dayjs';
 import type {
   AmuletRulesConfigProposal,
@@ -37,6 +37,10 @@ import type {
 } from '../utils/types';
 import { buildAmuletConfigChanges } from './buildAmuletConfigChanges';
 import { buildDsoConfigChanges } from './buildDsoConfigChanges';
+import {
+  switchOverEntriesToConfigValue,
+  type SwitchOverEntry,
+} from '../components/forms/formValidators';
 import { AmuletRules_SetConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
 import { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
 import { Optional } from '@daml/types';
@@ -168,11 +172,9 @@ export function buildVoteHistoryData(
             getGovernanceActionTag(vr.request.action) as SupportedActionTag
           ],
         description: vr.request.reason.body,
-        votingThresholdDeadline: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
+        votingThresholdDeadline: vr.request.voteBefore,
         voteTakesEffect:
-          (vr.outcome.tag === 'VRO_Accepted' &&
-            dayjs(vr.outcome.value.effectiveAt).format(dateTimeFormatISO)) ||
-          dayjs(vr.completedAt).format(dateTimeFormatISO),
+          (vr.outcome.tag === 'VRO_Accepted' && vr.outcome.value.effectiveAt) || vr.completedAt,
         yourVote: computeYourVote(votes, svPartyId),
         status: getVoteResultStatus(vr.outcome),
         voteStats: computeVoteStats(votes),
@@ -370,6 +372,24 @@ export function configFormDataToConfigChanges(
     : changes;
 }
 
+/**
+ * Mirror the switch-over map editor's entries into the config field of the given
+ * name, so switch-over times participate in {@link configFormDataToConfigChanges}
+ * like any other config field (change detection, review summary, reconstruction).
+ * The entries slice remains the editable source of truth; this derives the flat
+ * config value from it at read time.
+ */
+export function withSwitchOverConfigValue(
+  config: ConfigFormData,
+  fieldName: string,
+  entries: SwitchOverEntry[]
+): ConfigFormData {
+  return {
+    ...config,
+    [fieldName]: { fieldName, value: switchOverEntriesToConfigValue(entries) },
+  };
+}
+
 export function formatBasisPoints(value: string): string {
   if (!value) return '';
   const padded = value.padStart(5, '0');
@@ -409,7 +429,7 @@ export function buildPendingConfigFields(
         pendingValue: change.newValue as string,
         proposalCid: proposal.contractId,
         effectiveDate: proposal.payload.targetEffectiveAt
-          ? dayjs(proposal.payload.targetEffectiveAt).format(dateTimeFormatISO)
+          ? proposal.payload.targetEffectiveAt
           : 'Threshold',
       }));
     });
@@ -438,7 +458,7 @@ export function buildAmuletRulesPendingConfigFields(
         pendingValue: change.newValue as string,
         proposalCid: proposal.contractId,
         effectiveDate: proposal.payload.targetEffectiveAt
-          ? dayjs(proposal.payload.targetEffectiveAt).format(dateTimeFormatISO)
+          ? proposal.payload.targetEffectiveAt
           : 'Threshold',
       }));
     });

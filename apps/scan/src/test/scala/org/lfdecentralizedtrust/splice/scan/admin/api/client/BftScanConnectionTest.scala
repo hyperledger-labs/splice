@@ -1,10 +1,12 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import com.daml.ledger.api.v2.{CommandsOuterClass, TraceContextOuterClass}
 import com.daml.ledger.javaapi.data as javaApi
-import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.daml.metrics.api.testing.{InMemoryMetricsFactory, MetricValues}
+import com.daml.metrics.api.testing.MetricValues
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
@@ -33,7 +35,11 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  BulkObjectsAvailability,
+  BulkStorageBucket,
+  DamlValueEncoding,
   ErrorResponse,
+  GetBulkObjectsProgressResponse,
   GetRewardAccountingActivityTotalsResponse,
   GetRewardAccountingBatchResponse,
   GetRewardAccountingRootHashResponse,
@@ -46,13 +52,18 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   RewardAccountingRootHashUndetermined,
 }
 
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.{
+  DataAvailabilityResponse,
+  NoScanWillHaveData,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.Bft
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
+  BulkStorageObjects,
   DomainScans,
   DsoScan,
 }
-import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
-import org.lfdecentralizedtrust.splice.metrics.ScanConnectionMetrics
+import org.lfdecentralizedtrust.splice.scan.config.{ScanAppClientConfig, ScanStorageConfig}
+import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
@@ -70,7 +81,6 @@ import org.slf4j.event.Level
 
 import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicInteger
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 
 // mock verification triggers this
@@ -350,6 +360,15 @@ class BftScanConnectionTest
     when(mock.getRewardAccountingBatch(round, hash)).thenReturn(Future.failed(failure))
 
   "BftScanConnection" should {
+
+    "map bulk progress answers to data availability" in {
+      def availability(answer: BulkObjectsAvailability) =
+        BftScanConnection.dataAvailability(GetBulkObjectsProgressResponse(answer))
+
+      availability(BulkObjectsAvailability.Available) shouldBe DataAvailabilityResponse.Available
+      availability(BulkObjectsAvailability.Processing) shouldBe DataAvailabilityResponse.NotYet
+      availability(BulkObjectsAvailability.Backfilling) shouldBe DataAvailabilityResponse.Never
+    }
 
     "return the agreed response when all agree" in {
       val connections = getMockedConnections(n = 4)
@@ -1030,258 +1049,85 @@ class BftScanConnectionTest
     }
   }
 
-  "When targetSuccess is 1, BftScanConnection.executeCall" should {
+  "BftScanConnection for bulk storage listing" should {
+    val availableAt = ctime(2)
+    val page = BulkStorageObjects.UpdateObjectsPage(
+      Seq(ObjectKeyAndChecksum("s/updates_compact_json_0.zstd", "checksum-0")),
+      None,
+    )
 
-    val call: SingleScanConnection => Future[PartyId] = _.getDsoPartyId()
-
-    "not let a single error response decide the call when n == 2" in {
-      val connections = getMockedConnections(n = 2)
-      makeMockFail(connections.head, tcpFailure)
-      val delayedSuccess =
-        org.apache.pekko.pattern.after(200.millis, actorSystem.scheduler)(
-          Future.successful(partyIdA)
+    def makeMockReturnCommittedProgress(
+        mock: SingleScanConnection,
+        availability: BulkObjectsAvailability,
+    ): Unit =
+      when(
+        mock.getBulkObjectsProgress(eqTo(availableAt), eqTo(BulkStorageBucket.Committed))(
+          any[ExecutionContext],
+          any[TraceContext],
         )
-      connections.tail.foreach(c => when(c.getDsoPartyId()).thenReturn(delayedSuccess))
+      ).thenReturn(Future.successful(GetBulkObjectsProgressResponse(availability)))
 
-      for {
-        (result, _) <- BftScanConnection.executeCall(call, connections, nTargetSuccess = 1, logger)
-      } yield result should be(partyIdA)
+    def makeMockReturnUpdateObjects(mock: SingleScanConnection): Unit =
+      when(
+        mock.listBulkUpdateHistoryObjects(
+          any[CantonTimestamp],
+          any[CantonTimestamp],
+          any[Int],
+          any[Option[String]],
+          any[Option[DamlValueEncoding]],
+        )(any[ExecutionContext], any[TraceContext])
+      ).thenReturn(Future.successful(page))
+
+    def listUpdates(bft: BftScanConnection) =
+      bft.listBulkUpdateHistoryObjectsWithPeers(
+        ctime(1),
+        availableAt,
+        10,
+        availableAt,
+        ScanStorageConfig.Encoding.CompactJson,
+      )
+
+    "list from the scans that committed the objects up to the given time, and return them" in {
+      val connections = getMockedConnections(n = 4)
+      connections.foreach { connection =>
+        makeMockReturnCommittedProgress(connection, BulkObjectsAvailability.Available)
+        makeMockReturnUpdateObjects(connection)
+      }
+
+      listUpdates(getBft(connections)).map { case (listed, peers) =>
+        listed shouldBe page
+        peers should not be empty
+        connections.map(_.url) should contain allElementsOf peers
+      }
     }
 
-    // Unlike a transport exception, an http failure still counts towards the quorum.
-    // Although this behaviour is mostly a result of the tech-debt of the
-    // inability for the scan endpoints to specify what responses are expected (like 404)
-    "but let a single http failure decide the call when n == 2" in {
-      val connections = getMockedConnections(n = 2)
-      makeMockFail(connections.head, notFoundFailure)
-      val delayedSuccess =
-        org.apache.pekko.pattern.after(200.millis, actorSystem.scheduler)(
-          Future.successful(partyIdA)
+    "list from the founder alone when every other scan is backfilling" in {
+      val connections = getMockedConnections(n = 4)
+      makeMockReturnCommittedProgress(connections(0), BulkObjectsAvailability.Available)
+      makeMockReturnUpdateObjects(connections(0))
+      connections
+        .drop(1)
+        .foreach(
+          makeMockReturnCommittedProgress(_, BulkObjectsAvailability.Backfilling)
         )
-      connections.tail.foreach(c => when(c.getDsoPartyId()).thenReturn(delayedSuccess))
 
-      for {
-        failure <- BftScanConnection
-          .executeCall(call, connections, nTargetSuccess = 1, logger)
-          .failed
-      } yield failure should be(notFoundFailure)
-    }
-
-    "Forward the error response when n == 1" in {
-      val connections = getMockedConnections(n = 1)
-      connections.foreach(makeMockFail(_, tcpFailure))
-
-      for {
-        failure <- BftScanConnection
-          .executeCall(call, connections, nTargetSuccess = 1, logger)
-          .failed
-      } yield failure should be(tcpFailure)
-    }
-
-    "fall through to ConsensusNotReached when all scans throw  error response" in {
-      val connections = getMockedConnections(n = 3)
-      connections.foreach(makeMockFail(_, tcpFailure))
-
-      for {
-        failure <- BftScanConnection
-          .executeCall(call, connections, nTargetSuccess = 1, logger)
-          .failed
-      } yield failure shouldBe a[BftScanConnection.ConsensusNotReached]
-    }
-  }
-
-  "BftScanConnection.executeCall consensus outcome reporting" should {
-
-    val call: SingleScanConnection => Future[PartyId] = _.getDsoPartyId()
-
-    "record per-connection agreement and disagreement with the consensus result" in {
-      val metrics = new ScanConnectionMetrics(new InMemoryMetricsFactory)
-      implicit val mc: MetricsContext = MetricsContext("request" -> "getDsoPartyId")
-
-      val connections = getMockedConnections(n = 3)
-      connections.zipWithIndex.foreach { case (c, n) =>
-        when(c.url).thenReturn(Uri(scanUrl(n)))
-      }
-      makeMockReturn(connections(0), partyIdA)
-      makeMockReturn(connections(1), partyIdA)
-      makeMockReturn(connections(2), partyIdB)
-
-      def recordedLabels: Seq[(Map[String, String], Long)] =
-        metrics.bftPerConnectionConsensus.valuesWithContext.toSeq.map { case (context, value) =>
-          context.labels -> value
-        }
-
-      for {
-        (result, _) <- BftScanConnection.executeCall(
-          call,
-          connections,
-          nTargetSuccess = 2,
-          logger,
-          connectionMetrics = Some(metrics),
-        )
-      } yield {
-        result should be(partyIdA)
-        eventually() {
-          recordedLabels should contain allOf (
-            Map(
-              "request" -> "getDsoPartyId",
-              "scan_connection" -> "0.example.com",
-              "consensus" -> "agree",
-            ) -> 1L,
-            Map(
-              "request" -> "getDsoPartyId",
-              "scan_connection" -> "1.example.com",
-              "consensus" -> "agree",
-            ) -> 1L,
-            // The disagreeing connection returned a successful (2xx) response.
-            Map(
-              "request" -> "getDsoPartyId",
-              "scan_connection" -> "2.example.com",
-              "consensus" -> "disagree",
-              "success" -> "true",
-            ) -> 1L
-          )
-        }
+      listUpdates(getBft(connections)).map { case (listed, peers) =>
+        listed shouldBe page
+        peers shouldBe List(connections(0).url)
       }
     }
 
-    "record the http status and success=false for a disagreeing error response" in {
-      val metrics = new ScanConnectionMetrics(new InMemoryMetricsFactory)
-      implicit val mc: MetricsContext = MetricsContext("request" -> "getDsoPartyId")
+    "report that no scan will have the objects when every scan is backfilling" in {
+      val connections = getMockedConnections(n = 4)
+      connections.foreach(makeMockReturnCommittedProgress(_, BulkObjectsAvailability.Backfilling))
 
-      val connections = getMockedConnections(n = 3)
-      connections.zipWithIndex.foreach { case (c, n) =>
-        when(c.url).thenReturn(Uri(scanUrl(n)))
-      }
-      makeMockReturn(connections(0), partyIdA)
-      makeMockReturn(connections(1), partyIdA)
-      // notFoundFailure is an UnexpectedHttpJsonResponse(404), i.e. a non-successful response.
-      makeMockFail(connections(2), notFoundFailure)
-
-      for {
-        (result, _) <- BftScanConnection.executeCall(
-          call,
-          connections,
-          nTargetSuccess = 2,
-          logger,
-          connectionMetrics = Some(metrics),
-        )
-      } yield {
-        result should be(partyIdA)
-        eventually() {
-          metrics.bftPerConnectionConsensus.valuesWithContext.toSeq.map { case (context, value) =>
-            context.labels -> value
-          } should contain(
-            Map(
-              "request" -> "getDsoPartyId",
-              "scan_connection" -> "2.example.com",
-              "consensus" -> "disagree",
-              "success" -> "false",
-              "http_status" -> "404",
-            ) -> 1L
-          )
-        }
-      }
-    }
-
-    "record agreements for every connection when all return the same successful response" in {
-      val metrics = new ScanConnectionMetrics(new InMemoryMetricsFactory)
-      implicit val mc: MetricsContext = MetricsContext("request" -> "getDsoPartyId")
-
-      val connections = getMockedConnections(n = 3)
-      connections.zipWithIndex.foreach { case (c, n) =>
-        when(c.url).thenReturn(Uri(scanUrl(n)))
-        makeMockReturn(c, partyIdA)
-      }
-
-      for {
-        (result, _) <- BftScanConnection.executeCall(
-          call,
-          connections,
-          nTargetSuccess = 2,
-          logger,
-          connectionMetrics = Some(metrics),
-        )
-      } yield {
-        result should be(partyIdA)
-        eventually() {
-          // All three connections agreed; no disagreement (and thus no success/http_status
-          // labels) should be recorded.
-          metrics.bftPerConnectionConsensus.valuesWithContext.toSeq.map { case (context, value) =>
-            context.labels -> value
-          } should contain theSameElementsAs Seq(
-            Map(
-              "request" -> "getDsoPartyId",
-              "scan_connection" -> "0.example.com",
-              "consensus" -> "agree",
-            ) -> 1L,
-            Map(
-              "request" -> "getDsoPartyId",
-              "scan_connection" -> "1.example.com",
-              "consensus" -> "agree",
-            ) -> 1L,
-            Map(
-              "request" -> "getDsoPartyId",
-              "scan_connection" -> "2.example.com",
-              "consensus" -> "agree",
-            ) -> 1L,
-          )
-        }
-      }
+      listUpdates(getBft(connections)).failed.map(_ shouldBe a[NoScanWillHaveData])
     }
   }
 
   "BftScanConnection.getRewardAccountingRootHash" should {
 
-    // n=4 scans -> default BFT threshold requiredNumScanThreshold(4) = f+1 = 2.
-    "reaches consensus when f+1 scans agree on the same hash" in {
-      val round = 42L
-      val connections = getMockedConnections(n = 4)
-      makeMockReturnRootHashOk(connections(0), round, "aabb")
-      when(connections(1).getRewardAccountingRootHash(round))
-        .thenReturn(Future.failed(notFoundFailure), Future.successful(rootHashOk(round, "aabb")))
-      makeMockReturnRootHashUndetermined(connections(2), round)
-      makeMockFail(connections(3), notFoundFailure)
-      val bft = getBft(connections)
-
-      // With n=4, we query only two connections randomly, and even with
-      // retries a single call can fail to reach consensus.
-      def attempt(remaining: Int): Future[(GetRewardAccountingRootHashResponse, List[Uri])] =
-        bft.getRewardAccountingRootHashWithScanUris(round).flatMap {
-          case (ok: GetRewardAccountingRootHashResponse.members.RewardAccountingRootHashOk, uris) =>
-            Future.successful((ok, uris))
-          case _ if remaining > 1 => attempt(remaining - 1)
-          case other => Future.successful(other)
-        }
-
-      // A call that reaches consensus here always queries a third scan that
-      // disagrees (returns IgnoreResponse or fails), which BftScanConnection
-      // logs at WARN for the reward-read paths. Assert that WARN is produced
-      // and suppress it so it doesn't fail the `sbt checkErrors` log-scan gate.
-      loggerFactory
-        .assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
-          attempt(100).map { resp =>
-            inside(resp) {
-              case (
-                    GetRewardAccountingRootHashResponse.members.RewardAccountingRootHashOk(ok),
-                    uris,
-                  ) =>
-                ok.rootHash should be("aabb")
-                ok.roundNumber should be(round)
-                uris.size should be(2)
-            }
-          },
-          logs =>
-            logs.exists(log =>
-              log.level == Level.WARN && log.message.contains(
-                "disagreed with consensus"
-              )
-            ) should be(true),
-        )
-        .map(_ => succeed)
-    }
-
-    "returns Undetermined when no quorum agrees on a hash" in {
+    "propagates BadGateway when no quorum agrees on a hash" in {
       val round = 42L
       val connections = getMockedConnections(n = 4)
       connections.zipWithIndex.foreach { case (c, i) =>
@@ -1289,50 +1135,62 @@ class BftScanConnectionTest
       }
       val bft = getBft(connections)
 
-      for {
-        resp <- bft.getRewardAccountingRootHash(round)
-      } yield inside(resp) {
-        case _: GetRewardAccountingRootHashResponse.members.RewardAccountingRootHashUndetermined =>
-          succeed
-      }
+      // n=4, f=1, targetSuccess=2. All 4 WithData peers are sampled from cache;
+      // each returns a distinct hash → no consensus → BadGateway.
+      loggerFactory.assertLogs(
+        for {
+          failure <- bft.getRewardAccountingRootHash(round).failed
+        } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
+          code should be(StatusCodes.BadGateway)
+          message should include("Failed to reach consensus from 4 Scan nodes")
+        },
+        _.warningMessage should include("Consensus not reached."),
+      )
     }
 
-    "never treats agreement on CannotProvide as consensus" in {
+    "propagates BadGateway when every peer returns CannotProvide" in {
+      // All 4 peers opt out via CannotProvide → connectionsForConsensus is empty
+      // → enoughAvailableScans = false → BadGateway. The "not enough scans"
+      // message is logged at INFO (not WARN) for reward-accounting endpoints
+      // where this is expected during bootstrap.
       val round = 42L
       val connections = getMockedConnections(n = 4)
       connections.foreach(makeMockReturnRootHashCannotProvide(_, round))
       val bft = getBft(connections)
 
       for {
-        resp <- bft.getRewardAccountingRootHash(round)
-      } yield inside(resp) {
-        case _: GetRewardAccountingRootHashResponse.members.RewardAccountingRootHashUndetermined =>
-          succeed
+        failure <- bft.getRewardAccountingRootHash(round).failed
+      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
+        code should be(StatusCodes.BadGateway)
       }
     }
 
-    "never treats agreement on Undetermined as consensus" in {
+    "propagates BadGateway when every peer returns Undetermined" in {
+      // All 4 Undetermined → probe classifies each as Unavailable → all kept
+      // in `n` (n=4, f=1, targetSuccess=2) but none contributes a cached
+      // response → 0 WithData scans to sample → enoughAvailableScans=false
+      // → BadGateway. "Not enough scans" is logged at INFO for these endpoints.
       val round = 42L
       val connections = getMockedConnections(n = 4)
       connections.foreach(makeMockReturnRootHashUndetermined(_, round))
       val bft = getBft(connections)
 
       for {
-        resp <- bft.getRewardAccountingRootHash(round)
-      } yield inside(resp) {
-        case _: GetRewardAccountingRootHashResponse.members.RewardAccountingRootHashUndetermined =>
-          succeed
+        failure <- bft.getRewardAccountingRootHash(round).failed
+      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
+        code should be(StatusCodes.BadGateway)
       }
     }
 
-    "returns Undetermined when there are no peer scans" in {
+    "propagates BadGateway when there are no peer scans" in {
+      // Empty scan list → no probes → connectionsForConsensus empty → BadGateway.
+      // "Not enough scans" is logged at INFO for these endpoints.
       val bft = getBft(Seq.empty)
 
       for {
-        resp <- bft.getRewardAccountingRootHash(1L)
-      } yield inside(resp) {
-        case _: GetRewardAccountingRootHashResponse.members.RewardAccountingRootHashUndetermined =>
-          succeed
+        failure <- bft.getRewardAccountingRootHash(1L).failed
+      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
+        code should be(StatusCodes.BadGateway)
       }
     }
 
@@ -1357,57 +1215,104 @@ class BftScanConnectionTest
         )
         .map(_ => succeed)
     }
-  }
 
-  "BftScanConnection.getRewardAccountingActivityTotals" should {
-
-    // n=4 scans -> default BFT threshold requiredNumScanThreshold(4) = f+1 = 2.
-    "reaches consensus when f+1 scans agree on the same totals" in {
+    "returns the sole Ok when every other peer explicitly said it has no hash" in {
       val round = 42L
       val connections = getMockedConnections(n = 4)
-      makeMockReturnActivityTotalsOk(connections(0), round, 100L, 10L, 5L)
-      when(connections(1).getRewardAccountingActivityTotals(round))
-        .thenReturn(
-          Future.failed(notFoundFailure),
-          Future.successful(activityTotalsOk(round, 100L, 10L, 5L)),
-        )
-      makeMockReturnActivityTotalsUndetermined(connections(2), round)
-      makeMockFail(connections(3), notFoundFailure)
+      makeMockReturnRootHashOk(connections(0), round, "aabb")
+      makeMockReturnRootHashCannotProvide(connections(1), round)
+      makeMockReturnRootHashCannotProvide(connections(2), round)
+      makeMockReturnRootHashCannotProvide(connections(3), round)
       val bft = getBft(connections)
 
-      // With n=4, we query only two connections randomly, and even with
-      // retries a single call can fail to reach consensus.
-      def attempt(remaining: Int): Future[(GetRewardAccountingActivityTotalsResponse, List[Uri])] =
-        bft.getRewardAccountingActivityTotalsWithScanUris(round).flatMap {
-          case (
-                ok: GetRewardAccountingActivityTotalsResponse.members.RewardAccountingActivityTotalsOk,
-                uris,
-              ) =>
-            Future.successful((ok, uris))
-          case _ if remaining > 1 => attempt(remaining - 1)
-          case other => Future.successful(other)
-        }
+      for {
+        resp <- bft.getRewardAccountingRootHashWithScanUris(round)
+      } yield inside(resp) {
+        case (
+              GetRewardAccountingRootHashResponse.members.RewardAccountingRootHashOk(ok),
+              uris,
+            ) =>
+          ok.roundNumber should be(round)
+          ok.rootHash should be("aabb")
+          uris should have size 1
+      }
+    }
 
-      // A call that reaches consensus here always queries a third scan that
-      // disagrees (returns IgnoreResponse or fails), which BftScanConnection
-      // logs at WARN for the reward-read paths. Assert that WARN is produced
-      // and suppress it so it doesn't fail the `sbt checkErrors` log-scan gate.
+    "reaches consensus when two peers agree and the rest explicitly opt out" in {
+      val round = 42L
+      val connections = getMockedConnections(n = 4)
+      makeMockReturnRootHashOk(connections(0), round, "aabb")
+      makeMockReturnRootHashOk(connections(1), round, "aabb")
+      makeMockReturnRootHashCannotProvide(connections(2), round)
+      makeMockReturnRootHashUndetermined(connections(3), round)
+      val bft = getBft(connections)
+
+      for {
+        resp <- bft.getRewardAccountingRootHashWithScanUris(round)
+      } yield inside(resp) {
+        case (
+              GetRewardAccountingRootHashResponse.members.RewardAccountingRootHashOk(ok),
+              _,
+            ) =>
+          ok.rootHash should be("aabb")
+      }
+    }
+
+    "reaches consensus despite a peer whose probe fails" in {
+      // SV0 returns Ok (cached in phase 1). SV1's probe fails with a
+      // transport error → classified as Unavailable (counted in `n` but
+      // NOT re-queried in phase 2). SV2/SV3 opt out via CannotProvide →
+      // dropped from `n`. n = 1 + 1 = 2, f = 0, targetSuccess = 1: SV0's
+      // cached Ok is the only response required, no consensus WARN.
+      val round = 42L
+      val connections = getMockedConnections(n = 4)
+      makeMockReturnRootHashOk(connections(0), round, "aabb")
+      when(connections(1).getRewardAccountingRootHash(round))
+        .thenReturn(Future.failed(tcpFailure))
+      makeMockReturnRootHashCannotProvide(connections(2), round)
+      makeMockReturnRootHashCannotProvide(connections(3), round)
+      val bft = getBft(connections)
+
+      bft.getRewardAccountingRootHash(round).map { resp =>
+        inside(resp) {
+          case GetRewardAccountingRootHashResponse.members.RewardAccountingRootHashOk(ok) =>
+            ok.rootHash should be("aabb")
+        }
+      }
+    }
+
+    "propagates BadGateway when a lone Ok cannot meet BFT quorum against Undetermined peers" in {
+      // 1 Ok + 3 Undetermined → probe classifies as {WithData, Unavailable*3}.
+      // Unavailable peers count in `n`: n=4, f=1, targetSuccess=2. Only SV0
+      // (WithData) has a cached response → connections=[SV0] with
+      // requestsToDo=1. `enoughAvailableScans` sees 1 < 2 → BadGateway.
+      val round = 42L
+      val connections = getMockedConnections(n = 4)
+      makeMockReturnRootHashOk(connections(0), round, "aabb")
+      makeMockReturnRootHashUndetermined(connections(1), round)
+      makeMockReturnRootHashUndetermined(connections(2), round)
+      makeMockReturnRootHashUndetermined(connections(3), round)
+      val bft = getBft(connections)
+
+      for {
+        failure <- bft.getRewardAccountingRootHash(round).failed
+      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
+        code should be(StatusCodes.BadGateway)
+      }
+    }
+
+    "logs a WARN when Oks from the probed subset disagree on the payload" in {
+      val round = 42L
+      val connections = getMockedConnections(n = 4)
+      makeMockReturnRootHashOk(connections(0), round, "aabb")
+      makeMockReturnRootHashOk(connections(1), round, "ccdd")
+      makeMockReturnRootHashCannotProvide(connections(2), round)
+      makeMockReturnRootHashCannotProvide(connections(3), round)
+      val bft = getBft(connections)
+
       loggerFactory
         .assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
-          attempt(100).map { resp =>
-            inside(resp) {
-              case (
-                    GetRewardAccountingActivityTotalsResponse.members
-                      .RewardAccountingActivityTotalsOk(ok),
-                    uris,
-                  ) =>
-                ok.roundNumber should be(round)
-                ok.totalAppActivityWeight should be(100L)
-                ok.activePartiesCount should be(10L)
-                ok.activityRecordsCount should be(5L)
-                uris.size should be(2)
-            }
-          },
+          bft.getRewardAccountingRootHash(round),
           logs =>
             logs.exists(log =>
               log.level == Level.WARN && log.message.contains(
@@ -1418,7 +1323,57 @@ class BftScanConnectionTest
         .map(_ => succeed)
     }
 
-    "returns Undetermined when no quorum agrees on the totals" in {
+    "refuses a lone Ok when unreachable peers push BFT quorum above 1" in {
+      // Mirrors the integration test's dummy-SV scenario: some peers'
+      // connections fail to open (scanConnections.failed > 0), so they
+      // never get probed but still count in `n`. The lone Ok cannot
+      // meet the raised targetSuccess and BadGateway propagates.
+      // "Not enough scans" is logged at INFO for these endpoints.
+      val round = 42L
+      val connections = getMockedConnections(n = 2)
+      makeMockReturnRootHashOk(connections(0), round, "aabb")
+      makeMockReturnRootHashCannotProvide(connections(1), round)
+      val failedConnections = Map(
+        Uri("https://failed-a.example.com") -> new RuntimeException("Failed"),
+        Uri("https://failed-b.example.com") -> new RuntimeException("Failed"),
+        Uri("https://failed-c.example.com") -> new RuntimeException("Failed"),
+      )
+      val bft = getBft(connections, initialFailedConnections = failedConnections)
+
+      for { failure <- bft.getRewardAccountingRootHash(round).failed } yield inside(failure) {
+        case HttpErrorWithHttpCode(code, _) =>
+          code should be(StatusCodes.BadGateway)
+      }
+    }
+
+    "reaches consensus on a single Ok when other peers give a mix of CannotProvide, Undetermined, and probe failure" in {
+      // Exercises all three probe classifications in one call:
+      //   Ok → WithData, CannotProvide → WithoutData (dropped from n),
+      //   Undetermined → Unavailable, and a probe future failure →
+      //   Unavailable. Single Ok wins because n = 3 (1 withData + 2
+      //   unavailable) keeps f = 0.
+      val round = 42L
+      val connections = getMockedConnections(n = 4)
+      makeMockReturnRootHashOk(connections(0), round, "aabb")
+      makeMockReturnRootHashCannotProvide(connections(1), round)
+      makeMockReturnRootHashUndetermined(connections(2), round)
+      when(connections(3).getRewardAccountingRootHash(round))
+        .thenReturn(Future.failed(tcpFailure))
+      val bft = getBft(connections)
+
+      bft.getRewardAccountingRootHash(round).map { resp =>
+        inside(resp) {
+          case GetRewardAccountingRootHashResponse.members.RewardAccountingRootHashOk(ok) =>
+            ok.rootHash should be("aabb")
+        }
+      }
+    }
+
+  }
+
+  "BftScanConnection.getRewardAccountingActivityTotals" should {
+
+    "propagates BadGateway when no quorum agrees on the totals" in {
       val round = 42L
       val connections = getMockedConnections(n = 4)
       connections.zipWithIndex.foreach { case (c, i) =>
@@ -1426,50 +1381,61 @@ class BftScanConnectionTest
       }
       val bft = getBft(connections)
 
-      for {
-        resp <- bft.getRewardAccountingActivityTotals(round)
-      } yield inside(resp) {
-        case _: GetRewardAccountingActivityTotalsResponse.members.RewardAccountingActivityTotalsUndetermined =>
-          succeed
-      }
+      // n=4, f=1, targetSuccess=2. All 4 WithData peers are sampled from cache;
+      // each returns distinct totals → no consensus → BadGateway.
+      loggerFactory.assertLogs(
+        for {
+          failure <- bft.getRewardAccountingActivityTotals(round).failed
+        } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
+          code should be(StatusCodes.BadGateway)
+          message should include("Failed to reach consensus from 4 Scan nodes")
+        },
+        _.warningMessage should include("Consensus not reached."),
+      )
     }
 
-    "never treats agreement on CannotProvide as consensus" in {
+    "propagates BadGateway when every peer returns CannotProvide" in {
+      // All 4 peers opt out via CannotProvide → connectionsForConsensus is empty
+      // → enoughAvailableScans = false → BadGateway. "Not enough scans" is
+      // logged at INFO for these endpoints.
       val round = 42L
       val connections = getMockedConnections(n = 4)
       connections.foreach(makeMockReturnActivityTotalsCannotProvide(_, round))
       val bft = getBft(connections)
 
       for {
-        resp <- bft.getRewardAccountingActivityTotals(round)
-      } yield inside(resp) {
-        case _: GetRewardAccountingActivityTotalsResponse.members.RewardAccountingActivityTotalsUndetermined =>
-          succeed
+        failure <- bft.getRewardAccountingActivityTotals(round).failed
+      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
+        code should be(StatusCodes.BadGateway)
       }
     }
 
-    "never treats agreement on Undetermined as consensus" in {
+    "propagates BadGateway when every peer returns Undetermined" in {
+      // All 4 Undetermined → probe classifies each as Unavailable → all kept
+      // in `n` (n=4, f=1, targetSuccess=2) but none contributes a cached
+      // response → 0 WithData scans to sample → enoughAvailableScans=false
+      // → BadGateway. "Not enough scans" is logged at INFO for these endpoints.
       val round = 42L
       val connections = getMockedConnections(n = 4)
       connections.foreach(makeMockReturnActivityTotalsUndetermined(_, round))
       val bft = getBft(connections)
 
       for {
-        resp <- bft.getRewardAccountingActivityTotals(round)
-      } yield inside(resp) {
-        case _: GetRewardAccountingActivityTotalsResponse.members.RewardAccountingActivityTotalsUndetermined =>
-          succeed
+        failure <- bft.getRewardAccountingActivityTotals(round).failed
+      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
+        code should be(StatusCodes.BadGateway)
       }
     }
 
-    "returns Undetermined when there are no peer scans" in {
+    "propagates BadGateway when there are no peer scans" in {
+      // Empty scan list → no probes → connectionsForConsensus empty → BadGateway.
+      // "Not enough scans" is logged at INFO for these endpoints.
       val bft = getBft(Seq.empty)
 
       for {
-        resp <- bft.getRewardAccountingActivityTotals(1L)
-      } yield inside(resp) {
-        case _: GetRewardAccountingActivityTotalsResponse.members.RewardAccountingActivityTotalsUndetermined =>
-          succeed
+        failure <- bft.getRewardAccountingActivityTotals(1L).failed
+      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
+        code should be(StatusCodes.BadGateway)
       }
     }
 
@@ -1493,6 +1459,94 @@ class BftScanConnectionTest
             ) should be(true),
         )
         .map(_ => succeed)
+    }
+
+    "returns the sole Ok when every other peer explicitly said it has no data" in {
+      val round = 42L
+      val connections = getMockedConnections(n = 4)
+      makeMockReturnActivityTotalsOk(connections(0), round, 100L, 10L, 5L)
+      makeMockReturnActivityTotalsCannotProvide(connections(1), round)
+      makeMockReturnActivityTotalsCannotProvide(connections(2), round)
+      makeMockReturnActivityTotalsCannotProvide(connections(3), round)
+      val bft = getBft(connections)
+
+      for {
+        resp <- bft.getRewardAccountingActivityTotalsWithScanUris(round)
+      } yield inside(resp) {
+        case (
+              GetRewardAccountingActivityTotalsResponse.members
+                .RewardAccountingActivityTotalsOk(ok),
+              uris,
+            ) =>
+          ok.roundNumber should be(round)
+          ok.totalAppActivityWeight should be(100L)
+          uris should have size 1
+      }
+    }
+
+    "reaches consensus when two peers agree and the rest explicitly opt out" in {
+      val round = 42L
+      val connections = getMockedConnections(n = 4)
+      makeMockReturnActivityTotalsOk(connections(0), round, 100L, 10L, 5L)
+      makeMockReturnActivityTotalsOk(connections(1), round, 100L, 10L, 5L)
+      makeMockReturnActivityTotalsCannotProvide(connections(2), round)
+      makeMockReturnActivityTotalsUndetermined(connections(3), round)
+      val bft = getBft(connections)
+
+      for {
+        resp <- bft.getRewardAccountingActivityTotalsWithScanUris(round)
+      } yield inside(resp) {
+        case (
+              GetRewardAccountingActivityTotalsResponse.members
+                .RewardAccountingActivityTotalsOk(ok),
+              _,
+            ) =>
+          ok.totalAppActivityWeight should be(100L)
+      }
+    }
+
+    "reaches consensus despite a peer whose probe fails" in {
+      // SV0 returns Ok (cached in phase 1). SV1's probe fails with a
+      // transport error → classified as Unavailable (counted in `n` but
+      // NOT re-queried in phase 2). SV2/SV3 opt out via CannotProvide →
+      // dropped from `n`. n = 1 + 1 = 2, f = 0, targetSuccess = 1: SV0's
+      // cached Ok is the only response required, no consensus WARN.
+      val round = 42L
+      val connections = getMockedConnections(n = 4)
+      makeMockReturnActivityTotalsOk(connections(0), round, 100L, 10L, 5L)
+      when(connections(1).getRewardAccountingActivityTotals(round))
+        .thenReturn(Future.failed(tcpFailure))
+      makeMockReturnActivityTotalsCannotProvide(connections(2), round)
+      makeMockReturnActivityTotalsCannotProvide(connections(3), round)
+      val bft = getBft(connections)
+
+      bft.getRewardAccountingActivityTotals(round).map { resp =>
+        inside(resp) {
+          case GetRewardAccountingActivityTotalsResponse.members
+                .RewardAccountingActivityTotalsOk(ok) =>
+            ok.totalAppActivityWeight should be(100L)
+        }
+      }
+    }
+
+    "propagates BadGateway when a lone Ok cannot meet BFT quorum against Undetermined peers" in {
+      // 1 Ok + 3 Undetermined → probe classifies as {WithData, Unavailable*3}.
+      // Unavailable peers count in `n`: n=4, f=1, targetSuccess=2. Only SV0
+      // (WithData) has a cached response → connections=[SV0] with
+      // requestsToDo=1. `enoughAvailableScans` sees 1 < 2 → BadGateway.
+      val round = 42L
+      val connections = getMockedConnections(n = 4)
+      makeMockReturnActivityTotalsOk(connections(0), round, 100L, 10L, 5L)
+      makeMockReturnActivityTotalsUndetermined(connections(1), round)
+      makeMockReturnActivityTotalsUndetermined(connections(2), round)
+      makeMockReturnActivityTotalsUndetermined(connections(3), round)
+      val bft = getBft(connections)
+
+      for {
+        failure <- bft.getRewardAccountingActivityTotals(round).failed
+      } yield inside(failure) { case HttpErrorWithHttpCode(code, _) =>
+        code should be(StatusCodes.BadGateway)
+      }
     }
   }
 

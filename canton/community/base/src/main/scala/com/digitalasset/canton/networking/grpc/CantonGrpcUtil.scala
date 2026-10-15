@@ -20,6 +20,7 @@ import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.connection.v30.{ApiInfoServiceGrpc, GetApiInfoRequest}
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.GrpcErrorGroup
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasRunOnClosing, UnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
@@ -27,6 +28,8 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{DelayUtil, EitherTUtil}
+import com.digitalasset.canton.validation.ProtoValidation
+import com.digitalasset.canton.version.ProtocolVersionValidation
 import com.digitalasset.canton.{GrpcServiceInvocationMethod, ProtoDeserializationError, config}
 import io.grpc.*
 import io.grpc.Context.CancellableContext
@@ -133,10 +136,10 @@ object CantonGrpcUtil {
             Math.min(backoffMs, retryDeadline.timeRemaining(TimeUnit.MILLISECONDS)),
         )
       case Duration.Inf =>
-        (client.service, Predef.identity[Long])
+        (client.service, x => Predef.identity[Long](x))
       case _ =>
         logger.error(s"Ignoring unexpected timeout $timeout value.")
-        (client.service, Predef.identity[Long])
+        (client.service, x => Predef.identity[Long](x))
     }
 
     def go(backoffMs: Long): FutureUnlessShutdown[Either[GrpcError, Res]] =
@@ -362,6 +365,11 @@ object CantonGrpcUtil {
         traceContext: TraceContext
     ): Unit = error.log(logger)
   }
+  object InfoLogPolicy extends GrpcLogPolicy {
+    override def log(error: GrpcError, logger: TracedLogger)(implicit
+        traceContext: TraceContext
+    ): Unit = logger.info(error.toString)
+  }
   object SilentLogPolicy extends GrpcLogPolicy {
     def log(error: GrpcError, logger: TracedLogger)(implicit
         traceContext: TraceContext
@@ -480,7 +488,12 @@ object CantonGrpcUtil {
         token = token,
       )(_.getApiInfo(GetApiInfoRequest()))
     for {
-      apiInfo <- sendF.bimap(_.toString, _.name)
+      apiInfoResponse <- sendF.leftMap(_.toString)
+      apiInfo <- EitherT.fromEither[FutureUnlessShutdown](
+        ProtoValidation
+          .validate(apiInfoResponse.name, "name", ProtocolVersionValidation.AlwaysValidation)
+          .leftMap(_.message)
+      )
       _ <-
         EitherTUtil.condUnitET[FutureUnlessShutdown](
           apiInfo == expectedName,

@@ -7,6 +7,7 @@ import cats.data.EitherT
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasRunOnClosing}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.sequencer.api.v30
@@ -29,6 +30,7 @@ import com.digitalasset.canton.util.{
   ByteStringUtil,
   EitherTUtil,
   ErrorUtil,
+  MaxBytesToDecompress,
   MonadUtil,
   SingleUseCell,
 }
@@ -67,6 +69,9 @@ import scala.concurrent.ExecutionContext
   *   Provides the crypto API for symmetric and asymmetric encryption operations.
   * @param protocolVersion
   *   Used for the proto messages versioning.
+  * @param maxBytesToDecompress
+  *   Upper bound on the decompressed size of payloads received via the channel, derived from the
+  *   synchronizer `maxRequestSize` parameter.
   * @param timestamp
   *   Determines the public key for asymmetric encryption.
   * @param onSentMessage
@@ -81,6 +86,7 @@ private[channel] final class SequencerChannelClientEndpoint(
     isSessionKeyOwner: Boolean,
     timestamp: CantonTimestamp,
     protocolVersion: ProtocolVersion,
+    maxBytesToDecompress: MaxBytesToDecompress,
     context: CancellableContext,
     parentHasRunOnClosing: HasRunOnClosing,
     protected val timeouts: ProcessingTimeout,
@@ -103,7 +109,13 @@ private[channel] final class SequencerChannelClientEndpoint(
     val initialStage = new ChannelStageBootstrap(
       isSessionKeyOwner,
       connectTo,
-      ChannelStage.InternalData(security, protocolVersion, processor, loggerFactory),
+      ChannelStage.InternalData(
+        security,
+        protocolVersion,
+        processor,
+        maxBytesToDecompress,
+        loggerFactory,
+      ),
     )
     new AtomicReference[ChannelStage](initialStage)
   }
@@ -181,7 +193,7 @@ private[channel] final class SequencerChannelClientEndpoint(
     String,
     Unit,
   ] = _.withTraceContext { implicit traceContext => responseP =>
-    val v30.ConnectToSequencerChannelResponse(response, _traceContextO) = responseP
+    val v30.ConnectToSequencerChannelResponse(response, _) = responseP
     val currentStage = stage.get()
     for {
       result <- currentStage.handleMessage(response)
@@ -246,7 +258,7 @@ private[channel] final class SequencerChannelClientEndpoint(
         },
       )
       message = new HasToByteString {
-        override def toByteString: ByteString = ByteStringUtil.compressGzip(payload)
+        override def toByteString: ByteString = ByteStringUtil.compressZstd(payload)
       }
       encrypted <- security.encrypt(message).leftMap(_.toString)
       _ <- sendMessage(

@@ -183,15 +183,9 @@ class RollForwardLsuIntegrationTest
         inside(sv1ScanBackend.listDsoSequencers()) {
           case Seq(DomainSequencers(synchronizerId, sequencers)) =>
             synchronizerId shouldBe decentralizedSynchronizerId
-            sequencers should have size 8
+            sequencers should have size 4
             sequencers.foreach { sequencer =>
-              sequencer.serial match {
-                case Some(serial) =>
-                  serial shouldBe 0
-                  sequencer.migrationId shouldBe -1
-                case None =>
-                  sequencer.migrationId shouldBe 0
-              }
+              sequencer.serial shouldBe 0
             }
         }
       }
@@ -214,7 +208,7 @@ class RollForwardLsuIntegrationTest
     clue("Topology state contains LSU announcement") {
       eventually(3.minutes) {
         sv1ScanBackend.participantClient.topology.lsu.announcement
-          .list(Some(decentralizedSynchronizerId)) should have size (1)
+          .list(Some(decentralizedSynchronizerId)) should have size 1
       }
     }
     val allSvBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
@@ -352,21 +346,15 @@ class RollForwardLsuIntegrationTest
           inside(sv1ScanLocalBackend.listDsoSequencers()) {
             case Seq(DomainSequencers(synchronizerId, sequencers)) =>
               synchronizerId shouldBe decentralizedSynchronizerId
-              sequencers should have size 12
+              sequencers should have size 8
               sequencers.groupBy(_.svName).foreach { case (sv, sequencers) =>
                 clue(s"check sequencers for $sv") {
-                  sequencers.size shouldBe 3
+                  sequencers.size shouldBe 2
                   forExactly(1, sequencers) { sequencer =>
-                    sequencer.serial.value shouldBe 0
-                    sequencer.migrationId shouldBe -1
+                    sequencer.serial shouldBe 0
                   }
                   forExactly(1, sequencers) { sequencer =>
-                    sequencer.serial.value shouldBe newSynchronizerSerial.value.toLong
-                    sequencer.migrationId shouldBe -1
-                  }
-                  forExactly(1, sequencers) { sequencer =>
-                    sequencer.serial should be(empty)
-                    sequencer.migrationId shouldBe 0
+                    sequencer.serial shouldBe newSynchronizerSerial.value.toLong
                   }
                 }
               }

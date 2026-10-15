@@ -9,6 +9,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.typesafe.config.Config
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.{IngestionConfig, SpliceConfig}
+import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
 import org.lfdecentralizedtrust.splice.store.db.InternedStringStore
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
 import pureconfig.ConfigReader
@@ -57,6 +58,7 @@ class UpdateHistoryIngestionPerformanceTest(
         loggerFactory,
         NoOpMetricsFactory,
       ),
+      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
       loggerFactory = loggerFactory,
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = false,

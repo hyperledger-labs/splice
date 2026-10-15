@@ -1,9 +1,10 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import cats.syntax.either.*
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.api.{MetricName, MetricsContext, HistogramInventory}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{CachingConfigs, CryptoProvider, CryptoSchemeConfig}
+import com.digitalasset.canton.config.{CachingConfigs, CryptoProvider}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.jce.JcePureCrypto
 import com.digitalasset.canton.crypto.v30 as cryptoProto
@@ -137,7 +138,11 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
   ): SubjectPublicKeyInfo = {
     SubjectPublicKeyInfo
       .getInstance(
-        publicKey.toProtoPublicKeyV30.getSigningPublicKey.publicKey.toByteArray
+        publicKey.toProtoPublicKeyV30
+          .valueOr(err => throw new RuntimeException(s"failed to convert public key: $err"))
+          .getSigningPublicKey
+          .publicKey
+          .toByteArray
       )
   }
 
@@ -157,24 +162,28 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
 
   // The parameters here are just defaults so don't really matter
   def crypto(implicit ec: ExecutionContext) = new JcePureCrypto(
-    CryptoProvider.Jce.symmetric.default,
-    CryptoScheme
-      .create(CryptoSchemeConfig[SigningAlgorithmSpec](), CryptoProvider.Jce.signingAlgorithms)
-      .value,
-    CryptoScheme
+    defaultSymmetricKeyScheme = CryptoProvider.Jce.symmetric.default,
+    signingAlgorithmSpecs = CryptoScheme
       .create(
-        CryptoSchemeConfig[EncryptionAlgorithmSpec](),
-        CryptoProvider.Jce.encryptionAlgorithms,
+        CryptoProvider.Jce.signingAlgorithms.default,
+        CryptoProvider.Jce.signingAlgorithms.supported,
       )
       .value,
-    CryptoProvider.Jce.hash.default,
-    CryptoProvider.Jce.pbkdf.value.default,
-    CachingConfigs.defaultPublicKeyConversionCache,
-    None,
-    PositiveInt.tryCreate(1),
-    signingMetrics,
-    decryptionMetrics,
-    loggerFactory,
+    encryptionAlgorithmSpecs = CryptoScheme
+      .create(
+        CryptoProvider.Jce.encryptionAlgorithms.default,
+        CryptoProvider.Jce.encryptionAlgorithms.supported,
+      )
+      .value,
+    defaultHashAlgorithm = CryptoProvider.Jce.hash.default,
+    defaultPbkdfScheme = CryptoProvider.Jce.pbkdf.value.default,
+    publicKeyConversionCacheConfig = CachingConfigs.defaultPublicKeyConversionCache,
+    privateKeyConversionCacheTtl = None,
+    signatureVerificationParallelism = PositiveInt.one,
+    encryptionParallelism = PositiveInt.one,
+    signingMetrics = signingMetrics,
+    decryptionMetrics = decryptionMetrics,
+    loggerFactory = loggerFactory,
   )
 
   case class OnboardingResult(
@@ -407,6 +416,9 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
         .fromProtoCryptoKeyPairV30(cryptoKeyPairProto)
         .value
         .toByteString(ProtocolVersion.dev)
+        .valueOr(err =>
+          throw new RuntimeException(s"Failed to convert key pair to bytestring: $err")
+        )
     }
 
     PreGeneratedParty(

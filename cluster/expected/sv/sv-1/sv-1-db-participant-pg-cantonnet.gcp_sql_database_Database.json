@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "name": "cantonnet"
+  },
+  "name": "sv-1-db-participant-pg-cantonnet",
+  "provider": "",
+  "type": "gcp:sql/database:Database"
+}

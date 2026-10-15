@@ -5,11 +5,11 @@ package com.digitalasset.canton.store.memory
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.{OrdinarySerializedEvent, PossiblyIgnoredSerializedEvent}
@@ -22,6 +22,7 @@ import com.digitalasset.canton.store.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Mutex
+import com.digitalasset.nonempty.NonEmpty
 
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.mutable
@@ -117,7 +118,7 @@ class InMemorySequencedEventStore(
       eventByTimestamp.values.take(limit.getOrElse(Int.MaxValue)).toList
     }))
 
-  override def doPrune(
+  override protected def doPrune(
       beforeAndIncluding: CantonTimestamp,
       lastPruning: Option[CantonTimestamp],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Int] = FutureUnlessShutdown.pure {

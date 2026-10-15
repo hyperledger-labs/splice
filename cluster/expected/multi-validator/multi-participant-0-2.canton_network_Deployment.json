@@ -1,0 +1,8 @@
+{
+  "custom": false,
+  "id": "",
+  "inputs": {},
+  "name": "multi-participant-0-2",
+  "provider": "",
+  "type": "canton:network:Deployment"
+}

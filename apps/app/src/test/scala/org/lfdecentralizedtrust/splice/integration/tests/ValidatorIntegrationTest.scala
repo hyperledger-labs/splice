@@ -7,6 +7,8 @@ import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, DarResources}
+import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
+import com.digitalasset.canton.metrics.MetricValue
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
 import org.lfdecentralizedtrust.splice.util.WalletTestUtil
@@ -184,6 +186,42 @@ class ValidatorIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
         PositiveInt.tryCreate(2),
         ValidatorAppBackendConfig.DefaultSequencerRequestAmplificationPatience.toInternal,
       )
+    }
+  }
+
+  "export party to participant metrics" in { implicit env =>
+    initDsoWithSv1Only()
+    aliceValidatorBackend.startSync()
+    val participantId = aliceValidatorBackend.participantClient.id
+    val metricName = s"$MetricsPrefix.synchronizer-topology.num-parties-per-participant"
+    def numPartiesOnAliceParticipant() =
+      aliceValidatorBackend.metrics
+        .get(metricName, Map("participant_id" -> participantId.toString))
+        .select[MetricValue.DoublePoint]
+        .value
+        .value
+    def numPartiesFromTopology() =
+      aliceValidatorBackend.participantClient.topology.party_to_participant_mappings
+        .list(
+          synchronizerId = decentralizedSynchronizerId,
+          filterParticipant = participantId.filterString,
+        )
+        .size
+        .toDouble
+
+    val initialCount = clue("Metrics match the topology state") {
+      eventually() {
+        numPartiesOnAliceParticipant() shouldBe numPartiesFromTopology()
+      }
+      numPartiesOnAliceParticipant()
+    }
+
+    clue("Metrics are updated when a new party is allocated") {
+      aliceValidatorBackend.onboardUser(s"topology-metrics-user-${Random.nextInt(10000)}")
+      eventually() {
+        numPartiesOnAliceParticipant() shouldBe initialCount + 1
+        numPartiesOnAliceParticipant() shouldBe numPartiesFromTopology()
+      }
     }
   }
 

@@ -1,0 +1,23 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "notification.toolkit.fluxcd.io/v1beta3",
+    "kind": "Provider",
+    "metadata": {
+      "name": "flux-slack-provider",
+      "namespace": "operator"
+    },
+    "spec": {
+      "address": "https://slack.com/api/chat.postMessage",
+      "channel": "mock-slack-channel",
+      "secretRef": {
+        "name": "slack"
+      },
+      "type": "slack"
+    }
+  },
+  "name": "slack-notification-provider",
+  "provider": "",
+  "type": "kubernetes:notification.toolkit.fluxcd.io/v1beta3:Provider"
+}

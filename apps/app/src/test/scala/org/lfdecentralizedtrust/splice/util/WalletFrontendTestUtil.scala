@@ -100,38 +100,35 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       // This will have to change if we add a reload button here instead of auto-refreshing transactions.
       // The long eventually makes this robust against `StaleElementReferenceException` errors
       eventually(timeUntilSuccess = 2.minute) {
-        find(className(errorDisplayElementClass)).map { errElem =>
-          (
-            errElem.text.trim,
-            find(className(errorDetailsElementClass)).map(_.text.trim) match {
-              case Some(errDetails) if errDetails.contains("UNABLE_TO_GET_TOPOLOGY_SNAPSHOT") =>
-                tap()
-                fail("Tapping again due to UNABLE_TO_GET_TOPOLOGY_SNAPSHOT error")
-              case Some(errDetails)
-                  if errDetails.contains("Traffic balance below reserved traffic amount") =>
-                // Wait for traffic topup trigger to do its thing
-                tap()
-                fail("Tapping again due to Traffic balance below reserved traffic amount error")
-              case Some(errDetails) if errDetails.contains("NOT_CONNECTED_TO_DOMAIN") =>
-                tap()
-                fail(s"Tapping again due to a participant not connected to domain error")
-              case Some(errDetails)
-                  if errDetails.contains("The server is taking too long to respond") =>
-                // The tap might still succeed after the HTTP server timeout,
-                // for example if the command completion is delayed because of the record order publisher.
-                // The ledger api command might also have failed after the HTTP timeout (e.g., if it times out with a
-                // NOT_SEQUENCED_TIMEOUT), but we can't easily distinguish that from the case where the command
-                // is just taking a long time to complete.
-                logger.debug(
-                  s"Tap call timed out, checking if the tap result appears in case the command completed after the HTTP timeout."
-                )
-                assertTapResultIsVisible()
-              case Some(errDetails) =>
-                fail(s"Tap failed: ${errElem.text.trim} ($errDetails)")
-              case None =>
-                assertTapResultIsVisible()
-            },
-          )
+        find(className(errorDisplayElementClass)).fold(assertTapResultIsVisible()) { errElem =>
+          find(className(errorDetailsElementClass)).map(_.text.trim) match {
+            case Some(errDetails) if errDetails.contains("UNABLE_TO_GET_TOPOLOGY_SNAPSHOT") =>
+              tap()
+              fail("Tapping again due to UNABLE_TO_GET_TOPOLOGY_SNAPSHOT error")
+            case Some(errDetails)
+                if errDetails.contains("Traffic balance below reserved traffic amount") =>
+              // Wait for traffic topup trigger to do its thing
+              tap()
+              fail("Tapping again due to Traffic balance below reserved traffic amount error")
+            case Some(errDetails) if errDetails.contains("NOT_CONNECTED_TO_DOMAIN") =>
+              tap()
+              fail(s"Tapping again due to a participant not connected to domain error")
+            case Some(errDetails)
+                if errDetails.contains("The server is taking too long to respond") =>
+              // The tap might still succeed after the HTTP server timeout,
+              // for example if the command completion is delayed because of the record order publisher.
+              // The ledger api command might also have failed after the HTTP timeout (e.g., if it times out with a
+              // NOT_SEQUENCED_TIMEOUT), but we can't easily distinguish that from the case where the command
+              // is just taking a long time to complete.
+              logger.debug(
+                s"Tap call timed out, checking if the tap result appears in case the command completed after the HTTP timeout."
+              )
+              assertTapResultIsVisible()
+            case Some(errDetails) =>
+              fail(s"Tap failed: ${errElem.text.trim} ($errDetails)")
+            case None =>
+              assertTapResultIsVisible()
+          }
         }
       }
     }

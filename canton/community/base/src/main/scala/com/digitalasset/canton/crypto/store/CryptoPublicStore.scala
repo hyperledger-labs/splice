@@ -14,6 +14,7 @@ import com.digitalasset.canton.crypto.store.db.DbCryptoPublicStore
 import com.digitalasset.canton.crypto.store.memory.InMemoryCryptoPublicStore
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.{CantonBaseError, CantonErrorGroups}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -340,6 +341,7 @@ object CryptoPublicStoreError extends CantonErrorGroups.CommandErrorGroup {
         extends CantonBaseError.Impl(cause = "An error occurred with the public crypto store")
   }
 
+  // TODO(i34279): Make error handling in public and private key stores uniform
   final case class FailedToInsertKey(keyId: Fingerprint, reason: String)
       extends CryptoPublicStoreError {
     override protected def pretty: Pretty[FailedToInsertKey] =

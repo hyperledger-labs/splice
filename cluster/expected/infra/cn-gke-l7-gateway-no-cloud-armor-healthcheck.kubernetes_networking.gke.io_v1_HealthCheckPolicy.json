@@ -1,0 +1,32 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "networking.gke.io/v1",
+    "kind": "HealthCheckPolicy",
+    "metadata": {
+      "name": "cn-gke-l7-gateway-no-cloud-armor-healthcheck",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "default": {
+        "config": {
+          "httpHealthCheck": {
+            "port": 15021,
+            "requestPath": "/healthz/ready"
+          },
+          "type": "HTTP"
+        }
+      },
+      "targetRef": {
+        "group": "",
+        "kind": "Service",
+        "name": "cn-gke-l7-gateway-no-cloud-armor",
+        "namespace": "cluster-ingress"
+      }
+    }
+  },
+  "name": "cn-gke-l7-gateway-no-cloud-armor-healthcheck",
+  "provider": "",
+  "type": "kubernetes:networking.gke.io/v1:HealthCheckPolicy"
+}

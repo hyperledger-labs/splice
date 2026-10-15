@@ -41,7 +41,7 @@ describe('SV user can', () => {
 });
 
 describe('Set Amulet Config Rules Form', () => {
-  test('should render all Set Amulet Config Rules Form components', () => {
+  test('should render all Set Amulet Config Rules Form components', async () => {
     render(
       <Wrapper>
         <SetAmuletConfigRulesForm />
@@ -68,21 +68,18 @@ describe('Set Amulet Config Rules Form', () => {
     expect(urlInput.getAttribute('value')).toBe('');
 
     // Amulet Rules has a lot of fields to process so this can get flakey if not given enough time
-    waitFor(
-      () => {
-        const configLabels = screen.getAllByTestId('config-label', { exact: false });
-        expect(configLabels.length).toBeGreaterThan(65);
+    await waitFor(() => {
+      const configLabels = screen.getAllByTestId('config-label', { exact: false });
+      expect(configLabels.length).toBeGreaterThan(65);
 
-        const configFields = screen.getAllByTestId('config-field', { exact: false });
-        expect(configFields.length).toBeGreaterThan(65);
+      const configFields = screen.getAllByTestId('config-field', { exact: false });
+      expect(configFields.length).toBeGreaterThan(65);
 
-        // no changes have been made so we should not see any current values
-        expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
-          /Unable to find an element/
-        );
-      },
-      { timeout: 1000 }
-    );
+      // no changes have been made so we should not see any current values
+      expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
+        /Unable to find an element/
+      );
+    });
 
     const jsonDiffsToggle = screen.getByTestId('json-diff-toggle');
     expect(screen.getByText('JSON')).toBeInTheDocument();

@@ -5,6 +5,7 @@ package com.digitalasset.canton
 
 import com.digitalasset.canton.BaseTest.UnsupportedExternalPartyTest
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.topology.PartyKind
 import com.digitalasset.canton.version.ProtocolVersion
 import org.scalactic.source
@@ -245,6 +246,14 @@ trait ProtocolVersionChecksAsyncWordSpec {
     def in(testFun: => Future[Assertion])(implicit pos: source.Position): Unit =
       if (condition) verb.in(testFun) else verb.ignore(testFun)
 
+    def inUS(
+        testFun: => FutureUnlessShutdown[Assertion]
+    )(implicit pos: source.Position): Unit = {
+      def testFunHandleShutdown(): Future[Assertion] =
+        testFun.onShutdown(fail(s"Unexpected shutdown in OnlyRunWhenWordSpecStringWrapper.inUS"))
+      if (condition) verb.in(testFunHandleShutdown()) else verb.ignore(testFunHandleShutdown())
+    }
+
     def when(testFun: => Unit)(implicit pos: source.Position): Unit =
       if (condition) verb.when(testFun)
   }
@@ -275,6 +284,11 @@ trait ProtocolVersionChecksAnyWordSpec {
 
     def onlyRunWith(protocolVersion: ProtocolVersion): OnlyRunWhenWordSpecStringWrapper =
       new OnlyRunWhenWordSpecStringWrapper(verb, testedProtocolVersion == protocolVersion)
+
+    def onlyRunWithOrLessThan(
+        maxProtocolVersion: ProtocolVersion
+    ): OnlyRunWhenWordSpecStringWrapper =
+      new OnlyRunWhenWordSpecStringWrapper(verb, testedProtocolVersion <= maxProtocolVersion)
 
     def onlyRunWhen(
         condition: ProtocolVersion => Boolean

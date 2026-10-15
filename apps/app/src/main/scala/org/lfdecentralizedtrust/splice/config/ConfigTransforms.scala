@@ -218,6 +218,7 @@ object ConfigTransforms {
       // Tests default to TrafficBasedAppRewards. Networks (which don't apply
       // ConfigTransforms.defaults) fall back to the FeaturedAppMarkers default
       withTrafficBasedAppRewards,
+      withPerAcsSnapshotTablesEnabled,
     )
   }
 
@@ -862,6 +863,9 @@ object ConfigTransforms {
         )
       )
     )
+
+  def withPerAcsSnapshotTablesEnabled: ConfigTransform =
+    updateAllScanAppConfigs_(c => c.copy(perAcsSnapshotTablesEnabled = true))
 
   def withFeaturedAppMarkers: ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(c => c.copy(initialRewardConfig = None))

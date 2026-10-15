@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "role": "roles/monitoring.viewer"
+  },
+  "name": "mock-grafana-roles/monitoring.viewer-iam",
+  "provider": "",
+  "type": "gcp:projects/iAMMember:IAMMember"
+}

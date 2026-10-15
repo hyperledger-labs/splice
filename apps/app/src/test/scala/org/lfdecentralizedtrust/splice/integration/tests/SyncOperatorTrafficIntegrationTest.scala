@@ -33,7 +33,7 @@ import scala.jdk.CollectionConverters.*
 /** Buys traffic for a registered synchronizer via `AmuletRules_BuyMemberTraffic` with the
   * registration disclosed, and checks the operator grants it on that synchronizer's sequencer.
   */
-@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_30
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_31
 class SyncOperatorTrafficIntegrationTest
     extends IntegrationTest
     with SynchronizerFeesTestUtil

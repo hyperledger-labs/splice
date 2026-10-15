@@ -1,0 +1,11 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "create": "'SPLICE_ROOT/cluster/pulumi/canton-network/bigquery-cloudsql.sh' create-pub-rep-slot \\\n      --private-network-project=\"test-project\" \\\n      --compute-region=\"europe-west6\" \\\n      --service-account-email=\"undefined\" \\\n      --schema-name=\"scan_sv_1\" \\\n      --tables-to-replicate-joined=\"update_history_creates, update_history_exercises, scan_verdict_store, scan_verdict_transaction_view_store, app_activity_record_store\" \\\n      --postgres-user-name=\"cnadmin\" \\\n      --publication-name=\"update_history_datastream_pub\" \\\n      --replication-slot-name=\"update_history_datastream_r_slot\" \\\n      --replicator-user-name=\"bqdatastream\" \\\n      --postgres-instance-name=\"undefined\" \\\n      --scan-app-database-name=\"scan_sv_1\" \\\n      --flyway-migration-to-wait-for=\"V068__app_activity_record_meta.sql\" \\\n      ",
+    "delete": "'SPLICE_ROOT/cluster/pulumi/canton-network/bigquery-cloudsql.sh' delete-pub-rep-slot \\\n      --private-network-project=\"test-project\" \\\n      --compute-region=\"europe-west6\" \\\n      --service-account-email=\"undefined\" \\\n      --schema-name=\"scan_sv_1\" \\\n      --tables-to-replicate-joined=\"update_history_creates, update_history_exercises, scan_verdict_store, scan_verdict_transaction_view_store, app_activity_record_store\" \\\n      --postgres-user-name=\"cnadmin\" \\\n      --publication-name=\"update_history_datastream_pub\" \\\n      --replication-slot-name=\"update_history_datastream_r_slot\" \\\n      --replicator-user-name=\"bqdatastream\" \\\n      --postgres-instance-name=\"undefined\" \\\n      --scan-app-database-name=\"scan_sv_1\" \\\n      --flyway-migration-to-wait-for=\"V068__app_activity_record_meta.sql\" \\\n      "
+  },
+  "name": "sv-1-bqdatastream-pub-replicate-slots",
+  "provider": "",
+  "type": "command:local:Command"
+}

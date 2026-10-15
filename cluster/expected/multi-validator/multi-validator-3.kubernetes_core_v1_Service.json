@@ -1,0 +1,73 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+      "labels": {
+        "app": "multi-validator-3"
+      },
+      "name": "multi-validator-3",
+      "namespace": "multi-validator"
+    },
+    "spec": {
+      "ports": [
+        {
+          "name": "val-0",
+          "port": 5003
+        },
+        {
+          "name": "val-1",
+          "port": 5103
+        },
+        {
+          "name": "val-2",
+          "port": 5203
+        },
+        {
+          "name": "val-3",
+          "port": 5303
+        },
+        {
+          "name": "val-4",
+          "port": 5403
+        },
+        {
+          "name": "val-5",
+          "port": 5503
+        },
+        {
+          "name": "val-6",
+          "port": 5603
+        },
+        {
+          "name": "val-7",
+          "port": 5703
+        },
+        {
+          "name": "val-8",
+          "port": 5803
+        },
+        {
+          "name": "val-9",
+          "port": 5903
+        },
+        {
+          "name": "metrics",
+          "port": 10013
+        },
+        {
+          "name": "jmx",
+          "port": 9010
+        }
+      ],
+      "selector": {
+        "app": "multi-validator-3"
+      }
+    }
+  },
+  "name": "multi-validator-3",
+  "provider": "",
+  "type": "kubernetes:core/v1:Service"
+}

@@ -1,11 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { dateTimeFormatISO } from '@canton-network/splice-common-frontend-utils';
 import { Box, Typography } from '@mui/material';
 import dayjs from 'dayjs';
+import { formatDatetimeWithOffset } from '../../../utils/dateFormat';
 import { DetailItem } from './DetailItem';
-import { MemberIdentifier } from '../../beta';
+import { MemberIdentifier } from '../../ui';
 
 interface CreateUnallocatedUnclaimedActivityRecordSectionProps {
   beneficiary: string;
@@ -52,7 +52,7 @@ export const CreateUnallocatedUnclaimedActivityRecordSection: React.FC<
               data-testid="proposal-details-must-mint-before-value"
               gutterBottom
             >
-              {dayjs(mintBefore).format(dateTimeFormatISO)}
+              {formatDatetimeWithOffset(mintBefore)}
             </Typography>
 
             <Typography variant="body2" color="text.secondary">

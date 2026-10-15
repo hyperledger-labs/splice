@@ -5,6 +5,7 @@ package com.digitalasset.canton.lifecycle
 
 import com.digitalasset.canton.config.RefinedNonNegativeDuration
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 
 import scala.concurrent.{Future, TimeoutException}
@@ -20,7 +21,7 @@ trait FlagCloseableAsync extends FlagCloseable {
     */
   protected def closeAsync(): Seq[AsyncOrSyncCloseable]
 
-  final override def onClosed(): Unit = LifeCycle.close(closeAsync()*)(logger)
+  final override def onClosed(): Unit = LifeCycle.close(closeAsync())(logger)
 }
 
 trait AsyncOrSyncCloseable extends AutoCloseable

@@ -256,7 +256,7 @@ describe('Proposal Details Content', () => {
       PROPOSAL_CREATED_LABEL
     );
     expect(screen.getByTestId('proposal-details-created-at-value').textContent).toBe(
-      '2025-01-01 13:00'
+      '2025-01-01 13:00 (UTC+02:00)'
     );
 
     expect(screen.getByTestId('proposal-details-threshold-deadline-label').textContent).toBe(
@@ -269,12 +269,12 @@ describe('Proposal Details Content', () => {
     const votingClosesIso = within(votingInformationSection).getByTestId(
       'proposal-details-voting-closes-value'
     );
-    expect(votingClosesIso.textContent).toBe('2029-01-01 13:00');
+    expect(votingClosesIso.textContent).toBe('2029-01-01 13:00 (UTC+02:00)');
 
     const voteTakesEffectIso = within(votingInformationSection).getByTestId(
       'proposal-details-vote-takes-effect-value'
     );
-    expect(voteTakesEffectIso.textContent).toBe('2029-01-02 13:00');
+    expect(voteTakesEffectIso.textContent).toBe('2029-01-02 13:00 (UTC+02:00)');
 
     const status = screen.getByTestId('proposal-details-status-value');
     expect(status.textContent).toMatch(/Accepted/);
@@ -295,6 +295,23 @@ describe('Proposal Details Content', () => {
     );
     expect(screen.getByTestId('your-vote-accept')).toBeInTheDocument();
     expect(screen.getByTestId('your-vote-reject')).toBeInTheDocument();
+  });
+
+  test('should hide the created date when it is unknown', () => {
+    render(
+      <Wrapper>
+        <ProposalDetailsContent
+          currentSvPartyId={voteResult.votingInformation.requester}
+          contractId={voteResult.contractId}
+          proposalDetails={{ ...voteResult.proposalDetails, createdAt: undefined }}
+          votingInformation={voteResult.votingInformation}
+          votes={voteResult.votes}
+        />
+      </Wrapper>
+    );
+
+    expect(screen.queryByTestId('proposal-details-created-at-label')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('proposal-details-created-at-value')).not.toBeInTheDocument();
   });
 
   test('should render featured app proposal details', () => {

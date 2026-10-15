@@ -1,0 +1,12 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "description": "Logs with cloudsql databases events",
+    "filter": "\nresource.type=\"cloudsql_database\"\n\"terminating connection due to administrator command\" OR \"the database system is shutting down\"",
+    "name": "log_gke_cloudsql_update_mock"
+  },
+  "name": "log_gke_cloudsql_update",
+  "provider": "",
+  "type": "gcp:logging/metric:Metric"
+}

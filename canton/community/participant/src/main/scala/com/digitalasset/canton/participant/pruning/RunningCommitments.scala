@@ -7,17 +7,15 @@ import cats.syntax.functor.*
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.ledger.participant.state.{
   AcsChange,
-  ContractStakeholdersAndReassignmentCounter,
   GenericAcsChange,
   InternalizedAcsChange,
-  InternalizedContractStakeholdersAndReassignmentCounter,
 }
 import com.digitalasset.canton.logging.*
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.participant.event.RecordTime
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.CommitmentSnapshot
 import com.digitalasset.canton.platform.store.interning.StringInterning
-import com.digitalasset.canton.protocol.messages.AcsCommitment.CommitmentType
+import com.digitalasset.canton.protocol.messages.Digest
 import com.digitalasset.canton.util.Mutex
 import com.digitalasset.canton.{InternedPartyId, LfPartyId, lfPartyOrdering}
 
@@ -130,7 +128,7 @@ abstract class GenericRunningCommitments[T: Pretty](
 
   def watermark: RecordTime = rt
 
-  def reinitialize(snapshot: Map[SortedSet[T], CommitmentType], recordTime: RecordTime): Unit =
+  def reinitialize(snapshot: Map[SortedSet[T], Digest.DigestType], recordTime: RecordTime): Unit =
     lock.exclusive {
       ensureNotClosed()
       // delete all active
@@ -172,25 +170,8 @@ class InternalizedRunningCommitments(
   def update(rt: RecordTime, change: AcsChange)(implicit
       loggingContext: NamedLoggingContext
   ): Unit =
-    update(rt, internalizeAcsChange(change))
+    update(rt, InternalizedAcsChange.internalizeAcsChange(stringInterning, change))
 
-  private def internalizeContractStakeholders(
-      counter: ContractStakeholdersAndReassignmentCounter
-  ): InternalizedContractStakeholdersAndReassignmentCounter =
-    InternalizedContractStakeholdersAndReassignmentCounter(
-      counter.stakeholders.map(stringInterning.party.internalize),
-      counter.reassignmentCounter,
-    )
-
-  private def internalizeAcsChange(change: AcsChange): InternalizedAcsChange =
-    InternalizedAcsChange(
-      activations = change.activations.map { case (contractId, stakeholdersAndCounter) =>
-        contractId -> internalizeContractStakeholders(stakeholdersAndCounter)
-      },
-      deactivations = change.deactivations.map { case (contractId, stakeholdersAndCounter) =>
-        contractId -> internalizeContractStakeholders(stakeholdersAndCounter)
-      },
-    )
 }
 
 class RunningCommitments(

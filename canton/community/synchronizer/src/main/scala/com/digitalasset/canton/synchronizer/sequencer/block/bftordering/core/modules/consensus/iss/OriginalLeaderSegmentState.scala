@@ -30,6 +30,7 @@ class OriginalLeaderSegmentState(
     initialCompletedBlocks: Seq[Block],
     initialCurrentViewPrePrepareBlockNumbers: Seq[BlockNumber],
     override val loggerFactory: NamedLoggerFactory,
+    initTraceContext: TraceContext,
 ) extends NamedLogging {
   private val segment = state.segment
 
@@ -65,6 +66,8 @@ class OriginalLeaderSegmentState(
   def isProgressBlocked: Boolean =
     canReceiveProposals && blockedProgressDetector.isProgressBlocked(nextRelativeBlockToPropose)
 
+  def areMostSegmentsComplete: Boolean = blockedProgressDetector.areMostSegmentsComplete
+
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var nextRelativeBlockToPropose =
     // TODO(#16761): This assumes that a node's locally-assigned slots complete in order
@@ -90,13 +93,16 @@ class OriginalLeaderSegmentState(
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var waitingForAvailabilityResponse = false
 
+  def waitingResponseFromAvailability: Boolean = waitingForAvailabilityResponse
   def receivedResponseFromAvailability(): Unit = waitingForAvailabilityResponse = false
   def startWaitingForAvailabilityResponse(): Unit = waitingForAvailabilityResponse = true
 
   logger.debug(
     s"At segment creation with initialCompletedBlocks = ${initialCompletedBlocks.map(_.blockNumber)}, " +
       s"next relative block to propose = $nextRelativeBlockToPropose$absoluteNextBlockToProposeLogSuffix"
-  )(TraceContext.empty)
+  )(initTraceContext)
+
+  def pendingSlotsToPropose: Int = segment.slotNumbers.size - nextRelativeBlockToPropose
 
   def segmentIsInProgress: Boolean = segment.slotNumbers.sizeIs > nextRelativeBlockToPropose
 
@@ -121,10 +127,16 @@ class OriginalLeaderSegmentState(
         segment.slotNumbers(nextRelativeBlockToPropose - 1)
       )) // we finished processing the current slot
 
-  def reasonForNoProposal: Option[String] =
+  def reasonForNotAcceptingProposals: Option[String] =
     if (!segmentIsInProgress)
       Some(
-        s"End of segment reached: nextRelativeBlockToPropose $nextRelativeBlockToPropose is beyond segment size ${segment.slotNumbers.sizeIs}"
+        s"End of segment reached: nextRelativeBlockToPropose $nextRelativeBlockToPropose " +
+          s"is beyond segment size ${segment.slotNumbers.sizeIs}"
+      )
+    else if (waitingForAvailabilityResponse)
+      Some(
+        s"Waiting for availability proposal for relative block $nextRelativeBlockToPropose (absolute block ${segment
+            .slotNumbers(nextRelativeBlockToPropose)})"
       )
     else if (viewChangeOccurred)
       Some(s"ViewChangeOccurred! view = ${state.currentView}")
@@ -140,6 +152,8 @@ class OriginalLeaderSegmentState(
       Some(
         s"Previous relative block ${segment.slotNumbers(nextRelativeBlockToPropose - 1)} is still in progress"
       )
+    else if (!canReceiveProposals)
+      Some(s"Unknown (likely a new case, please align the reason computation logic)")
     else
       None
 
@@ -169,6 +183,18 @@ class OriginalLeaderSegmentState(
     )
 
     orderedBlock
+  }
+
+  def assignAllEmptyBlocksToRestOfSegment(): Seq[OrderedBlock] = {
+    val remainingSlots = segment.slotNumbers.forgetNE.drop(nextRelativeBlockToPropose)
+    nextRelativeBlockToPropose = segment.slotNumbers.size
+    remainingSlots.map { blockNumber =>
+      OrderedBlock(
+        BlockMetadata(state.epoch.info.number, blockNumber),
+        Seq.empty,
+        CanonicalCommitSet(Set.empty),
+      )
+    }
   }
 
   private def absoluteNextBlockToProposeLogSuffix =

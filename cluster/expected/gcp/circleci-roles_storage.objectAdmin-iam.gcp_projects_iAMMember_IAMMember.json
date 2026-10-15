@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "role": "roles/storage.objectAdmin"
+  },
+  "name": "circleci-roles/storage.objectAdmin-iam",
+  "provider": "",
+  "type": "gcp:projects/iAMMember:IAMMember"
+}

@@ -30,23 +30,23 @@
     }
   },
   "UpdateHistoryReadPerformanceTest-getUpdate": {
-    "_comment_avg_item_time_ns": "median*(1+ noise_margin + safety_margin) of last 30d. noise_margin=(p95-median)/median, safety_margin=10%. calculated on 2026-June-25",
+    "_comment_avg_item_time_ns": "median*(1+ noise_margin + safety_margin) of last 30d. noise_margin=(p95-median)/median, safety_margin=10%. calculated on 2026-Sep-18",
     "splice_perf_read_avg_item_time_ns": {
-      "max": 775400000
+      "max": 947000000
     },
     "_comment_total_time_ns": "hard max same as avg_item_time_ns, as we read 1 item",
     "splice_perf_read_total_time_ns": {
-      "max": 775400000
+      "max": 947000000
     }
   },
   "UpdateHistoryReadPerformanceTest-encodeUpdate": {
-    "_comment_avg_item_time_ns": "median*(1+ noise_margin + safety_margin) of last 30d. noise_margin=(p95-median)/median, safety_margin=10%. calculated on 2026-June-25",
+    "_comment_avg_item_time_ns": "median*(1+ noise_margin + safety_margin) of last 30d. noise_margin=(p95-median)/median, safety_margin=10%. calculated on 2026-Sep-18",
     "splice_perf_read_avg_item_time_ns": {
-      "max": 397400000
+      "max": 441300000
     },
     "_comment_total_time_ns": "hard max same as avg_item_time_ns, as we read 1 item",
     "splice_perf_read_total_time_ns": {
-      "max": 397400000
+      "max": 441300000
     }
   }
 }

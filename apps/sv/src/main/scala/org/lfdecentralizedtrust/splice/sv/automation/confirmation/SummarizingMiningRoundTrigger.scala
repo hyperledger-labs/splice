@@ -8,6 +8,7 @@ import com.daml.metrics.api.MetricQualification.Errors
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
+  TaskNoop,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -36,7 +37,6 @@ import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.Optional
@@ -89,7 +89,7 @@ class SummarizingMiningRoundTrigger(
       task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.summarizingRound.contract.payload.round.number
-    for {
+    (for {
       rewards <- queryRewards(
         task.summarizingRound.payload,
         task.summarizingRound.domain,
@@ -135,7 +135,7 @@ class SummarizingMiningRoundTrigger(
               )
             }
       }
-    } yield taskOutcome
+    } yield taskOutcome).recover { case _: ScanTotalsNotComputed => TaskNoop }
   }
 
   override def isStaleTask(task: SummarizingMiningRoundTrigger.Task)(implicit
@@ -229,12 +229,9 @@ class SummarizingMiningRoundTrigger(
   private def fetchRewardAccountingTotals(
       round: Long
   )(implicit tc: TraceContext): Future[definitions.RewardAccountingActivityTotalsOk] = {
-    def totalsUnavailable(reason: String): Nothing =
-      throw Status.FAILED_PRECONDITION
-        .withDescription(s"For round $round: $reason")
-        .asRuntimeException()
 
-    def bftReadTotals: Future[definitions.RewardAccountingActivityTotalsOk] = {
+    def bftReadTotals
+        : Future[Either[ScanTotalsNotComputed, definitions.RewardAccountingActivityTotalsOk]] = {
       miningRoundMetrics.summarizingRoundTotalsBftReads.mark()
       for {
         bftScan <- bftScanConnectionF()
@@ -245,8 +242,8 @@ class SummarizingMiningRoundTrigger(
             s"Obtained the reward accounting totals for round $round via BFT read from scans: ${scanUris
                 .mkString(", ")}."
           )
-          ok
-        case _ => totalsUnavailable("could not obtain reward accounting totals via BFT read.")
+          Right(ok)
+        case _ => Left(BftScanTotalsNotYetComputed)
       }
     }
 
@@ -257,14 +254,19 @@ class SummarizingMiningRoundTrigger(
         case RewardAccountingActivityTotalsOk(ok) =>
           Future.successful(ok)
         case RewardAccountingActivityTotalsUndetermined(_) =>
-          totalsUnavailable("our own Scan has not yet computed the reward accounting totals.")
-        case RewardAccountingActivityTotalsCannotProvide(_) => bftReadTotals
+          Future.failed(OwnScanTotalsNotYetComputed)
+        case RewardAccountingActivityTotalsCannotProvide(_) =>
+          bftReadTotals.transform(_.flatMap(_.toTry))
       }
     } yield totals
   }
 }
 
 object SummarizingMiningRoundTrigger {
+  sealed trait ScanTotalsNotComputed extends RuntimeException
+  private[confirmation] case object OwnScanTotalsNotYetComputed extends ScanTotalsNotComputed
+  private[confirmation] case object BftScanTotalsNotYetComputed extends ScanTotalsNotComputed
+
   final case class RoundRewards(
       round: Long,
       featuredAppRewardCoupons: BigDecimal,

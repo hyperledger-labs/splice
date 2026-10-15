@@ -40,6 +40,7 @@ import {
   configFormDataToConfigChanges,
   createProposalActions,
   getInitialExpiration,
+  withSwitchOverConfigValue,
 } from '../../utils/governance';
 import type { CommonProposalFormData, ConfigFormData } from '../../utils/types';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
@@ -55,11 +56,17 @@ import {
   validateNextScheduledLogicalSynchronizerUpgrade,
   validateSummary,
   validateUrl,
+  SwitchOverEntry,
 } from './formValidators';
+import { SwitchOverTimesField } from '../form-components/SwitchOverTimesField';
 
 export type SetDsoConfigCompleteFormData = {
   common: CommonProposalFormData;
   config: ConfigFormData;
+  switchOverTimes: {
+    entries: SwitchOverEntry[];
+    allowNonFutureDated: boolean;
+  };
 };
 
 const createProposalAction = createProposalActions.find(a => a.value === 'SRARC_SetConfig');
@@ -76,6 +83,8 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
   const mutation = useProposalMutation();
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const maybeConfig = dsoInfoQuery.data?.dsoRules.payload.config;
+  const dsoConfig = maybeConfig ? maybeConfig : null;
 
   const defaultValues = useMemo((): SetDsoConfigCompleteFormData => {
     if (!dsoInfoQuery.data) {
@@ -91,10 +100,15 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
           summary: '',
         },
         config: {},
+        switchOverTimes: {
+          entries: Object.entries(dsoConfig?.svOperationsSwitchOverTimes ?? {}).map(
+            ([key, time]) => ({ key, time })
+          ),
+          allowNonFutureDated: false,
+        },
       };
     }
 
-    const dsoConfig = dsoInfoQuery.data.dsoRules.payload.config;
     const dsoConfigChanges = buildDsoConfigChanges(dsoConfig, dsoConfig, true);
 
     return {
@@ -115,8 +129,14 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
         };
         return acc;
       }, {} as ConfigFormData),
+      switchOverTimes: {
+        entries: Object.entries(dsoConfig?.svOperationsSwitchOverTimes ?? {}).map(
+          ([key, time]) => ({ key, time })
+        ),
+        allowNonFutureDated: false,
+      },
     };
-  }, [dsoInfoQuery.data, initialExpiration, initialEffectiveDate]);
+  }, [dsoInfoQuery.data, initialExpiration, initialEffectiveDate, dsoConfig]);
 
   const form = useAppForm({
     defaultValues,
@@ -124,7 +144,15 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
       if (!showConfirmation) {
         setShowConfirmation(true);
       } else {
-        const changes = configFormDataToConfigChanges(formData.config, dsoConfigChanges, false);
+        const changes = configFormDataToConfigChanges(
+          withSwitchOverConfigValue(
+            formData.config,
+            'svOperationsSwitchOverTimes',
+            formData.switchOverTimes.entries
+          ),
+          dsoConfigChanges,
+          false
+        );
         const baseConfig = dsoConfig;
         const newConfig = buildDsoRulesConfigFromChanges(changes);
         const action: ActionRequiringConfirmation = {
@@ -160,11 +188,16 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
         const syncMigrationId =
           formData.config.nextScheduledSynchronizerUpgradeMigrationId?.value ?? '';
         const effectiveDate = formData.common.effectiveDate.effectiveDate;
+        const currentValue = (fieldName: string) => defaultValues.config[fieldName]?.value ?? '';
 
         const synchronizerUpgradeError = validateNextScheduledSynchronizerUpgrade(
           syncUpgradeTime,
           syncMigrationId,
-          effectiveDate
+          effectiveDate,
+          {
+            upgradeTime: currentValue('nextScheduledSynchronizerUpgradeTime'),
+            migrationId: currentValue('nextScheduledSynchronizerUpgradeMigrationId'),
+          }
         );
         if (synchronizerUpgradeError) return synchronizerUpgradeError;
         const logicalSynchronizerUpgradeError = validateNextScheduledLogicalSynchronizerUpgrade(
@@ -175,13 +208,32 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
           formData.config
             .nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerProtocolVersion?.value ??
             '',
-          effectiveDate
+          effectiveDate,
+          {
+            topologyFreezeTime: currentValue(
+              'nextScheduledLogicalSynchronizerUpgradeTopologyFreezeTime'
+            ),
+            upgradeTime: currentValue('nextScheduledLogicalSynchronizerUpgradeUpgradeTime'),
+            newPhysicalSynchronizerSerial: currentValue(
+              'nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerSerial'
+            ),
+            newPhysicalSynchronizerProtocolVersion: currentValue(
+              'nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerProtocolVersion'
+            ),
+          }
         );
         if (logicalSynchronizerUpgradeError) return logicalSynchronizerUpgradeError;
         return false;
       },
       onSubmit: ({ value: formData }) => {
-        const changes = configFormDataToConfigChanges(formData.config, dsoConfigChanges);
+        const changes = configFormDataToConfigChanges(
+          withSwitchOverConfigValue(
+            formData.config,
+            'svOperationsSwitchOverTimes',
+            formData.switchOverTimes.entries
+          ),
+          dsoConfigChanges
+        );
 
         if (changes.length === 0) {
           return 'Cannot submit a proposal with no configuration changes';
@@ -199,15 +251,21 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
     },
   });
 
-  const maybeConfig = dsoInfoQuery.data?.dsoRules.payload.config;
-  const dsoConfig = maybeConfig ? maybeConfig : null;
   // passing the config twice here because we initially have no changes
   const dsoConfigChanges = buildDsoConfigChanges(dsoConfig, dsoConfig, true);
 
   const effectiveDateString = form.state.values.common.effectiveDate.effectiveDate;
   const effectivity = effectiveDateString ? dayjs(effectiveDateString).toDate() : undefined;
 
-  const changes = configFormDataToConfigChanges(form.state.values.config, dsoConfigChanges, false);
+  const changes = configFormDataToConfigChanges(
+    withSwitchOverConfigValue(
+      form.state.values.config,
+      'svOperationsSwitchOverTimes',
+      form.state.values.switchOverTimes.entries
+    ),
+    dsoConfigChanges,
+    false
+  );
   const changedFields = changes.filter(c => c.currentValue !== c.newValue);
 
   const baseConfig = dsoConfig;
@@ -281,27 +339,36 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
               {CREATE_PROPOSAL_LABEL_CONFIGURATION}
             </Typography>
 
-            {dsoConfigChanges.map(change => (
-              <form.AppField name={`config.${change.fieldName}`} key={change.fieldName}>
-                {field => (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: CREATE_PROPOSAL_CONFIG_ROW_DIVIDER_GAP,
-                    }}
-                  >
-                    <field.ConfigField
-                      configChange={change}
-                      pendingFieldInfo={pendingConfigFields.find(
-                        f => f.fieldName === change.fieldName
-                      )}
-                      effectiveDate={form.state.values.common.effectiveDate.effectiveDate}
-                    />
-                  </Box>
-                )}
-              </form.AppField>
-            ))}
+            {dsoConfigChanges
+              .filter(change => change.fieldName !== 'svOperationsSwitchOverTimes')
+              .map(change => (
+                <form.AppField name={`config.${change.fieldName}`} key={change.fieldName}>
+                  {field => (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: CREATE_PROPOSAL_CONFIG_ROW_DIVIDER_GAP,
+                      }}
+                    >
+                      <field.ConfigField
+                        configChange={change}
+                        pendingFieldInfo={pendingConfigFields.find(
+                          f => f.fieldName === change.fieldName
+                        )}
+                        effectiveDate={form.state.values.common.effectiveDate.effectiveDate}
+                      />
+                    </Box>
+                  )}
+                </form.AppField>
+              ))}
+
+            <SwitchOverTimesField
+              form={form}
+              title="SV operations switch-over times"
+              effectiveDate={form.state.values.common.effectiveDate.effectiveDate}
+              currentEntries={defaultValues.switchOverTimes.entries}
+            />
 
             <JsonDiffAccordion variant="form">{jsonDiffContent}</JsonDiffAccordion>
           </Box>

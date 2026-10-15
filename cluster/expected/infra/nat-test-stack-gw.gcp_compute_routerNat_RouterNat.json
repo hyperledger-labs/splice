@@ -1,0 +1,26 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "logConfig": {
+      "enable": true,
+      "filter": "ERRORS_ONLY"
+    },
+    "natIpAllocateOption": "MANUAL_ONLY",
+    "natIps": [
+      null
+    ],
+    "sourceSubnetworkIpRangesToNat": "LIST_OF_SUBNETWORKS",
+    "subnetworks": [
+      {
+        "name": "subnet-id",
+        "sourceIpRangesToNats": [
+          "ALL_IP_RANGES"
+        ]
+      }
+    ]
+  },
+  "name": "nat-test-stack-gw",
+  "provider": "",
+  "type": "gcp:compute/routerNat:RouterNat"
+}

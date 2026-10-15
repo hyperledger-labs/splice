@@ -4,6 +4,7 @@
 package com.digitalasset.canton.store.db
 
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.Outcome
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.resource.DbStorage
@@ -91,7 +92,6 @@ class PostgresStatsAnalysis(storage: DbStorage, override val timeouts: Processin
       .update(createExtensions, "create_pg_stat_statements_and_store_plans")(
         TraceContext.empty,
         closeContext,
-        implicitly,
       )
       .recover {
         case e: SQLException if e.getSQLState == "42P07" => // duplicate

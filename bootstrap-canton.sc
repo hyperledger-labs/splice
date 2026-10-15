@@ -4,7 +4,7 @@ import cats.syntax.either._
 import cats.syntax.functorFilter._
 import java.nio.file.{Paths, Files}
 import java.nio.charset.StandardCharsets
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.console.{
   LocalInstanceReference,
   LocalMediatorReference,

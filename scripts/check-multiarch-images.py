@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 from dockerfile_parse import DockerfileParser
 
@@ -91,14 +92,35 @@ def _image_sha256_for(file: str) -> str | None:
     return os.environ.get(key)
 
 
+INSPECT_ATTEMPTS = 20
+INSPECT_RETRY_WAIT_SECONDS = 5
+
+
 def _inspect(image: str, digest: str) -> bool:
     """Return True if the digest resolves to a multi-arch manifest list/index.
 
-    Uses `skopeo inspect --raw`. A multi-arch digest has a `.manifests` array
-    with at least one entry; a single-arch digest has no `.manifests`.
+    Retries `_inspect_once`, because a transient registry failure must not be
+    reported as a wrongly pinned digest.
     """
     # skopeo does not accept both a tag and a digest, so drop the tag.
     ref = f"docker://{image}@sha256:{digest}"
+    for attempt in range(1, INSPECT_ATTEMPTS + 1):
+        if _inspect_once(ref):
+            return True
+        if attempt < INSPECT_ATTEMPTS:
+            print(
+                f"Retrying inspect of {ref} in {INSPECT_RETRY_WAIT_SECONDS}s (attempt {attempt}/{INSPECT_ATTEMPTS} failed)",
+                file=sys.stderr,
+            )
+            time.sleep(INSPECT_RETRY_WAIT_SECONDS)
+    return False
+
+
+def _inspect_once(ref: str) -> bool:
+    """Return True if a single `skopeo inspect --raw` of the reference yields a
+    multi-arch manifest list/index. A multi-arch digest has a `.manifests` array
+    with at least one entry; a single-arch digest has no `.manifests`.
+    """
     try:
         raw = subprocess.run(
             ["skopeo", "inspect", "--raw", "--no-creds", ref],
@@ -117,7 +139,14 @@ def _inspect(image: str, digest: str) -> bool:
         return False
 
     manifests = manifest.get("manifests")
-    return isinstance(manifests, list) and len(manifests) > 0
+    if isinstance(manifests, list) and len(manifests) > 0:
+        return True
+    print(
+        f"ERROR: {ref} resolved to a manifest without a manifests list: "
+        f"mediaType={manifest.get('mediaType')} schemaVersion={manifest.get('schemaVersion')} keys={sorted(manifest.keys())}",
+        file=sys.stderr,
+    )
+    return False
 
 
 def _extract_refs_from_text(text: str) -> set[tuple[str, str, str]]:

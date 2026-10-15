@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "create": "bash SPLICE_ROOT/cluster/pulumi/observability/prometheus-crd-update.sh 0.94.0"
+  },
+  "name": "update-prometheus-crd-0.94.0",
+  "provider": "",
+  "type": "command:local:Command"
+}

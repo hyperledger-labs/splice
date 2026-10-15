@@ -15,7 +15,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
   PhysicalSynchronizerNodeConfig,
-  SequencerConfig,
   SequencerConnectionConfig,
   SynchronizerNodeConfig,
 }
@@ -84,7 +83,7 @@ class ValidatorSequencerConnectionIntegrationTest
           val now = env.environment.clock.now
           val availableSequencers = for {
             domain <- allSequencers
-            sequencer <- domain.sequencers.filter(_.serial.isDefined)
+            sequencer <- domain.sequencers
             if sequencer.url.nonEmpty && !now.toInstant.isBefore(sequencer.availableAfter)
           } yield sequencer
           availableSequencers.size shouldBe 4
@@ -219,24 +218,12 @@ class ValidatorSequencerConnectionIntegrationTest
         sys.error(s"No config found for synchronizer $synchronizerId"),
       )
 
-      existingSequencerConfig = synchronizerNodeConfig.sequencer.toScala
-        .getOrElse(
-          sys.error(s"No sequencer config found for synchronizer $synchronizerId")
-        )
-
-      updatedSequencerConfig = new SequencerConfig(
-        existingSequencerConfig.migrationId,
-        existingSequencerConfig.sequencerId,
-        newUrl,
-        existingSequencerConfig.availableAfter,
-      )
-
       newNodeConfig = new SynchronizerNodeConfig(
         synchronizerNodeConfig.cometBft,
-        Some(updatedSequencerConfig).toJava,
+        None.toJava,
         synchronizerNodeConfig.mediator,
         synchronizerNodeConfig.scan,
-        synchronizerNodeConfig.legacySequencerConfig,
+        None.toJava,
         synchronizerNodeConfig.sequencerIdentity,
         synchronizerNodeConfig.physicalSynchronizers.toScala
           .map(

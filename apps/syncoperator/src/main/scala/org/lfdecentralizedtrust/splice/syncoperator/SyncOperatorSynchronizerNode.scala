@@ -4,11 +4,12 @@
 package org.lfdecentralizedtrust.splice.syncoperator
 
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.admin.api.client.data.{
   SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
+  SubscriptionLivenessLimits,
 }
 import com.digitalasset.canton.config.{ClientConfig, CryptoConfig, CryptoProvider}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
@@ -64,6 +65,9 @@ final class SyncOperatorSynchronizerNode(
 
   override def mediatorSequencerConnectionPoolDelays: SequencerConnectionPoolDelays =
     config.mediator.fold(SequencerConnectionPoolDelays.default)(_.sequencerConnectionPoolDelays)
+
+  override def mediatorSubscriptionLivenessLimits: SubscriptionLivenessLimits =
+    config.mediator.fold(SubscriptionLivenessLimits.default)(_.subscriptionLivenessLimits)
 
   override def staticSynchronizerParameters(serial: NonNegativeInt): StaticSynchronizerParameters =
     SynchronizerParametersConfig(synchronizerLimits =

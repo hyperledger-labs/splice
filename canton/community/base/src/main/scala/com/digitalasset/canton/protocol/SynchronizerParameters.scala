@@ -23,9 +23,10 @@ import com.digitalasset.canton.time.{NonNegativeFiniteDuration, PositiveSeconds}
 import com.digitalasset.canton.topology.transaction.ParticipantSynchronizerLimits
 import com.digitalasset.canton.util.EitherUtil
 import com.digitalasset.canton.util.EitherUtil.RichEither
+import com.digitalasset.canton.validation.{ProtoUnvalidatedSeq, ProtoValidation}
 import com.digitalasset.canton.version.*
 import com.digitalasset.canton.{ProtoDeserializationError, checked}
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.concurrent.Future
 
@@ -82,7 +83,7 @@ object SynchronizerParameters {
   * @param synchronizerLimits
   *   Size limits on various collections, globally enforced on this synchronizer.
   */
-final case class StaticSynchronizerParameters private (
+final case class StaticSynchronizerParameters(
     requiredSigningSpecs: RequiredSigningSpecs,
     requiredEncryptionSpecs: RequiredEncryptionSpecs,
     requiredSymmetricKeySchemes: NonEmpty[Set[SymmetricKeyScheme]],
@@ -218,31 +219,15 @@ object StaticSynchronizerParameters
       )
     )
 
-  // Splice: Inlined from ProtoValidation.validateLength
-  private def validateLength[E](
-      seq: Seq[E],
-      field: String,
-      maxLength: Int,
-  ): ParsingResult[Seq[E]] =
-    Either.cond(
-      seq.length <= maxLength,
-      seq,
-      InvariantViolation(
-        field,
-        s"repeated field has ${seq.size} elements, exceeding the maximum of $maxLength",
-      ),
-    )
-
-  // Splice: Copied from Canton, still a placeholder even in Canton.
-  private val MaxCollectionSize: Int = Int.MaxValue
-
   private def parseRequiredSet[P, A](
+      pvv: ProtocolVersionValidation,
       field: String,
-      content: Seq[P],
-      parse: (String, P) => ParsingResult[A],
+      content: ProtoUnvalidatedSeq[P],
+      parse: (P, String) => ParsingResult[A],
   ): ParsingResult[NonEmpty[Set[A]]] =
-    validateLength(content, field, MaxCollectionSize)
-      .flatMap(ProtoConverter.parseRequiredNonEmpty(parse(field, _), field, _))
+    ProtoValidation
+      .validateLength(content, field, pvv, ProtoValidation.MaxCollectionSize)
+      .flatMap(ProtoConverter.parseRequiredNonEmpty(parse(_, field), field, _))
       .map(_.toSet)
 
   def fromProtoV30(
@@ -261,35 +246,45 @@ object StaticSynchronizerParameters
       topologyChangeDelayP,
     ) = synchronizerParametersP
 
+    // The declared protocol version is itself untrusted here, so bound unconditionally.
+    val pvv = ProtocolVersionValidation.AlwaysValidation
+
     for {
+      protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP)
+      _ <- checkProtoVersionCompatibility(protocolVersion, ProtoVersion(30))
+
       requiredSigningSpecsP <- requiredSigningSpecsOP.toRight(
         ProtoDeserializationError.FieldNotSet(
           "required_signing_specs"
         )
       )
-      requiredSigningSpecs <- RequiredSigningSpecs.fromProtoV30(requiredSigningSpecsP)
+      requiredSigningSpecs <- RequiredSigningSpecs.fromProtoV30(pvv, requiredSigningSpecsP)
       requiredEncryptionSpecsP <- requiredEncryptionSpecsOP.toRight(
         ProtoDeserializationError.FieldNotSet(
           "required_encryption_specs"
         )
       )
-      requiredEncryptionSpecs <- RequiredEncryptionSpecs.fromProtoV30(requiredEncryptionSpecsP)
+      requiredEncryptionSpecs <- RequiredEncryptionSpecs.fromProtoV30(pvv, requiredEncryptionSpecsP)
       requiredSymmetricKeySchemes <- parseRequiredSet(
+        pvv,
         "required_symmetric_key_schemes",
         requiredSymmetricKeySchemesP,
         SymmetricKeyScheme.fromProtoEnum,
       )
       requiredHashAlgorithms <- parseRequiredSet(
+        pvv,
         "required_hash_algorithms",
         requiredHashAlgorithmsP,
         HashAlgorithm.fromProtoEnum,
       )
       requiredCryptoKeyFormats <- parseRequiredSet(
+        pvv,
         "required_crypto_key_formats",
         requiredCryptoKeyFormatsP,
         CryptoKeyFormat.fromProtoEnum,
       )
       requiredSignatureFormats <- parseRequiredSet(
+        pvv,
         "required_signature_formats",
         requiredSignatureFormatsP,
         SignatureFormat.fromProtoEnum,
@@ -299,7 +294,6 @@ object StaticSynchronizerParameters
         "topology_change_delay",
         topologyChangeDelayP,
       )
-      protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP)
       serial <- ProtoConverter.parseNonNegativeInt("serial", serialP)
 
       staticSynchronizerParameters <- create(
@@ -335,35 +329,45 @@ object StaticSynchronizerParameters
       synchronizerLimitsP,
     ) = synchronizerParametersP
 
+    // The declared protocol version is itself untrusted here, so bound unconditionally.
+    val pvv = ProtocolVersionValidation.AlwaysValidation
+
     for {
+      protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP)
+      _ <- checkProtoVersionCompatibility(protocolVersion, ProtoVersion(31))
+
       requiredSigningSpecsP <- requiredSigningSpecsOP.toRight(
         ProtoDeserializationError.FieldNotSet(
           "required_signing_specs"
         )
       )
-      requiredSigningSpecs <- RequiredSigningSpecs.fromProtoV30(requiredSigningSpecsP)
+      requiredSigningSpecs <- RequiredSigningSpecs.fromProtoV30(pvv, requiredSigningSpecsP)
       requiredEncryptionSpecsP <- requiredEncryptionSpecsOP.toRight(
         ProtoDeserializationError.FieldNotSet(
           "required_encryption_specs"
         )
       )
-      requiredEncryptionSpecs <- RequiredEncryptionSpecs.fromProtoV30(requiredEncryptionSpecsP)
+      requiredEncryptionSpecs <- RequiredEncryptionSpecs.fromProtoV30(pvv, requiredEncryptionSpecsP)
       requiredSymmetricKeySchemes <- parseRequiredSet(
+        pvv,
         "required_symmetric_key_schemes",
         requiredSymmetricKeySchemesP,
         SymmetricKeyScheme.fromProtoEnum,
       )
       requiredHashAlgorithms <- parseRequiredSet(
+        pvv,
         "required_hash_algorithms",
         requiredHashAlgorithmsP,
         HashAlgorithm.fromProtoEnum,
       )
       requiredCryptoKeyFormats <- parseRequiredSet(
+        pvv,
         "required_crypto_key_formats",
         requiredCryptoKeyFormatsP,
         CryptoKeyFormat.fromProtoEnum,
       )
       requiredSignatureFormats <- parseRequiredSet(
+        pvv,
         "required_signature_formats",
         requiredSignatureFormatsP,
         SignatureFormat.fromProtoEnum,
@@ -373,7 +377,6 @@ object StaticSynchronizerParameters
         "topology_change_delay",
         topologyChangeDelayP,
       )
-      protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP)
       serial <- ProtoConverter.parseNonNegativeInt("serial", serialP)
       synchronizerLimits <- parseRequired(
         SynchronizerLimits.fromProtoV31,
@@ -396,6 +399,17 @@ object StaticSynchronizerParameters
       ).leftMap(_.toProtoDeserializationError)
     } yield staticSynchronizerParameters
   }
+
+  private def checkProtoVersionCompatibility(
+      protocolVersion: ProtocolVersion,
+      protoVersion: ProtoVersion,
+  ): ParsingResult[Unit] = EitherUtil.condUnit(
+    protoVersionFor(protocolVersion) == protoVersion,
+    InvariantViolation(
+      "protocol_version",
+      s"Synchronizer parameters with PV $protocolVersion cannot be deserialized from $protoVersion",
+    ),
+  )
 
   class InvalidStaticSynchronizerParameters(message: String) extends RuntimeException(message) {
     lazy val toProtoDeserializationError: ProtoDeserializationError.InvariantViolation =
@@ -1079,8 +1093,8 @@ final case class DynamicSynchronizerParametersWithValidity(
     )
 
   def assignmentExclusivityLimitFor(baseline: CantonTimestamp): Either[String, CantonTimestamp] =
-    checkValidity(baseline, "assignment exclusivity limit").map(_ =>
-      baseline.add(assignmentExclusivityTimeout.unwrap)
+    checkValidity(baseline, "assignment exclusivity limit").flatMap(_ =>
+      baseline.safeAdd(assignmentExclusivityTimeout)
     )
 
   /** Computes the participant response time for the given timestamp.
@@ -1217,7 +1231,7 @@ object DynamicSynchronizerParametersHistory {
   * @throws java.lang.IllegalArgumentException
   *   when [[catchUpIntervalSkip]] * [[nrIntervalsToTriggerCatchUp]] overflows.
   */
-final case class AcsCommitmentsCatchUpParameters private (
+final case class AcsCommitmentsCatchUpParameters(
     catchUpIntervalSkip: PositiveInt,
     nrIntervalsToTriggerCatchUp: PositiveInt,
 ) extends PrettyPrinting {

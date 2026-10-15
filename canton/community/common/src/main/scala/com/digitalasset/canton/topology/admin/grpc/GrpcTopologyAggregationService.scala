@@ -4,24 +4,30 @@
 package com.digitalasset.canton.topology.admin.grpc
 
 import cats.data.EitherT
-import cats.syntax.parallel.*
+import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.ProtoDeserializationError.ProtoDeserializationFailure
+import com.digitalasset.canton.ProtoSerializationError.ProtoSerializationFailure
+import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.*
-import com.digitalasset.canton.topology.admin.v30
+import com.digitalasset.canton.topology.admin.grpc.GrpcTopologyAggregationService.MemberKeyRecord
+import com.digitalasset.canton.topology.admin.{grpc, v30}
 import com.digitalasset.canton.topology.client.*
+import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
 import com.digitalasset.canton.topology.store.{
   NoPackageDependencies,
   TopologyStore,
-  TopologyStoreId,
+  TopologyStoreId as InternalTopologyStoreId,
 }
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{
+  Member,
   MemberCode,
   ParticipantId,
   PartyId,
@@ -30,21 +36,28 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.{MonadUtil, OptionUtil}
+import com.digitalasset.canton.validation.ProtoValidation
+import com.digitalasset.canton.version.{ProtocolVersionValidation, ReleaseVersion}
 import com.google.protobuf.timestamp.Timestamp as ProtoTimestamp
 
 import scala.concurrent.{ExecutionContext, Future}
 
+/** Aggregates topology info across synchronizer stores. */
 class GrpcTopologyAggregationService(
-    stores: => Seq[TopologyStore[TopologyStoreId.SynchronizerStore]],
+    stores: => Seq[
+      TopologyStoreInitializationStatus[InternalTopologyStoreId.SynchronizerStore, TopologyStore]
+    ],
+    physicalSynchronizerIdLookup: PsidLookup,
     ips: IdentityProvidingServiceClient,
     val loggerFactory: NamedLoggerFactory,
+    batchingConfig: BatchingConfig,
 )(implicit val ec: ExecutionContext)
     extends v30.TopologyAggregationServiceGrpc.TopologyAggregationService
     with NamedLogging {
 
   private def getTopologySnapshot(
       asOf: CantonTimestamp,
-      store: TopologyStore[TopologyStoreId.SynchronizerStore],
+      store: TopologyStore[InternalTopologyStoreId.SynchronizerStore],
   ): TopologySnapshotLoader =
     new StoreBasedTopologySnapshot(
       store.storeId.psid,
@@ -55,48 +68,48 @@ class GrpcTopologyAggregationService(
     )
 
   private def snapshots(
-      synchronizerIds: Set[SynchronizerId],
+      requestedSynchronizerIds: Set[SynchronizerId],
       asOf: Option[ProtoTimestamp],
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, RpcError, List[
+  ): EitherT[FutureUnlessShutdown, RpcError, Seq[
     (PhysicalSynchronizerId, TopologySnapshotLoader)
   ]] =
     for {
       asOfO <- wrapErrUS(asOf.traverse(CantonTimestamp.fromProtoTimestamp))
-    } yield {
-      stores.collect {
-        case store
-            if synchronizerIds.contains(
-              store.storeId.psid.logical
-            ) || synchronizerIds.isEmpty =>
-          val synchronizerId = store.storeId.psid
-          // get approximate timestamp from synchronizer client to prevent race conditions (when we have written data into the stores but haven't yet updated the client)
-          val asOf = asOfO.getOrElse(
-            ips
-              .forSynchronizer(synchronizerId)
-              .map(_.approximateTimestamp)
-              .getOrElse(CantonTimestamp.MaxValue)
-          )
-          (
-            synchronizerId,
-            getTopologySnapshot(asOf, store),
-          )
-      }.toList
-    }
 
-  private def groupBySnd[A, B, C](item: Seq[(A, B, C)]): Map[B, Seq[(A, C)]] =
-    item.groupBy(_._2).map { case (b, res) =>
-      (
-        b,
-        res.map { case (a, _, c) =>
-          (a, c)
-        },
+      activeStores <- EitherT.fromEither[FutureUnlessShutdown](
+        GrpcTopologyServiceUtil.collectActiveStores[SynchronizerStore](
+          requestedSynchronizerIds.map(lsid => grpc.TopologyStoreId.Synchronizer(lsid)).toSeq,
+          stores,
+          physicalSynchronizerIdLookup,
+        )
       )
+    } yield {
+      activeStores.map { store =>
+        val psid = store.storeId.psid
+        // Get the approximate timestamp from the synchronizer client to prevent race conditions
+        // (when we have written data into the stores but haven't yet updated the client)
+        val effectiveAsOf = asOfO.getOrElse(
+          ips
+            .forSynchronizer(psid)
+            .map(_.approximateTimestamp)
+            .getOrElse(CantonTimestamp.MaxValue)
+        )
+        (
+          psid,
+          getTopologySnapshot(effectiveAsOf, store),
+        )
+      }
     }
 
+  /** Sequentially finds parties matching filters, short-circuiting at `limit`.
+    *
+    * Scaling impact: High limits risk heavy JVM memory pressure as the accumulated `Set[PartyId]`
+    * is held entirely in memory.
+    */
   private def findMatchingParties(
-      clients: List[(PhysicalSynchronizerId, TopologySnapshotLoader)],
+      clients: Seq[(PhysicalSynchronizerId, TopologySnapshotLoader)],
       filterParty: String,
       filterParticipant: String,
       limit: Int,
@@ -109,48 +122,87 @@ class GrpcTopologyAggregationService(
           if (tmp.sizeIs >= limit) (tmp.take(limit), true) else (tmp, false)
         }
     }
-    .map(_._1)
+    .map { case (res, _) => res }
 
-  private def findParticipants(
-      clients: List[(PhysicalSynchronizerId, TopologySnapshotLoader)],
-      partyId: PartyId,
-  )(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[ParticipantId, Map[PhysicalSynchronizerId, ParticipantPermission]]] =
-    clients
-      .parFlatTraverse { case (synchronizerId, client) =>
-        client
-          .activeParticipantsOf(partyId.toLf)
-          .map(_.map { case (participantId, attributes) =>
-            (synchronizerId, participantId, attributes.permission)
-          }.toList)
-      }
-      .map(_.groupBy { case (_, participantId, _) => participantId }.map { case (k, v) =>
-        (k, v.map { case (synchronizerId, _, permission) => (synchronizerId, permission) }.toMap)
-      })
-
+  /** Lists parties and their participants across synchronizers.
+    *
+    * Scaling impact: An excessively high `limit` pushes massive arrays to the DB, risking DB-level
+    * constraints (e.g., query size bounds) and JVM OutOfMemory errors during response mapping.
+    */
   override def listParties(
       request: v30.ListPartiesRequest
   ): Future[v30.ListPartiesResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-    val v30.ListPartiesRequest(asOfP, limit, synchronizerIdsP, filterParty, filterParticipant) =
+    val v30.ListPartiesRequest(asOfP, limit, synchronizerIdsP, filterPartyP, filterParticipantP) =
       request
+
     val res: EitherT[FutureUnlessShutdown, RpcError, v30.ListPartiesResponse] = for {
       synchronizerIds <- EitherT
         .fromEither[FutureUnlessShutdown](
-          synchronizerIdsP.traverse(SynchronizerId.fromProtoPrimitive(_, "synchronizer_ids"))
+          ProtoValidation.validateThen(
+            synchronizerIdsP,
+            "synchronizer_ids",
+            ProtocolVersionValidation.AlwaysValidation,
+            ProtoValidation.MaxCollectionSize,
+          )(SynchronizerId.fromProtoPrimitive)
         )
         .leftMap(ProtoDeserializationFailure.Wrap(_): RpcError)
+
+      filterParty <- wrapErrUS(
+        ProtoValidation.validate(
+          filterPartyP,
+          "filter_party",
+          ProtocolVersionValidation.AlwaysValidation,
+        )
+      )
+      filterParticipant <- wrapErrUS(
+        ProtoValidation
+          .validate(
+            filterParticipantP,
+            "filter_participant",
+            ProtocolVersionValidation.AlwaysValidation,
+          )
+      )
+
       matched <- snapshots(synchronizerIds.toSet, asOfP)
+
       parties <- EitherT.right(
         findMatchingParties(matched, filterParty, filterParticipant, limit)
       )
-      results <- EitherT.right(parties.toList.parTraverse { partyId =>
-        findParticipants(matched, partyId).map(res => (partyId, res))
-      })
+
+      partyIdLookup = parties.map(p => p.toLf -> p).toMap
+      lfParties = partyIdLookup.keys.toSeq
+
+      // Execute exactly ONE bulk query per synchronizer, sequentially.
+      results <- EitherT.right(
+        MonadUtil.foldLeftM(
+          Map
+            .empty[PartyId, Map[ParticipantId, Map[PhysicalSynchronizerId, ParticipantPermission]]],
+          matched,
+        ) { case (acc, (synchronizerId, client)) =>
+          client.activeParticipantsOfPartiesWithInfo(lfParties).map { partiesInfoMap =>
+            partiesInfoMap.foldLeft(acc) { case (partyAcc, (lfParty, partyInfo)) =>
+              val partyId = partyIdLookup(lfParty)
+              val currentPartyParticipants = partyAcc.getOrElse(partyId, Map.empty)
+
+              val updatedPartyParticipants =
+                partyInfo.participants.foldLeft(currentPartyParticipants) {
+                  case (participantAcc, (participantId, attributes)) =>
+                    val existingSyncs = participantAcc.getOrElse(participantId, Map.empty)
+                    participantAcc.updated(
+                      participantId,
+                      existingSyncs + (synchronizerId -> attributes.permission),
+                    )
+                }
+
+              partyAcc.updated(partyId, updatedPartyParticipants)
+            }
+          }
+        }
+      )
     } yield {
       v30.ListPartiesResponse(
-        results = results.map { case (partyId, participants) =>
+        results = results.view.map { case (partyId, participants) =>
           v30.ListPartiesResponse.Result(
             party = partyId.toProtoPrimitive,
             participants = participants.map { case (participantId, synchronizers) =>
@@ -166,54 +218,112 @@ class GrpcTopologyAggregationService(
               )
             }.toSeq,
           )
-        }
+        }.toSeq
       )
     }
     CantonGrpcUtil.mapErrNewEUS(res)
   }
 
+  /** Lists key owners and their signing/encryption keys across specified synchronizers.
+    *
+    * Scaling impact: `request.limit` restrict keys *per owner*, not total owners. Broad queries on
+    * large networks will yield massive result sets, risking JVM OOM during grouping.
+    */
   override def listKeyOwners(
       request: v30.ListKeyOwnersRequest
   ): Future[v30.ListKeyOwnersResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+
     val res: EitherT[FutureUnlessShutdown, RpcError, v30.ListKeyOwnersResponse] = for {
       keyOwnerTypeO <- wrapErrUS(
-        OptionUtil
-          .emptyStringAsNone(request.filterKeyOwnerType)
-          .traverse(code => MemberCode.fromProtoPrimitive(code, "filterKeyOwnerType"))
+        ProtoValidation.validateThen(
+          request.filterKeyOwnerType,
+          "filter_key_owner_type",
+          ProtocolVersionValidation.AlwaysValidation,
+        )((code, field) =>
+          OptionUtil.emptyStringAsNone(code).traverse(MemberCode.fromProtoPrimitive(_, field))
+        )
       ): EitherT[FutureUnlessShutdown, RpcError, Option[MemberCode]]
-      synchronizerIds <- EitherT
+
+      clientVersion <- EitherT
         .fromEither[FutureUnlessShutdown](
-          request.synchronizerIds.traverse(SynchronizerId.fromProtoPrimitive(_, "synchronizer_ids"))
+          ProtoValidation.validateThen(
+            request.baseAggregationRequest.map(_.clientVersion),
+            "client_version",
+            ProtocolVersionValidation.AlwaysValidation,
+          )(ReleaseVersion.fromProtoPrimitive)
         )
         .leftMap(ProtoDeserializationFailure.Wrap(_): RpcError)
 
-      matched <- snapshots(synchronizerIds.toSet, request.asOf)
-      res <- EitherT.right(matched.parTraverse { case (storeId, client) =>
-        client.inspectKeys(request.filterKeyOwnerUid, keyOwnerTypeO, request.limit).map { res =>
-          (storeId, res)
-        }
-      })
-    } yield {
-      val mapped = groupBySnd(res.flatMap { case (storeId, keyPerMember) =>
-        keyPerMember.map { case (owner, keys) =>
-          (storeId, owner, keys)
-        }
-      })
-      v30.ListKeyOwnersResponse(
-        results = mapped.toSeq.flatMap { case (owner, keyPerSynchronizer) =>
-          keyPerSynchronizer.map { case (psid, keys) =>
-            v30.ListKeyOwnersResponse.Result(
-              keyOwner = owner.toProtoPrimitive,
-              synchronizerId = psid.logical.toProtoPrimitive,
-              signingKeys = keys.signingKeys.map(_.toProtoV30),
-              encryptionKeys = keys.encryptionKeys.map(_.toProtoV30),
-              physicalSynchronizerId = psid.toProtoPrimitive,
-            )
-          }
-        }
+      synchronizerIds <- EitherT
+        .fromEither[FutureUnlessShutdown](
+          ProtoValidation.validateThen(
+            request.synchronizerIds,
+            "synchronizer_ids",
+            ProtocolVersionValidation.AlwaysValidation,
+            ProtoValidation.MaxCollectionSize,
+          )(SynchronizerId.fromProtoPrimitive)
+        )
+        .leftMap(ProtoDeserializationFailure.Wrap(_): RpcError)
+
+      filterKeyOwnerUid <- wrapErrUS(
+        ProtoValidation.validate(
+          request.filterKeyOwnerUid,
+          "filter_key_owner_uid",
+          ProtocolVersionValidation.AlwaysValidation,
+        )
       )
-    }
+
+      matched <- snapshots(synchronizerIds.toSet, request.asOf)
+
+      res <- EitherT.right(MonadUtil.parTraverseWithLimit(batchingConfig.parallelism)(matched) {
+        case (storeId, client) =>
+          client.inspectKeys(filterKeyOwnerUid, keyOwnerTypeO, request.limit).map { res =>
+            (storeId, res)
+          }
+      })
+
+      records = for {
+        (storeId, keyPerMember) <- res
+        (owner, keys) <- keyPerMember
+      } yield MemberKeyRecord(owner, storeId, keys)
+
+      mapped = records.groupMap(r => r.owner)(r => (r.storeId, r.keys))
+
+      resultsE = mapped.toSeq
+        .flatTraverse { case (owner, keyPerSynchronizer) =>
+          keyPerSynchronizer
+            .traverse { case (psid, keys) =>
+              val serializedKeysE =
+                // TODO(#32231) Switch to v31
+                if (ReleaseVersion.Feature.signingKeyUsageProtoV31.supported(clientVersion))
+                  Seq().asRight
+                else
+                  keys.signingKeys.traverse(_.toProtoV30)
+              serializedKeysE.map(serializedKeys =>
+                v30.ListKeyOwnersResponse.Result(
+                  keyOwner = owner.toProtoPrimitive,
+                  synchronizerId = psid.logical.toProtoPrimitive,
+                  signingKeysV30 = serializedKeys,
+                  encryptionKeys = keys.encryptionKeys.map(_.toProtoV30),
+                  physicalSynchronizerId = psid.toProtoPrimitive,
+                )
+              )
+            }
+        }
+        .leftMap(ProtoSerializationFailure.Wrap(_).toCantonRpcError)
+
+      results <- EitherT.fromEither[FutureUnlessShutdown](resultsE)
+    } yield v30.ListKeyOwnersResponse(results = results)
+
     CantonGrpcUtil.mapErrNewEUS(res)
   }
+}
+
+object GrpcTopologyAggregationService {
+  private final case class MemberKeyRecord[K](
+      owner: Member,
+      storeId: PhysicalSynchronizerId,
+      keys: K,
+  )
 }

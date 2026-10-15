@@ -51,6 +51,7 @@ import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpRateLimiter}
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_operator.SvOperatorResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_public.SvPublicResource
+import org.lfdecentralizedtrust.splice.http.v0.sv_public_stream.SvPublicStreamResource
 import org.lfdecentralizedtrust.splice.setup.ParticipantInitializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
@@ -548,6 +549,12 @@ class SvApp(
           errorHandler.directive(traceContext) {
             concat(
               SvPublicResource.routes(
+                publicHandler,
+                operation =>
+                  buildOperation("svPublic", operation)
+                    .tflatMap(_ => provide(traceContext)),
+              ),
+              SvPublicStreamResource.routes(
                 publicHandler,
                 operation =>
                   buildOperation("svPublic", operation)

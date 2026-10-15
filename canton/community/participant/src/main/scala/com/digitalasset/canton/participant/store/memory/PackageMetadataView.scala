@@ -12,6 +12,7 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.error.{CommonErrors, PackageServiceErrors}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors
@@ -166,10 +167,8 @@ class MutablePackageMetadataViewImpl(
           .asGrpcError
       )
 
-  override def onClosed(): Unit = {
-    LifeCycle.close(mutatePackageMetadataExecutionQueue)(logger)
-    LifeCycle.close(packageStore)(logger)
-  }
+  override def onClosed(): Unit =
+    LifeCycle.close(mutatePackageMetadataExecutionQueue, packageStore)(logger)
 
   private def decodePackageMetadata(
       archive: DamlLf.Archive

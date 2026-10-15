@@ -4,7 +4,6 @@
 package com.digitalasset.canton.crypto.provider.jce
 
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{
@@ -31,6 +30,7 @@ import com.digitalasset.canton.serialization.{
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherUtil, ShowUtil, ThrowableUtil}
 import com.digitalasset.canton.version.HasToByteString
+import com.digitalasset.nonempty.NonEmpty
 import com.github.blemale.scaffeine.Cache
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
@@ -38,6 +38,7 @@ import org.bouncycastle.crypto.DataLengthException
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator
 import org.bouncycastle.crypto.params.Argon2Parameters
 import org.bouncycastle.jcajce.provider.asymmetric.edec.{BCEdDSAPrivateKey, BCEdDSAPublicKey}
+import org.bouncycastle.jcajce.provider.asymmetric.mldsa.{BCMLDSAPrivateKey, BCMLDSAPublicKey}
 import org.bouncycastle.jce.spec.IESParameterSpec
 
 import java.security.interfaces.*
@@ -91,6 +92,7 @@ class JcePureCrypto(
     publicKeyConversionCacheConfig: CacheConfig,
     privateKeyConversionCacheTtl: Option[FiniteDuration],
     override val signatureVerificationParallelism: PositiveInt,
+    override val encryptionParallelism: PositiveInt,
     override val signingMetrics: SigningMetrics,
     override val decryptionMetrics: DecryptionMetrics,
     override val loggerFactory: NamedLoggerFactory,
@@ -219,7 +221,9 @@ class JcePureCrypto(
                 )
               ),
         )
-        .leftMap(err => errFn(s"Failed to deserialize ${privateKey.format} private key: $err"))
+        .leftMap(err =>
+          errFn(s"Failed to deserialize ${privateKey.format} private key [${privateKey.id}]: $err")
+        )
       // The private key is already validated, including its type, during creation/deserialization,
       // so we can throw an exception here. This type check should never fail, except in case of an internal error.
       checkedPrivateKey <- typeMatcher(javaPrivateKey)
@@ -321,7 +325,7 @@ class JcePureCrypto(
         SymmetricKey.create(CryptoKeyFormat.Raw, bytes.unwrap, scheme)
     }
 
-  override private[crypto] def signBytesInternal(
+  override def signBytes(
       bytes: ByteString,
       signingKey: SigningPrivateKey,
       usage: NonEmpty[Set[SigningKeyUsage]],
@@ -350,17 +354,27 @@ class JcePureCrypto(
               { case k: ECPrivateKey => Right(k) },
               SigningError.InvalidSigningKey.apply,
             )
-        }
-        signature <- Either
-          .catchOnly[GeneralSecurityException] {
-            val signer = JSignature.getInstance(
-              signingAlgorithmSpec.jcaAlgorithmName,
-              JceSecurityProvider.bouncyCastleProvider,
+          case SigningAlgorithmSpec.MlDsa65 =>
+            toJavaPrivateKey(
+              signingKey,
+              { case k: BCMLDSAPrivateKey => Right(k) },
+              SigningError.InvalidSigningKey.apply,
             )
-            signer.initSign(privateKeyParsed)
-            signer.update(bytes.toByteArray)
-            signer.sign()
-          }
+
+        }
+        signature <- signingMetrics.signingLatency
+          .time(
+            Either
+              .catchOnly[GeneralSecurityException] {
+                val signer = JSignature.getInstance(
+                  signingAlgorithmSpec.jcaAlgorithmName,
+                  JceSecurityProvider.bouncyCastleProvider,
+                )
+                signer.initSign(privateKeyParsed)
+                signer.update(bytes.toByteArray)
+                signer.sign()
+              }
+          )
           .bimap(
             err => SigningError.FailedToSign(show"$err"),
             signatureBytes =>
@@ -419,6 +433,12 @@ class JcePureCrypto(
             toJavaPublicKey(
               publicKey,
               { case k: ECPublicKey => Right(k) },
+              SignatureCheckError.InvalidKeyError.apply,
+            )
+          case SigningAlgorithmSpec.MlDsa65 =>
+            toJavaPublicKey(
+              publicKey,
+              { case k: BCMLDSAPublicKey => Right(k) },
               SignatureCheckError.InvalidKeyError.apply,
             )
         }
@@ -655,7 +675,7 @@ class JcePureCrypto(
       case Left(err) => Left(err)
     }
 
-  override private[crypto] def decryptWithInternal[M](
+  override def decryptWith[M](
       encrypted: AsymmetricEncrypted[M],
       privateKey: EncryptionPrivateKey,
   )(
@@ -698,30 +718,33 @@ class JcePureCrypto(
                   DecryptionError.FailedToDeserialize(DefaultDeserializationError(err.show))
                 )
               (iv, ciphertext) = ciphertextSplit
-              decrypter <- Either
-                .catchOnly[GeneralSecurityException] {
-                  val cipher = Cipher
-                    .getInstance(
-                      EciesHmacSha256Aes128CbcParams.jceInternalName,
-                      JceSecurityProvider.bouncyCastleProvider,
+              plaintext <- decryptionMetrics.decryptLatency.time(
+                for {
+                  decrypter <- Either
+                    .catchOnly[GeneralSecurityException] {
+                      val cipher = Cipher.getInstance(
+                        EciesHmacSha256Aes128CbcParams.jceInternalName,
+                        JceSecurityProvider.bouncyCastleProvider,
+                      )
+                      cipher.init(
+                        Cipher.DECRYPT_MODE,
+                        ecPrivateKey,
+                        EciesHmacSha256Aes128CbcParams.parameterSpec(iv.toByteArray),
+                      )
+                      cipher
+                    }
+                    .leftMap(err =>
+                      DecryptionError.InvalidEncryptionKey(ThrowableUtil.messageWithStacktrace(err))
                     )
-                  cipher.init(
-                    Cipher.DECRYPT_MODE,
-                    ecPrivateKey,
-                    EciesHmacSha256Aes128CbcParams.parameterSpec(iv.toByteArray),
-                  )
-                  cipher
-                }
-                .leftMap(err =>
-                  DecryptionError.InvalidEncryptionKey(ThrowableUtil.messageWithStacktrace(err))
-                )
-              plaintext <- Either
-                .catchOnly[GeneralSecurityException](
-                  decrypter.doFinal(ciphertext.toByteArray)
-                )
-                .leftMap(err =>
-                  DecryptionError.FailedToDecrypt(ThrowableUtil.messageWithStacktrace(err))
-                )
+                  plaintext <- Either
+                    .catchOnly[GeneralSecurityException](
+                      decrypter.doFinal(ciphertext.toByteArray)
+                    )
+                    .leftMap(err =>
+                      DecryptionError.FailedToDecrypt(ThrowableUtil.messageWithStacktrace(err))
+                    )
+                } yield plaintext
+              )
               message <- deserialize(ByteString.copyFrom(plaintext))
                 .leftMap(DecryptionError.FailedToDeserialize.apply)
             } yield message
@@ -732,31 +755,35 @@ class JcePureCrypto(
                 { case k: RSAPrivateKey => Right(k) },
                 DecryptionError.InvalidEncryptionKey.apply,
               )
-              decrypter <- Either
-                .catchOnly[GeneralSecurityException] {
-                  val cipher = Cipher
-                    .getInstance(
-                      RsaOaepSha256Params.jceInternalName,
-                      JceSecurityProvider.bouncyCastleProvider,
-                    )
-                  cipher.init(
-                    Cipher.DECRYPT_MODE,
-                    rsaPrivateKey,
-                  )
-                  cipher
-                }
-                .leftMap(err => DecryptionError.InvalidEncryptionKey(err.toString))
-              plaintext <- Try[Array[Byte]](
-                decrypter.doFinal(encrypted.ciphertext.toByteArray)
-              ).toEither.leftMap {
-                case err: DataLengthException =>
-                  DecryptionError
-                    .FailedToDecrypt(
-                      s"Most probably using a wrong secret key to decrypt the ciphertext: ${err.toString}"
-                    )
-                case err =>
-                  DecryptionError.FailedToDecrypt(ThrowableUtil.messageWithStacktrace(err))
-              }
+              plaintext <- decryptionMetrics.decryptLatency.time(
+                for {
+                  decrypter <- Either
+                    .catchOnly[GeneralSecurityException] {
+                      val cipher = Cipher
+                        .getInstance(
+                          RsaOaepSha256Params.jceInternalName,
+                          JceSecurityProvider.bouncyCastleProvider,
+                        )
+                      cipher.init(
+                        Cipher.DECRYPT_MODE,
+                        rsaPrivateKey,
+                      )
+                      cipher
+                    }
+                    .leftMap(err => DecryptionError.InvalidEncryptionKey(err.toString))
+                  plaintext <- Try[Array[Byte]](
+                    decrypter.doFinal(encrypted.ciphertext.toByteArray)
+                  ).toEither.leftMap {
+                    case err: DataLengthException =>
+                      DecryptionError
+                        .FailedToDecrypt(
+                          s"Most probably using a wrong secret key to decrypt the ciphertext: ${err.toString}"
+                        )
+                    case err =>
+                      DecryptionError.FailedToDecrypt(ThrowableUtil.messageWithStacktrace(err))
+                  }
+                } yield plaintext
+              )
               message <- deserialize(ByteString.copyFrom(plaintext))
                 .leftMap(DecryptionError.FailedToDeserialize.apply)
             } yield message
@@ -844,13 +871,9 @@ class JcePureCrypto(
           }
     }
 
-  override def signBytes(
-      bytes: ByteString,
-      signingKey: SigningPrivateKey,
-      usage: NonEmpty[Set[SigningKeyUsage]],
-      signingAlgorithmSpec: SigningAlgorithmSpec = signingAlgorithmSpecs.default,
-  )(implicit traceContext: TraceContext): Either[SigningError, Signature] =
-    super.signBytes(bytes, signingKey, usage, signingAlgorithmSpec)
+  override def toJwk(publicKey: SigningPublicKey): Either[JwksError, Jwk] =
+    JceJwks.toJwk(publicKey)
+
 }
 
 object JcePureCrypto {
@@ -900,6 +923,7 @@ object JcePureCrypto {
       publicKeyConversionCacheConfig = publicKeyConversionCacheConfig,
       privateKeyConversionCacheTtl = minimumPrivateKeyCacheDuration,
       signatureVerificationParallelism = config.parallelism.signatureVerificationParallelism,
+      encryptionParallelism = config.parallelism.encryptionParallelism,
       signingMetrics = cryptoMetrics.signingMetrics,
       decryptionMetrics = cryptoMetrics.decryptionMetrics,
       loggerFactory = loggerFactory,

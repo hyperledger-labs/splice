@@ -10,6 +10,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String36
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.store.ActiveContractSnapshot.ActiveContractIdsChange
@@ -80,9 +81,6 @@ trait ActiveContractStore
     *   - [[ActiveContractStore.DoubleContractCreation]] if the contract is created a second time.
     *   - [[ActiveContractStore.SimultaneousActivation]] if the contract is assigned at the same
     *     time or has been created by a different request at the same time.
-    *   - [[ActiveContractStore.ChangeBeforeCreation]] for every change that occurs before the
-    *     creation timestamp. This is reported only if no
-    *     [[ActiveContractStore.DoubleContractCreation]] is reported.
     */
   def markContractsCreated(
       contracts: Seq[(LfContractId, ReassignmentCounter)],
@@ -149,8 +147,6 @@ trait ActiveContractStore
     *   - [[ActiveContractStore.DoubleContractArchival]] if the contract is archived a second time.
     *   - [[ActiveContractStore.SimultaneousDeactivation]] if the contract is unassigned at the same
     *     time or has been archived by a different request at the same time.
-    *   - [[ActiveContractStore.ChangeBeforeCreation]] if this archival is earlier than the latest
-    *     creation of the contract.
     */
   def archiveContracts(contractIds: Seq[LfContractId], toc: TimeOfChange)(implicit
       traceContext: TraceContext
@@ -223,8 +219,6 @@ trait ActiveContractStore
     *   irregularities are reported:
     *   - [[ActiveContractStore.SimultaneousActivation]] if an assignment from another synchronizer
     *     or a creation has been added with the same timestamp.
-    *   - [[ActiveContractStore.ChangeBeforeCreation]] if this timestamp is before the latest
-    *     creation of the contract.
     *   - [[ActiveContractStore.ReassignmentCounterShouldIncrease]] if the reassignment counter does
     *     not increase monotonically.
     */
@@ -253,8 +247,6 @@ trait ActiveContractStore
     *   are reported:
     *   - [[ActiveContractStore.SimultaneousDeactivation]] if an unassignment to another
     *     synchronizer or a creation has been added with the same timestamp.
-    *   - [[ActiveContractStore.ChangeBeforeCreation]] if this timestamp is before the latest
-    *     creation of the contract.
     *   - [[ActiveContractStore.ReassignmentCounterShouldIncrease]] if the reassignment counter does
     *     not increase monotonically.
     */
@@ -279,7 +271,7 @@ trait ActiveContractStore
     * The caller must ensure that the given timestamp is at most the one of the clean cursor in the
     * [[com.digitalasset.canton.participant.protocol.RequestJournal]]
     */
-  override protected[canton] def doPrune(
+  override protected def doPrune(
       beforeAndIncluding: CantonTimestamp,
       lastPruning: Option[CantonTimestamp],
   )(implicit
@@ -611,16 +603,6 @@ object ActiveContractStore {
   ) extends AcsWarning {
     override def timeOfChanges: List[TimeOfChange] = List(oldTime, newTime)
 
-  }
-
-  /** The state of a contract is changed before its `creation`. */
-  // TODO(i31579): double-check if this can be removed
-  final case class ChangeBeforeCreation(
-      contractId: LfContractId,
-      creation: TimeOfChange,
-      change: TimeOfChange,
-  ) extends AcsWarning {
-    override def timeOfChanges: List[TimeOfChange] = List(creation, change)
   }
 
   /** ReassignmentCounter should increase monotonically with the time of change. */

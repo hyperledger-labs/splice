@@ -4,18 +4,19 @@
 package com.digitalasset.canton.crypto.store
 
 import cats.data.{EitherT, OptionT}
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.{CacheConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.SigningKeyUsage.matchesRelevantUsages
 import com.digitalasset.canton.crypto.kms.{Kms, KmsKeyId}
 import com.digitalasset.canton.crypto.store.KmsMetadataStore.KmsMetadata
 import com.digitalasset.canton.crypto.{Fingerprint, KeyPurpose, SigningKeyUsage}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.StampedLockWithHandle
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.ExecutionContext

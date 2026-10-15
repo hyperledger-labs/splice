@@ -1,0 +1,13 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "description": "SSL Policy for cn-gke-l7-gateway enforcing TLS 1.2+",
+    "minTlsVersion": "TLS_1_2",
+    "name": "cn-gke-l7-gateway-mock-ssl-policy",
+    "profile": "RESTRICTED"
+  },
+  "name": "cn-gke-l7-gateway-mock-ssl-policy",
+  "provider": "",
+  "type": "gcp:compute/regionSslPolicy:RegionSslPolicy"
+}

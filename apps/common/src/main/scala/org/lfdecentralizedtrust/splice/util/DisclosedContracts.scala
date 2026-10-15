@@ -5,8 +5,8 @@ package org.lfdecentralizedtrust.splice.util
 
 import com.daml.ledger.api.v2.CommandsOuterClass.DisclosedContract as Lav1DisclosedContract
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
-import com.daml.nonempty.{NonEmpty, Singleton}
-import com.daml.nonempty.NonEmptyReturningOps.*
+import com.digitalasset.nonempty.{NonEmpty, Singleton}
+import com.digitalasset.nonempty.NonEmptyReturningOps.*
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.util.ShowUtil.*
 import PrettyInstances.*

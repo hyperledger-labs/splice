@@ -4,6 +4,7 @@
 package com.digitalasset.canton.admin.api.client.commands
 
 import cats.syntax.either.*
+import cats.syntax.option.*
 import cats.syntax.traverse.*
 import com.daml.jwt.JwksUrl
 import com.daml.ledger.api.v2.admin.command_inspection_service.CommandInspectionServiceGrpc.CommandInspectionServiceStub
@@ -16,10 +17,16 @@ import com.daml.ledger.api.v2.admin.command_inspection_service.{
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.*
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfigServiceGrpc.IdentityProviderConfigServiceStub
 import com.daml.ledger.api.v2.admin.object_meta.ObjectMeta
+import com.daml.ledger.api.v2.admin.package_management_service
 import com.daml.ledger.api.v2.admin.package_management_service.*
 import com.daml.ledger.api.v2.admin.package_management_service.PackageManagementServiceGrpc.PackageManagementServiceStub
 import com.daml.ledger.api.v2.admin.participant_pruning_service.*
 import com.daml.ledger.api.v2.admin.participant_pruning_service.ParticipantPruningServiceGrpc.ParticipantPruningServiceStub
+import com.daml.ledger.api.v2.admin.party_management_alpha_service.PartyManagementAlphaServiceGrpc.PartyManagementAlphaServiceStub
+import com.daml.ledger.api.v2.admin.party_management_alpha_service.{
+  PartyReplicationStatus as LapiPartyReplicationStatus,
+  *,
+}
 import com.daml.ledger.api.v2.admin.party_management_service.*
 import com.daml.ledger.api.v2.admin.party_management_service.PartyManagementServiceGrpc.PartyManagementServiceStub
 import com.daml.ledger.api.v2.admin.user_management_service.UserManagementServiceGrpc.UserManagementServiceStub
@@ -102,6 +109,15 @@ import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   PreparedTransaction,
   SinglePartySignatures,
 }
+import com.daml.ledger.api.v2.package_reference.PriorTopologySerial
+import com.daml.ledger.api.v2.package_service.PackageServiceGrpc.PackageServiceStub
+import com.daml.ledger.api.v2.package_service.{
+  ListVettedPackagesRequest,
+  ListVettedPackagesResponse,
+  PackageMetadataFilter,
+  PackageServiceGrpc,
+  TopologyStateFilter,
+}
 import com.daml.ledger.api.v2.reassignment.{
   AssignedEvent,
   Reassignment,
@@ -151,6 +167,7 @@ import com.daml.ledger.api.v2.transaction_filter.{
 }
 import com.daml.ledger.api.v2.update_service.UpdateServiceGrpc.UpdateServiceStub
 import com.daml.ledger.api.v2.update_service.{
+  GetUpdateByHashRequest,
   GetUpdateByIdRequest,
   GetUpdateByOffsetRequest,
   GetUpdateResponse,
@@ -179,10 +196,6 @@ import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{Signature, SigningPublicKey}
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
-import com.digitalasset.canton.ledger.api.{
-  IdentityProviderConfig as ApiIdentityProviderConfig,
-  IdentityProviderId,
-}
 import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -194,14 +207,28 @@ import com.digitalasset.canton.tea.v1.TrafficServiceGrpc.TrafficServiceStub
 import com.digitalasset.canton.tea.v1.{
   GetAccountRequest,
   GetAccountResponse,
+  PruneEventsRequest,
+  PruneEventsResponse,
   TrafficServiceGrpc,
   UpdateAccountRequest,
   UpdateAccountResponse,
 }
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.GenericTopologyTransaction
 import com.digitalasset.canton.topology.{ParticipantId, Party, PartyId, SynchronizerId}
+import com.digitalasset.canton.user.{
+  IdentityProviderConfig as ApiIdentityProviderConfig,
+  IdentityProviderId,
+}
 import com.digitalasset.canton.util.BinaryFileUtil
-import com.digitalasset.canton.{LfPackageId, LfPackageName, LfPartyId, config}
+import com.digitalasset.canton.{
+  GrpcServiceInvocationMethod,
+  LfPackageId,
+  LfPackageName,
+  LfPartyId,
+  config,
+}
+import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.*
@@ -278,12 +305,12 @@ object LedgerApiCommands {
         service.generateExternalPartyTopology(request)
 
       override protected def createRequest(): Either[String, GenerateExternalPartyTopologyRequest] =
-        Right(
+        publicKey.toProtoV30.map(serializedPublicKey =>
           GenerateExternalPartyTopologyRequest(
             synchronizer = synchronizerId.toProtoPrimitive,
             partyHint = partyHint,
             publicKey = Some(
-              publicKey.toProtoV30
+              serializedPublicKey
                 .into[v2.crypto.SigningPublicKey]
                 .withFieldRenamed(_.publicKey, _.keyData)
                 .transform
@@ -319,22 +346,30 @@ object LedgerApiCommands {
           AllocateExternalPartyResponse,
           AllocateExternalPartyResponse,
         ] {
+      import com.digitalasset.canton.validation.ProtoUnvalidated.chimney.*
+
       override protected def createRequest(): Either[String, AllocateExternalPartyRequest] =
-        Right(
-          AllocateExternalPartyRequest(
-            synchronizer = synchronizerId.toProtoPrimitive,
-            onboardingTransactions = transactions.map { case (transaction, signatures) =>
-              AllocateExternalPartyRequest.SignedTransaction(
-                transaction.getCryptographicEvidence,
-                signatures.map(_.toProtoV30.transformInto[lapicrypto.Signature]),
+        for {
+          onboardingTransactions <- transactions.traverse { case (transaction, signatures) =>
+            signatures
+              .traverse(_.toProtoV30.transformIntoPartial[lapicrypto.Signature].toEitherString)
+              .map(sigs =>
+                AllocateExternalPartyRequest.SignedTransaction(
+                  transaction.getCryptographicEvidence,
+                  sigs,
+                )
               )
-            },
-            multiHashSignatures =
-              multiHashSignatures.map(_.toProtoV30.transformInto[lapicrypto.Signature]),
-            waitForAllocation = Some(synchronize),
-            identityProviderId = identityProviderId,
-            userId = userId,
+          }
+          multiHashSigs <- multiHashSignatures.traverse(
+            _.toProtoV30.transformIntoPartial[lapicrypto.Signature].toEitherString
           )
+        } yield AllocateExternalPartyRequest(
+          synchronizer = synchronizerId.toProtoPrimitive,
+          onboardingTransactions = onboardingTransactions,
+          multiHashSignatures = multiHashSigs,
+          waitForAllocation = Some(synchronize),
+          identityProviderId = identityProviderId,
+          userId = userId,
         )
       override protected def submitRequest(
           service: PartyManagementServiceStub,
@@ -480,6 +515,180 @@ object LedgerApiCommands {
 
   }
 
+  object PartyManagementAlphaService {
+    abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
+      override type Svc = PartyManagementAlphaServiceStub
+
+      override def createService(channel: ManagedChannel): PartyManagementAlphaServiceStub =
+        PartyManagementAlphaServiceGrpc.stub(channel)
+    }
+
+    final case class GetAddPartyStatus(
+        partyId: PartyId,
+        synchronizerId: SynchronizerId,
+        targetParticipantId: ParticipantId,
+    ) extends BaseCommand[
+          GetAddPartyStatusRequest,
+          GetAddPartyStatusResponse,
+          LapiPartyReplicationStatus,
+        ] {
+
+      override protected def createRequest(): Either[String, GetAddPartyStatusRequest] =
+        Right(
+          GetAddPartyStatusRequest(
+            partyId.toProtoPrimitive,
+            synchronizerId.toProtoPrimitive,
+            targetParticipantId.uid.toProtoPrimitive,
+          )
+        )
+
+      override protected def submitRequest(
+          service: PartyManagementAlphaServiceStub,
+          request: GetAddPartyStatusRequest,
+      ): Future[GetAddPartyStatusResponse] = service.getAddPartyStatus(request)
+
+      override protected def handleResponse(
+          response: GetAddPartyStatusResponse
+      ): Either[String, LapiPartyReplicationStatus] =
+        ProtoConverter
+          .required("status", response.status)
+          .leftMap(_.toString)
+    }
+
+    final case class GeneratePartyTopologyUpdate(
+        partyId: PartyId,
+        synchronizerId: SynchronizerId,
+        targetParticipantId: ParticipantId,
+        participantPermission: ParticipantPermission,
+    ) extends BaseCommand[
+          GeneratePartyTopologyUpdateRequest,
+          GeneratePartyTopologyUpdateResponse,
+          GeneratePartyTopologyUpdateResponse,
+        ] {
+      override protected def createRequest(): Either[String, GeneratePartyTopologyUpdateRequest] =
+        Right(
+          GeneratePartyTopologyUpdateRequest(
+            partyId.toProtoPrimitive,
+            synchronizerId.toProtoPrimitive,
+            targetParticipantId.uid.toProtoPrimitive,
+            participantPermission match {
+              case ParticipantPermission.Observation =>
+                com.daml.ledger.api.v2.state_service.ParticipantPermission.PARTICIPANT_PERMISSION_OBSERVATION
+              case ParticipantPermission.Confirmation =>
+                com.daml.ledger.api.v2.state_service.ParticipantPermission.PARTICIPANT_PERMISSION_CONFIRMATION
+              case ParticipantPermission.Submission =>
+                com.daml.ledger.api.v2.state_service.ParticipantPermission.PARTICIPANT_PERMISSION_SUBMISSION
+            },
+          )
+        )
+
+      override protected def submitRequest(
+          service: PartyManagementAlphaServiceStub,
+          request: GeneratePartyTopologyUpdateRequest,
+      ): Future[GeneratePartyTopologyUpdateResponse] =
+        service.generatePartyTopologyUpdate(request)
+
+      override protected def handleResponse(
+          response: GeneratePartyTopologyUpdateResponse
+      ): Either[String, GeneratePartyTopologyUpdateResponse] = Right(response)
+    }
+
+    final case class AuthorizePartyUpdate(
+        partyToParticipantTopologyTransaction: ByteString,
+        signatures: Seq[Signature],
+        synchronizerId: SynchronizerId,
+        userId: String,
+        identityProviderId: String,
+    ) extends BaseCommand[
+          AuthorizePartyUpdateRequest,
+          AuthorizePartyUpdateResponse,
+          Unit,
+        ] {
+      import com.digitalasset.canton.validation.ProtoUnvalidated.chimney.*
+
+      override protected def createRequest(): Either[String, AuthorizePartyUpdateRequest] =
+        signatures
+          .traverse(_.toProtoV30.transformIntoPartial[lapicrypto.Signature].toEitherString)
+          .map(sigs =>
+            AuthorizePartyUpdateRequest(
+              synchronizerId.toProtoPrimitive,
+              partyToParticipantTopologyTransaction,
+              sigs,
+              userId,
+              identityProviderId,
+            )
+          )
+
+      override protected def submitRequest(
+          service: PartyManagementAlphaServiceStub,
+          request: AuthorizePartyUpdateRequest,
+      ): Future[AuthorizePartyUpdateResponse] =
+        service.authorizePartyUpdate(request)
+
+      override protected def handleResponse(
+          response: AuthorizePartyUpdateResponse
+      ): Either[String, Unit] = Either.unit
+    }
+
+  }
+
+  object PackageService {
+    abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
+      override type Svc = PackageServiceStub
+
+      override def createService(channel: ManagedChannel): PackageServiceStub =
+        PackageServiceGrpc.stub(channel)
+    }
+
+    final case class ListVettedPackages(
+        packageIds: Seq[LfPackageId],
+        packageNamePrefixes: Seq[String],
+        participantIds: Seq[ParticipantId],
+        synchronizerIds: Seq[SynchronizerId],
+        pageToken: Option[String],
+        pageSize: Int,
+    ) extends BaseCommand[
+          ListVettedPackagesRequest,
+          ListVettedPackagesResponse,
+          ListVettedPackagesResponse,
+        ] {
+
+      override protected def createRequest(): Either[String, ListVettedPackagesRequest] =
+        Right(
+          ListVettedPackagesRequest(
+            packageMetadataFilter =
+              Option.unless(packageIds.isEmpty && packageNamePrefixes.isEmpty) {
+                PackageMetadataFilter(
+                  packageIds = packageIds,
+                  packageNamePrefixes = packageNamePrefixes,
+                )
+              },
+            topologyStateFilter = Option.unless(
+              participantIds.isEmpty && synchronizerIds.isEmpty
+            ) {
+              TopologyStateFilter(
+                participantIds = participantIds.map(_.uid.toProtoPrimitive),
+                synchronizerIds = synchronizerIds.map(_.uid.toProtoPrimitive),
+              )
+            },
+            pageToken = pageToken.getOrElse(""),
+            pageSize = pageSize,
+          )
+        )
+
+      override protected def submitRequest(
+          service: PackageServiceStub,
+          request: ListVettedPackagesRequest,
+      ): Future[ListVettedPackagesResponse] =
+        service.listVettedPackages(request)
+
+      override protected def handleResponse(
+          response: ListVettedPackagesResponse
+      ): Either[String, ListVettedPackagesResponse] =
+        Right(response)
+    }
+  }
+
   object PackageManagementService {
 
     abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
@@ -556,6 +765,57 @@ object LedgerApiCommands {
           response: ListKnownPackagesResponse
       ): Either[String, Seq[PackageDetails]] =
         Right(response.packageDetails.take(limit.value))
+    }
+
+    final case class UpdateVettedPackages(
+        addOrUpdate: Seq[VettedPackagesChange.Vet],
+        remove: Seq[VettedPackagesRef],
+        dryRun: Boolean,
+        synchronizerId: Option[SynchronizerId],
+        expectedPriorTopologySerial: Option[PriorTopologySerial],
+        forceFlags: Seq[package_management_service.UpdateVettedPackagesForceFlag],
+    ) extends BaseCommand[
+          UpdateVettedPackagesRequest,
+          UpdateVettedPackagesResponse,
+          UpdateVettedPackagesResponse,
+        ] {
+
+      override protected def createRequest(): Either[String, UpdateVettedPackagesRequest] = {
+        val unvetOps = remove.map { vettedPackagesRef =>
+          package_management_service.VettedPackagesChange.Unvet(packages = Seq(vettedPackagesRef))
+        }
+
+        val changes = addOrUpdate.map(vetOp =>
+          package_management_service.VettedPackagesChange(
+            package_management_service.VettedPackagesChange.Operation.Vet(vetOp)
+          )
+        ) ++ unvetOps.map(unvetOp =>
+          package_management_service.VettedPackagesChange(
+            package_management_service.VettedPackagesChange.Operation.Unvet(unvetOp)
+          )
+        )
+
+        Right(
+          UpdateVettedPackagesRequest(
+            changes = changes,
+            dryRun = dryRun,
+            synchronizerId = synchronizerId.map(_.uid.toProtoPrimitive).getOrElse(""),
+            expectedTopologySerial = expectedPriorTopologySerial,
+            updateVettedPackagesForceFlags = forceFlags,
+          )
+        )
+      }
+
+      override protected def submitRequest(
+          service: PackageManagementServiceStub,
+          request: UpdateVettedPackagesRequest,
+      ): Future[UpdateVettedPackagesResponse] =
+        service.updateVettedPackages(request)
+
+      override protected def handleResponse(
+          response: UpdateVettedPackagesResponse
+      ): Either[String, UpdateVettedPackagesResponse] =
+        Right(response)
     }
   }
 
@@ -638,6 +898,7 @@ object LedgerApiCommands {
       def identityProviderAdmin: Boolean
       def readAsAnyParty: Boolean
       def executeAsAnyParty: Boolean
+      def actAsAnyParty: Boolean
 
       protected def getRights: Seq[UserRight] =
         actAs.toSeq.map(x => UserRight.defaultInstance.withCanActAs(UserRight.CanActAs(x))) ++
@@ -661,6 +922,11 @@ object LedgerApiCommands {
              Seq(
                UserRight.defaultInstance.withCanExecuteAsAnyParty(UserRight.CanExecuteAsAnyParty())
              )
+           else Seq()) ++
+          (if (actAsAnyParty)
+             Seq(
+               UserRight.defaultInstance.withCanActAsAnyParty(UserRight.CanActAsAnyParty())
+             )
            else Seq())
     }
 
@@ -678,6 +944,7 @@ object LedgerApiCommands {
         readAsAnyParty: Boolean,
         executeAs: Set[LfPartyId],
         executeAsAnyParty: Boolean,
+        actAsAnyParty: Boolean,
     ) extends BaseCommand[CreateUserRequest, CreateUserResponse, LedgerApiUser]
         with HasRights {
 
@@ -885,6 +1152,7 @@ object LedgerApiCommands {
           identityProviderId: String,
           readAsAnyParty: Boolean,
           executeAsAnyParty: Boolean,
+          actAsAnyParty: Boolean,
       ) extends BaseCommand[GrantUserRightsRequest, GrantUserRightsResponse, UserRights]
           with HasRights {
 
@@ -919,6 +1187,7 @@ object LedgerApiCommands {
           identityProviderId: String,
           readAsAnyParty: Boolean,
           executeAsAnyParty: Boolean,
+          actAsAnyParty: Boolean,
       ) extends BaseCommand[RevokeUserRightsRequest, RevokeUserRightsResponse, UserRights]
           with HasRights {
 
@@ -1335,25 +1604,21 @@ object LedgerApiCommands {
 
     }
 
-    final case class GetUpdateById(id: String, updateFormat: UpdateFormat)(implicit
-        ec: ExecutionContext
-    ) extends BaseCommand[GetUpdateByIdRequest, Option[GetUpdateResponse], Option[UpdateWrapper]]
+    sealed abstract class GetUpdateCommand[Req](implicit ec: ExecutionContext)
+        extends BaseCommand[Req, Option[GetUpdateResponse], Option[UpdateWrapper]]
         with PrettyPrinting {
-      override protected def createRequest(): Either[String, GetUpdateByIdRequest] = Right {
-        GetUpdateByIdRequest(
-          updateId = id,
-          updateFormat = Some(updateFormat),
-        )
-      }
+
+      @GrpcServiceInvocationMethod
+      protected def getUpdate(service: UpdateServiceStub, request: Req): Future[GetUpdateResponse]
 
       override protected def submitRequest(
           service: UpdateServiceStub,
-          request: GetUpdateByIdRequest,
+          request: Req,
       ): Future[Option[GetUpdateResponse]] =
-        // The Ledger API will throw an error if it can't find an update by ID.
-        // However, as Canton is distributed, an update ID might show up later, so we don't treat this as
-        // an error and change it to a None
-        service.getUpdateById(request).map(Some(_)).recover {
+        // The Ledger API will throw an error if it can't find the update.
+        // However, as Canton is distributed, an update might show up later, so we don't treat this
+        // as an error and change it to a None
+        getUpdate(service, request).map(Some(_)).recover {
           case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.NOT_FOUND =>
             None
         }
@@ -1362,6 +1627,23 @@ object LedgerApiCommands {
           response: Option[GetUpdateResponse]
       ): Either[String, Option[UpdateWrapper]] =
         Right(extractUpdate(response))
+    }
+
+    final case class GetUpdateById(id: String, updateFormat: UpdateFormat)(implicit
+        ec: ExecutionContext
+    ) extends GetUpdateCommand[GetUpdateByIdRequest] {
+      override protected def createRequest(): Either[String, GetUpdateByIdRequest] = Right {
+        GetUpdateByIdRequest(
+          updateId = id,
+          updateFormat = Some(updateFormat),
+        )
+      }
+
+      override protected def getUpdate(
+          service: UpdateServiceStub,
+          request: GetUpdateByIdRequest,
+      ): Future[GetUpdateResponse] =
+        service.getUpdateById(request)
 
       override protected def pretty: Pretty[GetUpdateById] =
         prettyOfClass(
@@ -1372,10 +1654,7 @@ object LedgerApiCommands {
 
     final case class GetUpdateByOffset(offset: Long, updateFormat: UpdateFormat)(implicit
         ec: ExecutionContext
-    ) extends BaseCommand[GetUpdateByOffsetRequest, Option[GetUpdateResponse], Option[
-          UpdateWrapper
-        ]]
-        with PrettyPrinting {
+    ) extends GetUpdateCommand[GetUpdateByOffsetRequest] {
       override protected def createRequest(): Either[String, GetUpdateByOffsetRequest] = Right {
         GetUpdateByOffsetRequest(
           offset = offset,
@@ -1383,26 +1662,38 @@ object LedgerApiCommands {
         )
       }
 
-      override protected def submitRequest(
+      override protected def getUpdate(
           service: UpdateServiceStub,
           request: GetUpdateByOffsetRequest,
-      ): Future[Option[GetUpdateResponse]] =
-        // The Ledger API will throw an error if it can't find an update by ID.
-        // However, as Canton is distributed, an update ID might show up later, so we don't treat this as
-        // an error and change it to a None
-        service.getUpdateByOffset(request).map(Some(_)).recover {
-          case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.NOT_FOUND =>
-            None
-        }
-
-      override protected def handleResponse(
-          response: Option[GetUpdateResponse]
-      ): Either[String, Option[UpdateWrapper]] =
-        Right(extractUpdate(response))
+      ): Future[GetUpdateResponse] =
+        service.getUpdateByOffset(request)
 
       override protected def pretty: Pretty[GetUpdateByOffset] =
         prettyOfClass(
           param("offset", _.offset),
+          param("updateFormat", _.updateFormat.toString.unquoted),
+        )
+    }
+
+    final case class GetUpdateByHash(hash: ByteString, updateFormat: UpdateFormat)(implicit
+        ec: ExecutionContext
+    ) extends GetUpdateCommand[GetUpdateByHashRequest] {
+      override protected def createRequest(): Either[String, GetUpdateByHashRequest] = Right {
+        GetUpdateByHashRequest(
+          transactionHash = hash,
+          updateFormat = Some(updateFormat),
+        )
+      }
+
+      override protected def getUpdate(
+          service: UpdateServiceStub,
+          request: GetUpdateByHashRequest,
+      ): Future[GetUpdateResponse] =
+        service.getUpdateByHash(request)
+
+      override protected def pretty: Pretty[GetUpdateByHash] =
+        prettyOfClass(
+          param("hash", _.hash.toByteArray.map("%02x".format(_)).mkString.unquoted),
           param("updateFormat", _.updateFormat.toString.unquoted),
         )
     }
@@ -1694,16 +1985,17 @@ object LedgerApiCommands {
         ] {
 
       import com.digitalasset.canton.crypto.LedgerApiCryptoConversions.*
+      import com.digitalasset.canton.validation.ProtoUnvalidated.chimney.*
       import io.scalaland.chimney.dsl.*
 
-      private def makePartySignatures: PartySignatures = PartySignatures(
-        transactionSignatures.map { case (party, signatures) =>
-          SinglePartySignatures(
-            party = party.toProtoPrimitive,
-            signatures = signatures.map(_.toProtoV30.transformInto[lapicrypto.Signature]),
-          )
-        }.toSeq
-      )
+      private def makePartySignatures: Either[String, PartySignatures] =
+        transactionSignatures.toSeq
+          .traverse { case (party, signatures) =>
+            signatures
+              .traverse(_.toProtoV30.transformIntoPartial[lapicrypto.Signature].toEitherString)
+              .map(sigs => SinglePartySignatures(party = party.toProtoPrimitive, signatures = sigs))
+          }
+          .map(PartySignatures(_))
 
       private[commands] def serializeDeduplicationPeriod(
           deduplicationPeriod: Option[DeduplicationPeriod]
@@ -1721,10 +2013,10 @@ object LedgerApiCommands {
       }
 
       override protected def createRequest(): Either[String, ExecuteSubmissionRequest] =
-        Right(
+        makePartySignatures.map(partySignatures =>
           ExecuteSubmissionRequest(
             preparedTransaction = Some(preparedTransaction),
-            partySignatures = Some(makePartySignatures),
+            partySignatures = Some(partySignatures),
             submissionId = submissionId,
             userId = userId,
             deduplicationPeriod = serializeDeduplicationPeriod(deduplicationPeriod),
@@ -2142,11 +2434,12 @@ object LedgerApiCommands {
         StateServiceGrpc.stub(channel)
     }
 
-    final case class LedgerEnd()
-        extends BaseCommand[GetLedgerEndRequest, GetLedgerEndResponse, Long] {
+    final case class LedgerEnd(
+        synchronizers: Seq[String]
+    ) extends BaseCommand[GetLedgerEndRequest, GetLedgerEndResponse, Long] {
 
       override protected def createRequest(): Either[String, GetLedgerEndRequest] =
-        Right(GetLedgerEndRequest())
+        Right(GetLedgerEndRequest(synchronizers))
 
       override protected def submitRequest(
           service: StateServiceStub,
@@ -2490,20 +2783,36 @@ object LedgerApiCommands {
 
     final case class UpdateAccount(
         accountId: String,
-        balance: Option[Long],
+        balanceDelta: Option[Long],
         deduplicationId: String,
     ) extends BaseCommand[
           UpdateAccountRequest,
           UpdateAccountResponse,
         ] {
       override protected def createRequest(): Either[String, UpdateAccountRequest] =
-        Right(UpdateAccountRequest(accountId, balance, deduplicationId))
+        Right(UpdateAccountRequest(accountId, balanceDelta, deduplicationId))
 
       override protected def submitRequest(
           service: TrafficServiceStub,
           request: UpdateAccountRequest,
       ): Future[UpdateAccountResponse] =
         service.updateAccount(request)
+    }
+
+    final case class PruneEvents(
+        beforeInclusive: CantonTimestamp
+    ) extends BaseCommand[
+          PruneEventsRequest,
+          PruneEventsResponse,
+        ] {
+      override protected def createRequest(): Either[String, PruneEventsRequest] =
+        Right(PruneEventsRequest(beforeInclusive.toProtoTimestamp.some))
+
+      override protected def submitRequest(
+          service: TrafficServiceStub,
+          request: PruneEventsRequest,
+      ): Future[PruneEventsResponse] =
+        service.pruneEvents(request)
     }
   }
 }

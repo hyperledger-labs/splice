@@ -1,0 +1,13 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "allowOfflineAccess": true,
+    "identifier": "https://sv.sv-da-1.test-stack.canton.network/api",
+    "name": "SV App API for SV sv-da-1 on test-stack (Pulumi managed)",
+    "tokenLifetime": 86400
+  },
+  "name": "SvAppApisvda1",
+  "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+  "type": "auth0:index/resourceServer:ResourceServer"
+}

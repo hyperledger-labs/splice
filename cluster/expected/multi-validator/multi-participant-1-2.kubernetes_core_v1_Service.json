@@ -1,0 +1,113 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+      "labels": {
+        "app": "multi-participant-1-2"
+      },
+      "name": "multi-participant-1-2",
+      "namespace": "multi-validator"
+    },
+    "spec": {
+      "ports": [
+        {
+          "name": "lg-0",
+          "port": 5001
+        },
+        {
+          "name": "adm-0",
+          "port": 5002
+        },
+        {
+          "name": "lg-1",
+          "port": 5101
+        },
+        {
+          "name": "adm-1",
+          "port": 5102
+        },
+        {
+          "name": "lg-2",
+          "port": 5201
+        },
+        {
+          "name": "adm-2",
+          "port": 5202
+        },
+        {
+          "name": "lg-3",
+          "port": 5301
+        },
+        {
+          "name": "adm-3",
+          "port": 5302
+        },
+        {
+          "name": "lg-4",
+          "port": 5401
+        },
+        {
+          "name": "adm-4",
+          "port": 5402
+        },
+        {
+          "name": "lg-5",
+          "port": 5501
+        },
+        {
+          "name": "adm-5",
+          "port": 5502
+        },
+        {
+          "name": "lg-6",
+          "port": 5601
+        },
+        {
+          "name": "adm-6",
+          "port": 5602
+        },
+        {
+          "name": "lg-7",
+          "port": 5701
+        },
+        {
+          "name": "adm-7",
+          "port": 5702
+        },
+        {
+          "name": "lg-8",
+          "port": 5801
+        },
+        {
+          "name": "adm-8",
+          "port": 5802
+        },
+        {
+          "name": "lg-9",
+          "port": 5901
+        },
+        {
+          "name": "adm-9",
+          "port": 5902
+        },
+        {
+          "name": "metrics",
+          "port": 10013
+        },
+        {
+          "name": "jmx",
+          "port": 9010
+        }
+      ],
+      "selector": {
+        "app": "multi-participant-1-2"
+      }
+    }
+  },
+  "name": "multi-participant-1-2",
+  "provider": "",
+  "type": "kubernetes:core/v1:Service"
+}

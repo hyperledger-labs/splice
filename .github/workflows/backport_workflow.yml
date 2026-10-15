@@ -84,7 +84,7 @@ jobs:
           git config user.name "DA Automation"
           git checkout -b $new_branch origin/$base_branch
           # Filter files for the patch
-          EXPECTED_FILE_REGEX="cluster/expected/.*/expected.*\.json"
+          EXPECTED_FILE_REGEX="cluster/expected/.*\.json"
           RESOLVED_CONFIG_FILE_REGEX="cluster/deployment/.*/config\.resolved\.yaml"
           git cherry-pick --no-commit "$commit_sha" || true
           conflicted_files=$(git diff --name-only --diff-filter=U)
@@ -122,7 +122,7 @@ jobs:
             fi
             make update-expected -j4
             if git status --porcelain | grep -q -E "$EXPECTED_FILE_REGEX|$RESOLVED_CONFIG_FILE_REGEX"; then
-              git add cluster/expected/*/expected*.json
+              git add -A cluster/expected
               # do not add scratchnet's symlinks
               if [ -d splice ]; then
                 # shellcheck disable=SC2010
@@ -209,6 +209,7 @@ jobs:
           pr_number: ${{ inputs.pr_number }}
           base_branch: ${{ inputs.base_branch }}
         with:
+          github-token: ${{ secrets.strong_token }}
           retries: 3
           script: |
             await github.rest.issues.createComment({

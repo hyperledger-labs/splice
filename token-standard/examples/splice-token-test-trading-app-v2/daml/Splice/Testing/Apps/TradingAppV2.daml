@@ -376,9 +376,14 @@ template TradeSettlementAgreement with
         choiceArg : V2.AllocationFactory_Allocate
       controller venue
       do
+        let authorizer = choiceArg.allocation.authorizer
+        require' ("receipt allocation authorizer owner", regularAccountOwner authorizer)
+          isEqualR ("trader", trader)
+        require' ("receipt allocation authorizer provider", authorizer.provider)
+          isEqualR ("no provider", None)
         -- Important: validate the factory call to create a receipt allocation
-        -- to avoid accidentally delegating sending assets to the venue .
-        ensureIsReceiptAllocation [venue] trader (basicAccount trader) choiceArg
+        -- to avoid accidentally delegating sending assets to the venue.
+        ensureIsReceiptAllocation [venue] trader authorizer choiceArg
         result <- exercise factoryCid choiceArg
         extractAllocationCidFromResult result
 

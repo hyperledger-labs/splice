@@ -1,0 +1,30 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "source.toolkit.fluxcd.io/v1",
+    "kind": "GitRepository",
+    "metadata": {
+      "labels": {
+        "notifications": "false"
+      },
+      "name": "splice-node-migration-5-base",
+      "namespace": "operator"
+    },
+    "spec": {
+      "ignore": "**/splice/canton\n!**/splice/canton/community/app/src/pack/examples/13-observability/grafana/dashboards\n**/daml/dars\n!**/daml/dars/splitwell*\n**/token-standard\n!**/token-standard/*/openapi/**",
+      "interval": "5m",
+      "recurseSubmodules": true,
+      "ref": {
+        "commit": "981227e62011e386cca3cdb5f00b472cf05a12c4"
+      },
+      "secretRef": {
+        "name": "github"
+      },
+      "url": "https://github.com/canton-network/splice"
+    }
+  },
+  "name": "splice-node-migration-5-base",
+  "provider": "",
+  "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+}

@@ -5,24 +5,30 @@ package com.digitalasset.canton.store.db
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import cats.syntax.functor.*
 import com.daml.nameof.NameOf.functionFullName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.*
+import com.digitalasset.canton.protocol.SynchronizerLimits
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
-import com.digitalasset.canton.sequencing.protocol.{SequencedEvent, SignedContent}
+import com.digitalasset.canton.sequencing.protocol.{
+  DecompressionPolicy,
+  SequencedEvent,
+  SequencedEventDeserializationContext,
+  SignedContent,
+}
 import com.digitalasset.canton.sequencing.{OrdinarySerializedEvent, PossiblyIgnoredSerializedEvent}
 import com.digitalasset.canton.store.*
 import com.digitalasset.canton.store.SequencedEventStore.CounterAndTimestamp
 import com.digitalasset.canton.store.db.DbSequencedEventStore.*
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
-import com.digitalasset.canton.util.{EitherTUtil, MaxBytesToDecompress}
+import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.version.ProtocolVersionValidation
+import com.digitalasset.nonempty.NonEmpty
 import slick.jdbc.{GetResult, SetParameter}
 
 import scala.concurrent.ExecutionContext
@@ -39,12 +45,13 @@ class DbSequencedEventStore(
 
   override protected[this] implicit def setParameterIndexedSynchronizer
       : SetParameter[IndexedPhysicalSynchronizer] = IndexedString.setParameterIndexedString
-  override protected[this] def partitionColumn: String = "physical_synchronizer_idx"
+  override protected[this] def partitionColumn: String & Singleton = "physical_synchronizer_idx"
 
   private val protocolVersion = physicalSynchronizerIdx.psid.protocolVersion
   override protected[this] val partitionKey: IndexedPhysicalSynchronizer = physicalSynchronizerIdx
 
-  override protected[this] def pruning_status_table: String = "common_sequenced_event_store_pruning"
+  override protected[this] def pruning_status_table: String & Singleton =
+    "common_sequenced_event_store_pruning"
 
   import com.digitalasset.canton.store.SequencedEventStore.*
   import storage.api.*
@@ -71,7 +78,11 @@ class DbSequencedEventStore(
               _.deserializeContent(
                 SequencedEvent.fromByteString(
                   ProtocolVersionValidation.PV(protocolVersion),
-                  MaxBytesToDecompress.MaxValueUnsafe,
+                  // No decompression nor size bound needed: the database is trusted.
+                  SequencedEventDeserializationContext(
+                    DecompressionPolicy.MaxValueUnsafe,
+                    SynchronizerLimits.max,
+                  ),
                   _,
                 )
               )
@@ -188,7 +199,7 @@ class DbSequencedEventStore(
       functionFullName,
     )
 
-  override protected[canton] def doPrune(
+  override protected def doPrune(
       untilInclusive: CantonTimestamp,
       lastPruning: Option[CantonTimestamp],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Int] = {

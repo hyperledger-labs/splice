@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import * as nodePath from 'path';
 import { PathLike } from 'fs';
@@ -29,6 +30,7 @@ export const PRIVATE_CONFIGS_PATH = config.optionalEnv('PRIVATE_CONFIGS_PATH');
 
 export const HELM_REPO = spliceEnvConfig.requireEnv('OCI_DEV_HELM_REGISTRY');
 export const DOCKER_REPO = spliceEnvConfig.requireEnv('CACHE_DEV_DOCKER_REGISTRY');
+export const CACHE_GHCR = spliceEnvConfig.requireEnv('CACHE_GHCR');
 
 export const ObservabilityReleaseName = 'prometheus-grafana-monitoring';
 
@@ -61,14 +63,49 @@ export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 // exactly the policy of this cluster.
 export const CLOUD_ARMOR_POLICY_NAME = `waf-whitelist-throttle-ban-${CLUSTER_BASENAME}`;
 
-// Priority range reserved for the preconfigured (OWASP CRS based) WAF rules of the
-// Cloud Armor policy (see cluster/pulumi/infra/src/cloudArmor.ts). Shared so that alerts
-// can tell a WAF rule rejection apart from an IP whitelist, throttle or default deny
-// rejection: the request logs only carry the priority of the rule that matched, not its
-// name.
-export const CLOUD_ARMOR_WAF_RULE_MIN_PRIORITY = 10;
-// Exclusive upper bound: the IP whitelist rules start at this priority.
-export const CLOUD_ARMOR_WAF_RULE_MAX_PRIORITY = 1000010;
+// Every group of rules of the Cloud Armor policy
+// owns a block of 9 digit priorities sharing a unique leading digit. The request logs
+// only carry the priority of the rule that matched, not its name, so this lets alerts
+// and dashboards tell the groups apart by priority prefix alone, e.g.
+// `rule_priority=~"1[0-9]{8}"` for the WAF rules. The default deny rule and its
+// preview-only twin keep the two highest (10 digit) priorities.
+export const CLOUD_ARMOR_RULE_GROUP_PREFIXES = {
+  // preconfigured (OWASP CRS based) WAF rules
+  waf: 1,
+  // allow rules for the whitelisted source IPs
+  ipWhitelist: 2,
+  // allow / per source IP throttle rules of the public endpoints
+  publicEndpoints: 3,
+} as const;
+export type CloudArmorRuleGroup = keyof typeof CLOUD_ARMOR_RULE_GROUP_PREFIXES;
+// Number of priorities available to each rule group.
+export const CLOUD_ARMOR_RULE_GROUP_SIZE = 100_000_000;
+
+export function cloudArmorRulePriority(group: CloudArmorRuleGroup, offset: number): number {
+  if (!Number.isInteger(offset) || offset < 0 || offset >= CLOUD_ARMOR_RULE_GROUP_SIZE) {
+    throw new Error(
+      `Cloud Armor ${group} rule priority offset ${offset} is outside [0, ${CLOUD_ARMOR_RULE_GROUP_SIZE})`
+    );
+  }
+  return CLOUD_ARMOR_RULE_GROUP_PREFIXES[group] * CLOUD_ARMOR_RULE_GROUP_SIZE + offset;
+}
+
+export function cloudArmorRulePriorityRegex(group: CloudArmorRuleGroup): string {
+  return `${CLOUD_ARMOR_RULE_GROUP_PREFIXES[group]}[0-9]{8}`;
+}
+
+// The GKE gateway is fronted by a regional external application load balancer, whose
+// request logs (carrying the Cloud Armor decisions) use `http_external_regional_lb_rule`;
+// `http_load_balancer` is accepted as well so filters keep working if the gateway ever
+// becomes global.
+export const LB_REQUEST_LOG_RESOURCE_TYPES = [
+  'http_external_regional_lb_rule',
+  'http_load_balancer',
+];
+
+export function lbRequestLogResourceTypesFilter(): string {
+  return `resource.type=(${LB_REQUEST_LOG_RESOURCE_TYPES.map(t => `"${t}"`).join(' OR ')})`;
+}
 
 export const sequencerTokenExpirationTime: string | undefined = config.optionalEnv(
   'SEQUENCER_TOKEN_EXPIRATION_TIME'
@@ -112,7 +149,7 @@ export function loadJsonFromFile(path: PathLike): any {
 
     return JSON.parse(content);
   } catch (e) {
-    console.error(`could not read JSON from: ${path}`);
+    void pulumi.log.error(`could not read JSON from: ${path}`);
     throw e;
   }
 }

@@ -4,8 +4,6 @@
 package com.digitalasset.canton.admin.api.client.data
 
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.NonEmptyUtil.instances.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.admin.api.client.data.crypto.{
   CryptoKeyFormat,
@@ -48,8 +46,11 @@ import com.digitalasset.canton.time.{
   SimClock,
 }
 import com.digitalasset.canton.util.BinaryFileUtil
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.validation.{ProtoUnvalidatedSeq, ProtoValidation}
+import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
 import com.digitalasset.canton.{ProtoDeserializationError, config, crypto as SynchronizerCrypto}
+import com.digitalasset.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmptyUtil.instances.*
 import io.scalaland.chimney.dsl.*
 
 import scala.Ordering.Implicits.*
@@ -72,10 +73,10 @@ final case class StaticSynchronizerParameters(
   def writeToFile(outputFile: String)(implicit consoleEnvironment: ConsoleEnvironment): Unit =
     BinaryFileUtil.writeByteStringToFile(
       outputFile,
-      toInternal.toByteString,
+      toInternal.valueOr(consoleEnvironment.raiseError).toByteString,
     )
 
-  def toInternal: StaticSynchronizerParametersInternal =
+  def toInternal: Either[String, StaticSynchronizerParametersInternal] =
     // Cannot use Chimney's `transformInto` because `StaticSynchronizerParametersInternal`'s constructor
     // is private to enforce its invariants
     StaticSynchronizerParametersInternal
@@ -98,7 +99,7 @@ final case class StaticSynchronizerParameters(
         serial = serial,
         synchronizerLimits = synchronizerLimits.toInternal,
       )
-      .valueOr(err => throw new RuntimeException("Failed to convert synchronizer parameters", err))
+      .leftMap(_.toString)
 
   override protected def pretty: Pretty[StaticSynchronizerParameters] = prettyOfClass(
     param("required signing specs", _.requiredSigningSpecs),
@@ -204,11 +205,18 @@ object StaticSynchronizerParameters {
 
   private def parseRequiredSet[P, A](
       field: String,
-      content: Seq[P],
-      parse: (String, P) => ParsingResult[A],
+      content: ProtoUnvalidatedSeq[P],
+      parse: (P, String) => ParsingResult[A],
   ): ParsingResult[NonEmpty[Set[A]]] =
-    // Splice: Not bothering with length validation, we don't really care in splice.
-    ProtoConverter.parseRequiredNonEmpty(parse(field, _), field, content).map(_.toSet)
+    ProtoValidation
+      .validateLength(
+        content,
+        field,
+        ProtocolVersionValidation.AlwaysValidation,
+        ProtoValidation.MaxCollectionSize,
+      )
+      .flatMap(ProtoConverter.parseRequiredNonEmpty(parse(_, field), field, _))
+      .map(_.toSet)
 
   def fromProtoV30(
       synchronizerParametersP: v30.StaticSynchronizerParameters

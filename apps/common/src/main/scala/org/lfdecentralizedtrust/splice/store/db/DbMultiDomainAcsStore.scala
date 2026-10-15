@@ -55,7 +55,7 @@ import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
 }
 import org.lfdecentralizedtrust.splice.store.db.AcsTables.ContractStateRowData
 import AsUpdateReturning.*
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
+import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
@@ -112,6 +112,8 @@ final class DbMultiDomainAcsStore[TXE](
   import DbMultiDomainAcsStore.*
   import MultiDomainAcsStore.*
   import profile.api.jdbcActionExtensionMethods
+
+  private implicit val dbProfile: DbStorage.Profile = storage.profile
 
   override lazy val storeName = acsStoreDescriptor.name
   override lazy val storeParty = acsStoreDescriptor.party
@@ -1362,7 +1364,7 @@ final class DbMultiDomainAcsStore[TXE](
                   acsInserts.toList ++ incompleteOutInserts ++ incompleteInInserts
                 ),
               "ingestAcsBatch",
-            )(implicitly, implicitly, _ => false)
+            )
         } yield ()
       }
     }
@@ -1397,11 +1399,7 @@ final class DbMultiDomainAcsStore[TXE](
           .sequentialTraverse(steps) {
             case batch: IngestTransactionTreesBatch =>
               storage
-                .queryAndUpdate(ingestTransactionTrees(batch), "ingestTransactionTrees")(
-                  implicitly,
-                  implicitly,
-                  _ => false,
-                )
+                .queryAndUpdate(ingestTransactionTrees(batch), "ingestTransactionTrees")
                 .map { summaryState =>
                   val lastTree = batch.batch.last.tree
                   val synchronizerIdToRecordTime = batch.batch
@@ -1435,7 +1433,7 @@ final class DbMultiDomainAcsStore[TXE](
                 .queryAndUpdate(
                   ingestReassignment(reassignment.offset, reassignment.transfer),
                   "ingestReassignment",
-                )(implicitly, implicitly, _ => false)
+                )
                 .map { summaryState =>
                   val reassignmentRecordTimes = Map(synchronizerId -> reassignment.recordTime)
                   state

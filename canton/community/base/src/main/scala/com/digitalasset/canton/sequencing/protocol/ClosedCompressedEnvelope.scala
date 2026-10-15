@@ -3,16 +3,15 @@
 
 package com.digitalasset.canton.sequencing.protocol
 
-import cats.syntax.traverse.*
 import com.digitalasset.canton.crypto.{HashOps, Signature}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
-import com.digitalasset.canton.protocol.{v30, v31}
+import com.digitalasset.canton.protocol.{SynchronizerLimits, v31}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.Member
-import com.digitalasset.canton.util.MaxBytesToDecompress
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.validation.ProtoValidation
+import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import monocle.Lens
@@ -22,34 +21,49 @@ final case class ClosedCompressedEnvelope(
     override val recipients: Recipients,
     algorithm: CompressionAlgorithm,
 )(
-    // Moved maxBytesToCompress to a separate argument group, so it doesn't affect "equals"
-    maxBytesToDecompress: MaxBytesToDecompress
+    // Moved the deferred decompression to a separate argument group, so it doesn't affect "equals"
+    deferredDecompression: DeferredDecompression,
+    // The negotiated validation from the batch this envelope was parsed out of.
+    pvv: ProtocolVersionValidation,
 ) extends ClosedEnvelope {
-  // Internal cache in case we need to uncompress more than once
+  // Internal cache in case we need to uncompress more than once.
   private lazy val uncompressedEnvelopeResult: ParsingResult[ClosedUncompressedEnvelope] =
     prepareUncompressedEnvelopeResult
 
   override def toOpenEnvelope(
       hashOps: HashOps,
+      synchronizerLimits: SynchronizerLimits,
       protocolVersion: ProtocolVersion,
   ): ParsingResult[DefaultOpenEnvelope] =
-    uncompressedEnvelopeResult.flatMap(_.toOpenEnvelope(hashOps, protocolVersion))
+    uncompressedEnvelopeResult.flatMap(
+      _.toOpenEnvelope(hashOps, synchronizerLimits, protocolVersion)
+    )
 
   override def toClosedUncompressedEnvelopeResult: ParsingResult[ClosedUncompressedEnvelope] =
     uncompressedEnvelopeResult
 
-  override def toClosedCompressedEnvelope: ClosedCompressedEnvelope = this
+  override def toClosedCompressedEnvelope(
+      algo: com.digitalasset.canton.util.CompressionAlgo
+  ): ClosedCompressedEnvelope = {
+    require(
+      CompressionAlgorithm(algo) == algorithm,
+      s"Cannot re-compress envelope from $algorithm to $algo",
+    )
+    this
+  }
 
   private def prepareUncompressedEnvelopeResult: ParsingResult[ClosedUncompressedEnvelope] = for {
-    decompressed <- Batch.decompress(
-      algorithm = v30.CompressedBatch.CompressionAlgorithm.COMPRESSION_ALGORITHM_GZIP,
-      compressed = bytes,
-      maxRequestSize = maxBytesToDecompress,
-    )
+    decompressed <- deferredDecompression.decompressed
     protoEnvelope <- ProtoConverter.protoParser(v31.EnvelopeWithoutRecipients.parseFrom)(
       decompressed
     )
-    signatures <- protoEnvelope.signatures.traverse(Signature.fromProtoV30)
+    signatures <- ProtoValidation
+      .validateLengthThen(
+        protoEnvelope.signatures,
+        "signatures",
+        pvv,
+        ProtoValidation.MaxCollectionSize,
+      )((element, _) => Signature.fromProtoV30(element))
   } yield ClosedUncompressedEnvelope.create(
     protoEnvelope.content,
     recipients,
@@ -64,12 +78,22 @@ final case class ClosedCompressedEnvelope(
     recipients.forMember(member, groupAddresses).map(withRecipients)
 
   override protected def pretty: Pretty[ClosedCompressedEnvelope] = prettyOfClass(
-    param("recipients", _.recipients)
+    param("recipients", _.recipients),
+    param("algorithm", _.algorithm),
   )
 
   @VisibleForTesting
   override def withRecipients(newRecipients: Recipients): ClosedCompressedEnvelope =
-    ClosedCompressedEnvelope(bytes, newRecipients, algorithm)(maxBytesToDecompress)
+    // Share the deferred decompression, so that copies draw the budget at most once
+    ClosedCompressedEnvelope(bytes, newRecipients, algorithm)(deferredDecompression, pvv)
+
+  override private[protocol] def withDecompressionBudget(
+      decompressionBudget: DecompressionBudget
+  ): ClosedCompressedEnvelope =
+    ClosedCompressedEnvelope(bytes, recipients, algorithm)(
+      DeferredDecompression(bytes, decompressionBudget, algorithm),
+      pvv,
+    )
 }
 
 object ClosedCompressedEnvelope {
@@ -80,7 +104,36 @@ object ClosedCompressedEnvelope {
     )
 
   def create(bytes: ByteString, recipients: Recipients, algorithm: CompressionAlgorithm)(
-      maxBytesToDecompress: MaxBytesToDecompress
+      decompressionBudget: DecompressionBudget,
+      pvv: ProtocolVersionValidation,
   ): ClosedCompressedEnvelope =
-    ClosedCompressedEnvelope(bytes, recipients, algorithm)(maxBytesToDecompress)
+    ClosedCompressedEnvelope(bytes, recipients, algorithm)(
+      DeferredDecompression(bytes, decompressionBudget, algorithm),
+      pvv,
+    )
+}
+
+/** Deferred, memoized decompression of a [[ClosedCompressedEnvelope]] payload. Per-recipient copies
+  * of an envelope share the same instance, so the payload is decompressed once for all of them.
+  */
+private[protocol] final class DeferredDecompression(
+    bytes: ByteString,
+    budget: DecompressionBudget,
+    algorithm: CompressionAlgorithm,
+) {
+  lazy val decompressed: ParsingResult[ByteString] =
+    Batch.decompress(
+      algorithm = algorithm,
+      compressed = bytes,
+      decompressionBudget = budget,
+    )
+}
+
+private[protocol] object DeferredDecompression {
+  def apply(
+      bytes: ByteString,
+      budget: DecompressionBudget,
+      algorithm: CompressionAlgorithm,
+  ): DeferredDecompression =
+    new DeferredDecompression(bytes, budget, algorithm)
 }

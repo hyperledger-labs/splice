@@ -4,11 +4,11 @@
 package com.digitalasset.canton.topology.client
 
 import cats.syntax.functorFilter.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.SigningKeysWithThreshold
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.{
   DynamicSynchronizerParameters,
@@ -60,6 +60,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.nonempty.NonEmpty
 
 import scala.concurrent.ExecutionContext
 import scala.math.Ordered.orderingToOrdered
@@ -657,7 +658,7 @@ abstract class BaseTopologySnapshot(
       filterUid = NonEmpty(Seq, psid.uid),
     ).map(
       _.collectOfMapping[LsuAnnouncement].result
-        .filter(_.mapping.successorSynchronizerId > psid)
+        .filter(_.mapping.successorSynchronizerId > psid.opaque)
         .toList match {
         case Nil => None
         case one :: Nil =>

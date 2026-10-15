@@ -17,6 +17,8 @@ object CantonErrorGroups {
 
   abstract class ProtoDeserializationErrorGroup extends ErrorGroup
 
+  abstract class ProtoSerializationErrorGroup extends ErrorGroup
+
   abstract class SequencerErrorGroup extends ErrorGroup()
 
   abstract class SequencerSubscriptionErrorGroup extends ErrorGroup()
@@ -62,6 +64,8 @@ object CantonErrorGroups {
 
     abstract class AdminWorkflowServicesErrorGroup extends ErrorGroup()
 
+    abstract class TrafficEnforcementErrorGroup extends ErrorGroup()
+
   }
 
   object TopologyManagementErrorGroup extends ErrorGroup() {
@@ -70,6 +74,6 @@ object CantonErrorGroups {
 
   abstract class StorageErrorGroup extends ErrorGroup()
 
-  abstract class ClockErrorGroup extends ErrorGroup() {}
+  abstract class ClockErrorGroup extends ErrorGroup()
 
 }

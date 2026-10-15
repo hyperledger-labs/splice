@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv
 
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.{ClientConfig, CryptoConfig, CryptoProvider}
@@ -75,6 +75,7 @@ class LocalSynchronizerNode(
       sequencerConfig,
       config.mediator.sequencerRequestAmplification,
       config.mediator.sequencerConnectionPoolDelays,
+      config.mediator.subscriptionLivenessLimits,
       cometbftNode,
     )
     with LsuSynchronizerNode
@@ -321,6 +322,7 @@ class LocalSynchronizerNode(
               internalSequencerConnection,
               mediatorSequencerAmplification.toInternal,
               mediatorSequencerConnectionPoolDelays.toInternal,
+              mediatorSubscriptionLivenessLimits.toInternal,
             )
           case NodeStatus.Success(_) =>
             logger.info("Mediator is already initialized")
@@ -529,6 +531,7 @@ class LocalSynchronizerNode(
           sequencerConnection,
           mediatorSequencerAmplification.toInternal,
           mediatorSequencerConnectionPoolDelays.toInternal,
+          mediatorSubscriptionLivenessLimits.toInternal,
         ),
       logger,
     )

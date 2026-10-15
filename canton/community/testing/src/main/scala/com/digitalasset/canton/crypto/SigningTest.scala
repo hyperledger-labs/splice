@@ -12,6 +12,7 @@ import com.digitalasset.canton.crypto.SignatureCheckError.{
 }
 import com.digitalasset.canton.crypto.SigningError.UnknownSigningKey
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.{BaseTest, FailOnShutdown}
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AsyncWordSpec
@@ -90,7 +91,9 @@ trait SigningTest extends AsyncWordSpec with BaseTest with CryptoTestHelper with
                 SigningKeyUsage.ProtocolOnly,
                 signingKeySpec,
               )
-              publicKeyP = publicKey.toProtoVersioned(testedProtocolVersion)
+              publicKeyP = publicKey
+                .toProtoVersioned(testedProtocolVersion)
+                .valueOrFail("serialization of public key")
               publicKey2 = SigningPublicKey
                 .fromProtoVersioned(publicKeyP)
                 .valueOrFail("serialize key")

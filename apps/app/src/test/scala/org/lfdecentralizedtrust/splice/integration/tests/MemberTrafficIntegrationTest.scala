@@ -125,14 +125,18 @@ class MemberTrafficIntegrationTest
     "serve a member's traffic status as reported by the sequencer" in { implicit env =>
       val memberId = aliceValidatorBackend.participantClient.id
 
-      val actualStateAsPerSequencer = getTrafficState(aliceValidatorBackend, activeSynchronizerId)
       val actualTotalPurchasedAsPerDso =
         listMemberTrafficContracts(memberId).map(_.data.totalPurchased.toLong).sum
 
-      val statusAsPerScan = sv1ScanBackend.getMemberTrafficStatus(activeSynchronizerId, memberId)
-
-      statusAsPerScan.actual.totalConsumed shouldBe actualStateAsPerSequencer.extraTrafficConsumed.value
-      statusAsPerScan.actual.totalLimit shouldBe actualStateAsPerSequencer.extraTrafficPurchased.value
+      val statusAsPerScan = eventually() {
+        val actualStateAsPerSequencer =
+          getTrafficState(aliceValidatorBackend, activeSynchronizerId)
+        val statusAsPerScan =
+          sv1ScanBackend.getMemberTrafficStatus(activeSynchronizerId, memberId)
+        statusAsPerScan.actual.totalConsumed shouldBe actualStateAsPerSequencer.extraTrafficConsumed.value
+        statusAsPerScan.actual.totalLimit shouldBe actualStateAsPerSequencer.extraTrafficPurchased.value
+        statusAsPerScan
+      }
       statusAsPerScan.target.totalPurchased shouldBe actualTotalPurchasedAsPerDso
     }
 

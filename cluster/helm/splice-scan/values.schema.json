@@ -206,6 +206,10 @@
         "failOnAppVersionMismatch": {
           "type": "boolean"
         },
+        "analyzableTimeWindowDuration": {
+          "type": "string",
+          "description": "Duration for which update history remains analyzable, e.g. \"30 days\"."
+        },
         "cluster": {
           "type": "object",
           "properties": {

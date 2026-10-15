@@ -18,16 +18,23 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.admin.party.OnboardingClearanceScheduler
+import com.digitalasset.canton.participant.admin.party.{
+  OnboardingClearanceScheduler,
+  PartyReplicationTriggers,
+}
 import com.digitalasset.canton.participant.config.AlphaOnlinePartyReplicationConfig
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.ledger.api.LedgerApiStore
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.participant.protocol.ParticipantTopologyTerminateProcessing
 import com.digitalasset.canton.participant.protocol.party.OnboardingClearanceOperation.PendingOnboardingClearanceStore
-import com.digitalasset.canton.participant.store.SyncPersistentState
 import com.digitalasset.canton.participant.store.memory.PackageMetadataView
+import com.digitalasset.canton.participant.store.{
+  SyncPersistentState,
+  SynchronizerConnectionConfigStore,
+}
 import com.digitalasset.canton.participant.synchronizer.PendingLsuOperation
 import com.digitalasset.canton.participant.topology.client.MissingKeysAlerter
 import com.digitalasset.canton.store.SequencedEventStore
@@ -79,7 +86,7 @@ class TopologyComponentFactory(
     loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext) {
 
-  private val topologyStateCache = new TopologyStateWriteThroughCache(
+  private lazy val topologyStateCache = new TopologyStateWriteThroughCache(
     topologyStore,
     batching.topologyCacheAggregator,
     cacheEvictionThreshold = topology.topologyStateCacheEvictionThreshold,
@@ -98,10 +105,12 @@ class TopologyComponentFactory(
       topologyClient: SynchronizerTopologyClientWithInit,
       recordOrderPublisher: RecordOrderPublisher,
       pendingLsuOperationsStore: PendingLsuOperation.Store,
+      synchronizerConnectionConfigStore: SynchronizerConnectionConfigStore,
       pendingOnboardingClearanceStore: PendingOnboardingClearanceStore,
       sequencedEventStore: SequencedEventStore,
       synchronizerPredecessor: Option[SynchronizerPredecessor],
       ledgerApiStore: LedgerApiStore,
+      partyReplicationTriggersO: Option[PartyReplicationTriggers],
       metrics: ParticipantMetrics,
   ): TopologyTransactionProcessor.Factory = new TopologyTransactionProcessor.Factory {
     override def create(
@@ -121,8 +130,10 @@ class TopologyComponentFactory(
         ),
         synchronizerPredecessor = synchronizerPredecessor,
         pendingLsuOperationsStore = pendingLsuOperationsStore,
+        synchronizerConnectionConfigStore = synchronizerConnectionConfigStore,
         pendingOnboardingClearanceStore = pendingOnboardingClearanceStore,
         onboardingClearanceScheduler = onboardingClearanceScheduler,
+        partyReplicationTriggersO = partyReplicationTriggersO,
         metrics = metrics,
         loggerFactory,
       )
@@ -223,7 +234,7 @@ class TopologyComponentFactory(
         checkCannotDisablePartyWithActiveContracts(
           partyId,
           forceFlags,
-          acsInspections = () => Map(syncPersistentState.lsid -> syncPersistentState.acsInspection),
+          acsInspections = Map(syncPersistentState.lsid -> syncPersistentState.acsInspection),
         )
 
       override def checkInsufficientSignatoryAssigningParticipantsForParty(
@@ -241,7 +252,7 @@ class TopologyComponentFactory(
           nextThreshold,
           nextConfirmingParticipants,
           forceFlags,
-          () => Map(syncPersistentState.lsid -> syncPersistentState.reassignmentStore),
+          Map(syncPersistentState.lsid -> syncPersistentState.reassignmentStore),
           () => ledgerApiStore.value.ledgerEnd,
         )
 
@@ -254,7 +265,7 @@ class TopologyComponentFactory(
         checkInsufficientParticipantPermissionForSignatoryParty(
           partyId,
           forceFlags,
-          acsInspections = () => Map(syncPersistentState.lsid -> syncPersistentState.acsInspection),
+          acsInspections = Map(syncPersistentState.lsid -> syncPersistentState.acsInspection),
         )
     }
     topologyManager
@@ -278,6 +289,7 @@ class TopologyComponentFactory(
   def createTopologyClient(
       packageDependencyResolver: PackageDependencyResolver,
       synchronizerPredecessor: Option[SynchronizerPredecessor],
+      cleanSynchronizerRecordTime: Option[CantonTimestamp],
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
@@ -289,6 +301,7 @@ class TopologyComponentFactory(
       topologyStateCache,
       synchronizerUpgradeTime = synchronizerPredecessor.map(_.upgradeTime),
       sequencerSnapshotTimestamp = None,
+      cleanSynchronizerRecordTime = cleanSynchronizerRecordTime,
       packageDependencyResolver,
       caching,
       enableConsistencyChecks,
@@ -301,14 +314,7 @@ class TopologyComponentFactory(
       asOf: CantonTimestamp,
       packageDependencyResolver: PackageDependencyResolver,
       preferCaching: Boolean,
-  )(implicit executionContext: ExecutionContext): TopologySnapshot = {
-    val snapshot = new StoreBasedTopologySnapshot(
-      psid,
-      asOf,
-      topologyStore,
-      packageDependencyResolver,
-      loggerFactory,
-    )
+  )(implicit executionContext: ExecutionContext): TopologySnapshot =
     if (preferCaching) {
       new WriteThroughCacheTopologySnapshot(
         psid,
@@ -318,9 +324,15 @@ class TopologyComponentFactory(
         asOf,
         loggerFactory,
       )
-    } else
-      snapshot
-  }
+    } else {
+      new StoreBasedTopologySnapshot(
+        psid,
+        asOf,
+        topologyStore,
+        packageDependencyResolver,
+        loggerFactory,
+      )
+    }
 
   def createHeadTopologySnapshot()(implicit
       executionContext: ExecutionContext

@@ -116,7 +116,7 @@ abstract class LsuTransferTriggerBase[T <: SynchronizerNode & LsuSynchronizerNod
       state <- exporter.exportLSUState(topologyExportTime = None)
       parameters <- initializer.initializeSynchronizer(
         state,
-        task.work.announcement.successorSynchronizerId,
+        task.work.announcement.successorSynchronizerId.tryAsPhysical,
         task.readyAt,
         Some(task.work.announcement.upgradeTime),
         ignorePsidCheck = false,

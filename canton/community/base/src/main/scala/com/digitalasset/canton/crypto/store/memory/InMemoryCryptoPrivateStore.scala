@@ -6,32 +6,21 @@ package com.digitalasset.canton.crypto.store.memory
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.parallel.*
-import com.daml.nonempty.NonEmpty
+import cats.syntax.traverse.*
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.KeyPurpose.{Encryption, Signing}
+import com.digitalasset.canton.crypto.store.*
 import com.digitalasset.canton.crypto.store.db.StoredPrivateKey
-import com.digitalasset.canton.crypto.store.{
-  CryptoPrivateStoreError,
-  CryptoPrivateStoreExtended,
-  EncryptionPrivateKeyWithName,
-  PrivateKeyWithName,
-  SigningPrivateKeyWithName,
-}
-import com.digitalasset.canton.crypto.{
-  EncryptionPrivateKey,
-  Fingerprint,
-  KeyName,
-  KeyPurpose,
-  PrivateKey,
-  SigningPrivateKey,
-}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.collection.TrieMapUtil
+import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.canton.version.ReleaseProtocolVersion
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.concurrent.TrieMap
@@ -53,16 +42,25 @@ class InMemoryCryptoPrivateStore(
   private val storedDecryptionKeyMap: TrieMap[Fingerprint, EncryptionPrivateKeyWithName] =
     TrieMap.empty
 
-  private def wrapPrivateKeyInToStored(pk: PrivateKey, name: Option[KeyName]): StoredPrivateKey =
-    new StoredPrivateKey(
-      id = pk.id,
-      data = (pk: @unchecked) match {
-        case spk: SigningPrivateKey => spk.toByteString(releaseProtocolVersion.v)
-        case epk: EncryptionPrivateKey => epk.toByteString(releaseProtocolVersion.v)
-      },
-      purpose = pk.purpose,
-      name = name,
-      wrapperKeyId = None,
+  private def wrapPrivateKeyInToStored(
+      pk: PrivateKey,
+      name: Option[KeyName],
+  ): Either[String, StoredPrivateKey] =
+    (pk match {
+      case spk: SigningPrivateKey => spk.toByteString(releaseProtocolVersion.v)
+      case epk: EncryptionPrivateKey => epk.toByteString(releaseProtocolVersion.v).asRight
+      case other =>
+        Left(
+          s"Unexpected private key to store: should be either a SigningPrivateKey or an EncryptionPrivateKey, got $other"
+        )
+    }).map(serializedKey =>
+      new StoredPrivateKey(
+        id = pk.id,
+        data = serializedKey,
+        purpose = pk.purpose,
+        name = name,
+        wrapperKeyId = None,
+      )
     )
 
   private def errorDuplicate[K <: PrivateKeyWithName](
@@ -91,12 +89,13 @@ class InMemoryCryptoPrivateStore(
       case Signing => storedSigningKeyMap
       case Encryption => storedDecryptionKeyMap
     }
-    val keys = keyIds.collect {
-      case key if keyMap.contains(key) =>
-        val pk = keyMap(key)
+    val keysE = keyIds
+      .collect { case key if keyMap.contains(key) => keyMap(key) }
+      .traverse { pk =>
         wrapPrivateKeyInToStored(pk.privateKey, pk.name)
-    }
-    EitherT.rightT[FutureUnlessShutdown, CryptoPrivateStoreError](keys.toSet)
+      }
+      .leftMap(CryptoPrivateStoreError.FailedToSerializeKey(_, releaseProtocolVersion.v))
+    EitherT.fromEither[FutureUnlessShutdown](keysE.map(_.toSet))
   }
 
   private[crypto] def writePrivateKey(
@@ -110,7 +109,7 @@ class InMemoryCryptoPrivateStore(
         cache: TrieMap[Fingerprint, B],
         buildKeyWithNameFunc: (A, Option[KeyName]) => B,
     ): EitherT[Future, CryptoPrivateStoreError, Unit] =
-      TrieMapUtil
+      MapsUtil
         .insertIfAbsent(
           cache,
           key.id,
@@ -172,15 +171,21 @@ class InMemoryCryptoPrivateStore(
       case Signing =>
         storedSigningKeyMap.values.toSeq
           .parTraverse((x: SigningPrivateKeyWithName) =>
-            EitherT.rightT[FutureUnlessShutdown, CryptoPrivateStoreError](
+            EitherT.fromEither[FutureUnlessShutdown](
               wrapPrivateKeyInToStored(x.privateKey, x.name)
+                .leftMap[CryptoPrivateStoreError](
+                  CryptoPrivateStoreError.FailedToSerializeKey(_, releaseProtocolVersion.v)
+                )
             )
           )
       case Encryption =>
         storedDecryptionKeyMap.values.toSeq
           .parTraverse((x: EncryptionPrivateKeyWithName) =>
-            EitherT.rightT[FutureUnlessShutdown, CryptoPrivateStoreError](
+            EitherT.fromEither[FutureUnlessShutdown](
               wrapPrivateKeyInToStored(x.privateKey, x.name)
+                .leftMap[CryptoPrivateStoreError](
+                  CryptoPrivateStoreError.FailedToSerializeKey(_, releaseProtocolVersion.v)
+                )
             )
           )
     }).map(_.toSet)

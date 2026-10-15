@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.wallet.treasury
 
 import com.daml.ledger.javaapi.data.codegen.{Exercised, Update}
+import com.daml.metrics.api.MetricsContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.ValidatorRight
@@ -202,6 +203,7 @@ class TreasuryService(
       }
       .mapAsync(1) { queuedBatch =>
         recordQueueLatencies(queuedBatch)
+        metrics.batchSize.update(queuedBatch.enqueuedAts.size)(MetricsContext.Empty)
         queuedBatch.batch match {
           case amuletBatch: AmuletOperationBatch => filterAndExecuteBatch(amuletBatch)
           case TokenStandardOperationV1Batch(operation) =>

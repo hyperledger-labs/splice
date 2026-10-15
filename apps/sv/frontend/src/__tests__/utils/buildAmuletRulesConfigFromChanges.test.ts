@@ -278,7 +278,7 @@ describe('buildAmuletRulesConfigFromChanges', () => {
     expect(result.decentralizedSynchronizer.activeSynchronizer).toBe('sync2');
     const expectedRequiredSynchronizers = Array.from(
       result.decentralizedSynchronizer.requiredSynchronizers.map.entriesArray().map(e => e[0])
-    ).sort();
+    ).toSorted();
     expect(expectedRequiredSynchronizers).toEqual(['sync1', 'sync2']);
     expect(result.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount).toBe('2000');
     expect(
@@ -479,5 +479,30 @@ describe('buildAmuletRulesConfigFromChanges', () => {
         optDevelopmentFundPercentage: '0.06',
       },
     });
+  });
+});
+
+describe('buildAmuletRulesConfigFromChanges switch-over times', () => {
+  const switchOverChange = (value: string) => ({
+    fieldName: 'amuletSwitchOverTimes',
+    label: 'Amulet switch-over times',
+    currentValue: '',
+    newValue: value,
+  });
+
+  test('is null when the switch-over field is absent', () => {
+    expect(buildAmuletRulesConfigFromChanges([]).amuletSwitchOverTimes).toBeNull();
+  });
+
+  test('is null when the switch-over field value is empty', () => {
+    const result = buildAmuletRulesConfigFromChanges([switchOverChange('')]);
+    expect(result.amuletSwitchOverTimes).toBeNull();
+  });
+
+  test('parses the serialized map back into a switch-over map', () => {
+    const result = buildAmuletRulesConfigFromChanges([
+      switchOverChange('{"amulet-v2":"2026-09-06T00:00:00Z"}'),
+    ]);
+    expect(result.amuletSwitchOverTimes).toEqual({ 'amulet-v2': '2026-09-06T00:00:00Z' });
   });
 });

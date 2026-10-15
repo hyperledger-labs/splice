@@ -1,0 +1,42 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "apiVersion": "networking.istio.io/v1alpha3",
+    "kind": "EnvoyFilter",
+    "metadata": {
+      "name": "strip-rate-limit-headers",
+      "namespace": "cluster-ingress"
+    },
+    "spec": {
+      "configPatches": [
+        {
+          "applyTo": "ROUTE_CONFIGURATION",
+          "match": {
+            "context": "GATEWAY"
+          },
+          "patch": {
+            "operation": "MERGE",
+            "value": {
+              "response_headers_to_remove": [
+                "x-local-rate-limit",
+                "x-ratelimit-limit",
+                "x-ratelimit-remaining",
+                "x-ratelimit-reset",
+                "x-envoy-ratelimited"
+              ]
+            }
+          }
+        }
+      ],
+      "workloadSelector": {
+        "labels": {
+          "istio": "ingress"
+        }
+      }
+    }
+  },
+  "name": "strip-rate-limit-headers",
+  "provider": "",
+  "type": "kubernetes:networking.istio.io/v1alpha3:EnvoyFilter"
+}

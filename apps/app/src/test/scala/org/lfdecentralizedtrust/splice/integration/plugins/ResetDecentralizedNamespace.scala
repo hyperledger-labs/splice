@@ -2,16 +2,18 @@ package org.lfdecentralizedtrust.splice.integration.plugins
 
 import org.lfdecentralizedtrust.splice.console.{ParticipantClientReference, SvAppBackendReference}
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests
-import com.daml.nonempty.NonEmpty
+import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.console.ConsoleMacros
+import com.digitalasset.canton.console.{CommandFailure, ConsoleMacros}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.logging.{SuppressingLogger, SuppressionRule}
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.logging.{LogEntry, SuppressingLogger, SuppressionRule}
+import com.digitalasset.canton.topology.{Namespace, SynchronizerId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.DecentralizedNamespaceDefinition
 import io.grpc
 import org.slf4j.event.Level
+
+import scala.util.{Failure, Success, Try}
 
 /** The decentralized namespace is reset to contain only sv1 after each env is used
   * When onboarding SVs their participant namespace is added to the decentralized namespace, so for a "clean" test we have to remove them
@@ -50,12 +52,21 @@ final class ResetDecentralizedNamespace extends ResetTopologyStatePlugin {
             s"The following namespaces need to be removed from the decentralized namespace: $ownersThatMustBeRemoved"
           )
 
+          val suppressingLogger = env.environment.loggerFactory.asInstanceOf[SuppressingLogger]
+
+          def isRejectionOfAnUnneededProposal(entry: LogEntry): Boolean =
+            Seq(
+              "FAILED_PRECONDITION/SERIAL_MISMATCH",
+              "ALREADY_EXISTS/TOPOLOGY_MAPPING_ALREADY_EXISTS",
+              "NOT_FOUND/TOPOLOGY_NO_APPROPRIATE_SIGNING_KEY_IN_STORE",
+            ).exists(entry.message.contains)
+
           def proposeDecentralizedNamespaceReset(
-              client: ParticipantClientReference
-          ) = {
-            env.environment.loggerFactory
-              .asInstanceOf[SuppressingLogger]
-              .assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
+              namespace: Namespace,
+              client: ParticipantClientReference,
+          ): Unit =
+            suppressingLogger.suppress(SuppressionRule.LevelAndAbove(Level.ERROR))(
+              Try(
                 client.topology.decentralized_namespaces
                   .propose(
                     DecentralizedNamespaceDefinition
@@ -72,10 +83,27 @@ final class ResetDecentralizedNamespace extends ResetTopologyStatePlugin {
                     ),
                     synchronize = None,
                   )
-                  .discard,
-                forAll(_)(_.message should include("FAILED_PRECONDITION/SERIAL_MISMATCH")),
+                  .discard
               )
-          }
+            ) match {
+              case Success(()) =>
+                suppressingLogger.checkLogsAssertion(
+                  forAll(_)(_.message should include("FAILED_PRECONDITION/SERIAL_MISMATCH"))
+                )
+              case Failure(failure: CommandFailure) =>
+                val errors = suppressingLogger.fetchRecordedLogEntries
+                suppressingLogger.checkLogsAssertion(_ => succeed)
+                val reasons = errors.map(_.message).mkString("; ")
+                if (errors.nonEmpty && errors.forall(isRejectionOfAnUnneededProposal))
+                  logger.info(
+                    s"Proposal from $namespace is not needed ($reasons), checking the ledger for the reset"
+                  )
+                else {
+                  logger.info(s"Proposal from $namespace failed ($reasons), retrying the reset")
+                  throw failure
+                }
+              case Failure(other) => throw other
+            }
 
           val usableSvs =
             env.svs.local
@@ -94,7 +122,7 @@ final class ResetDecentralizedNamespace extends ResetTopologyStatePlugin {
                   s"Failed to remove $namespace as there is no SV with that namespace, svs found: ${usableSvsByNamespace.keySet}"
                 ),
               )
-              proposeDecentralizedNamespaceReset(sv)
+              proposeDecentralizedNamespaceReset(namespace, sv)
             }
           logger.info(
             "All required proposals to reset SV namespace submitted, waiting for it to be effective"

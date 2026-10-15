@@ -6,7 +6,11 @@ package com.digitalasset.canton.crypto
 import cats.Order
 import cats.syntax.either.*
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.serialization.DeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.version.{
@@ -57,10 +61,10 @@ object PasswordBasedEncrypted extends HasVersionedMessageCompanion[PasswordBased
   ): ParsingResult[PasswordBasedEncrypted] =
     for {
       symmetricKeyScheme <- SymmetricKeyScheme.fromProtoEnum(
-        "symmetric_key_scheme",
         encryptedP.symmetricKeyScheme,
+        "symmetric_key_scheme",
       )
-      pbkdfScheme <- PbkdfScheme.fromProtoEnum("pbkdf_scheme", encryptedP.pbkdfScheme)
+      pbkdfScheme <- PbkdfScheme.fromProtoEnum(encryptedP.pbkdfScheme, "pbkdf_scheme")
       // Validate that the salt has the expected length for the PBKDF scheme.
       // An empty or short salt defeats the purpose of password-based key derivation by
       // enabling precomputation attacks (rainbow tables) against the password.
@@ -134,7 +138,7 @@ trait PasswordBasedEncryptionOps { this: EncryptionOps =>
 }
 
 /** Schemes for Password-Based Key Derivation Functions */
-sealed trait PbkdfScheme extends Product with Serializable {
+sealed trait PbkdfScheme extends CryptoSpec with Product with Serializable {
   def name: String
 
   def toProtoEnum: v30.PbkdfScheme
@@ -153,6 +157,8 @@ object PbkdfScheme {
 
     override def defaultSaltLengthInBytes: Int = 16
 
+    override def experimental: Boolean = false
+
     // Recommended parameters: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id
     // NOTE: Do not change those parameters, instead add a new mode as a new PBKDF scheme
     val memoryInKb = 12288
@@ -161,8 +167,8 @@ object PbkdfScheme {
   }
 
   def fromProtoEnum(
-      field: String,
       schemeP: v30.PbkdfScheme,
+      field: String,
   ): ParsingResult[PbkdfScheme] =
     schemeP match {
       case v30.PbkdfScheme.PBKDF_SCHEME_UNSPECIFIED =>
@@ -175,32 +181,48 @@ object PbkdfScheme {
 
 }
 
-sealed trait PasswordBasedEncryptionError extends Product with Serializable with PrettyPrinting
+sealed trait PasswordBasedEncryptionError
+    extends Product
+    with Serializable
+    with PrettyPrintingFromCompanion
 
 object PasswordBasedEncryptionError {
 
   final case class KeyCreationError(error: EncryptionKeyCreationError)
       extends PasswordBasedEncryptionError {
-    override protected def pretty: Pretty[KeyCreationError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[KeyCreationError] = KeyCreationError
+  }
+  object KeyCreationError extends PrettyPrintingCompanion[KeyCreationError] {
+    override protected val pretty: Pretty[KeyCreationError] = prettyOfClass(
       unnamedParam(_.error)
     )
   }
 
   final case class DecryptError(error: DecryptionError) extends PasswordBasedEncryptionError {
-    override protected def pretty: Pretty[DecryptError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[DecryptError] = DecryptError
+  }
+  object DecryptError extends PrettyPrintingCompanion[DecryptError] {
+    override protected val pretty: Pretty[DecryptError] = prettyOfClass(
       unnamedParam(_.error)
     )
   }
 
   final case class EncryptError(error: EncryptionError) extends PasswordBasedEncryptionError {
-    override protected def pretty: Pretty[EncryptError] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[EncryptError] = EncryptError
+  }
+  object EncryptError extends PrettyPrintingCompanion[EncryptError] {
+    override protected val pretty: Pretty[EncryptError] = prettyOfClass(
       unnamedParam(_.error)
     )
   }
 
   final case class PbkdfOutputLengthInvalid(expectedLength: Int, actualLength: Int)
       extends PasswordBasedEncryptionError {
-    override protected def pretty: Pretty[PbkdfOutputLengthInvalid] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[PbkdfOutputLengthInvalid] =
+      PbkdfOutputLengthInvalid
+  }
+  object PbkdfOutputLengthInvalid extends PrettyPrintingCompanion[PbkdfOutputLengthInvalid] {
+    override protected val pretty: Pretty[PbkdfOutputLengthInvalid] = prettyOfClass(
       param("expectedLength", _.expectedLength),
       param("actualLength", _.actualLength),
     )

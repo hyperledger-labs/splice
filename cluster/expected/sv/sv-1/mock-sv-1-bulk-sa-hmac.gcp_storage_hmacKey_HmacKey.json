@@ -1,0 +1,8 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {},
+  "name": "mock-sv-1-bulk-sa-hmac",
+  "provider": "",
+  "type": "gcp:storage/hmacKey:HmacKey"
+}

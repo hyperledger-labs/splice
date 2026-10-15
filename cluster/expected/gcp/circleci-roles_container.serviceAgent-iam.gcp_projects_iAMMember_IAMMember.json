@@ -1,0 +1,10 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "role": "roles/container.serviceAgent"
+  },
+  "name": "circleci-roles/container.serviceAgent-iam",
+  "provider": "",
+  "type": "gcp:projects/iAMMember:IAMMember"
+}
