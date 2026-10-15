@@ -459,7 +459,8 @@ class UpdateHistory(
     // TODO(#6313): compare CREATE TABLE ... PARTITION OF with separate CREATE and ATTACH PARTITION
     storage.queryAndUpdate(
       // CREATE TABLE is transactional, so the partitions of all tables are created atomically.
-      AdvisoryLocks.withTransactionalLock(
+      // The lock makes concurrent callers wait for each other instead of failing.
+      AdvisoryLocks.withBlockingTransactionalLock(
         profile,
         AdvisoryLockIds.createUpdateHistoryPartitionStatement,
         DBIO.seq(PartitionedTables.map { table =>

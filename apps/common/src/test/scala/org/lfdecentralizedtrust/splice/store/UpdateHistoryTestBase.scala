@@ -9,12 +9,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
 }
-import org.lfdecentralizedtrust.splice.store.db.{
-  AcsJdbcTypes,
-  AcsTables,
-  AdvisoryLocks,
-  SplicePostgresTest,
-}
+import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
@@ -30,12 +25,11 @@ import org.scalatest.Assertion
 
 import java.time.{LocalDate, ZoneOffset}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import UpdateHistory.UpdateHistoryResponse
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.config.NonNegativeDuration
-import com.digitalasset.canton.util.{DelayUtil, MonadUtil}
+import com.digitalasset.canton.util.MonadUtil
 
 abstract class UpdateHistoryTestBase
     extends StoreTestBase
@@ -516,28 +510,8 @@ object UpdateHistoryTestBase {
         windowSizeDays,
       )
       _ <- MonadUtil.sequentialTraverse(0.until(partitionRunwayDays, step = windowSizeDays)) { n =>
-        val windowStart = timeStart.plus(java.time.Duration.ofDays(n.toLong))
-        createPartitionsWithRetry(updateHistory, windowStart, windowSizeDays)
+        updateHistory.createPartitions(firstDay.plusDays(n.toLong), windowSizeDays)
       }
     } yield ()
-  }
-
-  // createPartitions fails fast if another session is creating partitions at the same time,
-  // e.g. another store of the same test case or another suite using the same database.
-  private def createPartitionsWithRetry(
-      updateHistory: UpdateHistory,
-      windowStart: CantonTimestamp,
-      windowSizeDays: Int,
-      attemptsLeft: Int = 100,
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
-    val firstDay = LocalDate.ofInstant(windowStart.toInstant, ZoneOffset.UTC)
-    updateHistory.createPartitions(firstDay, windowSizeDays).recoverWith {
-      case _: AdvisoryLocks.FailedToAcquireLockException if attemptsLeft > 1 =>
-        DelayUtil
-          .delay(100.millis)
-          .flatMap(_ =>
-            createPartitionsWithRetry(updateHistory, windowStart, windowSizeDays, attemptsLeft - 1)
-          )
-    }
   }
 }

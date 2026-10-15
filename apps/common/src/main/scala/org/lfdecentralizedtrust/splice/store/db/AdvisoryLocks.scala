@@ -60,4 +60,20 @@ object AdvisoryLocks {
     import profile.api.jdbcActionExtensionMethods
     withLock("transactional", lockId)(acquireTransactionalLock(lockId), action).transactionally
   }
+
+  /** Like [[withTransactionalLock]], but waits for the lock instead of failing while another
+    * session holds it.
+    */
+  def withBlockingTransactionalLock[T, E <: Effect](
+      profile: JdbcProfile,
+      lockId: Long,
+      action: DBIOAction[T, NoStream, E],
+  ): DBIOAction[T, NoStream, Effect.Read & Effect.Transactional & E] = {
+    import profile.api.jdbcActionExtensionMethods
+    sql"SELECT pg_advisory_xact_lock($lockId)"
+      .as[Unit]
+      .head
+      .andThen(action)
+      .transactionally
+  }
 }
