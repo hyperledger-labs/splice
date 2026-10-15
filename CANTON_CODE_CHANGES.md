@@ -19,13 +19,13 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Generalization of `MetricsFactory`
 * Removed a trailing comma in many places because the CC Scala compiler doesn't like it (e.g. `.authorize(op, domain, mediator, side, key.some, )` -> `.authorize(op, domain, mediator, side, key.some)`)
 * Added `org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition` to `BaseIntegrationTest.scala`
-* Added `internalErrorGrpc` to `ErrorUtil`
 * Added `resetRetriesAfter` option to `Backoff` retry policy
 * Changed default concurrency limit in `ConcurrencyEnvironmentLimit` to 1
 * LogReporter logs location, message and throwable on TestFailed event.
 * Added an optional `darFile` parameter to `ParticipantAdminCommands.UploadDar` so we can more conveniently upload DARs from weird locations (like JARs).
 * `ParticipantAdminCommands.ImportPartyAcs` now takes an InputStream instead of a file for greater versatility.
 * Decreases the `maxPollInterval` to 100ms from 5s, in the `eventually` methods in `BaseTest`
+* Added `BaseTest.DefaultEventuallyTimeUntilSuccess`, the default `timeUntilSuccess` of `object BaseTest`'s `eventually`.
 * Compute the minimum poll interval used in `eventually` to 10% of the `maxPollInterval`
 * Added `suppressFailedClues` to `BaseTest` trait.
 * Support specifying `darData` on `upload.dars`.
