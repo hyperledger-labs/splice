@@ -60,8 +60,8 @@ alter table update_history_backfilling
 -- * For sequences, ALTER SEQUENCE would fail with 'cannot change ownership of identity sequence'.
 -- * The primary key is (row_id, record_time), as a primary key on a partitioned table must include the partition key.
 --   It serves as the row identity (e.g., as replica identity for logical replication), deduplication is done by the unique indexes.
--- * We do still have unique checks with record_time added that prevent the same row from being inserted twice.
---   They can't however prevent two different rows with equal columns except for record_time to be inserted.
+-- * The unique indexes include record_time, for the same reason. This does not weaken deduplication:
+--   record_time is part of the update itself, so ingesting the same update again carries the same record_time and hits the unique index.
 -- * creates, exercises and assignments get _interned columns (see interned_strings).
 create table update_history_transactions
 (
