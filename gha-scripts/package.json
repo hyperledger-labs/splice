@@ -7,7 +7,7 @@
     "build:parse_backport_comments": "npx esbuild src/actions/parse_backport_comments.ts --outfile=actions/parse_backport_comments/index.js --bundle --platform=node --format=cjs"
   },
   "dependencies": {
-    "js-yaml": "^4.2.0"
+    "js-yaml": "^4.3.1"
   },
   "devDependencies": {
     "@actions/core": "^3.0.1",
