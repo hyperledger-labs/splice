@@ -1,5 +1,0 @@
----
-name: dsync
-description: "Provision a dedicated synchronizer"
-runtime: nodejs
-main: "../../../pulumi/dsync/src/index.ts"
