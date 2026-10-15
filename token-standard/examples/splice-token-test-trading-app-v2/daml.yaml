@@ -1,7 +1,7 @@
 # Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-sdk-version: 3.5.2
+sdk-version: 3.5.7
 name: splice-token-test-trading-app-v2
 description: |
   A trading app PoC built on top of the V2 allocation APIs of the Canton Network Token Standard.

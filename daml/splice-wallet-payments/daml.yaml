@@ -1,4 +1,4 @@
-sdk-version: 3.5.2
+sdk-version: 3.5.7
 name: splice-wallet-payments
 source: daml
 version: 0.1.24

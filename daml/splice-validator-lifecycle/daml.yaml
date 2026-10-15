@@ -1,4 +1,4 @@
-sdk-version: 3.5.2
+sdk-version: 3.5.7
 name: splice-validator-lifecycle
 source: daml
 version: 0.1.9
