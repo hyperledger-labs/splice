@@ -1,8 +1,8 @@
 {
-  "version": "3.7.0-snapshot.20261014.20770.0.v0fd13468",
-  "oss_sha256": "sha256:1dh7zm6m28qi3s8wiy7bq7wj4vkqxmj19zpiwzkca374bvdpvij9",
-  "canton_base_image_sha256": "sha256:8c4d223bb7ad9ba1b943289e58bc41dc2d22a0737d927b28f7bba851c7a0b2ce",
-  "canton_participant_image_sha256": "sha256:286796f55f821ad06013e6a0e03917c31d180c795c10dd868ce4c5ae94d770fc",
-  "canton_mediator_image_sha256": "sha256:69baee5d1c0f6371fc5004204f940503f294009e5c40a69a74d6a23d2d1d0684",
-  "canton_sequencer_image_sha256": "sha256:55176549db13ff9a2698a0c465f39d70bf7adeef246eb806b32a8e9dfcb53677"
+  "version": "3.7.0-snapshot.20261014.20773.0.vc6e16988",
+  "oss_sha256": "sha256:0pfmh91fixkf3jnd74dgqnhd4afpn7bm289km02a21sfg6nfr8w3",
+  "canton_base_image_sha256": "sha256:f8f051a6c486ef0beaf0ad8c18aeb9defc19db7d648ff87e5d6ffc4732e63968",
+  "canton_participant_image_sha256": "sha256:d96d281e96cc46eacb4058de46826a4db97e96aa1cc86c172b35ca27d60b5587",
+  "canton_mediator_image_sha256": "sha256:6ed7e9e4b9385910e5fdeb35c182668dbd04b468b986e6feb9d2fd806f263a80",
+  "canton_sequencer_image_sha256": "sha256:c42b36a746654849b6e7ba8bd86ee01ece0447e8404d3b508dce70258ffc1551"
 }
