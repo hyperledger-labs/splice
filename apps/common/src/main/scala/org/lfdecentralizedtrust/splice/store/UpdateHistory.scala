@@ -456,16 +456,11 @@ class UpdateHistory(
         profile,
         AdvisoryLockIds.createUpdateHistoryPartitionStatement,
         DBIO.seq(
-          sql"create table if not exists update_history_transactions_#$tableSuffix partition of update_history_transactions for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-            .as[Unit],
-          sql"create table if not exists update_history_creates_#$tableSuffix partition of update_history_creates for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-            .as[Unit],
-          sql"create table if not exists update_history_exercises_#$tableSuffix partition of update_history_exercises for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-            .as[Unit],
-          sql"create table if not exists update_history_assignments_#$tableSuffix partition of update_history_assignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-            .as[Unit],
-          sql"create table if not exists update_history_unassignments_#$tableSuffix partition of update_history_unassignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})"
-            .as[Unit],
+          sqlu"create table if not exists update_history_transactions_#$tableSuffix partition of update_history_transactions for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})",
+          sqlu"create table if not exists update_history_creates_#$tableSuffix partition of update_history_creates for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})",
+          sqlu"create table if not exists update_history_exercises_#$tableSuffix partition of update_history_exercises for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})",
+          sqlu"create table if not exists update_history_assignments_#$tableSuffix partition of update_history_assignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})",
+          sqlu"create table if not exists update_history_unassignments_#$tableSuffix partition of update_history_unassignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})",
         ),
       ),
       "createPartitions",
