@@ -4,7 +4,6 @@
 module Splice.Ans where
 
 import DA.Action (void)
-import DA.TextMap qualified as TM
 import DA.Time
 
 import Splice.Amulet
@@ -15,7 +14,16 @@ import Splice.Wallet.Subscriptions
 import Splice.Util
 
 import Splice.Api.Token.MetadataV1 (emptyMetadata)
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferV1
+import Splice.Api.Token.TransferInstructionV2 qualified as TransferV2
 import Splice.Api.Credential.RegistryV1 qualified as RegistryV1
+import Splice.TokenStandard.Utils (
+  publicFetchDefaultImpl,
+  transferFactoryV1_transferDefaultImplUsingV2,
+  transferFactoryV2_privateAsset_transferExtraObserversDefaultImpl,
+  )
+
+import Splice.Ans.CredentialExpiry (extendCredentialExpiry)
 
 data AnsRules_RequestEntryResult = AnsRules_RequestEntryResult
   with
@@ -78,6 +86,27 @@ template AnsRules
   where
     signatory dso
     ensure validAnsConfig config
+
+    -- Credential-expiry burn. The body is the v2 choice; v1 upcasts into it.
+    -- A v1 call only carries the sender, so it extends a credential only when
+    -- sender, holder, and issuer are the same party.
+    interface instance TransferV1.TransferFactory for AnsRules where
+      view = TransferV1.TransferFactoryView with
+        admin = dso
+        meta = emptyMetadata
+
+      transferFactory_publicFetchImpl = publicFetchDefaultImpl this
+      transferFactory_transferImpl = transferFactoryV1_transferDefaultImplUsingV2 (toInterface this)
+
+    interface instance TransferV2.TransferFactory for AnsRules where
+      view = TransferV2.TransferFactoryView with
+        admin = dso
+        meta = emptyMetadata
+
+      transferFactory_publicFetchImpl = publicFetchDefaultImpl this
+      -- Sender only. The receiver is the unhosted expiry sentinel.
+      transferFactory_transferExtraObservers = transferFactoryV2_privateAsset_transferExtraObserversDefaultImpl
+      transferFactory_transferImpl _self arg = extendCredentialExpiry dso arg
 
     -- Request a ans entry, to be paid and renewed via subscription payments.
     -- The SubscriptionRequest is accepted (or rejected) via the user's wallet by offering the initial payment.
@@ -319,33 +348,37 @@ template AnsEntry
         admin = dso
         issuer = dso
         holder = user
-        claims = RegistryV1.Claims with
-          values = TM.fromList [
-              -- TODO: use the right CIP number once it is assigned; factor it out into a constant
-
-              ("cip-TBD/cns.name!" <> name, partyToText user),
-              -- This claim translates to (subject="name", property="cip-TBD/cns.name", value=holder).
-              --
-              -- A name lookup matching ANS 1.0 lookup semantics
-              -- can be performed by searching for credentials with
-              -- key = "cip-TBD/cns.name#<name>" and issuer=dso
-              --
-              -- TODO: consider saving space and defining the default rule that an empty value
-              -- means that the value is the holder party. It also obviates the need to deal
-              -- with credentials where the holder is different from the value of this claim.
-              --
-              -- TODO: consider using reverse DNS style for the name, so that the prefix search
-              -- allows listing all names under a domain, e.g., "com.example.myname".
-              --
-              ("cip-TBD/cns.url!" <> name, url),
-              ("cip-TBD/cns.description!" <> name, description)
-              -- Note that name and description are associated with the ans.name and not
-              -- the holder directly; i.e., the holder can have different attributes for different names.
-
+        claims =
+            -- TODO: use the right CIP number once it is assigned; factor it out into a constant
+            --
+            -- A name lookup matching ANS 1.0 lookup semantics
+            -- can be performed by searching for credentials with
+            -- property = "cip-TBD/cns.name", subject = name and issuer = dso.
+            --
+            -- TODO: consider saving space and defining the default rule that an empty value
+            -- means that the value is the holder party. It also obviates the need to deal
+            -- with credentials where the holder is different from the value of this claim.
+            --
+            -- TODO: consider using reverse DNS style for the name, so that the prefix search
+            -- allows listing all names under a domain, e.g., "com.example.myname".
+            --
+            -- Note that name and description are associated with the ans.name and not
+            -- the holder directly; i.e., the holder can have different attributes for different names.
+            [ RegistryV1.Claim with
+                subject = Some name
+                property = "cip-TBD/cns.name"
+                value = partyToText user
+            , RegistryV1.Claim with
+                subject = Some name
+                property = "cip-TBD/cns.url"
+                value = url
+            , RegistryV1.Claim with
+                subject = Some name
+                property = "cip-TBD/cns.description"
+                value = description
             ]
-          validFrom = None
-          validUntil = Some expiresAt
-          meta = emptyMetadata
+        validFrom = None
+        validUntil = Some expiresAt
         createdAt = None
         expiresAt = Some expiresAt
         meta = emptyMetadata

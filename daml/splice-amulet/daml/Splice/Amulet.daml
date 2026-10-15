@@ -372,14 +372,14 @@ template FeaturedAppRight with
         admin = dso
         issuer = dso
         holder = provider
-        claims = Api.Credential.RegistryV1.Claims with
-          values = TextMap.fromList [
-              ("cip-TBD/is-featured-app", "")
-              -- TODO: replace TBD with the actual CIP number once it is assigned; factor it out into a constant
-            ]
-          validFrom = None
-          validUntil = None
-          meta = Api.Token.MetadataV1.emptyMetadata
+        claims = [Api.Credential.RegistryV1.Claim with
+            subject = None
+            property = "cip-TBD/is-featured-app"
+            -- TODO: replace TBD with the actual CIP number once it is assigned; factor it out into a constant
+            value = ""
+          ]
+        validFrom = None
+        validUntil = None
         createdAt = None
         expiresAt = None
         meta = Api.Token.MetadataV1.emptyMetadata
