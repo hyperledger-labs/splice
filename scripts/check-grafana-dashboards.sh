@@ -68,8 +68,7 @@ check_grafana_dashboards() {
   done
 
   if [[ $classic == true ]]; then
-    echo "ERROR: Export dashboards with the V2 Resource model, or convert them with" >&2
-    echo "       $script_dir/observability/convert-grafana-dashboards-to-v2.sh <dir>" >&2
+    echo "ERROR: Dashboards must use the V2 resource format, please convert them."
     return 1
   fi
 

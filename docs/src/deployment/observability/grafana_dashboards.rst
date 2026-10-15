@@ -17,7 +17,6 @@ under the bundle root:
   everything in the validator set plus SV-specific dashboards.
 
 Import the folder matching your role into your Grafana instance.
-The dashboards use the V2 resource format and require Grafana 13 or newer.
 
 .. note::
 
