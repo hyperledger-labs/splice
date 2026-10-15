@@ -67,6 +67,8 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.I
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import slick.jdbc.canton.SQLActionBuilder
 
+import java.time.{LocalDate, ZoneOffset}
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
@@ -444,24 +446,24 @@ class UpdateHistory(
       """
     }
 
-  def createPartitions(windowStart: CantonTimestamp, windowEnd: CantonTimestamp)(implicit
+  def createPartitions(firstDay: LocalDate, windowSizeDays: Int)(implicit
       tc: TraceContext
   ): Future[Unit] = {
-    val tableSuffix =
-      if (windowStart == CantonTimestamp.MinValue) "import_updates"
-      else windowStart.toMicros.toString
+    def startOf(d: LocalDate) =
+      CantonTimestamp.assertFromInstant(d.atStartOfDay(ZoneOffset.UTC).toInstant)
+
+    val tableSuffix = firstDay.format(DateTimeFormatter.BASIC_ISO_DATE)
+    val start = startOf(firstDay)
+    val end = startOf(firstDay.plusDays(windowSizeDays.toLong))
+
     storage.queryAndUpdate(
       // CREATE TABLE is transactional, so the partitions of all tables are created atomically.
       AdvisoryLocks.withTransactionalLock(
         profile,
         AdvisoryLockIds.createUpdateHistoryPartitionStatement,
-        DBIO.seq(
-          sqlu"create table if not exists update_history_transactions_#$tableSuffix partition of update_history_transactions for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})",
-          sqlu"create table if not exists update_history_creates_#$tableSuffix partition of update_history_creates for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})",
-          sqlu"create table if not exists update_history_exercises_#$tableSuffix partition of update_history_exercises for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})",
-          sqlu"create table if not exists update_history_assignments_#$tableSuffix partition of update_history_assignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})",
-          sqlu"create table if not exists update_history_unassignments_#$tableSuffix partition of update_history_unassignments for values from (#${windowStart.toMicros}) to (#${windowEnd.toMicros})",
-        ),
+        DBIO.seq(PartitionedTables.map { table =>
+          sqlu"create table if not exists #${table}_#$tableSuffix partition of #$table for values from (#${start.toMicros}) to (#${end.toMicros})"
+        }*),
       ),
       "createPartitions",
     )
@@ -2424,6 +2426,14 @@ class UpdateHistory(
 }
 
 object UpdateHistory {
+
+  private val PartitionedTables: Seq[String] = Seq(
+    "update_history_transactions",
+    "update_history_creates",
+    "update_history_exercises",
+    "update_history_assignments",
+    "update_history_unassignments",
+  )
 
   val ImportUpdatesPartitionStart: CantonTimestamp = CantonTimestamp.MinValue
   val ImportUpdatesPartitionEnd: CantonTimestamp = CantonTimestamp.MinValue.immediateSuccessor

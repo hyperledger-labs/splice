@@ -28,6 +28,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodeg
 import org.lfdecentralizedtrust.splice.util.Contract
 import org.scalatest.Assertion
 
+import java.time.{LocalDate, ZoneOffset}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -512,12 +513,11 @@ object UpdateHistoryTestBase {
       _ <- createPartitionsWithRetry(
         updateHistory,
         UpdateHistory.ImportUpdatesPartitionStart,
-        UpdateHistory.ImportUpdatesPartitionEnd,
+        windowSizeDays,
       )
       _ <- MonadUtil.sequentialTraverse(0.until(partitionRunwayDays, step = windowSizeDays)) { n =>
         val windowStart = timeStart.plus(java.time.Duration.ofDays(n.toLong))
-        val windowEnd = windowStart.plus(java.time.Duration.ofDays(windowSizeDays.toLong))
-        createPartitionsWithRetry(updateHistory, windowStart, windowEnd)
+        createPartitionsWithRetry(updateHistory, windowStart, windowSizeDays)
       }
     } yield ()
   }
@@ -527,15 +527,17 @@ object UpdateHistoryTestBase {
   private def createPartitionsWithRetry(
       updateHistory: UpdateHistory,
       windowStart: CantonTimestamp,
-      windowEnd: CantonTimestamp,
+      windowSizeDays: Int,
       attemptsLeft: Int = 100,
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] =
-    updateHistory.createPartitions(windowStart, windowEnd).recoverWith {
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
+    val firstDay = LocalDate.ofInstant(windowStart.toInstant, ZoneOffset.UTC)
+    updateHistory.createPartitions(firstDay, windowSizeDays).recoverWith {
       case _: AdvisoryLocks.FailedToAcquireLockException if attemptsLeft > 1 =>
         DelayUtil
           .delay(100.millis)
           .flatMap(_ =>
-            createPartitionsWithRetry(updateHistory, windowStart, windowEnd, attemptsLeft - 1)
+            createPartitionsWithRetry(updateHistory, windowStart, windowSizeDays, attemptsLeft - 1)
           )
     }
+  }
 }
