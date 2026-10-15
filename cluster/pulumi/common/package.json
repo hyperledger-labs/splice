@@ -15,7 +15,7 @@
     "@pulumi/std": "2.3.2",
     "@types/auth0": "^3.3.11",
     "auth0": "^6.4.0",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.3.2",
     "lodash": "^4.18.1",
     "node-fetch": "^2.7.0",
     "ts-node": "^10.9.2",
