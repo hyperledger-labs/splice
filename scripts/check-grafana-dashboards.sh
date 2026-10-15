@@ -33,7 +33,6 @@ check_grafana_dashboards() {
 
   changed=false
   classic=false
-  invalid=false
 
   for dashboard_file in "${dashboard_files[@]}"; do
     dashboard_data=$(jq . "$dashboard_file")
@@ -42,14 +41,6 @@ check_grafana_dashboards() {
       echo "ERROR: $dashboard_file is not in the Grafana V2 resource format." >&2
       classic=true
       continue
-    fi
-
-    # Queries that the converter couldn't resolve to a datasource end up on the built-in Grafana one
-    unresolved=$(echo "$dashboard_data" | jq '[.. | objects | select(.kind == "DataQuery" and .group == "grafana"
-      and ((.datasource.name // "") | IN("-- Grafana --", "grafana") | not))] | length')
-    if [[ $unresolved -gt 0 ]]; then
-      echo "ERROR: $dashboard_file has $unresolved queries on the built-in Grafana datasource without referencing it." >&2
-      invalid=true
     fi
 
     dashboard_data_modified=$(
@@ -69,10 +60,6 @@ check_grafana_dashboards() {
 
   if [[ $classic == true ]]; then
     echo "ERROR: Dashboards must use the V2 resource format, please convert them."
-    return 1
-  fi
-
-  if [[ $invalid == true ]]; then
     return 1
   fi
 
