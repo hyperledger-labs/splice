@@ -104,6 +104,7 @@ export async function installNode(
             : [],
       },
     },
+    sv ? 'sv' : 'dsync',
     undefined,
     { dependsOn: imagePullDeps },
     supportsReset,
