@@ -955,6 +955,7 @@ object ParticipantAdminCommands {
         representativePackageIdOverride: RepresentativePackageIdOverride,
         excludedStakeholders: Set[PartyId],
         synchronizerId: SynchronizerId,
+        forceRepairWhenTopologyTransactionAtLedgerEnd: Boolean,
     )(implicit ec: ExecutionContext, loggingContext: ErrorLoggingContext)
         extends GrpcAdminCommand[
           Unit,
@@ -986,6 +987,7 @@ object ParticipantAdminCommands {
               excludedStakeholders.map(_.toProtoPrimitive).toSeq,
               Option.when(isFirst)(representativePackageIdOverride.toProtoV30),
               Option.when(isFirst)(synchronizerId.toProtoPrimitive),
+              forceRepairWhenTopologyTransactionAtLedgerEnd,
             )
           },
           new FileInputStream(importFilePath),

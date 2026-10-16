@@ -32,6 +32,7 @@ object ParticipantRepairManagementExtensions {
       representativePackageIdOverride: RepresentativePackageIdOverride,
       excludedStakeholders: Set[PartyId],
       synchronizerId: SynchronizerId,
+      forceRepairWhenTopologyTransactionAtLedgerEnd: Boolean,
   )(implicit ec: ExecutionContext, loggingContext: ErrorLoggingContext)
       extends GrpcAdminCommand[
         Unit,
@@ -61,6 +62,7 @@ object ParticipantRepairManagementExtensions {
             excludedStakeholders.map(_.toProtoPrimitive).toSeq,
             Some(representativePackageIdOverride.toProtoV30),
             Some(synchronizerId.toProtoPrimitive),
+            forceRepairWhenTopologyTransactionAtLedgerEnd,
           ),
         new SequenceInputStream(acsChunk.iterator.map(_.newInput()).asJavaEnumeration),
       )

@@ -491,6 +491,25 @@ abstract class TopologyAdminConnection(
       filterNamespace = Some(id.namespace),
     ).map(_.map(_.transaction))
 
+  private def generateOnboardingTopologyTransactions(protocolVersion: ProtocolVersion)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[GenericSignedTopologyTransaction]] =
+    runCmd(
+      TopologyAdminCommands.Read.GenerateOnboardingTopologyTransactions(protocolVersion, None)
+    ).map(_.transactions)
+
+  def getOrGenerateIdentityTransactions(member: Member, protocolVersion: ProtocolVersion)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[GenericSignedTopologyTransaction]] =
+    getIdentityTransactions(member.uid, TopologyStoreId.Authorized).flatMap { stored =>
+      val hasOwnerToKeyMapping = stored.exists(_.mapping match {
+        case otk: OwnerToKeyMapping => otk.member == member
+        case _ => false
+      })
+      if (hasOwnerToKeyMapping) Future.successful(stored)
+      else generateOnboardingTopologyTransactions(protocolVersion)
+    }
+
   def listAllTransactions(
       store: TopologyStoreId,
       timeQuery: TimeQuery = TimeQuery.HeadState,
