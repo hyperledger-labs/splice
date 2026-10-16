@@ -303,26 +303,8 @@ cloudArmor:
   wafRules:
     excludedHostPrefixes:
       - 'grafana'
-multiValidator:
-  postgresPvcSize: '100Gi'
-  resources:
-    participant:
-      requests:
-        cpu: '1'
-        memory: '8Gi'
-      limits:
-        memory: '16Gi'
-    validator:
-      requests:
-        cpu: '0.5'
-        memory: '2400Mi'
-      limits:
-        memory: '8Gi'
-    postgres:
-      requests:
-        memory: '5Gi'
-      limits:
-        memory: '12Gi'
+# TODO(#7801) remove when internal config is adjusted
+multiValidator: !include(./multi-validator.yaml) {}
 sv:
   scan:
     externalRateLimits:
