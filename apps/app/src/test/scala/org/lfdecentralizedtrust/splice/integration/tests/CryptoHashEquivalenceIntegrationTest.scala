@@ -150,7 +150,6 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
           ),
           AnalyzableTimeWindowConfig.UnlimitedAtw,
           loggerFactory,
-          enableissue12777Workaround = true,
           enableImportUpdateBackfill = false,
           HistoryMetrics(NoOpMetricsFactory, 0L),
         )

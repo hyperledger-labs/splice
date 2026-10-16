@@ -567,7 +567,6 @@ class TxLogBackfillingStoreTest
         analyzableTimeWindowDuration =
           NonNegativeDuration.tryFromDuration(scala.concurrent.duration.Duration.Inf),
         loggerFactory,
-        enableissue12777Workaround = true,
         enableImportUpdateBackfill = true,
         HistoryMetrics.apply(NoOpMetricsFactory, migrationId),
       )

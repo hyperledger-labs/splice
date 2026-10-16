@@ -74,7 +74,6 @@ class UpdateHistoryReadPerformanceTest(
       ),
       analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
       loggerFactory = loggerFactory,
-      enableissue12777Workaround = true,
       enableImportUpdateBackfill = false,
       metrics = HistoryMetrics.apply(NoOpMetricsFactory, migrationId),
     )

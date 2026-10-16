@@ -1334,7 +1334,6 @@ class DbScanAppRewardsStoreTest
         internedStringStore(storage),
         analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
         loggerFactory,
-        enableissue12777Workaround = true,
         enableImportUpdateBackfill = false,
         HistoryMetrics(NoOpMetricsFactory, migrationId),
       )

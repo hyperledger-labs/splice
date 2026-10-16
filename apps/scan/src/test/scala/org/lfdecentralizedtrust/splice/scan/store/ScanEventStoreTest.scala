@@ -1068,7 +1068,6 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
         internedStringStore(storage),
         analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
         loggerFactory,
-        enableissue12777Workaround = true,
         enableImportUpdateBackfill = true,
         HistoryMetrics(NoOpMetricsFactory, migrationId),
       )

@@ -253,7 +253,6 @@ abstract class UpdateHistoryTestBase
         internedStringStore(storage),
         analyzableTimeWindowDuration,
         loggerFactory,
-        enableissue12777Workaround = true,
         enableImportUpdateBackfill = true,
         HistoryMetrics.apply(NoOpMetricsFactory, domainMigrationId),
       )
