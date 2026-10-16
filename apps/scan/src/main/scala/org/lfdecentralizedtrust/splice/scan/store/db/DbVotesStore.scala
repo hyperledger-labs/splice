@@ -314,7 +314,16 @@ object DbVotesStore {
         // Only the nodes that are a CloseVoteRequest exercise can fail here, all other nodes are ignored.
         Try(event match {
           case DsoRulesCloseVoteRequest(node) =>
-            Some(toInsert(node.result.value, storeId, recordTime, tx, eventNumber))
+            Some(
+              toInsert(
+                node.result.value,
+                storeId,
+                recordTime,
+                tx.getSynchronizerId,
+                tx.getUpdateId,
+                eventNumber,
+              )
+            )
           case _ => None
         }) match {
           case Success(insert) => insert
@@ -327,8 +336,14 @@ object DbVotesStore {
               e,
             )
             Some(
-              toInsert(placeholderResult(recordTime), storeId, recordTime, tx, eventNumber)
-                .copy(error = Some(e.getMessage.take(MaxErrorLength)))
+              toInsert(
+                placeholderResult(recordTime),
+                storeId,
+                recordTime,
+                tx.getSynchronizerId,
+                tx.getUpdateId,
+                eventNumber,
+              ).copy(error = Some(e.getMessage.take(MaxErrorLength)))
             )
         }
       }
@@ -340,15 +355,16 @@ object DbVotesStore {
       result: DsoRules_CloseVoteRequestResult,
       storeId: Int,
       recordTime: Long,
-      tx: Transaction,
+      synchronizerId: String,
+      updateId: String,
       eventNumber: Int,
   ): InsertVoteResult = {
     val outcome = VoteRequestOutcome.parse(result.outcome)
     InsertVoteResult(
       storeId = storeId,
       recordTime = recordTime,
-      synchronizerId = String2066.tryCreate(tx.getSynchronizerId),
-      updateId = String2066.tryCreate(tx.getUpdateId),
+      synchronizerId = String2066.tryCreate(synchronizerId),
+      updateId = String2066.tryCreate(updateId),
       eventNumber = eventNumber,
       voteActionName = String2066.tryCreate(actionName(result.request.action)),
       voteRequesterName = String2066.tryCreate(result.request.requester),
