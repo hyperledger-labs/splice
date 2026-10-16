@@ -10,14 +10,6 @@ on:
       pr_number:
         type: number
         required: true
-      cluster:
-        type: string
-        required: false
-        default: ''
-      approver:
-        type: string
-        required: false
-        default: ''
 permissions:
   contents: read
   issues: read
@@ -58,40 +50,23 @@ jobs:
     if: github.event_name != 'issue_comment' || github.event.issue.pull_request
     outputs:
       workflow: ${{ steps.determine_test_type.outputs.workflow }}
-      cluster: ${{ steps.determine_test_type.outputs.cluster }}
-      approver: ${{ steps.determine_test_type.outputs.approver }}
     steps:
       - name: Determine test type
         id: determine_test_type
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           INPUTS_WORKFLOW: ${{ inputs.workflow }}
-          INPUTS_CLUSTER: ${{ inputs.cluster }}
-          INPUTS_APPROVER: ${{ inputs.approver }}
         with:
           script: |
-            const allowedScratchnets = ['scratchneta', 'scratchnetb', 'scratchnetc', 'scratchnetd', 'scratchnete'];
             let workflow = '';
-            let cluster = '';
-            let approver = '';
 
             if (process.env.INPUTS_WORKFLOW !== '') {
               workflow = process.env.INPUTS_WORKFLOW;
-              cluster = process.env.INPUTS_CLUSTER || '';
-              approver = process.env.INPUTS_APPROVER || '';
             } else {
               const body = context.payload.comment.body || '';
-              approver = context.payload.comment.user.login || '';
 
-              const clusterTestMatch = body.match(/\/cluster_test(?:\s+(\S+))?/);
-              if (clusterTestMatch) {
+              if (body.includes('/cluster_test')) {
                 workflow = 'cluster_test';
-                const arg = (clusterTestMatch[1] || '').toLowerCase().replace(/^[`]+/, '').replace(/[.,;:!?)\]`]+$/, '');
-                if (allowedScratchnets.includes(arg)) {
-                  cluster = arg;
-                } else {
-                  cluster = '';
-                }
               } else if (body.includes('/hdm_test')) {
                 workflow = 'hdm_test';
               } else if (body.includes('/lsu_test')) {
@@ -102,30 +77,26 @@ jobs:
             }
 
             core.setOutput('workflow', workflow);
-            core.setOutput('cluster', cluster);
-            core.setOutput('approver', approver);
 
   trigger_test:
     needs:
       - get_head
       - determine_test_type
-    if: needs.determine_test_type.outputs.workflow != '' && (needs.determine_test_type.outputs.workflow != 'cluster_test' || needs.determine_test_type.outputs.cluster != '')
+    if: needs.determine_test_type.outputs.workflow != '' && needs.determine_test_type.outputs.workflow != 'cluster_test'
     uses: ./.github/workflows/cluster_tests.yml
     secrets: inherit
     with:
       workflow: ${{ needs.determine_test_type.outputs.workflow }}
       sha: ${{ needs.get_head.outputs.sha }}
-      cluster: ${{ needs.determine_test_type.outputs.cluster }}
-      approver: ${{ needs.determine_test_type.outputs.approver }}
 
-  cluster_test_usage:
+  cluster_test_instructions:
     runs-on: ubuntu-24.04
     needs:
       - get_head
       - determine_test_type
-    if: needs.determine_test_type.outputs.workflow == 'cluster_test' && needs.determine_test_type.outputs.cluster == ''
+    if: needs.determine_test_type.outputs.workflow == 'cluster_test'
     steps:
-      - name: Comment usage on the PR
+      - name: Comment instructions on the PR
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -133,37 +104,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: "No test was triggered. To trigger a cluster test (DA-internal only), first lock a scratchnet cluster and then comment `/cluster_test <scratchnet>` where `<scratchnet>` is the locked cluster, one of `scratchneta`, `scratchnetb`, `scratchnetc`, `scratchnetd`, `scratchnete` (e.g. `/cluster_test scratchneta`).\n\nTo lock, run `cncluster lock` in `cluster/deployment/<scratchnet>`."
-            });
-
-  result:
-    runs-on: ubuntu-24.04
-    needs:
-      - get_head
-      - determine_test_type
-      - trigger_test
-    if: needs.determine_test_type.outputs.workflow == 'cluster_test' && needs.determine_test_type.outputs.cluster != ''
-    steps:
-      - name: parse the result
-        id: parse
-        run: |
-          result='${{ needs.trigger_test.outputs.result }}'
-          url=$(echo "$result" | jq -r '.html_url // .run_url // empty')
-          if [ -z "$url" ]; then
-            run_id=$(echo "$result" | jq -r '.run_id // empty')
-            url="https://github.com/DACH-NY/canton-network-internal/actions/runs/$run_id"
-          fi
-          echo "Deploy scratchnet pipeline triggered for [Commit ${{ needs.get_head.outputs.sha }} in ${{ needs.get_head.outputs.repo }}](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/${{ needs.get_head.outputs.sha }}), track progress here: $url"
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-      - name: Comment on the PR
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script : |
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: "Deploy cluster test on ${{ needs.determine_test_type.outputs.cluster }} triggered for [Commit ${{ needs.get_head.outputs.sha }} in ${{ needs.get_head.outputs.repo }}](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/${{ needs.get_head.outputs.sha }}). Track progress here: ${{ steps.parse.outputs.url }}"
+              body: "To run a cluster test on this PR, a maintainer can run the following from a scratchnet checkout (`cluster/deployment/<scratchnet>`):\n\n`cncluster deploy_basic ${{ github.event.issue.number }}`\n\nThis grabs the cluster lock if free (use `cncluster lock` to lock explicitly), triggers the deploy workflow, and posts the run link back on this PR. Nothing was triggered by this comment."
             });
 
   result_hdm:
