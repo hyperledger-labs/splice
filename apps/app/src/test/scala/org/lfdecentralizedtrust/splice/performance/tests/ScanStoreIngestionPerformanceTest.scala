@@ -20,7 +20,7 @@ import pureconfig.ConfigReader
 import pureconfig.generic.semiauto.deriveReader
 
 import java.nio.file.Path
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class ScanStoreIngestionPerformanceTest(
     dsoParty: PartyId,
@@ -44,7 +44,7 @@ class ScanStoreIngestionPerformanceTest(
   override protected val tablesToSanityCheck: Seq[String] =
     Seq(ScanTables.acsTableName, ScanTables.txLogTableName)
 
-  override protected def mkStore(storage: DbStorage): MultiDomainAcsStore = {
+  override protected def mkStore(storage: DbStorage): Future[MultiDomainAcsStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         DarResources.amulet.all ++
@@ -53,7 +53,7 @@ class ScanStoreIngestionPerformanceTest(
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
-    new DbScanStore(
+    Future.successful(new DbScanStore(
       ScanStore.Key(dsoParty),
       storage,
       loggerFactory,
@@ -65,7 +65,7 @@ class ScanStoreIngestionPerformanceTest(
       IngestionConfig(),
       new DbScanStoreMetrics(NoOpMetricsFactory, loggerFactory, timeouts),
       defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-    )(ec, templateJsonDecoder, closeContext).multiDomainAcsStore
+    )(ec, templateJsonDecoder, closeContext).multiDomainAcsStore)
   }
 
 }

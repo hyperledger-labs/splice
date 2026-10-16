@@ -242,20 +242,22 @@ abstract class UpdateHistoryTestBase
       analyzableTimeWindowDuration: NonNegativeDuration =
         NonNegativeDuration.tryFromDuration(scala.concurrent.duration.Duration.Inf),
   ): UpdateHistory = {
-    new UpdateHistory(
-      storage,
-      domainMigrationId,
-      storeName,
-      participantId,
-      updateStreamParty,
-      backfillingRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = true,
-      HistoryMetrics.apply(NoOpMetricsFactory, domainMigrationId),
-    )
+    UpdateHistory
+      .create(
+        storage,
+        domainMigrationId,
+        storeName,
+        participantId,
+        updateStreamParty,
+        backfillingRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration,
+        loggerFactory,
+        enableissue12777Workaround = true,
+        enableImportUpdateBackfill = true,
+        HistoryMetrics.apply(NoOpMetricsFactory, domainMigrationId),
+      )
+      .futureValue
   }
 
   override def cleanDb(

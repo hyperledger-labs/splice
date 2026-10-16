@@ -555,21 +555,23 @@ class TxLogBackfillingStoreTest
       migrationId: Long,
       backfillingRequired: BackfillingRequirement = BackfillingRequirement.BackfillingNotRequired,
   ): UpdateHistory = {
-    new UpdateHistory(
-      storage,
-      migrationId,
-      "TxLogBackfillingStoreTest",
-      participantId,
-      party,
-      backfillingRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration =
-        NonNegativeDuration.tryFromDuration(scala.concurrent.duration.Duration.Inf),
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = true,
-      HistoryMetrics.apply(NoOpMetricsFactory, migrationId),
-    )
+    UpdateHistory
+      .create(
+        storage,
+        migrationId,
+        "TxLogBackfillingStoreTest",
+        participantId,
+        party,
+        backfillingRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration =
+          NonNegativeDuration.tryFromDuration(scala.concurrent.duration.Duration.Inf),
+        loggerFactory,
+        enableissue12777Workaround = true,
+        enableImportUpdateBackfill = true,
+        HistoryMetrics.apply(NoOpMetricsFactory, migrationId),
+      )
+      .futureValue
   }
 
   def mkStoreWithAcsRowDataF[R <: AcsRowData](

@@ -229,7 +229,7 @@ class ScanApp(
         loggerFactory,
         retryProvider.metricsFactory,
       )
-      updateHistory = new UpdateHistory(
+      updateHistory <- UpdateHistory.create(
         storage,
         domainMigrationId,
         store.storeName,

@@ -37,7 +37,7 @@ import org.lfdecentralizedtrust.splice.util.{
   LegacyOffset,
   ValueJsonCodecProtobuf as ProtobufCodec,
 }
-import com.digitalasset.canton.config.CantonRequireTypes.String256M
+import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String256M}
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -90,7 +90,8 @@ import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
   *      See [[destinationHistory.markBackfillingComplete]] and [[destinationHistory.markImportUpdatesBackfillingComplete]].
   *   1. [[AcsSnapshotTrigger]] backfills ACS snapshots.
   */
-class UpdateHistory(
+class UpdateHistory private (
+    val historyId: Long,
     storage: DbStorage,
     val domainMigrationId: Long,
     storeName: String,
@@ -145,13 +146,7 @@ class UpdateHistory(
 
   def waitUntilInitialized: Future[Unit] = state.get().initialized.future
 
-  def historyId: Long =
-    state
-      .get()
-      .historyId
-      .getOrElse(throw new RuntimeException("Using historyId before it was assigned"))
-
-  def isReady: Boolean = state.get().historyId.isDefined
+  def isReady: Boolean = state.get().initialized.isCompleted
 
   override def close(): Unit = metrics.close()
 
@@ -246,38 +241,12 @@ class UpdateHistory(
             } else {
               Future.unit
             }
-          _ <- storage
-            .update(
-              sql"""
-            insert into update_history_descriptors (party, participant_id, store_name)
-            values ($updateStreamParty, $participantId, ${lengthLimited(storeName)})
-            on conflict do nothing
-           """.asUpdate,
-              "initialize.1",
-            )
-
-          newHistoryId <- storage
-            .querySingle(
-              sql"""
-             select id
-             from update_history_descriptors
-             where party = $updateStreamParty and participant_id = $participantId and store_name = ${lengthLimited(
-                  storeName
-                )}
-             """.as[Long].headOption,
-              "initialize.2",
-            )
-            .getOrRaise(
-              new RuntimeException(
-                s"No row for ($updateStreamParty,$participantId) found, which was just inserted!"
-              )
-            )
 
           _ <- storage
             .update(
               sql"""
              insert into update_history_last_ingested_offsets (history_id, migration_id)
-             values ($newHistoryId, $domainMigrationId)
+             values ($historyId, $domainMigrationId)
              on conflict do nothing
              """.asUpdate,
               "initialize.3",
@@ -288,20 +257,15 @@ class UpdateHistory(
               sql"""
              select last_ingested_offset
              from update_history_last_ingested_offsets
-             where history_id = $newHistoryId and migration_id = $domainMigrationId
+             where history_id = $historyId and migration_id = $domainMigrationId
              """.as[Option[String]].headOption,
               "initialize.4",
             )
             .getOrRaise(
-              new RuntimeException(s"No row for $newHistoryId found, which was just inserted!")
+              new RuntimeException(s"No row for $historyId found, which was just inserted!")
             )
             .map(_.map(LegacyOffset.Api.assertFromStringToLong))
         } yield {
-          state.updateAndGet(
-            _.copy(
-              historyId = Some(newHistoryId)
-            )
-          )
           state.get().initialized.trySuccess(()).discard
           lastIngestedOffset match {
             case Some(offset) =>
@@ -2159,11 +2123,7 @@ class UpdateHistory(
 
   lazy val sourceHistory: HistoryBackfilling.SourceHistory[UpdateHistoryResponse] =
     new HistoryBackfilling.SourceHistory[UpdateHistoryResponse] {
-      override def isReady: Boolean = state
-        .get()
-        .historyId
-        .isDefined
-
+      override def isReady: Boolean = state.get().initialized.isCompleted
       override def migrationInfo(
           migrationId: Long
       )(implicit tc: TraceContext): Future[Option[SourceMigrationInfo]] = for {
@@ -2227,10 +2187,7 @@ class UpdateHistory(
       extends HistoryBackfilling.DestinationHistory[UpdateHistoryResponse]
       with ImportUpdatesBackfilling.DestinationImportUpdates[UpdateHistoryResponse] {
 
-    override def isReady = state
-      .get()
-      .historyId
-      .isDefined
+    override def isReady = state.get().initialized.isCompleted
 
     override def backfillingInfo(implicit
         tc: TraceContext
@@ -2384,6 +2341,69 @@ class UpdateHistory(
 
 object UpdateHistory {
 
+  def create(
+      storage: DbStorage,
+      domainMigrationId: Long,
+      storeName: String,
+      participantId: ParticipantId,
+      updateStreamParty: PartyId,
+      backfillingRequired: BackfillingRequirement,
+      internedStringStore: InternedStringStore,
+      analyzableTimeWindowDuration: NonNegativeDuration,
+      loggerFactory: NamedLoggerFactory,
+      enableissue12777Workaround: Boolean,
+      enableImportUpdateBackfill: Boolean,
+      metrics: HistoryMetrics,
+  )(implicit
+      initTraceContext: TraceContext,
+      ec: ExecutionContext,
+      closeContext: CloseContext,
+  ) = {
+    for {
+      _ <- storage
+        .update(
+          sql"""
+            insert into update_history_descriptors (party, participant_id, store_name)
+            values ($updateStreamParty, $participantId, ${String2066.tryCreate(storeName)})
+            on conflict do nothing
+           """.asUpdate,
+          "initialize.1",
+        )
+
+      newHistoryId <- storage
+        .querySingle(
+          sql"""
+             select id
+             from update_history_descriptors
+             where party = $updateStreamParty and participant_id = $participantId and store_name = ${String2066
+              .tryCreate(
+                storeName
+              )}
+             """.as[Long].headOption,
+          "initialize.2",
+        )
+        .getOrRaise(
+          new RuntimeException(
+            s"No row for ($updateStreamParty,$participantId) found, which was just inserted!"
+          )
+        )
+    } yield new UpdateHistory(
+      newHistoryId,
+      storage,
+      domainMigrationId,
+      storeName,
+      participantId,
+      updateStreamParty,
+      backfillingRequired,
+      internedStringStore,
+      analyzableTimeWindowDuration,
+      loggerFactory,
+      enableissue12777Workaround,
+      enableImportUpdateBackfill,
+      metrics,
+    )
+  }
+
   sealed trait BackfillingRequirement
   object BackfillingRequirement {
 
@@ -2405,7 +2425,6 @@ object UpdateHistory {
   )
 
   case class State(
-      historyId: Option[Long],
       initialized: Promise[Unit],
       corruptSnapshotsDeleted: Boolean,
       lastIngestedRecordTime: Option[CantonTimestamp],
@@ -2413,7 +2432,6 @@ object UpdateHistory {
 
   object State {
     def empty(): State = State(
-      historyId = None,
       initialized = Promise[Unit](),
       corruptSnapshotsDeleted = false,
       lastIngestedRecordTime = None,

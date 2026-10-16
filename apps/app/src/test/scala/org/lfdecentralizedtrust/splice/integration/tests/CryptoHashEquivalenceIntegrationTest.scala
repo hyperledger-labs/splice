@@ -133,7 +133,7 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
       }
       val participantId =
         ParticipantId.tryFromProtoPrimitive("PAR::batch-hash-test::dummy")
-      val updateHistory = new UpdateHistory(
+      val updateHistory = UpdateHistory.create(
         storage,
         0L,
         "batch_hash_equiv_test",
@@ -152,7 +152,7 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
         enableissue12777Workaround = true,
         enableImportUpdateBackfill = false,
         HistoryMetrics(NoOpMetricsFactory, 0L),
-      )
+      ).futureValue
       updateHistory.ingestionSink.initialize().futureValue
       val appActivityRecordStore = new DbAppActivityRecordStore(
         storage,
