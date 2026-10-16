@@ -29,7 +29,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Compute the minimum poll interval used in `eventually` to 10% of the `maxPollInterval`
 * Added `suppressFailedClues` to `BaseTest` trait.
 * Support specifying `darData` on `upload.dars`.
-* Added support for passing trace-contexts via gRPC CallOptions to `TraceContextGrpc`
+* Turned `synchronize_topology` into a noop.
 * Added priority shutdown tasks in `OnShutdownRunner` that run before other tasks, and added `setAsClosing` method.
 * Disabled `logConfigOnStartup` by default as it also logs secrets.
 * Changed `metrics.filterByNodeAndAttribute` in `InstanceReference ` to filter by `node_name` instead of `node` to match the Splice metrics
