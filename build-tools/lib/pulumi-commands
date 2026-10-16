@@ -12,6 +12,15 @@ function subcmd_pulumi() {
 
     pulumi_project="$1"
     pulumi_cmd="$2"
+    if [ $pulumi_project == "sv-canton" ]; then
+        if [ -z "${SPLICE_SV:-}" -a -z "${SPLICE_DSYNC_NODE:-}" ]; then
+        _error "Either SPLICE_SV or SPLICE_DSYNC_NODE must be specified for sv-canton stack"
+        fi
+        if [ -z "${SPLICE_MIGRATION_ID:-}" ]; then
+            _error "SPLICE_MIGRATION_ID must be specified for sv-canton stack"
+        fi
+    fi
+
     pulumi_stack=$(_resolve_pulumi_stack "$pulumi_project")
     shift 2
 
