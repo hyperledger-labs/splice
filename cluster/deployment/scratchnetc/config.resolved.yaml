@@ -50,6 +50,63 @@ cluster:
       maxNodes: 3
       minNodes: 1
       nodeType: 'n4d-standard-8'
+dsync:
+  migration:
+    active:
+      id: 1
+      sequencer:
+        enableBftSequencer: true
+      version: 'local'
+    frozenMigrationId: 1
+dsyncNodes:
+  dsync-node-1:
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    sequencer:
+      enableAntiAffinity: false
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+  dsync-node-2:
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    sequencer:
+      enableAntiAffinity: false
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
 infra:
   enableSweetSecurity: true
   gkeGateway:

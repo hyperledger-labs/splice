@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as automation from '@pulumi/pulumi/automation';
 
+import { clusterDSyncNodesConfiguration, dSyncMigrationConfig } from '../common-sv/src/dSyncNode';
 import { allSvNamesToDeploy } from '../common-sv/src/dsoConfig';
 import { DeploySvRunbook, isDevNet } from '../common/src/config';
 // We have to be explicit with the imports here, if we import a module that creates a pulumi resource running the preview will fail
@@ -29,7 +30,8 @@ export function pulumiOptsForMigration(
 export async function stackForMigration(
   nodeName: string,
   migrationId: DomainMigrationIndex,
-  requiresExistingStack: boolean
+  requiresExistingStack: boolean,
+  nodeType: 'sv' | 'dsync' = 'sv'
 ): Promise<automation.Stack> {
   return stack(
     'sv-canton',
@@ -37,7 +39,8 @@ export async function stackForMigration(
     requiresExistingStack,
     {
       SPLICE_MIGRATION_ID: migrationId.toString(),
-      SPLICE_SV: nodeName,
+      ...(nodeType === 'sv' ? { SPLICE_SV: nodeName } : {}),
+      ...(nodeType === 'dsync' ? { SPLICE_DSYNC_NODE: nodeName } : {}),
     }
   );
 }
@@ -65,6 +68,29 @@ export function runSvCantonForAllMigrations<T>(
     requiresExistingStack,
     forceMigrations
   );
+}
+
+export function runSvCantonForDsyncForAllMigrations<T>(
+  operation: string,
+  runForStack: (stack: automation.Stack, migration: MigrationInfo, dsyncNode: string) => Promise<T>,
+  requiresExistingStack: boolean,
+): { name: string; promise: Promise<T> }[] {
+  const dsyncMigrations = dSyncMigrationConfig?.allMigrations;
+  if (!dsyncMigrations) {
+    return [];
+  }
+  const dsyncNodesToRunFor = Object.keys(clusterDSyncNodesConfiguration);
+  return dsyncNodesToRunFor.flatMap(dsyncNode => {
+    return dsyncMigrations.map(migration => {
+      return {
+        name: `${operation}-canton-M${migration.id}-${dsyncNode}`,
+        // eslint-disable-next-line promise/prefer-await-to-then
+        promise: stackForMigration(dsyncNode, migration.id, requiresExistingStack, 'dsync').then(stack => {
+          return runForStack(stack, migration, dsyncNode);
+        }),
+      };
+    });
+  });
 }
 
 export function runSvCantonForSvs<T>(

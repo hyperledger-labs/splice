@@ -13,18 +13,18 @@ import * as _ from 'lodash';
 export const dsyncConfigSchema = z.object({
   dsync: z.object({
     migration: SynchronizerMigrationSchema,
-  }),
+  }).optional(),
 });
 export type DsyncConfig = z.infer<typeof dsyncConfigSchema>;
 
 export const dsyncConfig = dsyncConfigSchema.parse(clusterYamlConfig);
 
-export const dSyncMigrationConfig = new DecentralizedSynchronizerMigrationConfig(dsyncConfig.dsync.migration);
+export const dSyncMigrationConfig = dsyncConfig.dsync ? new DecentralizedSynchronizerMigrationConfig(dsyncConfig.dsync.migration) : undefined;
 
 const DSyncNodeSchema = SyncNodeSchema.extend({}).transform(({ physicalSynchronizerOverrides, sequencer, mediator, ...svConfig }) => {
   // Implicit config merging is confusing but for now I don't really see a better way of introducting these overrides.
   // Perhaps a proper revisit of the synchronizerMigration config structure will lead to a better solution here.
-  const physicalSynchronizers = dSyncMigrationConfig.allMigrations.map(
+  const physicalSynchronizers = dSyncMigrationConfig?.allMigrations.map(
     migration => [
       migration.id,
       {
@@ -41,19 +41,19 @@ const DSyncNodeSchema = SyncNodeSchema.extend({}).transform(({ physicalSynchroni
   );
   return {
     ...svConfig,
-    physicalSynchronizers: _.fromPairs(physicalSynchronizers),
+    physicalSynchronizers: _.fromPairs(physicalSynchronizers || []),
   };
 });
 ;
 const AllDSyncNodesConfigurationSchema = z.record(z.string(), DSyncNodeSchema);
 const DSyncNodesConfigurationSchema = z.object({
-  dsyncNodes: AllDSyncNodesConfigurationSchema,
+  dsyncNodes: AllDSyncNodesConfigurationSchema.optional(),
 });
 
-type SingleDSyncNodeConfig = z.infer<typeof AllDSyncNodesConfigurationSchema>;
+type AllDSyncNodesConfig = z.infer<typeof AllDSyncNodesConfigurationSchema>;
 export type SingleDSyncNodeConfiguration = z.infer<typeof DSyncNodeSchema>;
 
-const clusterDSyncNodesConfiguration: SingleDSyncNodeConfig = DSyncNodesConfigurationSchema.parse(clusterYamlConfig).dsyncNodes;
+export const clusterDSyncNodesConfiguration: AllDSyncNodesConfig = DSyncNodesConfigurationSchema.parse(clusterYamlConfig)?.dsyncNodes || {};
 
 export const configForDSyncNode = (dSyncNodeName: string): SingleDSyncNodeConfiguration => {
   return clusterDSyncNodesConfiguration[dSyncNodeName];

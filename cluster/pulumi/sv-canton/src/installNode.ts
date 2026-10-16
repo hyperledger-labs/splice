@@ -66,7 +66,7 @@ export async function installNode(
   const serviceAccountName = `sv-canton-migration-${migrationId}`;
   const imagePullDeps = imagePullSecretWithNonDefaultServiceAccount(xns, serviceAccountName);
 
-  const migrationConfig = sv ? DecentralizedSynchronizerUpgradeConfig : dSyncMigrationConfig;
+  const migrationConfig = sv ? DecentralizedSynchronizerUpgradeConfig : dSyncMigrationConfig!;
 
   return await installCantonComponents(
     xns,
