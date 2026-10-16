@@ -36,7 +36,9 @@ const publicationName = 'pgpart_stag_prod_pub';
 const replicationSlotName = 'pgpart_stag_prod_r_slot';
 const fakeFlywayMigration = 'V001__pgpart_init.sql';
 const tablesToReplicate = ['partitioned_events', 'cutover_events'];
-const labels = { cluster: CLUSTER_BASENAME };
+// marks everything this test creates, for finding leftovers; see README.md
+const testingTag = 'pgpart-pr7737';
+const labels = { cluster: CLUSTER_BASENAME, testing: testingTag };
 
 const project = gcp.organizations.getProjectOutput({});
 const zone = getCloudSdkZone();
@@ -147,6 +149,9 @@ CREATE TABLE IF NOT EXISTS cutover_events (
 );
 `;
 
+const bucketLabels = Object.entries(labels)
+  .map(([key, value]) => `${key}=${value}`)
+  .join(',');
 const initDb = new command.local.Command(
   `${prefix}-init-db`,
   {
@@ -156,7 +161,8 @@ const initDb = new command.local.Command(
       --service-account-email="${instance.serviceAccountEmailAddress}" \
       --postgres-instance-name="${instance.name}" \
       --database="${databaseName}" \
-      --user="${defaultUserName}"`,
+      --user="${defaultUserName}" \
+      --bucket-labels="${bucketLabels}"`,
     stdin: initSql,
   },
   { dependsOn: [database, adminUser] }
@@ -212,8 +218,10 @@ iptables-save
 const natVm = new gcp.compute.Instance(`${prefix}-nat-vm`, {
   machineType: 'e2-micro',
   zone,
-  bootDisk: { initializeParams: { image: 'debian-cloud/debian-12' } },
+  bootDisk: { initializeParams: { image: 'debian-cloud/debian-12', labels } },
   networkInterfaces: [{ network: 'default', accessConfigs: [{}] }],
+  // network tags are plain strings; no firewall rule targets this one
+  tags: [testingTag],
   metadata: {
     'enable-osconfig': 'TRUE',
     'enable-oslogin': 'true',
@@ -236,6 +244,8 @@ const privateConnection = new gcp.datastream.PrivateConnection(
 
 new gcp.compute.Firewall(`${prefix}-datastream-to-nat`, {
   name: `${prefix}-datastream-to-nat`,
+  // firewall rules take no labels
+  description: testingTag,
   direction: 'INGRESS',
   priority: 42,
   network: 'default',

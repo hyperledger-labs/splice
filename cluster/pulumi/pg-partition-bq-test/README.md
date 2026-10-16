@@ -65,6 +65,7 @@ VPC, so run a client pod there:
 
 ```bash
 kubectl run pgpart-psql --rm -it --restart=Never --image=postgres:18 \
+  --labels=testing=pgpart-pr7737 \
   --env=PGPASSWORD="$PGPASSWORD" \
   -- psql -h "$PRIVATE_IP" -U cnadmin -d partition_test
 ```
@@ -82,7 +83,7 @@ SET TIME ZONE 'UTC';
 ### BigQuery
 
 ```bash
-bq query --use_legacy_sql=false "<query>"
+bq query --use_legacy_sql=false --label=testing:pgpart-pr7737 "<query>"
 ```
 
 Datastream writes with a delay of a few minutes, even with `dataFreshness: 0s`.
@@ -372,3 +373,16 @@ cncluster pulumi pg-partition-bq-test down
 
 Deleting the stack drops the replication slot and publication first, then the
 instance, and deletes the BigQuery dataset along with its contents.
+
+Everything the stack and this procedure create carries `pgpart-pr7737`: as the
+`testing` label where the resource takes labels, as the description of the
+firewall rule, and as a network tag on the NAT VM. To look for leftovers (Cloud
+Asset Inventory lags by a few minutes, and needs the Cloud Asset API):
+
+```bash
+gcloud asset search-all-resources --scope="projects/$CLOUDSDK_CORE_PROJECT" --query='pgpart-pr7737'
+kubectl get pods -A -l testing=pgpart-pr7737
+```
+
+The temporary GCS bucket that `bigquery-cloudsql.sh` uses to create the
+publication is not labelled, because the stack runs that script unchanged.

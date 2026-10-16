@@ -15,6 +15,7 @@ SERVICE_ACCOUNT_EMAIL=""
 POSTGRES_INSTANCE_NAME=""
 DATABASE=""
 POSTGRES_USER=""
+BUCKET_LABELS=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -24,6 +25,7 @@ while [ "$#" -gt 0 ]; do
     --postgres-instance-name=*) POSTGRES_INSTANCE_NAME="${1#*=}" ;;
     --database=*) DATABASE="${1#*=}" ;;
     --user=*) POSTGRES_USER="${1#*=}" ;;
+    --bucket-labels=*) BUCKET_LABELS="${1#*=}" ;;
     *)
       echo "Unknown argument: $1" >&2
       exit 1
@@ -66,6 +68,12 @@ cat > "$TMP_SQL_FILE"
 echo "Creating temporary bucket $TMP_BUCKET"
 gcloud storage buckets create --pap --project "$PROJECT" \
     -l "$COMPUTE_REGION" "gs://$TMP_BUCKET"
+
+if [[ -n "$BUCKET_LABELS" ]]; then
+  # `buckets create` takes no labels; label it so a bucket leaked by a failed
+  # cleanup can be traced back to its stack
+  gcloud storage buckets update "gs://$TMP_BUCKET" --update-labels="$BUCKET_LABELS"
+fi
 
 echo "Granting CloudSQL DB access to $TMP_BUCKET"
 gcloud storage buckets add-iam-policy-binding "gs://$TMP_BUCKET" \
