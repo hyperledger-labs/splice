@@ -149,10 +149,6 @@
                 {
                   "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
                   "value": "canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {\n  cron = \"0 /10 * * * ?\"\n  max-duration = \"5m\"\n  retention = \"25h\"\n}\n"
-                },
-                {
-                  "name": "ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE",
-                  "value": "canton.validator-apps.validator_backend.enable-internal-auto-onboarding-through-sv-traffic-faucet = true"
                 }
               ],
               "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",

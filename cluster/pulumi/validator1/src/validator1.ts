@@ -31,7 +31,6 @@ import {
 } from '@canton-network/splice-pulumi-common-validator/src/validator';
 
 import { spliceConfig } from '../../common/src/config/config';
-import { splitwellConfig } from '../../common/src/config/splitwellConfig';
 import { validator1Config } from './config';
 
 export async function installValidator1(

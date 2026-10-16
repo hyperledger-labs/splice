@@ -27,7 +27,6 @@ import {
   splitwellDarPaths,
 } from '@canton-network/splice-pulumi-common-validator';
 import { installValidatorApp } from '@canton-network/splice-pulumi-common-validator/src/validator';
-import { multiValidatorConfig } from '@canton-network/splice-pulumi-multi-validator/src/config';
 
 import { spliceConfig } from '../../common/src/config/config';
 import { splitwellConfig } from '../../common/src/config/splitwellConfig';
