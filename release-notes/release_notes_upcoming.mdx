@@ -37,11 +37,13 @@
 
     - **Implement traffic purchases via token standard transfers:** a V1 or V2 token standard transfer to the receiver party
       `cip-128_traffic-purchase::1220000000000000000000000000000000000000000000000000000000000000abcd`
-      with the memo set to `cip-128/memo:memberId=<member>&synchronizerId=<synchronizer>&migrationId=<int>`
+      with the memo set to `cip-128/memo:memberId=<member>&synchronizerId=<synchronizer>&migrationId=<int>[&forfeitValidatorRewardCoupon=<true|false>]`
       burns the full transfer `amount` and creates a `MemberTraffic` contract instead of transferring amulet.
       The purchased traffic is calculated from the CC price and traffic price in the referenced `ExternalPartyConfigState`
       and rounded down to whole bytes.
       Any sub-byte remainder is also burned. Purchases below the minimum traffic top-up amount are rejected.
+      By default, the transaction must be executed within about 10 minutes after it is prepared.
+      If you need more time, set the optional `forfeitValidatorRewardCoupon` memo key to `true` to skip the validator reward coupon for the traffic burn.
 
     - Traffic purchases, including those made through `AmuletRules_BuyMemberTraffic`, now include the purchased
       traffic in bytes and the memo in the `splice.lfdecentralizedtrust.org/reason` of their burn and transaction metadata:
