@@ -25,8 +25,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorrepermission
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 
-import scala.concurrent.duration.*
-
 class PermissionedSynchronizerIntegrationTest
     extends IntegrationTest
     with HasExecutionContext
@@ -136,8 +134,12 @@ class PermissionedSynchronizerIntegrationTest
     )
 
     clue("Bob Validator starts and onboards correctly ") {
-      bobValidatorBackend.start()
-      eventually(40.seconds) {
+      bobValidatorBackend.startSync()
+      bobValidatorBackend.onboardUser("TestUserBob")
+    }
+
+    clue("Bob Validator has ParticipantSynchronizerPermission") {
+      eventually() {
         sv1ScanBackend.getParticipantSynchronizerPermission(
           decentralizedSynchronizerId.toProtoPrimitive,
           bobValidatorBackend.participantClient.id.toProtoPrimitive,
@@ -145,8 +147,6 @@ class PermissionedSynchronizerIntegrationTest
           SynchronizerPermissionState(None)
         )
       }
-      bobValidatorBackend.waitForInitialization()
-      bobValidatorBackend.onboardUser("TestUserBob")
     }
 
     val bobParticipantId = bobValidatorBackend.participantClient.id.toProtoPrimitive
