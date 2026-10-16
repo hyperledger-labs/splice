@@ -11,7 +11,7 @@ export function getSvAppApiAudience(auth0Config: Auth0Config, namespace: string)
 }
 
 export function getValidatorAppApiAudience(auth0Config: Auth0Config, namespace: string): string {
-  return getNamespaceConfig(auth0Config, namespace).audiences.validatorApi;
+  return getNamespaceConfig(auth0Config, namespace).audiences.validatorApi!;
 }
 
 export function getLedgerApiAudience(auth0Config: Auth0Config, namespace: string): string {

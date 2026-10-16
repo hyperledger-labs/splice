@@ -20,26 +20,29 @@ import {
   extraSvConfigsBasic,
 } from '@canton-network/splice-pulumi-common-sv/src/svConfigsBasic';
 
+import { infraConfig } from './config';
+
 function tokenLifetime(): number {
   return fixedTokens() ? 2592000 : 86400; // TODO(DACH-NY/canton-network-internal#2114): Move this to the cluster config? We want it to be long for fixed token clusters
 }
 
 function ledgerApiAudience(
-  svNamespace: string,
+  namespace: string,
   clusterBasename: string,
-  auth0DomainProvider: auth0.Provider
+  auth0DomainProvider: auth0.Provider,
+  forceCreate: boolean = false // create the audience also for non-prod clusters. TODO(DACH-NY/canton-network-internal#2873): drop the manually-created legacy audience, always create via pulumi
 ): pulumi.Output<string> {
   if (isMainNet) {
     // TODO(DACH-NY/canton-network-internal#2873): get rid of this
     return pulumi.output('https://ledger_api.main.digitalasset.com');
   }
-  if (clusterProdLike) {
+  if (clusterProdLike || forceCreate) {
     // On prod clusters, we create a ledger API per SV namespace
     const auth0Api = new auth0.ResourceServer(
-      `LedgerApi${svNamespace.replace(/-/g, '')}`,
+      `LedgerApi${namespace.replace(/-/g, '')}`,
       {
-        name: `Ledger API for SV ${svNamespace} on ${clusterBasename} (Pulumi managed)`,
-        identifier: `https://ledger_api.${svNamespace}.${clusterBasename}.canton.network`,
+        name: `Ledger API for node ${namespace} on ${clusterBasename} (Pulumi managed)`,
+        identifier: `https://ledger_api.${namespace}.${clusterBasename}.canton.network`,
         allowOfflineAccess: true, // TODO(DACH-NY/canton-network-internal#2114): is this still needed?
         tokenLifetime: tokenLifetime(),
       },
@@ -47,7 +50,7 @@ function ledgerApiAudience(
     );
 
     new auth0.ResourceServerScopes(
-      `LedgerApiScopes${svNamespace.replace(/-/g, '')}`,
+      `LedgerApiScopes${namespace.replace(/-/g, '')}`,
       {
         resourceServerIdentifier: auth0Api.identifier,
         scopes: [
@@ -132,7 +135,8 @@ function newM2MApp(
   clusterBasename: string,
   ledgerApiAud: pulumi.Output<string>,
   appAud: pulumi.Output<string>,
-  auth0DomainProvider: auth0.Provider
+  auth0DomainProvider: auth0.Provider,
+  supportLegacyLedgerApiAudience: boolean = true // TODO(DACH-NY/canton-network-internal#2873): drop the manually-created legacy audience, always create via pulumi
 ): auth0.Client {
   const ret = new auth0.Client(
     resourceName,
@@ -161,7 +165,7 @@ function newM2MApp(
     const legacyLedgerApiAud = isMainNet
       ? 'https://ledger_api.main.digitalasset.com'
       : 'https://canton.network.global';
-    if (ledgerApiAudValue !== legacyLedgerApiAud) {
+    if (ledgerApiAudValue !== legacyLedgerApiAud && supportLegacyLedgerApiAudience) {
       // TODO(DACH-NY/canton-network-internal#2873): For now, we also grant all apps access to the old default ledger API
       // audience, to un-break it until we clean up the audiences we use.
       new auth0.ClientGrant(
@@ -580,6 +584,70 @@ function newWalletGatewayApp(
   );
 }
 
+function auth0ForDSyncNamespace(
+  clusterBasename: string,
+  namespace: string,
+  provider: auth0.Provider
+): pulumi.Output<Auth0NamespaceConfig> {
+  const id = namespace.replace(/-/g, '');
+  const aud = ledgerApiAudience(
+    `${id}LedgerApi`,
+    clusterBasename,
+    provider,
+    true // We create the audience also for non-prod clusters, as we did not create it manually and don't want to (as opposed to other tenants where we're still using hand-created legacy stuff).
+  );
+  const opApp = newM2MApp(
+    `${id}DsyncOpApp`,
+    `${id.toUpperCase()} dSync Operator`,
+    `Used for the dSync operator app for ${namespace} on ${clusterBasename}`,
+    clusterBasename,
+    aud,
+    aud, // For now, no need for a separate audience for the app, as it doesn't have an admin API yet
+    provider,
+    false // We don't want to support the legacy audience for dSync, as its tenant does not have the manually created audience, and we'd rather not create it manually.
+  );
+  return pulumi.all([aud, opApp.id]).apply(([audValue, opAppValue]) => {
+    return {
+      audiences: {
+        ledgerApi: audValue,
+      },
+      backendClientIds: {
+        dSync: opAppValue,
+      },
+    };
+  });
+}
+
+function dsyncAuth0(clusterBasename: string): pulumi.Output<Auth0Config> | undefined {
+  if (!infraConfig.supportDsync) {
+    return undefined;
+  }
+  const domain = 'canton-network-dsync-test.us.auth0.com';
+  const clientId = config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_ID');
+  const clientSecret = config.requireEnv('AUTH0_DSYNC_MANAGEMENT_API_CLIENT_SECRET');
+  const provider = new auth0.Provider('dsync', {
+    domain,
+    clientId,
+    clientSecret,
+  });
+  const configs = [1, 2, 3, 4].map(i =>
+    auth0ForDSyncNamespace(clusterBasename, `dsync-op-${i}`, provider)
+  );
+  return pulumi.all(configs).apply(cfgs => {
+    const namespacedConfig: NamespacedAuth0Configs = {};
+    cfgs.forEach((cfg, i) => {
+      namespacedConfig[`dsync-op-${i + 1}`] = cfg;
+    });
+    return {
+      namespacedConfigs: namespacedConfig,
+      auth0Domain: domain,
+      auth0MgtClientId: clientId,
+      auth0MgtClientSecret: clientSecret,
+      fixedTokenCacheName: 'auth0-fixed-token-cache-dsync-test',
+    };
+  });
+}
+
 function svRunbookAuth0(
   clusterBasename: string,
   dnsNames: string[],
@@ -773,17 +841,17 @@ export function configureAuth0(
       'auth0-fixed-token-cache-sv-test'
     );
     const validatorRunbookAuth0Cfg = validatorRunbookAuth0(clusterBasename, dnsNames);
+    const dsyncAuth0Cfg = dsyncAuth0(clusterBasename);
 
-    return spliceAuth0Cfg.apply(splice => {
-      return svRunbookAuth0Cfg.apply(sv => {
-        return validatorRunbookAuth0Cfg.apply(validator => {
-          return {
-            cantonNetwork: splice,
-            svRunbook: sv,
-            validatorRunbook: validator,
-          };
-        });
+    return pulumi
+      .all([spliceAuth0Cfg, svRunbookAuth0Cfg, validatorRunbookAuth0Cfg, dsyncAuth0Cfg])
+      .apply(([splice, sv, validator, dsync]) => {
+        return {
+          cantonNetwork: splice,
+          svRunbook: sv,
+          validatorRunbook: validator,
+          dSync: dsync,
+        };
       });
-    });
   }
 }

@@ -9,14 +9,15 @@ export type Auth0SecretMap = Map<string, Auth0ClientSecret>;
 
 export type Auth0NamespaceAudiences = {
   ledgerApi: string;
-  validatorApi: string;
-  svAppApi?: string; // Empty for validator-only namespaces
+  validatorApi?: string;
+  svAppApi?: string;
 };
 
 export type Auth0NamespaceBackendClientIds = {
-  validator: string;
-  svApp?: string; // Empty for validator-only namespaces
+  validator?: string;
+  svApp?: string;
   splitwell?: string;
+  dSync?: string;
 };
 
 export type Auth0NamespaceUiClientIds = {
@@ -30,7 +31,7 @@ export type Auth0NamespaceUiClientIds = {
 export type Auth0NamespaceConfig = {
   audiences: Auth0NamespaceAudiences;
   backendClientIds: Auth0NamespaceBackendClientIds;
-  uiClientIds: Auth0NamespaceUiClientIds;
+  uiClientIds?: Auth0NamespaceUiClientIds;
 };
 
 // Map<> doesn't work as Pulumi outputs, so we use Record<> here. See https://github.com/pulumi/pulumi/issues/9787
@@ -65,4 +66,5 @@ export type Auth0ClusterConfig = {
   svRunbook?: Auth0Config;
   validatorRunbook?: Auth0Config;
   mainnet?: Auth0Config;
+  dSync?: Auth0Config;
 };

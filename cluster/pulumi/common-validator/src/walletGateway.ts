@@ -34,7 +34,7 @@ export async function installWalletGateway(
   const ns = xns.logicalName;
   const auth0Cfg = auth0Client.getCfg();
   const nsAuth0 = getNamespaceConfig(auth0Cfg, ns);
-  if (!nsAuth0.uiClientIds.walletGateway) {
+  if (!nsAuth0.uiClientIds?.walletGateway) {
     throw new Error(`No wallet gateway Auth0 client configured for namespace ${ns}`);
   }
 

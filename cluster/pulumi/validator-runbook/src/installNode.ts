@@ -303,7 +303,7 @@ async function installValidator(
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
-  const cnsUiClientId = getNamespaceConfig(auth0Client.getCfg(), xns.logicalName).uiClientIds.cns;
+  const cnsUiClientId = getNamespaceConfig(auth0Client.getCfg(), xns.logicalName).uiClientIds?.cns;
   if (!cnsUiClientId) {
     throw new Error('No validator ui client id in auth0 config');
   }

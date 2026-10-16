@@ -52,6 +52,7 @@ export const InfraConfigSchema = z.object({
       .strict(),
     enableSweetSecurity: z.boolean().default(false),
     extraCustomResources: z.object({}).catchall(z.any()).default({}),
+    supportDsync: z.boolean().default(false),
   }),
   cloudArmor: CloudArmorConfigSchema,
 });
