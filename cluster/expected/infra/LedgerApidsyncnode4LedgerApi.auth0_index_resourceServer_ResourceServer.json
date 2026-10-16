@@ -1,0 +1,13 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "allowOfflineAccess": true,
+    "identifier": "https://ledger_api.dsyncnode4LedgerApi.test-stack.canton.network",
+    "name": "Ledger API for node dsyncnode4LedgerApi on test-stack (Pulumi managed)",
+    "tokenLifetime": 86400
+  },
+  "name": "LedgerApidsyncnode4LedgerApi",
+  "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dsync::04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+  "type": "auth0:index/resourceServer:ResourceServer"
+}

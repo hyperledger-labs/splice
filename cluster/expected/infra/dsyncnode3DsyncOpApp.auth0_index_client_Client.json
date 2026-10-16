@@ -1,0 +1,12 @@
+{
+  "custom": true,
+  "id": "",
+  "inputs": {
+    "appType": "non_interactive",
+    "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the dSync operator app for dsync-node-3 on test-stack",
+    "name": "DSYNCNODE3 dSync Operator (Pulumi managed, test-stack)"
+  },
+  "name": "dsyncnode3DsyncOpApp",
+  "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dsync::04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+  "type": "auth0:index/client:Client"
+}
