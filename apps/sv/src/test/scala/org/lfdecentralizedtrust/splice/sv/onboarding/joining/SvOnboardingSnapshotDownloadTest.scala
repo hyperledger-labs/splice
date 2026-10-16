@@ -1,0 +1,263 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package org.lfdecentralizedtrust.splice.sv.onboarding.joining
+
+import better.files.File
+import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
+import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import io.grpc.{Status, StatusRuntimeException}
+import org.apache.pekko.http.scaladsl.model.{
+  ContentTypes,
+  HttpEntity,
+  HttpRequest,
+  StatusCode,
+  StatusCodes,
+  Uri,
+}
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
+import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvStreamClient.{
+  OnboardSvDownloadResponse
+}
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingSnapshotsConfig
+import org.scalatest.wordspec.AnyWordSpec
+
+import java.io.IOException
+import java.nio.file.{Files, Path}
+import java.util.concurrent.atomic.AtomicInteger
+import scala.collection.mutable
+import scala.concurrent.{Future, Promise}
+
+class SvOnboardingSnapshotDownloadTest
+    extends AnyWordSpec
+    with BaseTest
+    with HasActorSystem
+    with HasExecutionContext {
+
+  private val retryProvider =
+    RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)
+
+  override def afterAll(): Unit = {
+    retryProvider.close()
+    super.afterAll()
+  }
+
+  private val content = "0123456789".getBytes
+
+  private def full() =
+    OnboardSvDownloadResponse.OK(HttpEntity(ContentTypes.`application/octet-stream`, content))
+
+  private class Interrupted(bytes: Int) {
+    private val cut = Promise[ByteString]()
+    private val data = Source.single(ByteString(content.take(bytes))) ++ Source.future(cut.future)
+    val response = OnboardSvDownloadResponse.OK(
+      HttpEntity.Default(ContentTypes.`application/octet-stream`, content.length.toLong, data)
+    )
+    def after(snapshotDownload: SvOnboardingSnapshotDownload, result: Future[Path]) = {
+      val file = snapshotDownload.directory.resolve("snapshot")
+      eventually() {
+        Files.exists(file) shouldBe true
+        Files.size(file) shouldBe bytes.toLong
+      }
+      cut.failure(new IOException("cut"))
+      failsUnavailable(result)
+    }
+  }
+
+  private class Sponsor(responses: OnboardSvDownloadResponse*) {
+    private val remaining = mutable.Queue(responses*)
+    val requests = mutable.ListBuffer.empty[String]
+    def download(id: String): Future[OnboardSvDownloadResponse] = {
+      requests += id
+      Future.successful(remaining.dequeue())
+    }
+  }
+
+  private class PreparingSponsor(responses: Either[Throwable, OnboardSvDownloadResponse]*) {
+    private val remaining = mutable.Queue(responses*)
+    val prepares = new AtomicInteger()
+    val downloads = mutable.ListBuffer.empty[String]
+    def prepare(): Future[String] =
+      Future.successful(s"id-${prepares.incrementAndGet()}")
+    def download(id: String): Future[OnboardSvDownloadResponse] = {
+      downloads += id
+      remaining.dequeue().fold(Future.failed, Future.successful)
+    }
+  }
+
+  private def httpError(status: StatusCode) = HttpCommandException(
+    HttpRequest(),
+    status,
+    HttpCommandException.ErrorResponseBody(definitions.ErrorResponse("snapshot response")),
+  )
+
+  private def withDownload(test: SvOnboardingSnapshotDownload => Unit): Unit =
+    File.usingTemporaryDirectory() { directory =>
+      test(
+        SvOnboardingSnapshotDownload(
+          SvOnboardingSnapshotsConfig(directory = Some(directory.path)),
+          "test",
+          retryProvider,
+        )
+      )
+    }
+
+  private def failsUnavailable(result: Future[Path]) =
+    inside(result.failed.futureValue) { case e: StatusRuntimeException =>
+      e.getStatus.getCode shouldBe Status.Code.UNAVAILABLE
+    }
+
+  "SvOnboardingSnapshotDownload" should {
+
+    "keep the prepared id across temporary service failures" in withDownload { snapshotDownload =>
+      val preparing = httpError(StatusCodes.ServiceUnavailable)
+      val sponsor = new PreparingSponsor(Left(preparing), Left(preparing), Right(full()))
+      def attempt = snapshotDownload.prepareAndDownload(sponsor.prepare(), sponsor.download)
+
+      attempt.failed.futureValue shouldBe preparing
+      attempt.failed.futureValue shouldBe preparing
+      Files.readAllBytes(attempt.futureValue) shouldBe content
+      sponsor.prepares.get() shouldBe 1
+      sponsor.downloads shouldBe Seq("id-1", "id-1", "id-1")
+    }
+
+    "download again from the start with the same prepared id after an interrupted download" in withDownload {
+      snapshotDownload =>
+        val interrupted = new Interrupted(4)
+        val sponsor = new PreparingSponsor(Right(interrupted.response), Right(full()))
+        def attempt = snapshotDownload.prepareAndDownload(sponsor.prepare(), sponsor.download)
+
+        interrupted.after(snapshotDownload, attempt)
+        Files.readAllBytes(attempt.futureValue) shouldBe content
+        sponsor.prepares.get() shouldBe 1
+        sponsor.downloads shouldBe Seq("id-1", "id-1")
+    }
+
+    "prepare again when a download id is missing or its export has failed" in {
+      Seq[StatusCode](StatusCodes.NotFound, StatusCodes.InternalServerError).foreach { status =>
+        withDownload { snapshotDownload =>
+          val interrupted = new Interrupted(4)
+          val error = httpError(status)
+          val sponsor =
+            new PreparingSponsor(Right(interrupted.response), Left(error), Right(full()))
+          def attempt = snapshotDownload.prepareAndDownload(sponsor.prepare(), sponsor.download)
+
+          interrupted.after(snapshotDownload, attempt)
+          attempt.failed.futureValue shouldBe error
+          Files.readAllBytes(attempt.futureValue) shouldBe content
+          sponsor.prepares.get() shouldBe 2
+          sponsor.downloads shouldBe Seq("id-1", "id-1", "id-2")
+        }
+      }
+    }
+
+    "retry preparation after a failed prepare request" in withDownload { snapshotDownload =>
+      val preparing = httpError(StatusCodes.ServiceUnavailable)
+      val sponsor = new PreparingSponsor(Right(full()))
+      snapshotDownload
+        .prepareAndDownload(Future.failed(preparing), sponsor.download)
+        .failed
+        .futureValue shouldBe preparing
+      sponsor.downloads shouldBe empty
+      val file =
+        snapshotDownload.prepareAndDownload(sponsor.prepare(), sponsor.download).futureValue
+      Files.readAllBytes(file) shouldBe content
+      sponsor.downloads shouldBe Seq("id-1")
+    }
+
+    "download the whole snapshot" in withDownload { snapshotDownload =>
+      val sponsor = new Sponsor(full())
+      val file = snapshotDownload.download("id", sponsor.download).futureValue
+      Files.readAllBytes(file) shouldBe content
+      sponsor.requests shouldBe Seq("id")
+    }
+
+    "never write outside its directory" in File.usingTemporaryDirectory() { directory =>
+      val snapshotDownload = SvOnboardingSnapshotDownload(
+        SvOnboardingSnapshotsConfig(directory = Some(directory.path)),
+        "test",
+        retryProvider,
+      )
+      val file =
+        snapshotDownload.download("../../unrelated", new Sponsor(full()).download).futureValue
+      file.getParent shouldBe snapshotDownload.directory
+      directory.listRecursively.map(_.name).toSeq should not contain "unrelated"
+    }
+
+    "use a fresh directory below the configured one" in File.usingTemporaryDirectory() {
+      directory =>
+        val stale = (directory / "downloads" / "acs" / "stale").createIfNotExists(
+          createParents = true
+        )
+        val exports = (directory / "exports").createDirectories()
+        val snapshotDownload = SvOnboardingSnapshotDownload(
+          SvOnboardingSnapshotsConfig(directory = Some(directory.path)),
+          "acs",
+          retryProvider,
+        )
+        snapshotDownload.directory shouldBe (directory / "downloads" / "acs").path
+        stale.exists shouldBe false
+        exports.exists shouldBe true
+        snapshotDownload.delete()
+        Files.exists(snapshotDownload.directory) shouldBe false
+    }
+
+    "use a temporary directory when none is configured" in {
+      val snapshotDownload =
+        SvOnboardingSnapshotDownload(SvOnboardingSnapshotsConfig(), "acs", retryProvider)
+      Files.isDirectory(snapshotDownload.directory) shouldBe true
+      snapshotDownload.delete()
+      Files.exists(snapshotDownload.directory) shouldBe false
+    }
+  }
+
+  "onboardingSnapshotsNotSupported" should {
+
+    def notFound(message: String) =
+      HttpCommandException(
+        HttpRequest(),
+        StatusCodes.NotFound,
+        HttpCommandException.ErrorResponseBody(definitions.ErrorResponse(message)),
+      )
+    val sponsor = Uri("http://sponsor")
+    val missingEndpoint = notFound(
+      "The requested resource could not be found: http://sponsor/api/sv/v0/onboard/sv/party-migration/prepare"
+    )
+    val notSupported = HttpSvPublicAppClient.onboardingSnapshotsNotSupported(sponsor, Future.unit)
+
+    "fail without retrying when an active sponsor does not have the prepare endpoints" in {
+      notSupported(missingEndpoint).failed.futureValue shouldBe
+        HttpSvPublicAppClient.OnboardingSnapshotsNotSupported(sponsor)
+    }
+
+    "keep the missing-endpoint error retryable while the sponsor is initializing" in {
+      val recovering = HttpSvPublicAppClient.onboardingSnapshotsNotSupported(
+        sponsor,
+        Future.failed(
+          Status.FAILED_PRECONDITION.withDescription("Node is not active").asRuntimeException()
+        ),
+      )
+      recovering(missingEndpoint).failed.futureValue shouldBe missingEndpoint
+    }
+
+    "keep the missing-endpoint error retryable when the sponsor health check fails" in {
+      val recovering = HttpSvPublicAppClient.onboardingSnapshotsNotSupported(
+        sponsor,
+        Future.failed(new IOException("connection reset during startup")),
+      )
+      recovering(missingEndpoint).failed.futureValue shouldBe missingEndpoint
+    }
+
+    "keep other not found errors retryable" in {
+      notSupported.isDefinedAt(
+        notFound("Candidate party is not an sv and no `SvOnboardingConfirmed` for the candidate")
+      ) shouldBe false
+    }
+  }
+}

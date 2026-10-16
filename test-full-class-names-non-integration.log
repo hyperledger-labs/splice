@@ -63,10 +63,13 @@ org.lfdecentralizedtrust.splice.store.db.InternedStringStoreTest
 org.lfdecentralizedtrust.splice.store.db.LegacyAcsSnapshotStoreTest
 org.lfdecentralizedtrust.splice.store.db.SpliceStorageMultiLockTest
 org.lfdecentralizedtrust.splice.store.db.TablePerAcsSnapshotStoreTest
+org.lfdecentralizedtrust.splice.sv.admin.http.OnboardSvSnapshotHandlerTest
 org.lfdecentralizedtrust.splice.sv.automation.VoteRequestMetricsTriggerTest
 org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNodeTest
 org.lfdecentralizedtrust.splice.sv.cometbft.CometBftRequestSignerTest
 org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconcilerSpec
+org.lfdecentralizedtrust.splice.sv.onboarding.joining.SvOnboardingSnapshotDownloadTest
+org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.SvOnboardingSnapshotServiceTest
 org.lfdecentralizedtrust.splice.sv.util.SvOnboardingTokenTest
 org.lfdecentralizedtrust.splice.sv.util.WeightDistributionForSvTest
 org.lfdecentralizedtrust.splice.unit.http.HttpClientProxyTest

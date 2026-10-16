@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
+import better.files.File
 import cats.data.EitherT
 import cats.implicits.catsSyntaxOptionId
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.ParticipantRepairManagementExtensions
@@ -21,6 +22,7 @@ import com.digitalasset.canton.admin.participant.v30.{
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.grpc.OutputFileStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
   ContractImportMode,
@@ -67,10 +69,11 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologySnapshot,
 }
 
-import java.io.{InputStream, SequenceInputStream}
+import java.nio.file.{Files, Path}
 import java.time.Instant
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
+import scala.util.Failure
 
 /** Connection to the subset of the Canton admin API that we rely
   * on in our own applications.
@@ -171,16 +174,15 @@ class ParticipantAdminConnection(
     }
   }
 
-  def exportPartyAcs(
+  def exportPartyAcsToFile(
       party: PartyId,
       synchronizerId: SynchronizerId,
       targetParticipantId: ParticipantId,
       activationTime: Instant,
+      file: Path,
   )(implicit
       traceContext: TraceContext
-  ): Future[Seq[ByteString]] = {
-    val observer = new SeqAccumulatingObserver[ExportPartyAcsResponse]
-
+  ): Future[Unit] =
     for {
       // The current ExportPartyAcs requires us to pass an offset that is right before the topology tx
       // in which the participant started hosing `partyId`.
@@ -192,6 +194,9 @@ class ParticipantAdminConnection(
       _ = logger.info(
         show"Exporting ACS snapshot for party $party from domain $synchronizerId at offset $beforeActivationOffset"
       )
+      observer <- Future(
+        blocking(new OutputFileStreamObserver[ExportPartyAcsResponse](File(file), _.chunk))
+      )
       _ <- runCmd(
         ParticipantAdminCommands.PartyManagement.ExportPartyAcs(
           party,
@@ -201,10 +206,9 @@ class ParticipantAdminConnection(
           waitForActivationTimeout = None, // i.e., default
           observer,
         )
-      )
-      chunks <- observer.resultFuture
-    } yield chunks.map(_.chunk)
-  }
+      ).andThen { case Failure(e) => observer.onError(e) }
+      result <- observer.result
+    } yield result
 
   def downloadAcsSnapshotNonChunked(
       parties: Set[PartyId],
@@ -247,28 +251,28 @@ class ParticipantAdminConnection(
     )
   }
 
-  def importPartyAcs(acsChunks: Seq[ByteString], synchronizerId: SynchronizerId, partyId: PartyId)(
-      implicit tc: TraceContext
+  def importPartyAcsFromFile(file: Path, synchronizerId: SynchronizerId, partyId: PartyId)(implicit
+      tc: TraceContext
   ): Future[Unit] = {
     retryProvider.retryForClientCalls(
       "import_party_acs",
-      "Imports the acs in the participant",
-      runCmd(
-        ParticipantAdminCommands.PartyManagement
-          .ImportPartyAcs(
-            new SequenceInputStream(
-              acsChunks.iterator.map(chunk => chunk.newInput(): InputStream).asJavaEnumeration
+      "Imports the acs in the participant", {
+        val inputStream = Files.newInputStream(file)
+        runCmd(
+          ParticipantAdminCommands.PartyManagement
+            .ImportPartyAcs(
+              inputStream,
+              synchronizerId,
+              IMPORT_ACS_WORKFLOW_ID_PREFIX,
+              contractImportMode = ContractImportMode.Validation,
+              representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
+              // according to docs: enables crash-resilient scheduling of the onboarding flag clearance
+              // ...except that only works from protocol version 35+
+              party = Some(partyId),
             ),
-            synchronizerId,
-            IMPORT_ACS_WORKFLOW_ID_PREFIX,
-            contractImportMode = ContractImportMode.Validation,
-            representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
-            // according to docs: enables crash-resilient scheduling of the onboarding flag clearance
-            // ...except that only works from protocol version 35+
-            party = Some(partyId),
-          ),
-        timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
-      ).map(_ => ()),
+          timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
+        ).andThen(_ => inputStream.close()).map(_ => ())
+      },
       logger,
     )
   }
@@ -383,6 +387,7 @@ class ParticipantAdminConnection(
       newParticipant: ParticipantId,
       expectedSerial: PositiveInt,
       topologySnapshot: TopologySnapshot = TopologySnapshot.Sequenced,
+      waitForAuthorization: Boolean = true,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     ensureTopologyMapping[PartyToParticipant](
       TopologyStoreId.Synchronizer(synchronizerId),
@@ -425,6 +430,7 @@ class ParticipantAdminConnection(
       RetryFor.ClientCalls,
       isProposal = true,
       recreateOnAuthorizedStateChange = RecreateOnAuthorizedStateChange.Abort(expectedSerial),
+      waitForAuthorization = waitForAuthorization,
     )
   }
 
