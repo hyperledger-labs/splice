@@ -11,7 +11,7 @@ import {
 import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 
 import { spliceEnvConfig } from '../config/envConfig';
-import { configForStack, PulumiOperatorGracePeriod } from './config';
+import { configForStack, deploymentConf, PulumiOperatorGracePeriod } from './config';
 import { GitFluxRef } from './flux-source';
 
 export type EnvRefs = { [key: string]: unknown };
@@ -24,14 +24,14 @@ export function createEnvRefs(envSecretName: string, namespaceName: string): Env
     'AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET',
     'AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID',
     'AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET',
-  ]);
+  ]).concat(
+    deploymentConf.projectsToDeploy.has('gha') ? ['GHA_RUNNER_VERSION', 'GHA_RUNNER_DIGEST'] : []
+  );
 
   const optionalEnvs = Array.from([
     'K6_USERS_PASSWORD',
     'K6_VALIDATOR_ADMIN_PASSWORD',
     'SLACK_ACCESS_TOKEN',
-    'GHA_RUNNER_VERSION',
-    'GHA_RUNNER_DIGEST',
   ]).concat(
     isMainNet
       ? ['AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET', 'AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID']
