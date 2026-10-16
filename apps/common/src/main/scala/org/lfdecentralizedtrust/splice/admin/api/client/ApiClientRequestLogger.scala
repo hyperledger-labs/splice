@@ -45,10 +45,10 @@ class ApiClientRequestLogger(
     val methodName = method.getFullMethodName
     val shortMethod = show"${methodName.readableQualifiedName(config.maxMethodLength)}"
 
-    val optCallerContext = TraceContextGrpc.inferCallerTraceContext(callOptions)
+    val optCallerContext =
+      Some(TraceContextGrpc.inferCallerTraceContext(callOptions)).filter(_.traceId.isDefined)
     val requestTraceContext = TraceContext.withNewTraceContext(shortMethod)(identity)
-    val callerTraceContext =
-      optCallerContext.filter(_.traceId.isDefined).getOrElse(requestTraceContext)
+    val callerTraceContext = optCallerContext.getOrElse(requestTraceContext)
 
     val receiver = next.authority()
 
@@ -61,7 +61,7 @@ class ApiClientRequestLogger(
     // propagates it correctly.
     val clientCall = next.newCall(
       method,
-      callOptions.withOption(TraceContextGrpc.TraceContextCallOptionKey, propagatedTraceContext),
+      callOptions.withOption(TraceContextGrpc.TraceContextOptionsKey, propagatedTraceContext),
     )
 
     if (requestsToIgnore.contains(methodName)) {
@@ -79,7 +79,6 @@ class ApiClientRequestLogger(
       val tidInfo =
         // TODO(#969): consider flushing out empty and missing trace contexts, as they typically indicate missed opportunities to simplify debugging
         if (optCallerContext.isEmpty) "no caller tid".unquoted
-        else if (callerTraceContext == requestTraceContext) "empty caller tid".unquoted
         else requestTraceContext.showTraceId
 
       def createLogMessage(message: String): String = {

@@ -252,7 +252,13 @@ object ProtocolVersion {
     )
 
   val stable: NonEmpty[List[StableProtocolVersion]] =
-    NonEmpty.mk(List, ProtocolVersion.v34, ProtocolVersion.v35, ProtocolVersion.v36)
+    NonEmpty.mk(
+      List,
+      ProtocolVersion.v34,
+      ProtocolVersion.v35,
+      ProtocolVersion.v36,
+      ProtocolVersion.v37,
+    )
 
   // LF versions that should only be used with alpha/beta protocol versions
   val alphaOnlyLfVersions: NonEmpty[List[LanguageVersion]] =
@@ -326,6 +332,9 @@ object ProtocolVersion {
 
   lazy val v36: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
     ProtocolVersion.createStable(36)
+
+  lazy val v37: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
+    ProtocolVersion.createStable(37)
 
   // local storage doesn't depend on a synchronizer with a specific protocol version
   lazy val acsCommitmentRedesignStorage

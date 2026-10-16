@@ -50,7 +50,7 @@ import scala.reflect.ClassTag
   * Invariant: All `signatures` have a different fingerprint.
   */
 @SuppressWarnings(Array("org.wartremover.warts.FinalCaseClass")) // This class is mocked in tests
-case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapping](
+case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapping] private (
     transaction: TopologyTransaction[Op, M],
     // All signatures from both the single and multi transaction hashes
     // May or may not cover the transaction hash.

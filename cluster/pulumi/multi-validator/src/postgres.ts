@@ -9,21 +9,16 @@ import {
   spliceConfig,
   standardStorageClassName,
 } from '@canton-network/splice-pulumi-common';
+import { MultiValidatorConfig } from '@canton-network/splice-pulumi-common/src/config/multiValidatorConfig';
 import { installSplicePostgres, Postgres } from '@canton-network/splice-pulumi-common/src/postgres';
-
-import { multiValidatorConfig } from './config';
 
 export function installPostgres(
   xns: ExactNamespace,
   name: string,
+  config: MultiValidatorConfig,
   dependsOn: CnInput<pulumi.Resource>[]
 ): Postgres {
   const secretName = `${name}-secret`;
-
-  if (!multiValidatorConfig) {
-    throw new Error('multiValidator config must be set when they are enabled');
-  }
-  const config = multiValidatorConfig!;
 
   return installSplicePostgres(
     xns,

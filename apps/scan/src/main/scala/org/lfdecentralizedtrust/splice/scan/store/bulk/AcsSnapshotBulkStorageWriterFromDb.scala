@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
@@ -11,6 +12,7 @@ import org.lfdecentralizedtrust.splice.store.{
   HistoryMetrics,
   S3BucketConnection,
   TimestampWithMigrationId,
+  UpdateHistory,
 }
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -24,15 +26,28 @@ class AcsSnapshotBulkStorageWriterFromDb(
     storageConfig: ScanStorageConfig,
     appConfig: BulkStorageConfig,
     acsSnapshotStore: AcsSnapshotStore,
+    updateHistory: UpdateHistory,
     s3Connection: S3BucketConnection,
     historyMetrics: HistoryMetrics,
     val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
-    extends AcsSnapshotBulkStorageWriter
+    extends AcsSnapshotBulkStorageWriter[TimestampWithMigrationId]
     with NamedLogging
     with Spanning {
 
-  override def getNextSnapshotTimestampAfter(
+  override def positionAt(
+      recordTime: CantonTimestamp
+  )(implicit tc: TraceContext): Future[TimestampWithMigrationId] =
+    updateHistory
+      .getLowestMigrationForRecordTime(recordTime)
+      .map(migrationId =>
+        TimestampWithMigrationId(recordTime, migrationId.getOrElse(updateHistory.domainMigrationId))
+      )
+
+  override def recordTimeOf(snapshot: TimestampWithMigrationId): CantonTimestamp =
+    snapshot.timestamp
+
+  override def getNextSnapshotAfter(
       last: TimestampWithMigrationId
   )(implicit tc: TraceContext): Future[Option[TimestampWithMigrationId]] =
     OptionT(acsSnapshotStore.lookupSnapshotAfter(last.migrationId, last.timestamp)).subflatMap {
@@ -45,15 +60,15 @@ class AcsSnapshotBulkStorageWriterFromDb(
         }
     }.value
 
-  override def shouldProcessSnapshotAt(ts: TimestampWithMigrationId)(implicit
+  override def shouldProcessSnapshot(snapshot: TimestampWithMigrationId)(implicit
       tc: TraceContext
   ): Boolean = {
-    val ret = storageConfig.shouldDumpSnapshotToBulkStorage(ts.timestamp)
+    val ret = storageConfig.shouldDumpSnapshotToBulkStorage(snapshot.timestamp)
     if (ret) {
-      logger.debug(s"Dumping snapshot at timestamp ${ts.timestamp} to bulk storage")
+      logger.debug(s"Dumping snapshot at timestamp ${snapshot.timestamp} to bulk storage")
     } else {
       logger.info(
-        s"Skipping snapshot at timestamp ${ts.timestamp} for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
+        s"Skipping snapshot at timestamp ${snapshot.timestamp} for bulk storage, not required per the configured period of ${storageConfig.bulkAcsSnapshotPeriodHours}"
       )
     }
     ret

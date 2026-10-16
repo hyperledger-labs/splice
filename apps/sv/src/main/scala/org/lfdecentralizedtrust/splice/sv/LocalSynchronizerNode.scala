@@ -5,6 +5,10 @@ package org.lfdecentralizedtrust.splice.sv
 
 import cats.syntax.either.*
 import com.digitalasset.nonempty.NonEmpty
+import com.digitalasset.canton.admin.api.client.data.SequencerConnectionPoolDelaysAccess.*
+import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplificationAccess.*
+import com.digitalasset.canton.admin.api.client.data.SubscriptionLivenessLimitsAccess.*
+import com.digitalasset.canton.protocol.StaticSynchronizerParametersAccess.*
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.{ClientConfig, CryptoConfig, CryptoProvider}
@@ -224,9 +228,9 @@ class LocalSynchronizerNode(
     logger.info("Adding mediator identity transactions")
     for {
       mediatorId <- mediatorAdminConnection.getMediatorId
-      identity <- mediatorAdminConnection.getIdentityTransactions(
-        mediatorId.uid,
-        TopologyStoreId.Authorized,
+      identity <- mediatorAdminConnection.getOrGenerateIdentityTransactions(
+        mediatorId,
+        config.protocolVersion,
       )
       _ <- addIdentityTransactions(
         "mediator",
@@ -391,9 +395,9 @@ class LocalSynchronizerNode(
     )
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
-      identity <- sequencerAdminConnection.getIdentityTransactions(
-        sequencerId.uid,
-        TopologyStoreId.Authorized,
+      identity <- sequencerAdminConnection.getOrGenerateIdentityTransactions(
+        sequencerId,
+        config.protocolVersion,
       )
       _ <- addIdentityTransactions(
         "sequencer",

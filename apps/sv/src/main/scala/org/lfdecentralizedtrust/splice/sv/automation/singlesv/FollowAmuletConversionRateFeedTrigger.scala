@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status

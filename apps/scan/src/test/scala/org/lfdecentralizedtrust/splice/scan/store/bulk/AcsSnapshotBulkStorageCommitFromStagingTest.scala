@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.daml.metrics.api.noop.NoOpMetricsFactory
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
@@ -21,12 +22,7 @@ import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
 import org.lfdecentralizedtrust.splice.scan.store.{ScanKeyValueProvider, ScanKeyValueStore}
-import org.lfdecentralizedtrust.splice.store.{
-  HasS3Mock,
-  HistoryMetrics,
-  StoreTestBase,
-  TimestampWithMigrationId,
-}
+import org.lfdecentralizedtrust.splice.store.{HasS3Mock, HistoryMetrics, StoreTestBase}
 
 import scala.concurrent.Future
 import scala.util.Using
@@ -132,7 +128,7 @@ class AcsSnapshotBulkStorageCommitFromStagingTest
       def createDummySnapshot(day: Int, objectCount: Int): Unit = {
         createDummySnapshotWithoutMarkingProcessed(day, objectCount)
         acsStagingProgress
-          .persistLatestProcessedSnapshotTimestamp(TimestampWithMigrationId(ts(day), 0))
+          .persistLatestProcessedSnapshotTimestamp(ts(day))
           .futureValue
       }
 
@@ -184,9 +180,7 @@ class AcsSnapshotBulkStorageCommitFromStagingTest
         createDummySnapshotWithoutMarkingProcessed(day = 3, objectCount = 2)
 
         eventually() {
-          acsCommittedProgress.readLatestProcessedSnapshotTimestamp.futureValue.map(
-            _.timestamp
-          ) shouldBe Some(ts(2))
+          acsCommittedProgress.readLatestProcessedSnapshotTimestamp.futureValue shouldBe Some(ts(2))
         }
         assertCommittedObjectsForSnapshot(day = 1, expectedCount = 1)
         assertCommittedObjectsForSnapshot(day = 2, expectedCount = 2)
@@ -206,12 +200,10 @@ class AcsSnapshotBulkStorageCommitFromStagingTest
         )
 
         acsStagingProgress
-          .persistLatestProcessedSnapshotTimestamp(TimestampWithMigrationId(ts(3), 0))
+          .persistLatestProcessedSnapshotTimestamp(ts(3))
           .futureValue
         eventually() {
-          acsCommittedProgress.readLatestProcessedSnapshotTimestamp.futureValue.map(
-            _.timestamp
-          ) shouldBe Some(ts(3))
+          acsCommittedProgress.readLatestProcessedSnapshotTimestamp.futureValue shouldBe Some(ts(3))
         }
         assertCommittedObjectsForSnapshot(day = 3, expectedCount = 2)
         assertNoStagingObjectsForSnapshot(3)
@@ -230,9 +222,7 @@ class AcsSnapshotBulkStorageCommitFromStagingTest
 
       withNewCommitService {
         eventually() {
-          acsCommittedProgress.readLatestProcessedSnapshotTimestamp.futureValue.map(
-            _.timestamp
-          ) shouldBe Some(ts(4))
+          acsCommittedProgress.readLatestProcessedSnapshotTimestamp.futureValue shouldBe Some(ts(4))
         }
         assertCommittedObjectsForSnapshot(day = 4, expectedCount = 3)
         assertNoStagingObjectsForSnapshot(4)
@@ -259,9 +249,7 @@ class AcsSnapshotBulkStorageCommitFromStagingTest
 
       withNewCommitService {
         eventually() {
-          acsCommittedProgress.readLatestProcessedSnapshotTimestamp.futureValue.map(
-            _.timestamp
-          ) shouldBe Some(ts(5))
+          acsCommittedProgress.readLatestProcessedSnapshotTimestamp.futureValue shouldBe Some(ts(5))
         }
         assertCommittedObjectsForSnapshot(day = 5, expectedCount = 2)
         assertNoStagingObjectsForSnapshot(5)

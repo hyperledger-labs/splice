@@ -6,8 +6,8 @@ package com.digitalasset.canton.tracing
 import io.grpc.*
 import io.grpc.Context as GrpcContext
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall
-import io.grpc.stub.AbstractStub
 import io.grpc.ForwardingServerCallListener.SimpleForwardingServerCallListener
+import io.grpc.stub.AbstractStub
 import io.opentelemetry.api.trace.{Span, Tracer}
 
 import scala.util.{Try, Using}
@@ -17,20 +17,19 @@ import scala.util.{Try, Using}
   *   - a server interceptor for receiving context values when receiving requests from a client
   */
 object TraceContextGrpc {
-  val TraceContextOptionsKey = CallOptions.Key.create[TraceContext]("traceContext")
-
   // value of trace context in the GRPC Context
-  // There are two options for implicitly propagating the trace context within a process: thread-local storage and
-  // attaching custom call options to a GRPC call. Thread-local storage does *not* work with Futures, so we recommend
-  // using the latter approach where possible. The former is used sometimes for historical purposes, and sometimes
-  // because for technical reasons.
-  private val TraceContextThreadLocalKey =
-    Context.keyWithDefault[TraceContext]("TraceContextThreadLocalKey", TraceContext.empty)
+  private val TraceContextKey =
+    Context.keyWithDefault[TraceContext]("traceContext", TraceContext.empty)
 
-  val TraceContextCallOptionKey =
-    CallOptions.Key.create[TraceContext]("TraceContextCallOptionKey")
+  /** Value of the trace context in a call's [[io.grpc.CallOptions]].
+    *
+    * Unlike [[TraceContextKey]], call options travel with the stub value rather than with the
+    * thread, so they survive arbitrary thread hops and `Future` composition.
+    */
+  val TraceContextOptionsKey: CallOptions.Key[TraceContext] =
+    CallOptions.Key.create[TraceContext]("traceContext")
 
-  def fromGrpcContext: TraceContext = TraceContextThreadLocalKey.get()
+  def fromGrpcContext: TraceContext = TraceContextKey.get()
 
   def fromGrpcContextOrNew(name: String): TraceContext = {
     val grpcTraceContext = TraceContextGrpc.fromGrpcContext
@@ -44,35 +43,36 @@ object TraceContextGrpc {
   def withGrpcTraceContext[A](f: TraceContext => A): A = f(fromGrpcContext)
 
   def withGrpcContext[A](traceContext: TraceContext)(fn: => A): A = {
-    val context = GrpcContext.current().withValue(TraceContextThreadLocalKey, traceContext)
+    val context = GrpcContext.current().withValue(TraceContextKey, traceContext)
 
     context.call(() => fn)
   }
 
+  /** Attaches `traceContext` to the stub's call options, so that it is propagated to the server
+    * even if the call is later issued from a different thread, e.g. from a `Future` callback.
+    */
   def addTraceContextToCallOptions[T <: AbstractStub[T]](
       stub: T
-  )(implicit traceContext: TraceContext): T = {
-    stub.withOption(TraceContextCallOptionKey, traceContext)
-  }
+  )(implicit traceContext: TraceContext): T =
+    stub.withOption(TraceContextOptionsKey, traceContext)
 
-  def inferServerRequestTraceContext(span: String): TraceContext = {
-    val grpcTraceContext = TraceContextGrpc.fromGrpcContext
-    if (grpcTraceContext.traceId.isDefined) {
-      grpcTraceContext
-    } else {
-      TraceContext.withNewTraceContext(span)(identity)
-    }
-  }
+  /** The trace context the caller of a GRPC call intended.
+    *
+    * Prefers the call option set by [[addTraceContextToCallOptions]] and falls back to the
+    * thread-local [[io.grpc.Context]]. A call issued from a thread without an attached GRPC context
+    * yields the empty trace context; callers that want a usable trace id regardless should use
+    * [[inferClientRequestTraceContext]].
+    */
+  def inferCallerTraceContext(callOptions: CallOptions): TraceContext =
+    Option(callOptions.getOption(TraceContextOptionsKey)).getOrElse(fromGrpcContext)
 
-  def inferCallerTraceContext(callOptions: CallOptions): Option[TraceContext] = {
-    val callOptionTraceContext = callOptions.getOption(TraceContextGrpc.TraceContextCallOptionKey)
-    if (callOptionTraceContext == null) {
-      // TODO(#9754): remove the need to infer the trace context from thread-local storage, which doesn't work with Futures in the mix, and log a big fat warning if we do
-      val grpcTraceContext = TraceContextGrpc.fromGrpcContext
-      Option.when(grpcTraceContext.traceId.isDefined)(grpcTraceContext)
-    } else {
-      Some(callOptionTraceContext)
-    }
+  /** The trace context to report an outgoing GRPC call under, or a new one named `name` if the
+    * caller supplied none.
+    */
+  def inferClientRequestTraceContext(callOptions: CallOptions, name: String): TraceContext = {
+    val callerTraceContext = inferCallerTraceContext(callOptions)
+    if (callerTraceContext.traceId.isDefined) callerTraceContext
+    else TraceContext.withNewTraceContext(name)(identity)
   }
 
   private implicit final class TryFailedOps[A](private val a: Try[A]) extends AnyVal {
@@ -99,8 +99,7 @@ object TraceContextGrpc {
         callOptions: CallOptions,
         next: Channel,
     ): ClientCall[ReqT, RespT] = {
-      val tcOpts = Option(callOptions.getOption(TraceContextCallOptionKey))
-      val traceContext = tcOpts.getOrElse(TraceContextThreadLocalKey.get())
+      val traceContext = inferClientRequestTraceContext(callOptions, "grpc-client")
       val contextToPropagate = traceContext.context
 
       def withPropagatedContext[T](fn: => T): T =
@@ -142,7 +141,7 @@ object TraceContextGrpc {
       val traceContext = W3CTraceContext.fromGrpcMetadata(headers)
       val context = GrpcContext
         .current()
-        .withValue(TraceContextThreadLocalKey, traceContext)
+        .withValue(TraceContextKey, traceContext)
       Contexts.interceptCall(context, call, headers, next)
     }
   }
@@ -169,7 +168,7 @@ object TraceContextGrpc {
 
       val context = GrpcContext
         .current()
-        .withValue(TraceContextThreadLocalKey, traceContext)
+        .withValue(TraceContextKey, traceContext)
 
       val nextServerCallListener = Contexts.interceptCall(context, call, headers, next)
       new ServerCallListener(nextServerCallListener, span)
