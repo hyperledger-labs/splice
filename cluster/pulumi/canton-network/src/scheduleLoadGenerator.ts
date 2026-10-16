@@ -11,13 +11,15 @@ import {
   imagePullSecret,
   installSpliceHelmChart,
   isDevNet,
-  numInstances,
-  numNodesPerInstance,
   loadTesterConfig,
   CnChartVersion,
   getNamespaceConfig,
 } from '@canton-network/splice-pulumi-common';
 import { installLoopback } from '@canton-network/splice-pulumi-common-sv';
+import {
+  multiValidatorConfig,
+  numNodesPerInstance,
+} from '@canton-network/splice-pulumi-common/src/config/multiValidatorConfig';
 import { Resource } from '@pulumi/pulumi';
 
 export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Resource[]): void {
@@ -39,38 +41,44 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
     const prometheusRw =
       'http://prometheus-prometheus.observability.svc.cluster.local:9090/api/v1/write';
 
-    const validator1 = {
-      walletBaseUrl: `https://wallet.validator1.${clusterHostname}`,
-      auth: {
-        kind: 'oauth',
-        oauthDomain,
-        oauthClientId,
-        audience,
-        usersPassword,
-        managementApi: {
-          clientId: config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID'),
-          clientSecret: config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET'),
-        },
-        admin: {
-          email: config.optionalEnv('K6_VALIDATOR_ADMIN_USERNAME') || 'admin@validator1.com',
-          password: config.requireEnv('K6_VALIDATOR_ADMIN_PASSWORD'),
-        },
-      },
-    };
-
-    const multiValidatorConfigs = new Array(numInstances).fill(0).flatMap((_, instance) =>
-      generatePortSequence(5000, numNodesPerInstance, [{ id: 3 }]).map((p, validator) => ({
-        walletBaseUrl: `http://multi-validator-${instance}.multi-validator.svc.cluster.local:${p.port}`,
-        auth: {
-          kind: 'self-signed',
-          user: `validator-user-${validator}`,
-          audience,
-          secret: 'test',
-        },
-      }))
-    );
-
-    const validators = numInstances > 0 ? multiValidatorConfigs : [validator1];
+    const validators = [
+      ...(function* () {
+        if (multiValidatorConfig !== undefined && multiValidatorConfig.instanceCount > 0) {
+          for (let instance = 0; instance < multiValidatorConfig.instanceCount; ++instance) {
+            yield* generatePortSequence(5000, numNodesPerInstance, [{ id: 3 }]).map(
+              (p, validator) => ({
+                walletBaseUrl: `http://multi-validator-${instance}.multi-validator.svc.cluster.local:${p.port}`,
+                auth: {
+                  kind: 'self-signed',
+                  user: `validator-user-${validator}`,
+                  audience,
+                  secret: 'test',
+                },
+              })
+            );
+          }
+        } else {
+          yield {
+            walletBaseUrl: `https://wallet.validator1.${clusterHostname}`,
+            auth: {
+              kind: 'oauth',
+              oauthDomain,
+              oauthClientId,
+              audience,
+              usersPassword,
+              managementApi: {
+                clientId: config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID'),
+                clientSecret: config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET'),
+              },
+              admin: {
+                email: config.optionalEnv('K6_VALIDATOR_ADMIN_USERNAME') || 'admin@validator1.com',
+                password: config.requireEnv('K6_VALIDATOR_ADMIN_PASSWORD'),
+              },
+            },
+          };
+        }
+      })(),
+    ];
 
     installSpliceHelmChart(
       xns,

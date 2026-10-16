@@ -1,4 +1,4 @@
-enabled: true
+instanceCount: 0
 postgresPvcSize: '100Gi'
 resources:
   participant:
