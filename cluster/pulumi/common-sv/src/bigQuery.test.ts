@@ -13,6 +13,8 @@ import type { ScanBigQueryConfig } from './singleSvConfig';
 // use the mock cluster's environment, as `make cluster/pulumi/test` does for dump-config
 process.env.CN_PULUMI_LOAD_ENV_CONFIG_FILE = 'true';
 process.env.GCP_CLUSTER_BASENAME = 'mock';
+// Force this to the splice deployment dir as mock is always in there.
+process.env.DEPLOYMENT_DIR = `${process.env.SPLICE_ROOT}/cluster/deployment`;
 
 const legacyDatasetId = 'mock_scan';
 
