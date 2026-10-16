@@ -496,7 +496,6 @@ class ValidatorApp(
       onboardingConfig: Option[ValidatorOnboardingConfig],
       scanConnection: BftScanConnection,
       synchronizerId: SynchronizerId,
-      participantId: ParticipantId,
       ledgerConnection: SpliceLedgerConnection,
       dedupDuration: DedupDuration,
   )(implicit traceContext: TraceContext): Future[Unit] = {
@@ -519,7 +518,6 @@ class ValidatorApp(
                     "ValidatorLicense not found, permissioned synchronizer is enabled. Submitting ValidatorLicenseRequest to the ledger."
                   )
                   for {
-                    _ <- waitForTopologyPermission(scanConnection, synchronizerId, participantId)
                     _ <- submitValidatorLicenceRequest(
                       validatorParty,
                       store.key.dsoParty,
@@ -999,7 +997,6 @@ class ValidatorApp(
           config.onboarding,
           scanConnection,
           synchronizerId,
-          participantId,
           automation.connection(SpliceLedgerConnectionPriority.High),
           dedupDuration,
         )
