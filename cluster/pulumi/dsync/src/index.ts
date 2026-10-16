@@ -1,16 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { Auth0Fetch, config, getAuth0ClusterConfig } from '@canton-network/splice-pulumi-common';
 
-import { Auth0Fetch, config, getAuth0ClusterConfig } from "@canton-network/splice-pulumi-common";
-import { installNode } from "./installNode";
+import { installNode } from './installNode';
 
 async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
   await auth0Fetch.loadAuth0Cache();
 
-  await installNode(
-    auth0Fetch,
-    "dsync-op-1"
-  )
+  await installNode(auth0Fetch, 'dsync-node-1');
 
   await auth0Fetch.saveAuth0Cache();
 }
@@ -18,7 +15,7 @@ async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
 async function main() {
   const auth0ClusterCfg = await getAuth0ClusterConfig();
   if (!auth0ClusterCfg.dSync) {
-    throw new Error("dsync auth0 config is missing");
+    throw new Error('dsync auth0 config is missing');
   }
   const auth0FetchOutput = auth0ClusterCfg.dSync.apply(cfg => {
     if (!cfg) {

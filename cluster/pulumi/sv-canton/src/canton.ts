@@ -53,16 +53,31 @@ export async function installCantonComponents(
   const isActiveMigration = migrationConfig.active.id === migrationId;
 
   const auth0Config = auth0Client.getCfg();
-  const ledgerApiUserSecret = installLedgerApiUserSecret(
-    auth0Client,
-    xns,
-    `sv-canton-migration-${migrationId}`,
-    'sv'
-  );
-  const ledgerApiUserSecretSource = auth0UserNameEnvVarSource(
-    `sv-canton-migration-${migrationId}`,
-    true
-  );
+  if (xns.logicalName.startsWith('sv')) {
+    // FIXME: fix this ugliness! I think this just does not belong here, and should move the the sv/dsync stack instead,
+    // or at least be passed as arguments  (the reason it's here is probably because we want a secret per migration, and this is the stack that we run per migration...')
+    const ledgerApiUserSecret = await installLedgerApiUserSecret(
+      auth0Client,
+      xns,
+      `sv-canton-migration-${migrationId}`,
+      'sv'
+    );
+    const ledgerApiUserSecretSource = auth0UserNameEnvVarSource(
+      `sv-canton-migration-${migrationId}`,
+      true
+    );
+  } else {
+    const ledgerApiUserSecret = await installLedgerApiUserSecret(
+      auth0Client,
+      xns,
+      `dsync-canton-migration-${migrationId}`,
+      'dsync'
+    );
+    const ledgerApiUserSecretSource = auth0UserNameEnvVarSource(
+      `dsync-canton-migration-${migrationId}`,
+      true
+    );
+  }
 
   const migrationStillRunning = migrationConfig.isStillRunning(migrationId);
   const migrationInfo = migrationConfig.allMigrations.find(

@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { Config } from './config';
 import { spliceConfig } from './config/config';
-import { MigrationInfoSchema } from './config/migrationSchema';
+import { MigrationInfoSchema, SynchronizerMigrationConfig } from './config/migrationSchema';
 
 export class DecentralizedSynchronizerMigrationConfig {
   // the current running migration, to which the ingresses point, and it's expected to be the active CN network
@@ -25,8 +25,7 @@ export class DecentralizedSynchronizerMigrationConfig {
   frozenMigrationId: number;
   public archived: MigrationInfo[];
 
-  constructor(config: Config) {
-    const synchronizerMigration = config.synchronizerMigration;
+  constructor(synchronizerMigration: SynchronizerMigrationConfig) {
     this.active = synchronizerMigration.active;
     this.legacy = synchronizerMigration.legacy;
     this.additionalLegacy = synchronizerMigration.additionalLegacy || [];
@@ -69,6 +68,6 @@ export type MigrationInfo = z.infer<typeof MigrationInfoSchema>;
 
 export type DomainMigrationIndex = number;
 export const DecentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig =
-  new DecentralizedSynchronizerMigrationConfig(spliceConfig.configuration);
+  new DecentralizedSynchronizerMigrationConfig(spliceConfig.configuration.synchronizerMigration);
 
 export const activeVersion = DecentralizedSynchronizerUpgradeConfig.active.version;

@@ -1,1 +1,40 @@
-!include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml) {}
+!include($SPLICE_ROOT/cluster/configs/shared/scratchnet.yaml)
+
+dsync:
+  migration:
+    # at least for now, starting from migration 1, to be different from the 0 in the gSync, to help debugging
+    frozenMigrationId: 1
+    active:
+      id: 1
+      version: 'local'
+      sequencer:
+        enableBftSequencer: true
+
+dsyncNodes:
+  dsync-node-1:
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_PARTICIPANT_PRUNING'
+          value: "# Ignore missing ACS commitment and commitment mismatches\ncanton.participants.participant.parameters.stores.safe-to-prune-commitment-state = \"all\"\n"
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    sequencer:
+      enableAntiAffinity: false
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'

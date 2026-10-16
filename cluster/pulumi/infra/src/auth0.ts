@@ -631,12 +631,12 @@ function dsyncAuth0(clusterBasename: string): pulumi.Output<Auth0Config> | undef
     clientSecret,
   });
   const configs = [1, 2, 3, 4].map(i =>
-    auth0ForDSyncNamespace(clusterBasename, `dsync-op-${i}`, provider)
+    auth0ForDSyncNamespace(clusterBasename, `dsync-node-${i}`, provider)
   );
   return pulumi.all(configs).apply(cfgs => {
     const namespacedConfig: NamespacedAuth0Configs = {};
     cfgs.forEach((cfg, i) => {
-      namespacedConfig[`dsync-op-${i + 1}`] = cfg;
+      namespacedConfig[`dsync-node-${i + 1}`] = cfg;
     });
     return {
       namespacedConfigs: namespacedConfig,
