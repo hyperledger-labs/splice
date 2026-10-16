@@ -2520,6 +2520,7 @@ class HttpScanHandler(
   )()(extracted: TraceContext): Future[ScanResource.GetBackfillingStatusResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getBackfillingStatus") { _ => _ =>
+      // TODO(#7728) include the votes store backfilling once we switch over the HTTP endpoints
       for {
         updateHistoryStatus <- updateHistory.getBackfillingState()
         txLogStatus <- store.multiDomainAcsStore.getTxLogBackfillingState()

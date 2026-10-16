@@ -31,6 +31,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, DbKeyValueStore}
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
+import org.lfdecentralizedtrust.splice.scan.store.votesbackfilling.VotesBackfillingStore
 import org.lfdecentralizedtrust.splice.store.events.DsoRulesCloseVoteRequest
 import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
@@ -59,6 +60,7 @@ class DbVotesStore private (
 )(implicit ec: ExecutionContext, closeContext: CloseContext)
     extends AcsJdbcTypes
     with HistoricalVotesStore
+    with VotesBackfillingStore
     with LimitHelpers
     with NamedLogging {
 
@@ -72,7 +74,9 @@ class DbVotesStore private (
   /** The record time of the first transaction that the ingestion of this store has seen.
     * Vote results from before that time have to be backfilled.
     */
-  def getFirstIngestedRecordTime()(implicit tc: TraceContext): Future[Option[CantonTimestamp]] = {
+  override def getFirstIngestedRecordTime()(implicit
+      tc: TraceContext
+  ): Future[Option[CantonTimestamp]] = {
     import ScanKeyValueProvider.timestampCodec
     kvStore
       .readValueAndLogOnDecodingFailure[CantonTimestamp](firstIngestedRecordTimeKey(storeId))
@@ -80,20 +84,22 @@ class DbVotesStore private (
   }
 
   /** Where [[VotesStoreBackfilling]] should resume from, or `None` if it has not started yet. */
-  def getBackfillingCursor()(implicit tc: TraceContext): Future[Option[VotesBackfillCursor]] = {
+  override def getBackfillingCursor()(implicit
+      tc: TraceContext
+  ): Future[Option[VotesBackfillCursor]] = {
     import ScanKeyValueProvider.votesBackfillCursorCodec
     kvStore
       .readValueAndLogOnDecodingFailure[VotesBackfillCursor](backfillCursorKey(storeId))
       .value
   }
 
-  def isBackfillingComplete()(implicit tc: TraceContext): Future[Boolean] =
+  override def isBackfillingComplete()(implicit tc: TraceContext): Future[Boolean] =
     kvStore
       .readValueAndLogOnDecodingFailure[Boolean](backfillCompleteKey(storeId))
       .value
       .map(_.getOrElse(false))
 
-  def markBackfillingComplete()(implicit tc: TraceContext): Future[Unit] =
+  override def markBackfillingComplete()(implicit tc: TraceContext): Future[Unit] =
     kvStore.setValue(backfillCompleteKey(storeId), true).map { _ =>
       logger.info("DbVotesStore backfilling is complete")
     }
@@ -101,7 +107,7 @@ class DbVotesStore private (
   /** Inserts vote results backfilled from a peer scan's `votes_store_results`, and persists
     * `cursor` in the same transaction, so that backfilling never inserts the same page twice.
     */
-  def insertPeerVoteResults(
+  override def insertPeerVoteResults(
       rows: Seq[PeerVoteResult],
       cursor: VotesBackfillCursor,
   )(implicit tc: TraceContext): Future[Unit] = {
