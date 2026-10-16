@@ -37,7 +37,11 @@ class SvIdentitiesDumpIntegrationTest extends IntegrationTest {
         val backends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
         val svIdentitiesLogLineRegex = "Wrote node identities to directory.*at path: (.*\\.json)".r
 
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
+        loggerFactory.assertEventuallyLogsSeq(
+          SuppressionRule.Level(Level.INFO) && SuppressionRule.LoggerNameContains(
+            "BackupNodeIdentitiesTrigger"
+          )
+        )(
           initDso(),
           logEntries => {
             forAll(backends) { backend =>
