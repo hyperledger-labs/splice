@@ -236,6 +236,18 @@ async function installValidator(
     validatorConfig.newParticipantId ||
     validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier;
 
+  const additionalEnvVars = validatorConfig.validatorApp?.additionalEnvVars
+    ? [...validatorConfig.validatorApp.additionalEnvVars]
+    : [];
+
+  if (validatorConfig.enableInternalAutoOnboardingThroughSvTrafficFaucet) {
+    additionalEnvVars.push({
+      name: 'ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
+      value:
+        'canton.validator-apps.validator_backend.enable-internal-auto-onboarding-through-sv-traffic-faucet = true',
+    });
+  }
+
   const validatorValues: ChartValues = {
     ...validatorValuesFromYamlFiles,
     scanClient: validatorConfig.validatorApp?.scanClient ?? validatorValuesFromYamlFiles.scanClient,
@@ -271,7 +283,7 @@ async function installValidator(
     enablePostgresMetrics: true,
     ...spliceInstanceNames,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
-    additionalEnvVars: validatorConfig.validatorApp?.additionalEnvVars,
+    additionalEnvVars: additionalEnvVars,
     additionalJvmOptions: validatorConfig.validatorApp?.additionalJvmOptions,
     resources: validatorConfig.validatorApp?.resources,
   };

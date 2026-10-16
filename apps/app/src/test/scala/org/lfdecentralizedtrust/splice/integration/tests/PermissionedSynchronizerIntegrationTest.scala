@@ -53,6 +53,13 @@ class PermissionedSynchronizerIntegrationTest
           )
         })(config)
       )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs {
+          case (name, c) if name == "bobValidator" =>
+            c.copy(enableInternalAutoOnboardingThroughSvTrafficFaucet = true)
+          case (_, c) => c
+        }(config)
+      )
       .withManualStart
 
   "Onboard network in RestrictedOpen mode" in { implicit env =>
@@ -126,11 +133,12 @@ class PermissionedSynchronizerIntegrationTest
       },
     )
 
-    clue("Sponser SV Buys Member Traffic for Bob in the DevNet") {
-      sv1Backend.devNetBuyMemberTraffic(bobValidatorBackend.participantClient.id)
+    clue("Bob Validator starts and onboards correctly ") {
+      bobValidatorBackend.startSync()
+      bobValidatorBackend.onboardUser("TestUserBob")
     }
 
-    clue("Verify Bob is granted ParticipantSynchronizerPermission") {
+    clue("Bob Validator has ParticipantSynchronizerPermission") {
       eventually() {
         sv1ScanBackend.getParticipantSynchronizerPermission(
           decentralizedSynchronizerId.toProtoPrimitive,
@@ -139,11 +147,6 @@ class PermissionedSynchronizerIntegrationTest
           SynchronizerPermissionState(None)
         )
       }
-    }
-
-    clue("Bob Validator starts and onboards correctly") {
-      bobValidatorBackend.startSync()
-      bobValidatorBackend.onboardUser("TestUserBob")
     }
 
     val bobParticipantId = bobValidatorBackend.participantClient.id.toProtoPrimitive

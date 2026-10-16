@@ -12,6 +12,12 @@
       "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
       "value": {
         "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwell = {\n  service-user = ${?SPLICE_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"splice-node/dars/splitwell-0.1.0.dar\", \"splice-node/dars/splitwell-0.1.1.dar\", \"splice-node/dars/splitwell-0.1.2.dar\", \"splice-node/dars/splitwell-0.1.3.dar\", \"splice-node/dars/splitwell-0.1.4.dar\", \"splice-node/dars/splitwell-0.1.5.dar\", \"splice-node/dars/splitwell-0.1.6.dar\", \"splice-node/dars/splitwell-0.1.7.dar\", \"splice-node/dars/splitwell-0.1.8.dar\"]\n}",
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE",
+            "value": "canton.validator-apps.validator_backend.enable-internal-auto-onboarding-through-sv-traffic-faucet = true"
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [
           {

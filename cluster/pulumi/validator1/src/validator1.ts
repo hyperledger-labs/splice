@@ -52,6 +52,15 @@ export async function installValidator1(
 
   const participantPruningConfig = validator1Config?.participantPruningSchedule;
 
+  const additionalEnvVars = [
+    ...(validator1Config?.validatorApp?.additionalEnvVars || []),
+    {
+      name: 'ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
+      value:
+        'canton.validator-apps.validator_backend.enable-internal-auto-onboarding-through-sv-traffic-faucet = true',
+    },
+  ];
+
   const imagePullDeps = imagePullSecret(xns);
 
   const defaultPostgres = !splitPostgresInstances
@@ -130,7 +139,7 @@ export async function installValidator1(
     deduplicationDuration: validator1Config?.deduplicationDuration,
     disableAuth: validator1Config?.disableAuth,
     version: activeVersion,
-    additionalEnvVars: validator1Config?.validatorApp?.additionalEnvVars,
+    additionalEnvVars: additionalEnvVars,
   });
   const walletGatewayConfig = validator1Config.walletGateway;
   if (walletGatewayConfig.enabled) {
