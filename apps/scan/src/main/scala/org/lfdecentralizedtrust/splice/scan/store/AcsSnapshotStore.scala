@@ -19,7 +19,12 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
 }
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.SelectFromCreateEvents
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, LimitHelpers, UpdateHistory}
-import org.lfdecentralizedtrust.splice.store.db.AdvisoryLocks
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsJdbcTypes,
+  AcsQueries,
+  AdvisoryLockIds,
+  AdvisoryLocks,
+}
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
@@ -33,7 +38,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.circe.Decoder.Result
 import io.circe.HCursor
-import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.util.{EventId, ValueJsonCodecProtobuf as ProtobufCodec}
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -817,12 +821,10 @@ class AcsSnapshotStore(
         saveV2IncrementalSnapshot(table, snapshot, nextSnapshotTargetRecordTime)(tc)
     }
     storage.queryAndUpdate(
-      AdvisoryLocks.withDdlLock(
-        withIncrementalSnapshotIdempotencyCheck(
-          table,
-          statement,
-          Some(snapshot),
-        )
+      withIncrementalSnapshotIdempotencyCheck(
+        table,
+        statement,
+        Some(snapshot),
       ),
       "saveIncrementalSnapshot",
     )
@@ -925,22 +927,24 @@ class AcsSnapshotStore(
     // - otherwise, on retry the `create index IF NOT EXISTS` will just move on.
     for {
       _ <- storage.queryAndUpdate(
-        AdvisoryLocks.withDdlLock(
+        AdvisoryLocks.withSessionLock(
+          AdvisoryLockIds.acsSnapshotIndex,
           AcsSnapshotDDL.stakeholderIndexAction(
             snapshot.stakeholdersTableName,
             historyId,
             snapshot.snapshotRecordTime,
-          )
+          ),
         ),
         "index_stakeholders",
       )
       _ <- storage.queryAndUpdate(
-        AdvisoryLocks.withDdlLock(
+        AdvisoryLocks.withSessionLock(
+          AdvisoryLockIds.acsSnapshotIndex,
           AcsSnapshotDDL.stakeholderTemplateIdIndexAction(
             snapshot.stakeholdersTableName,
             historyId,
             snapshot.snapshotRecordTime,
-          )
+          ),
         ),
         "index_stakeholders_templateid",
       )

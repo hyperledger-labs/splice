@@ -16,8 +16,6 @@ import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import scala.concurrent.{ExecutionContext, Future}
 
 trait PeerObjectSource {
-  def peers(implicit tc: TraceContext): Future[Seq[Uri]]
-
   def open(peer: Uri, key: String)(implicit tc: TraceContext): Future[Source[ByteString, Any]]
 }
 
@@ -30,9 +28,6 @@ class ScanPeerObjectSource(peerConnection: PeerBftScanConnection)(implicit
 
   private def openConnections(implicit tc: TraceContext) =
     peerConnection.connection.map(_.scanList.scanConnections.open)
-
-  override def peers(implicit tc: TraceContext): Future[Seq[Uri]] =
-    openConnections.map(_.map(_.config.adminApi.url))
 
   override def open(peer: Uri, key: String)(implicit
       tc: TraceContext

@@ -37,32 +37,45 @@ class SvIdentitiesDumpIntegrationTest extends IntegrationTest {
         val backends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
         val svIdentitiesLogLineRegex = "Wrote node identities to directory.*at path: (.*\\.json)".r
 
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
+        loggerFactory.assertEventuallyLogsSeq(
+          SuppressionRule.Level(Level.INFO) && SuppressionRule.LoggerNameContains(
+            "BackupNodeIdentitiesTrigger"
+          )
+        )(
           initDso(),
           logEntries => {
             forAll(backends) { backend =>
               {
-                forAtLeast(1, logEntries)(logEntry => {
-                  inside((logEntry.loggerName, logEntry.message)) {
-                    case (name, svIdentitiesLogLineRegex(filename))
-                        if name.contains(s"SV=${backend.name}") =>
-                      val dir = File(testDumpOutputDir(backend.config))
-                      val file = dir / filename
-                      val jsonString = file.contentAsString
-                      val parsed = SynchronizerNodeIdentities
-                        .fromHttp(
-                          io.circe.parser.decode[http.SynchronizerNodeIdentities](jsonString).value
-                        )
-                        .value
-                      val ids = backend.getSynchronizerNodeIdentitiesDump()
-                      // The authorized store snapshots are not always byte-for-byte equal
-                      // TODO(#794): Figure out why and if we can improve the checking here
-                      scrubAuthorizedStoreSnapshots(ids) shouldBe scrubAuthorizedStoreSnapshots(
-                        parsed
-                      ) withClue
-                        s"Identities dump for sv ${backend.name} is consistent with identities fetched through the endpoint"
+                val exportFileNames = logEntries.flatMap { logEntry =>
+                  (logEntry.loggerName, logEntry.message) match {
+                    case (name, svIdentitiesLogLineRegex(fileName))
+                        if (name.contains(s"SV=${backend.name}")) =>
+                      Seq(fileName)
+                    case _ => Seq.empty
                   }
-                })
+                }
+                if (exportFileNames.isEmpty) {
+                  fail(
+                    s"Could not find log line for identity dumps for ${backend.name}: $logEntries"
+                  )
+                }
+                forAll(exportFileNames) { filename =>
+                  val dir = File(testDumpOutputDir(backend.config))
+                  val file = dir / filename
+                  val jsonString = file.contentAsString
+                  val parsed = SynchronizerNodeIdentities
+                    .fromHttp(
+                      io.circe.parser.decode[http.SynchronizerNodeIdentities](jsonString).value
+                    )
+                    .value
+                  val ids = backend.getSynchronizerNodeIdentitiesDump()
+                  // The authorized store snapshots are not always byte-for-byte equal
+                  // TODO(#794): Figure out why and if we can improve the checking here
+                  scrubAuthorizedStoreSnapshots(ids) shouldBe scrubAuthorizedStoreSnapshots(
+                    parsed
+                  ) withClue
+                    s"Identities dump for sv ${backend.name} is consistent with identities fetched through the endpoint"
+                }
               }
             }
           },

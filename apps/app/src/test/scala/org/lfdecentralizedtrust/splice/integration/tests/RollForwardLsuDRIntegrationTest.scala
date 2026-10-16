@@ -136,7 +136,7 @@ class RollForwardLsuDRIntegrationTest
                     .modify(c =>
                       c.copy(
                         legacy = c.current.some,
-                        current = c.current.focus(_.protocolVersion).replace(ProtocolVersion.v35),
+                        current = c.current.focus(_.protocolVersion).replace(ProtocolVersion.v36),
                       )
                     )
                     .focus(_.onboarding)
@@ -145,7 +145,7 @@ class RollForwardLsuDRIntegrationTest
                         .RollForwardLsu(
                           c.value.name,
                           NonNegativeInt.tryCreate(2),
-                          ProtocolVersion.v35,
+                          ProtocolVersion.v36,
                           exportTimes = Some(
                             SvOnboardingConfig.RollForwardLsuTimestampConfig(
                               topologyExportTime = LsuRollForwardTimestamp.TimestampFromFile(

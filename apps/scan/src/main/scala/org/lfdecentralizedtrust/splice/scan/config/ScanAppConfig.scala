@@ -39,6 +39,8 @@ final case class MediatorVerdictIngestionConfig(
 final case class BulkStorageBackfillingConfig(
     enabled: Boolean = false,
     pollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
+    noPeerWillHoldRetryInterval: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofMinutes(10),
     downloadParallelism: Int = 1,
     pageSize: Int = Limit.DefaultMaxPageSize,
 )

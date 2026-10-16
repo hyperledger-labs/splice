@@ -163,6 +163,8 @@ class ValidatorAutomationService(
         clock,
         participantAdminConnection,
         globalSynchronizerAlias,
+        scanConnection,
+        validatorTopupConfig,
       )
     )
 

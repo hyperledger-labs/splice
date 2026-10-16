@@ -1842,10 +1842,14 @@ class DbScanStoreTest
         result <- store.getValidatorLicenseByValidator(
           Vector(alice, bob)
         )
+        withDuplicates <- store.getValidatorLicenseByValidator(
+          Vector(alice, bob, alice, alice)
+        )
       } yield {
         result should contain(aliceValidatorLicense)
         result should contain(bobValidatorLicense)
         result should not contain charlesValidatorLicense
+        withDuplicates should contain theSameElementsAs result
       }
     }
   }

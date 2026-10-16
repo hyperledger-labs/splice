@@ -76,9 +76,9 @@ To trigger the adaptive load test immediately, edit the Deployment to set `windo
 
 Running the load tester with _many_ validators:
 
-1. Set the cluster vars
-    - `loadTester.enable: true` in the cluster's config YAML
-    - `MULTIVALIDATOR_SIZE=<num>` (see cluster/README.md)
+1. Configure in the cluster's config YAML
+    - `loadTester.enable: true`
+    - `multiValidator.instanceCount: <num>`
 2. Deploy the base cluster
 3. Apply the `multi-validator` stack (`cncluster apply_multi`)
 
