@@ -53,19 +53,21 @@ class ScanStoreIngestionPerformanceTest(
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
-    Future.successful(new DbScanStore(
-      ScanStore.Key(dsoParty),
-      storage,
-      loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)(
-        NoReportingTracerProvider.tracer
-      ),
-      migrationId,
-      participantId = mkParticipantId("IngestionPerformanceIngestionTest"),
-      IngestionConfig(),
-      new DbScanStoreMetrics(NoOpMetricsFactory, loggerFactory, timeouts),
-      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-    )(ec, templateJsonDecoder, closeContext).multiDomainAcsStore)
+    Future.successful(
+      new DbScanStore(
+        ScanStore.Key(dsoParty),
+        storage,
+        loggerFactory,
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)(
+          NoReportingTracerProvider.tracer
+        ),
+        migrationId,
+        participantId = mkParticipantId("IngestionPerformanceIngestionTest"),
+        IngestionConfig(),
+        new DbScanStoreMetrics(NoOpMetricsFactory, loggerFactory, timeouts),
+        defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+      )(ec, templateJsonDecoder, closeContext).multiDomainAcsStore
+    )
   }
 
 }
