@@ -6,14 +6,11 @@ package org.lfdecentralizedtrust.splice.sv.admin.api.client
 import cats.data.EitherT
 import org.apache.pekko.http.scaladsl.marshalling.{Marshal, ToEntityMarshaller}
 import org.apache.pekko.http.scaladsl.model.*
-import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.http.scaladsl.model.headers.`Content-Range`
 import org.apache.pekko.http.scaladsl.util.FastFuture
 import org.apache.pekko.stream.Materializer
-import org.apache.pekko.stream.scaladsl.Sink
-import org.apache.pekko.util.ByteString
+import org.lfdecentralizedtrust.splice.http.v0.Implicits.*
 import org.lfdecentralizedtrust.splice.http.v0.PekkoHttpImplicits.*
-import org.lfdecentralizedtrust.splice.http.v0.definitions
-import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -32,19 +29,16 @@ object SvStreamClient {
   )(implicit ec: ExecutionContext, mat: Materializer): SvStreamClient =
     new SvStreamClient(host = host)(httpClient = httpClient, ec = ec, mat = mat)
 
-  sealed abstract class OnboardSvPartyMigrationAuthorizeResponse
-  object OnboardSvPartyMigrationAuthorizeResponse {
-
-    case class OK(value: Seq[ByteString]) extends OnboardSvPartyMigrationAuthorizeResponse
-    case class BadRequest(value: definitions.OnboardSvPartyMigrationAuthorizeErrorResponse)
-        extends OnboardSvPartyMigrationAuthorizeResponse
-    case class Unauthorized(value: ErrorResponse) extends OnboardSvPartyMigrationAuthorizeResponse
-  }
-
-  sealed abstract class OnboardSvSequencerResponse
-  object OnboardSvSequencerResponse {
-    case class OK(value: Seq[ByteString]) extends OnboardSvSequencerResponse
-    case class BadRequest(value: ErrorResponse) extends OnboardSvSequencerResponse
+  sealed abstract class OnboardSvDownloadResponse
+  object OnboardSvDownloadResponse {
+    case class OK(entity: ResponseEntity, reprDigest: Option[String])
+        extends OnboardSvDownloadResponse
+    case class PartialContent(
+        entity: ResponseEntity,
+        contentRange: Option[ContentRange],
+        reprDigest: Option[String],
+    ) extends OnboardSvDownloadResponse
+    case object RangeNotSatisfiable extends OnboardSvDownloadResponse
   }
 }
 
@@ -53,7 +47,7 @@ class SvStreamClient(host: String = "https://example.com")(implicit
     ec: ExecutionContext,
     mat: Materializer,
 ) {
-  import SvStreamClient.{OnboardSvPartyMigrationAuthorizeResponse, OnboardSvSequencerResponse}
+  import SvStreamClient.OnboardSvDownloadResponse
 
   val basePath: String = "/api/sv"
 
@@ -84,105 +78,44 @@ class SvStreamClient(host: String = "https://example.com")(implicit
     )
   }
 
-  private val jsonDecoder = {
-    structuredJsonEntityUnmarshaller.flatMap(_ =>
-      _ =>
-        json =>
-          io.circe
-            .Decoder[definitions.OnboardSvPartyMigrationAuthorizeErrorResponse]
-            .decodeJson(json)
-            .fold(FastFuture.failed, FastFuture.successful)
-    )
-  }
-
-  private val errorResponseDecoder = {
-    structuredJsonEntityUnmarshaller.flatMap(_ =>
-      _ =>
-        json =>
-          io.circe
-            .Decoder[ErrorResponse]
-            .decodeJson(json)
-            .fold(FastFuture.failed, FastFuture.successful)
-    )
-  }
-
-  def onboardSvPartyMigrationAuthorize(
-      body: definitions.OnboardSvPartyMigrationAuthorizeRequest,
+  def onboardSvDownload(
+      id: String,
       headers: List[HttpHeader] = Nil,
-  ): EitherT[Future, Either[Throwable, HttpResponse], OnboardSvPartyMigrationAuthorizeResponse] = {
-    val allHeaders = headers ++ scala.collection.immutable.Seq[Option[HttpHeader]]().flatten
+  ): EitherT[Future, Either[Throwable, HttpResponse], OnboardSvDownloadResponse] = {
     makeRequest(
-      HttpMethods.POST,
-      host + basePath + "/v0/onboard/sv/party-migration/authorize",
-      allHeaders,
-      body,
+      HttpMethods.GET,
+      host + basePath + "/v0/onboard/sv/download/" + Formatter.addPath(id),
+      headers,
+      HttpEntity.Empty,
       HttpProtocols.`HTTP/1.1`,
     ).flatMap(req =>
       EitherT(
         httpClient(req)
-          .flatMap(resp =>
+          .flatMap[Either[Either[Throwable, HttpResponse], OnboardSvDownloadResponse]](resp => {
+            val reprDigest = resp.headers.find(_.is("repr-digest")).map(_.value)
             resp.status match {
               case StatusCodes.OK =>
-                resp.entity.dataBytes
-                  .runWith(Sink.seq)
-                  .map(chunks =>
-                    Right(OnboardSvPartyMigrationAuthorizeResponse.OK(chunks)): Either[Either[
-                      Throwable,
-                      HttpResponse,
-                    ], OnboardSvPartyMigrationAuthorizeResponse]
+                FastFuture.successful(
+                  Right(OnboardSvDownloadResponse.OK(resp.entity, reprDigest))
+                )
+              case StatusCodes.PartialContent =>
+                FastFuture.successful(
+                  Right(
+                    OnboardSvDownloadResponse.PartialContent(
+                      resp.entity,
+                      resp.header[`Content-Range`].map(_.contentRange),
+                      reprDigest,
+                    )
                   )
-              case StatusCodes.BadRequest =>
-                Unmarshal(resp.entity)
-                  .to[definitions.OnboardSvPartyMigrationAuthorizeErrorResponse](
-                    jsonDecoder,
-                    implicitly,
-                    implicitly,
-                  )
-                  .map(x => Right(OnboardSvPartyMigrationAuthorizeResponse.BadRequest(x)))
-              case StatusCodes.Unauthorized =>
-                Unmarshal(resp.entity)
-                  .to[ErrorResponse](errorResponseDecoder, implicitly, implicitly)
-                  .map(x => Right(OnboardSvPartyMigrationAuthorizeResponse.Unauthorized(x)))
+                )
+              case StatusCodes.RangeNotSatisfiable =>
+                resp
+                  .discardEntityBytes()
+                  .future()
+                  .map(_ => Right(OnboardSvDownloadResponse.RangeNotSatisfiable))
               case _ => FastFuture.successful(Left(Right(resp)))
             }
-          )
-          .recover({ case e: Throwable => Left(Left(e)) })
-      )
-    )
-  }
-
-  def onboardSvSequencer(
-      body: definitions.OnboardSvSequencerRequest,
-      headers: List[HttpHeader] = Nil,
-  ): EitherT[Future, Either[Throwable, HttpResponse], OnboardSvSequencerResponse] = {
-    val allHeaders = headers ++ scala.collection.immutable.Seq[Option[HttpHeader]]().flatten
-    makeRequest(
-      HttpMethods.POST,
-      host + basePath + "/v0/onboard/sv/sequencer",
-      allHeaders,
-      body,
-      HttpProtocols.`HTTP/1.1`,
-    ).flatMap(req =>
-      EitherT(
-        httpClient(req)
-          .flatMap(resp =>
-            resp.status match {
-              case StatusCodes.OK =>
-                resp.entity.dataBytes
-                  .runWith(Sink.seq)
-                  .map(chunks =>
-                    Right(OnboardSvSequencerResponse.OK(chunks)): Either[Either[
-                      Throwable,
-                      HttpResponse,
-                    ], OnboardSvSequencerResponse]
-                  )
-              case StatusCodes.BadRequest =>
-                Unmarshal(resp.entity)
-                  .to[ErrorResponse](errorResponseDecoder, implicitly, implicitly)
-                  .map(x => Right(OnboardSvSequencerResponse.BadRequest(x)))
-              case _ => FastFuture.successful(Left(Right(resp)))
-            }
-          )
+          })
           .recover({ case e: Throwable => Left(Left(e)) })
       )
     )

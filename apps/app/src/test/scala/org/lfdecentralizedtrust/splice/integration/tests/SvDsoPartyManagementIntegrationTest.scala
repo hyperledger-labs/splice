@@ -2,10 +2,34 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
+import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.http.v0.sv_public.{
+  OnboardSvSequencerPrepareResponse,
+  SvPublicClient,
+}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvStreamClient
+import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.SvOnboardingSnapshotService.SnapshotState
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
-import org.lfdecentralizedtrust.splice.util.WalletTestUtil
+import org.lfdecentralizedtrust.splice.util.{Codec, WalletTestUtil}
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
-import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{PartyId, SequencerId, UniqueIdentifier}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.headers.{ByteRange, Range}
+import org.apache.pekko.http.scaladsl.model.{
+  ContentRange,
+  HttpMethods,
+  HttpRequest,
+  ResponseEntity,
+  StatusCodes,
+}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.util.ByteString
+
+import java.nio.file.Files
+import java.security.MessageDigest
+import java.util.{Base64, UUID}
 
 class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with WalletTestUtil {
 
@@ -46,6 +70,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
       clue("Starting DSO app and SV1 app") {
         startAllSync((sv1Nodes ++ sv3Nodes)*)
       }
+      val sponsor = sponsorClient()
 
       val dsoParty = sv1Backend.getDsoInfo().dsoParty
       val dsoPartyStr: String = dsoParty.toProtoPrimitive
@@ -64,15 +89,19 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
         "DSO party hosting authorization request with party which is not confirmed will be rejected by sponsor SV"
       ) {
         val randomParty = allocateRandomSvParty("random")
-        assertThrowsAndLogsCommandFailures(
-          sv1Backend.onboardSvPartyMigrationAuthorize(
-            sv3Backend.participantClient.id,
-            randomParty,
-          ),
-          _.errorMessage should include(
+        inside(
+          sponsor
+            .onboardSvPartyMigrationPrepare(
+              definitions.OnboardSvPartyMigrationAuthorizeRequest(randomParty.toProtoPrimitive)
+            )
+            .value
+            .futureValue
+        ) { case Left(Right(response)) =>
+          response.status shouldBe StatusCodes.NotFound
+          new String(bytesOf(response.entity)) should include(
             "Candidate party is not an sv and no `SvOnboardingConfirmed` for the candidate party is found."
-          ),
-        )
+          )
+        }
       }
 
       clue(
@@ -197,11 +226,119 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
         }
       }
 
+      clue(
+        "SV1 serves the onboarding state of sv3's sequencer as a snapshot that can be downloaded in ranges"
+      ) {
+        val sequencerId =
+          sv3Backend.appState.localSynchronizerNodes.current.sequencerAdminConnection.getSequencerId.futureValue
+        def prepare(sequencer: SequencerId) =
+          sponsor
+            .onboardSvSequencerPrepare(
+              definitions.OnboardSvSequencerRequest(Codec.encode(sequencer))
+            )
+            .value
+            .futureValue
+        val sponsorStream = sponsorStreamClient()
+        def download(id: String, offset: Long = 0) =
+          sponsorStream
+            .onboardSvDownload(
+              id,
+              if (offset > 0) List(Range(ByteRange.fromOffset(offset))) else Nil,
+            )
+            .value
+            .futureValue
+
+        val id = inside(prepare(sequencerId)) {
+          case Right(OnboardSvSequencerPrepareResponse.OK(response)) => response.id
+        }
+        prepare(sequencerId) shouldBe Right(
+          OnboardSvSequencerPrepareResponse.OK(
+            definitions.OnboardSvSnapshotPrepareResponse(id)
+          )
+        )
+        val (file, sha256) = eventually() {
+          inside(sv1Backend.appState.onboardingSnapshotService.lookup(id)) {
+            case Some(SnapshotState.Ready(file, sha256)) => (file, sha256)
+          }
+        }
+        val snapshot = Files.readAllBytes(file)
+        MessageDigest.getInstance("SHA-256").digest(snapshot) shouldBe sha256.toByteArray
+        val reprDigest =
+          Some(s"sha-256=:${Base64.getEncoder.encodeToString(sha256.toByteArray)}:")
+        val length = snapshot.length.toLong
+
+        inside(download(id)) {
+          case Right(SvStreamClient.OnboardSvDownloadResponse.OK(entity, digest)) =>
+            digest shouldBe reprDigest
+            bytesOf(entity) shouldBe snapshot
+        }
+        inside(download(id, length / 2)) {
+          case Right(
+                SvStreamClient.OnboardSvDownloadResponse.PartialContent(entity, range, digest)
+              ) =>
+            range shouldBe Some(ContentRange(length / 2, length - 1, length))
+            digest shouldBe reprDigest
+            bytesOf(entity) shouldBe snapshot.drop((length / 2).toInt)
+        }
+        download(id, length) shouldBe Right(
+          SvStreamClient.OnboardSvDownloadResponse.RangeNotSatisfiable
+        )
+        inside(download(UUID.randomUUID().toString)) { case Left(Right(response)) =>
+          response.status shouldBe StatusCodes.NotFound
+          new String(bytesOf(response.entity)) should include("not found")
+        }
+        prepare(
+          SequencerId(UniqueIdentifier.tryCreate("unknown", sequencerId.uid.namespace))
+        ) should matchPattern {
+          case Right(OnboardSvSequencerPrepareResponse.ServiceUnavailable(_)) =>
+        }
+      }
+
+      clue("SV1 answers unknown onboarding paths with 404") {
+        implicit val actorSystem: ActorSystem = env.actorSystem
+        val response = Http()
+          .singleRequest(
+            HttpRequest(
+              HttpMethods.POST,
+              s"${sv1Backend.httpClientConfig.url}/api/sv/v0/onboard/sv/unknown",
+            )
+          )
+          .futureValue
+        response.status shouldBe StatusCodes.NotFound
+        new String(bytesOf(response.entity)) should include("could not be found")
+      }
+
       clue("sv3 can restart") {
         sv3Backend.stop()
         sv3Backend.startSync()
       }
   }
+
+  private def sponsorClient()(implicit env: SpliceTestConsoleEnvironment): SvPublicClient = {
+    implicit val actorSystem: ActorSystem = env.actorSystem
+    registerHttpConnectionPoolsCleanup(env)
+    SvPublicClient.httpClient(Http().singleRequest(_), sv1Backend.httpClientConfig.url.toString)(
+      env.executionContext,
+      Materializer(actorSystem),
+    )
+  }
+
+  private def sponsorStreamClient()(implicit env: SpliceTestConsoleEnvironment): SvStreamClient = {
+    implicit val actorSystem: ActorSystem = env.actorSystem
+    registerHttpConnectionPoolsCleanup(env)
+    SvStreamClient.httpClient(Http().singleRequest(_), sv1Backend.httpClientConfig.url.toString)(
+      env.executionContext,
+      Materializer(actorSystem),
+    )
+  }
+
+  private def bytesOf(entity: ResponseEntity)(implicit
+      env: SpliceTestConsoleEnvironment
+  ): Array[Byte] =
+    entity.dataBytes
+      .runFold(ByteString.empty)(_ ++ _)(Materializer(env.actorSystem))
+      .futureValue
+      .toArray
 
   private def getAmulets(
       participant: ParticipantClientReference,

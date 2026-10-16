@@ -4,7 +4,11 @@ package toxiproxy
 import org.lfdecentralizedtrust.splice.config.{ParticipantClientConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.sv.config.SvParticipantClientConfig
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
-import org.lfdecentralizedtrust.splice.sv.config.{SvMediatorConfig, SvSequencerConfig}
+import org.lfdecentralizedtrust.splice.sv.config.{
+  SvMediatorConfig,
+  SvOnboardingConfig,
+  SvSequencerConfig,
+}
 import com.digitalasset.canton.BaseTest
 import eu.rekawek.toxiproxy.{Proxy, ToxiproxyClient}
 import monocle.macros.syntax.lens.*
@@ -23,6 +27,7 @@ case class UseToxiproxy(
     createScanLedgerApiProxy: Boolean = false,
     createSequencerProxies: Boolean = false,
     createMediatorProxies: Boolean = false,
+    createSvSponsorProxies: Boolean = false,
     instanceFilter: String => Boolean = _ => true,
 ) extends SpliceEnvironmentSetupPlugin
     with BaseTest {
@@ -110,6 +115,25 @@ case class UseToxiproxy(
     mediator
       .focus(_.adminApi)
       .modify(c => c.copy(port = admListenPort))
+  }
+
+  def addSvSponsorProxy(
+      instanceName: String,
+      adminApiPort: Int,
+      onboarding: SvOnboardingConfig,
+  ): SvOnboardingConfig = applyInstanceFilter(instanceName, onboarding) {
+    onboarding match {
+      case joinWithKey: SvOnboardingConfig.JoinWithKey =>
+        val url = joinWithKey.svClient.adminApi.url
+        val listenPort = adminApiPort + portBump
+        addProxy(
+          svSponsorApi(instanceName),
+          s"${url.authority.host.address}:$listenPort",
+          s"${url.authority.host.address}:${url.effectivePort}",
+        )
+        joinWithKey.focus(_.svClient.adminApi.url).replace(url.withPort(listenPort))
+      case other => other
+    }
   }
 
   override def beforeEnvironmentCreated(config: SpliceConfig): SpliceConfig = {
@@ -248,7 +272,20 @@ case class UseToxiproxy(
           )
       else sequencerConf
 
-    mediatorConf
+    val svSponsorConf =
+      if (createSvSponsorProxies)
+        mediatorConf
+          .focus(_.svApps)
+          .modify(_.map { case (n, c) =>
+            (
+              n,
+              c.focus(_.onboarding)
+                .modify(_.map(addSvSponsorProxy(n.unwrap, c.adminApi.port.unwrap, _))),
+            )
+          })
+      else mediatorConf
+
+    svSponsorConf
   }
 
   override def afterEnvironmentDestroyed(config: SpliceConfig): Unit = {
@@ -285,4 +322,5 @@ object UseToxiproxy {
   def sequencerAdminApi(forInstance: String): String = s"$forInstance-seq-adm-api"
   def sequencerPublicApi(forInstance: String): String = s"$forInstance-seq-pub-api"
   def mediatorAdminApi(forInstance: String): String = s"$forInstance-med-adm-api"
+  def svSponsorApi(forInstance: String): String = s"$forInstance-sv-sponsor-api"
 }

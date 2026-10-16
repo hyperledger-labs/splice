@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.store.DomainTimeSynchronization
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
+import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.SvOnboardingSnapshotService
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
@@ -106,6 +107,13 @@ class SvSvAutomationService(
       )
     )
   }
+
+  def registerOnboardingSnapshotCleanupTrigger(
+      onboardingSnapshotService: SvOnboardingSnapshotService
+  ): Unit =
+    registerTrigger(
+      new SvOnboardingSnapshotCleanupTrigger(triggerContext, onboardingSnapshotService)
+    )
 }
 
 object SvSvAutomationService extends AutomationServiceCompanion {

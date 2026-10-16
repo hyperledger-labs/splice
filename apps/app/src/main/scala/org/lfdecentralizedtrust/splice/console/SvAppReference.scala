@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.console
 
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.console.{BaseInspection, Help}
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
@@ -115,21 +115,6 @@ abstract class SvAppReference(
     consoleEnvironment.run {
       httpCommand(HttpSvPublicAppClient.CometBftJsonRpcRequest(id, method, params))
     }
-
-  def onboardSvPartyMigrationAuthorize(
-      participantId: ParticipantId,
-      candidateParty: PartyId,
-  ): HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeResponse =
-    consoleEnvironment
-      .run {
-        httpCommand(
-          HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorize(
-            participantId,
-            candidateParty,
-          )
-        )
-      }
-      .fold(throw _, identity)
 
   @Help.Summary("Cancel a running logical synchronizer upgrade by removing its LSU announcement")
   def cancelLogicalSynchronizerUpgrade(): Unit =

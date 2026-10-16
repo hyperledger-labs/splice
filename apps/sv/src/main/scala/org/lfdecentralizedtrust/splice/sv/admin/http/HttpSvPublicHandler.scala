@@ -7,26 +7,26 @@ import cats.data.{EitherT, OptionT}
 import cats.syntax.applicative.*
 import cats.syntax.option.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import io.grpc.Status.Code
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity}
-import org.apache.pekko.stream.scaladsl.Source
-import org.apache.pekko.util.ByteString as PekkoByteString
+import org.apache.pekko.http.scaladsl.server.Directive0
+import org.apache.pekko.http.scaladsl.server.Directives.{pass, withRangeSupport}
+import org.apache.pekko.stream.scaladsl.FileIO
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingRequest
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.ValidatorOnboarding
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.http.HttpVotesHandler
 import org.lfdecentralizedtrust.splice.http.v0.{
@@ -43,13 +43,23 @@ import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
-import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
+import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting.DsoPartyMigrationFailure
+import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.{
+  DsoPartyMigration,
+  SvOnboardingSnapshotService,
+}
+import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.SvOnboardingSnapshotService.{
+  SnapshotKey,
+  SnapshotState,
+}
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{Secrets, SvOnboardingToken}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract}
 
-import scala.concurrent.{ExecutionContext, Future}
+import java.nio.file.{Files, NoSuchFileException, Path}
+import java.util.Base64
+import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -63,6 +73,7 @@ class HttpSvPublicHandler(
     synchronizerNodeService: SynchronizerNodeService[LocalSynchronizerNode],
     retryProvider: RetryProvider,
     dsoPartyMigration: DsoPartyMigration,
+    onboardingSnapshotService: SvOnboardingSnapshotService,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -435,112 +446,118 @@ class HttpSvPublicHandler(
     *
     * Protection: Endpoint is protected by IP allowlisting
     */
-  override def onboardSvPartyMigrationAuthorize(
-      respond: rStream.OnboardSvPartyMigrationAuthorizeResponse.type
+  override def onboardSvPartyMigrationPrepare(
+      respond: r0.OnboardSvPartyMigrationPrepareResponse.type
   )(
       body: definitions.OnboardSvPartyMigrationAuthorizeRequest
   )(
       extracted: TraceContext
-  ): Future[rStream.OnboardSvPartyMigrationAuthorizeResponse] = {
+  ): Future[r0.OnboardSvPartyMigrationPrepareResponse] = {
     implicit val traceContext: TraceContext = extracted
-    withSpan(s"$workflowId.onboardSvPartyMigrationAuthorize") { _ => _ =>
-      (for {
-        candidateParty <- Codec.decode(Codec.Party)(body.candidatePartyId)
-      } yield {
-        val errorMessage =
-          s"Candidate party is not an sv and no `SvOnboardingConfirmed` for the candidate party is found."
-        for {
-          isCandidateOnboardingConfirmed <- isOnboardingConfirmed(candidateParty)
-          dsoRules <- dsoStore.getDsoRules()
-          isCandidateSv = SvApp.isSvParty(candidateParty, dsoRules)
-          contract <- dsoStore.lookupSvOnboardingConfirmedByParty(candidateParty)
-          candidateParticipantId = contract
-            .getOrElse(
-              throw Status.NOT_FOUND
-                .withDescription(errorMessage)
-                .asRuntimeException()
-            )
-          res <-
-            if (!isCandidateOnboardingConfirmed && !isCandidateSv)
-              Future.failed(
-                HttpErrorHandler.unauthorized(
-                  errorMessage
-                )
+    withSpan(s"$workflowId.onboardSvPartyMigrationPrepare") { _ => _ =>
+      Codec
+        .decode(Codec.Party)(body.candidatePartyId)
+        .fold(
+          errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
+          candidateParty =>
+            for {
+              participantId <- candidateParticipant(candidateParty)
+              prepared <- HttpSvPublicHandler.unavailableOnGrpcFailure(
+                s"Preparing DSO party hosting on $participantId",
+                logger,
+              )(dsoPartyMigration.prepareParticipantForHostingDsoParty(participantId).value)
+              response <- HttpSvPublicHandler.onboardSvPartyMigrationPrepareResponse(
+                onboardingSnapshotService,
+                prepared,
+                dsoPartyMigration.exportSnapshotToFile(_, _),
               )
-            else
-              authorizeParticipantForHostingDsoParty(
-                ParticipantId.tryFromProtoPrimitive(candidateParticipantId.payload.svParticipantId)
-              )
-        } yield res
-      }).fold(errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)), identity)
+            } yield response,
+        )
     }
   }
 
-  private def authorizeParticipantForHostingDsoParty(
-      participantId: ParticipantId
-  )(implicit tc: TraceContext): Future[rStream.OnboardSvPartyMigrationAuthorizeResponse] = {
-    dsoPartyMigration
-      .authorizeParticipantForHostingDsoParty(participantId)
-      .fold(
-        {
-          case DsoPartyHosting
-                .RequiredProposalNotFound(
-                  partyToParticipantSerial
-                ) =>
-            rStream.OnboardSvPartyMigrationAuthorizeResponseBadRequest(
-              definitions.ProposalNotFoundErrorResponse(
-                proposalNotFound = definitions.ProposalNotFoundErrorResponse.ProposalNotFound(
-                  BigInt(partyToParticipantSerial.value)
-                )
-              )
-            )
-        },
-        { acsChunks =>
-          rStream.OnboardSvPartyMigrationAuthorizeResponseOK(
-            HttpEntity(
-              ContentTypes.`application/octet-stream`,
-              Source(acsChunks.map(chunk => PekkoByteString(chunk.asReadOnlyByteBuffer()))),
+  private def candidateParticipant(
+      candidateParty: PartyId
+  )(implicit tc: TraceContext): Future[ParticipantId] = {
+    val errorMessage =
+      s"Candidate party is not an sv and no `SvOnboardingConfirmed` for the candidate party is found."
+    for {
+      isCandidateOnboardingConfirmed <- isOnboardingConfirmed(candidateParty)
+      dsoRules <- dsoStore.getDsoRules()
+      isCandidateSv = SvApp.isSvParty(candidateParty, dsoRules)
+      contract <- dsoStore.lookupSvOnboardingConfirmedByParty(candidateParty)
+      candidateParticipantId = contract
+        .getOrElse(
+          throw Status.NOT_FOUND
+            .withDescription(errorMessage)
+            .asRuntimeException()
+        )
+      _ <-
+        if (!isCandidateOnboardingConfirmed && !isCandidateSv)
+          Future.failed(
+            HttpErrorHandler.unauthorized(
+              errorMessage
             )
           )
-        },
-      )
+        else Future.unit
+    } yield ParticipantId.tryFromProtoPrimitive(candidateParticipantId.payload.svParticipantId)
   }
 
   /** Intended use: Used by other SV operators
     *
     * Protection: Endpoint is protected by IP allowlisting
     */
-  override def onboardSvSequencer(
-      respond: rStream.OnboardSvSequencerResponse.type
+  override def onboardSvSequencerPrepare(
+      respond: r0.OnboardSvSequencerPrepareResponse.type
   )(
       body: definitions.OnboardSvSequencerRequest
-  )(extracted: TraceContext): Future[rStream.OnboardSvSequencerResponse] = {
+  )(extracted: TraceContext): Future[r0.OnboardSvSequencerPrepareResponse] = {
     implicit val traceContext: TraceContext = extracted
-    withSpan(s"$workflowId.onboardSvSequencer") { _ => _ =>
+    withSpan(s"$workflowId.onboardSvSequencerPrepare") { _ => _ =>
       Codec.decode(Codec.Sequencer)(body.sequencerId) match {
         case Left(err) => Future.failed(HttpErrorHandler.badRequest(err))
         case Right(sequencerId) =>
-          synchronizerNodeService
-            .activeSynchronizerNode()
-            .flatMap(node =>
-              getSequencerOnboardingState(
+          for {
+            node <- synchronizerNodeService.activeSynchronizerNode()
+            sequencerAdminConnection = node.sequencerAdminConnection
+            observed <- HttpSvPublicHandler.unavailableOnGrpcFailure(
+              s"Checking whether sequencer $sequencerId is observed",
+              logger,
+            )(
+              isNewSequencerObservedByExistingSequencer(
                 node.config.sequencer.isCantonBftSequencer,
-                node.sequencerAdminConnection,
+                sequencerAdminConnection,
                 sequencerId,
               )
             )
-            .map(onboardingStateChunks =>
-              rStream.OnboardSvSequencerResponseOK(
-                HttpEntity(
-                  ContentTypes.`application/octet-stream`,
-                  Source(
-                    onboardingStateChunks
-                      .map(chunk => PekkoByteString(chunk.asReadOnlyByteBuffer()))
-                  ),
-                )
-              )
+            response <- HttpSvPublicHandler.onboardSvSequencerPrepareResponse(
+              onboardingSnapshotService,
+              sequencerId,
+              observed,
+              file =>
+                retryProvider.retry(
+                  RetryFor.WaitingOnInitDependency,
+                  "export_sequencer_onboarding_state",
+                  s"Export the onboarding state of sequencer $sequencerId",
+                  sequencerAdminConnection.getOnboardingStateToFile(Left(sequencerId), file),
+                  logger,
+                ),
             )
+          } yield response
       }
+    }
+  }
+
+  /** Intended use: Used by other SV operators
+    *
+    * Protection: Endpoint is protected by IP allowlisting
+    */
+  override def onboardSvDownload(
+      respond: rStream.OnboardSvDownloadResponse.type
+  )(id: String)(extracted: TraceContext): Future[rStream.OnboardSvDownloadResponse] = {
+    implicit val traceContext: TraceContext = extracted
+    withSpan(s"$workflowId.onboardSvDownload") { _ => _ =>
+      HttpSvPublicHandler.onboardSvDownloadResponse(onboardingSnapshotService, id)
     }
   }
 
@@ -587,90 +604,28 @@ class HttpSvPublicHandler(
       .map(_.isDefined)
   }
 
-  /** Returns the sequencing time the first topology transaction where the new sequencer is active */
-  private def waitForNewSequencerObservedByExistingSequencer(
+  private def isNewSequencerObservedByExistingSequencer(
       isBftSequencer: Boolean,
       sequencerAdminConnection: SequencerAdminConnection,
       sequencerId: SequencerId,
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Boolean] =
     for {
       decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
-      _ <- retryProvider.getValueWithRetries(
-        RetryFor.WaitingOnInitDependency, // the trigger runs every 30s, so this should be enough to observe the new sequencer
-        "sequencer_added_to_topology_state",
-        "New sequencer is observed in SequencerSynchronizerState through existing sequencer",
-        sequencerAdminConnection
-          .listSequencerSynchronizerState(
-            decentralizedSynchronizer,
-            store.TimeQuery.Range(None, None),
-            AuthorizedState,
-          )
-          .map { result =>
-            result
-              .sortBy(_.base.serial)
-              .foldLeft[Option[TopologyResult[SequencerSynchronizerState]]](None) {
-                case (_, newMapping) if !newMapping.mapping.allSequencers.contains(sequencerId) =>
-                  None
-                case (None, newMapping) if newMapping.mapping.allSequencers.contains(sequencerId) =>
-                  Some(newMapping)
-                case (Some(mapping), newMapping)
-                    if newMapping.mapping.allSequencers.contains(sequencerId) =>
-                  Some(mapping)
-                case _ => None
-              } match {
-              case Some(activeMapping) =>
-                activeMapping.base.validFrom
-              case None =>
-                throw Status.NOT_FOUND
-                  .withDescription(
-                    s"Sequencer $sequencerId is not in active sequencers $result"
-                  )
-                  .asRuntimeException()
-            }
-          },
-        logger,
+      sequencerStates <- sequencerAdminConnection.listSequencerSynchronizerState(
+        decentralizedSynchronizer,
+        store.TimeQuery.Range(None, None),
+        AuthorizedState,
       )
-      _ <-
-        if (isBftSequencer) {
-          retryProvider.waitUntil(
-            RetryFor.WaitingOnInitDependency,
-            "sequencer_ordering_topology",
-            s"Wait for $sequencerId to be in the ordering topology",
-            sequencerAdminConnection
-              .getSequencerOrderingTopology()
-              .map(topology =>
-                if (topology.sequencerIds.contains(sequencerId)) ()
-                else
-                  throw Status.NOT_FOUND
-                    .withDescription(
-                      s"Sequencer $sequencerId is not in the ordering topology $topology"
-                    )
-                    .asRuntimeException()
-              ),
-            logger,
-          )
-        } else Future.unit
-    } yield ()
-  }
-
-  private def getSequencerOnboardingState(
-      isCantonBftSequencer: Boolean,
-      sequencerAdminConnection: SequencerAdminConnection,
-      sequencerId: SequencerId,
-  )(implicit traceContext: TraceContext): Future[Seq[ByteString]] = {
-    logger.info(
-      s"Waiting for sequencer $sequencerId to be onboarded before querying its onboarding state"
-    )
-    for {
-      _ <- waitForNewSequencerObservedByExistingSequencer(
-        isCantonBftSequencer,
-        sequencerAdminConnection,
-        sequencerId,
-      )
-      _ = logger.info(s"Downloading sequencer onboarding state for $sequencerId")
-      onboardingState <- sequencerAdminConnection.getOnboardingState(Left(sequencerId))
-    } yield onboardingState
-  }
+      inSequencerState = sequencerStates
+        .maxByOption(_.base.serial)
+        .exists(_.mapping.allSequencers.contains(sequencerId))
+      observed <-
+        if (isBftSequencer && inSequencerState)
+          sequencerAdminConnection
+            .getSequencerOrderingTopology()
+            .map(_.sequencerIds.contains(sequencerId))
+        else Future.successful(inSequencerState)
+    } yield observed
 
   private def isCompleted(
       svParty: PartyId,
@@ -866,6 +821,118 @@ class HttpSvPublicHandler(
               .value
         }
       } yield outcome
+    }
+  }
+}
+
+object HttpSvPublicHandler {
+
+  private val onboardSvDownloadOperation = "onboardSvDownload"
+
+  def streamOperationDirective(operation: String): Directive0 =
+    if (operation == onboardSvDownloadOperation) withRangeSupport else pass
+
+  private[http] def unavailableOnGrpcFailure[T](description: String, logger: TracedLogger)(
+      check: Future[T]
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] =
+    check.recoverWith { case e: StatusRuntimeException =>
+      logger.info(s"$description failed", e)
+      Future.failed(
+        HttpErrorHandler.serviceUnavailable(s"$description failed: ${e.getStatus.getCode}")
+      )
+    }
+
+  private def proposalNotFoundResponse(
+      partyToParticipantSerial: PositiveInt
+  ): definitions.ProposalNotFoundErrorResponse =
+    definitions.ProposalNotFoundErrorResponse(
+      proposalNotFound = definitions.ProposalNotFoundErrorResponse.ProposalNotFound(
+        BigInt(partyToParticipantSerial.value)
+      )
+    )
+
+  private[http] def onboardSvPartyMigrationPrepareResponse(
+      snapshotService: SvOnboardingSnapshotService,
+      prepared: Either[DsoPartyMigrationFailure, Option[SnapshotKey.Acs]],
+      exportSnapshot: (SnapshotKey.Acs, Path) => Future[ByteString],
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[r0.OnboardSvPartyMigrationPrepareResponse] = {
+    val respond = r0.OnboardSvPartyMigrationPrepareResponse
+    prepared match {
+      case Left(DsoPartyHosting.RequiredProposalNotFound(partyToParticipantSerial)) =>
+        Future.successful(respond.BadRequest(proposalNotFoundResponse(partyToParticipantSerial)))
+      case Right(None) =>
+        Future.successful(
+          respond.ServiceUnavailable(
+            definitions.ErrorResponse(
+              "The DSO party is not yet hosted on the candidate participant"
+            )
+          )
+        )
+      case Right(Some(key)) =>
+        snapshotService
+          .prepare(key, exportSnapshot(key, _))
+          .map(id => respond.OK(definitions.OnboardSvSnapshotPrepareResponse(id)))
+    }
+  }
+
+  private[http] def onboardSvSequencerPrepareResponse(
+      snapshotService: SvOnboardingSnapshotService,
+      sequencerId: SequencerId,
+      observed: Boolean,
+      exportSnapshot: Path => Future[ByteString],
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[r0.OnboardSvSequencerPrepareResponse] = {
+    val respond = r0.OnboardSvSequencerPrepareResponse
+    if (!observed)
+      Future.successful(
+        respond.ServiceUnavailable(
+          definitions.ErrorResponse(s"Sequencer $sequencerId is not yet observed by the sponsor")
+        )
+      )
+    else
+      snapshotService
+        .prepare(SnapshotKey.SequencerOnboardingState(sequencerId), exportSnapshot)
+        .map(id => respond.OK(definitions.OnboardSvSnapshotPrepareResponse(id)))
+  }
+
+  private[http] def onboardSvDownloadResponse(
+      snapshotService: SvOnboardingSnapshotService,
+      id: String,
+  )(implicit
+      ec: ExecutionContext
+  ): Future[rStream.OnboardSvDownloadResponse] = {
+    val respond = rStream.OnboardSvDownloadResponse
+    def notFound = respond.NotFound(definitions.ErrorResponse(s"Onboarding snapshot $id not found"))
+    Future {
+      blocking {
+        snapshotService.lookup(id) match {
+          case None => notFound
+          case Some(SnapshotState.Exporting) =>
+            respond.ServiceUnavailable(
+              definitions.ErrorResponse(s"Onboarding snapshot $id is still being exported")
+            )
+          case Some(SnapshotState.Failed(_)) =>
+            respond.InternalServerError(
+              definitions.ErrorResponse(s"Export of onboarding snapshot $id failed")
+            )
+          case Some(SnapshotState.Ready(file, sha256)) =>
+            try
+              respond.OK(
+                HttpEntity(
+                  ContentTypes.`application/octet-stream`,
+                  Files.size(file),
+                  FileIO.fromPath(file),
+                ),
+                s"sha-256=:${Base64.getEncoder.encodeToString(sha256.toByteArray)}:",
+              )
+            catch { case _: NoSuchFileException => notFound }
+        }
+      }
     }
   }
 }
