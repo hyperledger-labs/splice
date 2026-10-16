@@ -189,7 +189,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       )
     )
 
-  def optionallyAwait[Tx](
+  private[canton] def optionallyAwait[Tx](
       tx: Tx,
       txId: String,
       txSynchronizerId: String,
@@ -4066,7 +4066,7 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
     }
   }
 
-  override def optionallyAwait[T](
+  override private[canton] def optionallyAwait[T](
       update: T,
       updateId: String,
       txSynchronizerId: String,

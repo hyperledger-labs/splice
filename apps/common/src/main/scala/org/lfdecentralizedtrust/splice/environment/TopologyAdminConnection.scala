@@ -15,6 +15,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
   VaultAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
+import com.digitalasset.canton.admin.api.client.data.SequencingParametersAccess.*
 import com.digitalasset.canton.admin.api.client.data.topology
 import com.digitalasset.canton.admin.api.client.data.topology.{
   BaseResult,
