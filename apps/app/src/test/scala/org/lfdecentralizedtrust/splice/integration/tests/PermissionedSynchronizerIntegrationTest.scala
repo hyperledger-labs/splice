@@ -58,7 +58,7 @@ class PermissionedSynchronizerIntegrationTest
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllValidatorConfigs {
           case (name, c) if name == "bobValidator" =>
-            c.copy(enableAutoOnboardingTrafficPurchase = true)
+            c.copy(enableInternalAutoOnboardingThroughSvTrafficFaucet = true)
           case (_, c) => c
         }(config)
       )

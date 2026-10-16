@@ -58,7 +58,8 @@ export async function installValidator1(
 
   additionalEnvVars.push({
     name: 'ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
-    value: 'canton.validator-apps.validator_backend.enable-auto-onboarding-traffic-purchase = true',
+    value:
+      'canton.validator-apps.validator_backend.enable-internal-auto-onboarding-through-sv-traffic-faucet = true',
   });
 
   const imagePullDeps = imagePullSecret(xns);

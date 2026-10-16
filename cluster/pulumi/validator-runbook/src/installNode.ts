@@ -240,11 +240,11 @@ async function installValidator(
     ? [...validatorConfig.validatorApp.additionalEnvVars]
     : [];
 
-  if (validatorConfig.enableAutoOnboardingTrafficPurchase) {
+  if (validatorConfig.enableInternalAutoOnboardingThroughSvTrafficFaucet) {
     additionalEnvVars.push({
       name: 'ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
       value:
-        'canton.validator-apps.validator_backend.enable-auto-onboarding-traffic-purchase = true',
+        'canton.validator-apps.validator_backend.enable-internal-auto-onboarding-through-sv-traffic-faucet = true',
     });
   }
 

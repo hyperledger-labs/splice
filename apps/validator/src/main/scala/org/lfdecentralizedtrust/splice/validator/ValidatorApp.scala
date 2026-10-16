@@ -238,7 +238,7 @@ class ValidatorApp(
                         for {
                           synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
                           _ <-
-                            if (config.enableAutoOnboardingTrafficPurchase) {
+                            if (config.enableInternalAutoOnboardingThroughSvTrafficFaucet) {
                               submitBuyMemberTraffic(oc.svClient, participantId)
                             } else Future.unit
                           _ <- waitForTopologyPermission(
