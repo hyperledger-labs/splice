@@ -18,6 +18,7 @@ import {
 } from '@canton-network/splice-pulumi-common';
 import { infraKubernetesScheduling } from '@canton-network/splice-pulumi-common';
 import { svConfigsBasic } from '@canton-network/splice-pulumi-common-sv/src/svConfigsBasic';
+import { allValidatorsConfig } from '@canton-network/splice-pulumi-common-validator';
 
 import { gcpDnsProject } from './config';
 
@@ -192,12 +193,16 @@ function clusterCertificate(
     );
   });
 
+  const validatorNamespaces = [
+    ...new Set(Object.values(allValidatorsConfig).map(v => v.namespace)),
+  ];
+
   const certDnsNames = dnsNames
     .map(dnsName =>
       [
         `${dnsName}`,
         `*.${dnsName}`,
-        `*.validator.${dnsName}`,
+        ...validatorNamespaces.map(ns => `*.${ns}.${dnsName}`),
         `*.validator1.${dnsName}`,
         `*.splitwell.${dnsName}`,
         `*.sv.${dnsName}`,
