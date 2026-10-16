@@ -70,8 +70,11 @@ import org.lfdecentralizedtrust.splice.store.{
   StoreTestBase,
   VoteResultsFilters,
 }
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import org.slf4j.event.Level
+import slick.jdbc.GetResult
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -443,6 +446,124 @@ class DbVotesStoreTest
         }
       }
     }
+
+    "backfilling cursor and completion" should {
+      "be empty initially" in {
+        for {
+          stores <- mkStores()
+          initial <- stores.votesStore.getBackfillingCursor()
+        } yield initial shouldBe empty
+      }
+
+      "default to incomplete, until marked complete" in {
+        for {
+          stores <- mkStores()
+          before <- stores.votesStore.isBackfillingComplete()
+          _ <- stores.votesStore.markBackfillingComplete()
+          after <- stores.votesStore.isBackfillingComplete()
+        } yield {
+          before shouldBe false
+          after shouldBe true
+        }
+      }
+
+      "not be shared between stores with different update histories" in {
+        val cursor = DbVotesStore.VotesBackfillCursor(CantonTimestamp.now(), 0)
+        for {
+          kvStore <- ScanKeyValueStore(
+            dsoParty,
+            mkParticipantId("DbVotesStoreTest"),
+            storage,
+            loggerFactory,
+          )
+          stores <- mkStoresWith(kvStore)
+          otherVotesStore <- mkStoresWith(kvStore, "update_history_votes_store_test_other")
+            .map(_.votesStore)
+          _ <- stores.votesStore.insertPeerVoteResults(Seq.empty, cursor)
+          _ <- stores.votesStore.markBackfillingComplete()
+          otherCursor <- otherVotesStore.getBackfillingCursor()
+          otherComplete <- otherVotesStore.isBackfillingComplete()
+        } yield {
+          otherVotesStore.storeId should not be stores.votesStore.storeId
+          otherCursor shouldBe empty
+          otherComplete shouldBe false
+        }
+      }
+    }
+
+    "backfilling from peers" should {
+      "page backwards by (record_time, event_number) and insert the same results" in {
+        val cursor = DbVotesStore.VotesBackfillCursor(CantonTimestamp.MinValue, 0)
+        for {
+          stores <- mkStores()
+          _ <- ingestAll(stores, voteFixtures)
+          fresh <- mkFreshVotesStore()
+          peerRows <- listAllPeerPages(stores.votesStore, pageSize = 2)
+          _ <- fresh.insertPeerVoteResults(peerRows, cursor)
+          stored <- fresh.getBackfillingCursor()
+          count <- fresh.countVoteRequestResults(VoteResultsFilters())
+          results <- listAllPages(fresh, VoteResultsFilters(), pageSize = 1000)
+          sourceRows <- listAllRows(stores.votesStore)
+          copiedRows <- listAllRows(fresh)
+        } yield {
+          stored shouldBe Some(cursor)
+          count shouldBe voteFixtures.flatMap(_.votes).size.toLong
+          results.flatten should contain theSameElementsAs voteFixtures.flatMap(_.votes)
+          // The columns that are derived from the result are the same as when ingesting it
+          sourceRows should have size voteFixtures.flatMap(_.votes).size.toLong
+          copiedRows shouldBe sourceRows
+        }
+      }
+
+      "serve the identifying data and the stored result, nothing else" in {
+        for {
+          stores <- mkStores()
+          _ <- ingestAll(stores, voteFixtures)
+          served <- stores.votesStore.listBackfillPage(
+            DbVotesStore.VotesBackfillCursor(CantonTimestamp.MaxValue, 0),
+            1000,
+          )
+          rows <- listAllRows(stores.votesStore)
+        } yield {
+          served should have size voteFixtures.flatMap(_.votes).size.toLong
+          // Newest first
+          served.map(_.recordTime) shouldBe served.map(_.recordTime).sorted.reverse
+          served.map(s => (s.recordTime, s.synchronizerId, s.updateId, s.eventNumber)) shouldBe
+            rows.reverse.map(r =>
+              (
+                CantonTimestamp.ofEpochMicro(r.recordTime),
+                r.synchronizerId,
+                r.updateId,
+                r.eventNumber,
+              )
+            )
+          served.map(_.choiceResult) shouldBe rows.reverse.map(_.choiceResult)
+        }
+      }
+
+      "refuse to decode a result that cannot be decoded, instead of storing a placeholder" in {
+        val thrown = the[IllegalArgumentException] thrownBy DbVotesStore.PeerVoteResult.decode(
+          CantonTimestamp.Epoch.plusSeconds(7),
+          "synchronizer",
+          "the-update",
+          0,
+          """{"not": "a vote result"}""",
+        )
+        thrown.getMessage should include("the-update")
+        thrown.getCause should not be null
+      }
+
+      "return an empty page once genesis is reached" in {
+        for {
+          stores <- mkStores()
+          _ <- ingestAll(stores, voteFixtures)
+          page <- stores.votesStore.listBackfillPage(
+            DbVotesStore.VotesBackfillCursor(CantonTimestamp.MinValue, 0),
+            1000,
+          )
+        } yield page shouldBe empty
+      }
+    }
   }
 
   private val base = Instant.parse("2024-03-01T10:00:00Z")
@@ -712,6 +833,98 @@ class DbVotesStoreTest
             }
         }
     go(None, Seq.empty)
+  }
+
+  /** Pages backwards through a (fully backfilled) votes store via [[DbVotesStore.listBackfillPage]],
+    * following the cursor the same way [[VotesStoreBackfilling]] would when reading from a peer.
+    */
+  /** A row of `votes_store_results`, without the local `store_id` and `row_id`. */
+  private case class VoteRow(
+      recordTime: Long,
+      synchronizerId: String,
+      updateId: String,
+      eventNumber: Int,
+      voteActionName: String,
+      voteRequesterName: String,
+      voteAccepted: Boolean,
+      voteTrackingCid: String,
+      voteCompletedAt: Option[Long],
+      voteEffectiveAt: Option[Long],
+      choiceResult: String,
+      error: Option[String],
+  )
+
+  implicit private val getResultVoteRow: GetResult[VoteRow] = GetResult { r =>
+    VoteRow(
+      r.<<[Long],
+      r.<<[String],
+      r.<<[String],
+      r.<<[Int],
+      r.<<[String],
+      r.<<[String],
+      r.<<[Boolean],
+      r.<<[String],
+      r.<<?[Long],
+      r.<<?[Long],
+      r.<<[String],
+      r.<<?[String],
+    )
+  }
+
+  /** All columns of all rows of the votes store, oldest first. */
+  private def listAllRows(votesStore: DbVotesStore): Future[Seq[VoteRow]] =
+    futureUnlessShutdownToFuture(
+      storage.query(
+        sql"""select record_time, synchronizer_id, update_id, event_number, vote_action_name,
+                     vote_requester_name, vote_accepted, vote_tracking_cid, vote_completed_at,
+                     vote_effective_at, choice_result, error
+              from votes_store_results
+              where store_id = ${votesStore.storeId}
+              order by record_time, event_number""".as[VoteRow],
+        "test.listAllRows",
+      )
+    )
+
+  private def listAllPeerPages(
+      votesStore: DbVotesStore,
+      pageSize: Int,
+  ): Future[Seq[DbVotesStore.PeerVoteResult]] = {
+    def go(
+        before: DbVotesStore.VotesBackfillCursor,
+        acc: Seq[DbVotesStore.ServedVoteResult],
+    ): Future[Seq[DbVotesStore.ServedVoteResult]] =
+      votesStore.listBackfillPage(before, pageSize).flatMap {
+        case Seq() => Future.successful(acc)
+        case page =>
+          val oldest = page.minBy(row => (row.recordTime, row.eventNumber))
+          go(
+            DbVotesStore.VotesBackfillCursor(
+              oldest.recordTime,
+              oldest.eventNumber,
+            ),
+            acc ++ page,
+          )
+      }
+    go(DbVotesStore.VotesBackfillCursor(CantonTimestamp.MaxValue, 0), Seq.empty)
+      .map(_.map(decodeServed))
+  }
+
+  /** Decodes what a peer served the way the client of the API does. */
+  private def decodeServed(served: DbVotesStore.ServedVoteResult): DbVotesStore.PeerVoteResult =
+    DbVotesStore.PeerVoteResult.decode(
+      served.recordTime,
+      served.synchronizerId,
+      served.updateId,
+      served.eventNumber,
+      served.choiceResult,
+    )
+
+  private def mkFreshVotesStore(): Future[DbVotesStore] = {
+    val participantId = mkParticipantId("DbVotesStoreTestFreshVotesStore")
+    for {
+      kvStore <- ScanKeyValueStore(dsoParty, participantId, storage, loggerFactory)
+      fresh <- mkStoresWith(kvStore, "update_history_votes_store_test_fresh")
+    } yield fresh.votesStore
   }
 
   private def mkStores(): Future[Stores] =
