@@ -3,27 +3,30 @@
 import { clusterYamlConfig } from '@canton-network/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
 
-import { LogLevelSchema, SplicePostgresSchema } from '../../common';
-import { K8sResourceSchema } from '../../common/src/config/configSchema';
-
-export const EnvironmentVariableSchema = z.object({
-  name: z.string(),
-  value: z.string(),
-});
-
-export type EnvironmentVariable = z.infer<typeof EnvironmentVariableSchema>;
+import { config, EnvVarConfigSchema, LogLevelSchema, SplicePostgresSchema } from '.';
+import { K8sResourceSchema } from './configSchema';
 
 export const MultiValidatorConfigSchema = z.object({
   multiValidator: z
     .object({
+      instanceCount: z
+        .number()
+        // TODO(#7801) remove env variable override when internal stops relying on it
+        .overwrite(instanceCount => {
+          const multivalidatorSize = config.optionalEnv('MULTIVALIDATOR_SIZE');
+          return multivalidatorSize !== undefined
+            ? Number.parseInt(multivalidatorSize)
+            : instanceCount;
+        })
+        .default(0),
       postgresPvcSize: z.string().optional(),
       // Multi-validator needs to be migrated
       postgres: SplicePostgresSchema.default({
         deployment: 'legacy-helm-chart',
       }),
       requiresOnboardingSecret: z.boolean().default(false),
-      extraValidatorEnvVars: z.array(EnvironmentVariableSchema).default([]),
-      extraParticipantEnvVars: z.array(EnvironmentVariableSchema).default([]),
+      extraValidatorEnvVars: z.array(EnvVarConfigSchema).default([]),
+      extraParticipantEnvVars: z.array(EnvVarConfigSchema).default([]),
       logLevel: LogLevelSchema.optional().default('INFO'),
       apiRequestLogLevel: LogLevelSchema.optional().default('DEBUG'),
       resources: z
@@ -37,9 +40,13 @@ export const MultiValidatorConfigSchema = z.object({
     .optional(),
 });
 
-export type Config = z.infer<typeof MultiValidatorConfigSchema>;
+export type MultiValidatorConfig = NonNullable<
+  z.infer<typeof MultiValidatorConfigSchema>['multiValidator']
+>;
 
 // eslint-disable-next-line
 // @ts-ignore
-export const multiValidatorConfig =
+export const multiValidatorConfig: MultiValidatorConfig | undefined =
   MultiValidatorConfigSchema.parse(clusterYamlConfig).multiValidator;
+
+export const numNodesPerInstance = 10;
