@@ -3,6 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
+import org.lfdecentralizedtrust.splice.scan.store.db.DbVotesStore.{
+  PeerVoteResult,
+  VotesBackfillCursor,
+}
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import com.digitalasset.canton.data.CantonTimestamp
@@ -31,4 +35,9 @@ trait BackfillingScanConnection extends FlagCloseableAsync {
       afterUpdateId: String,
       count: Int,
   )(implicit tc: TraceContext): Future[Seq[UpdateHistoryResponse]]
+
+  def getVotesBefore(
+      before: VotesBackfillCursor,
+      count: Int,
+  )(implicit tc: TraceContext): Future[Seq[PeerVoteResult]]
 }

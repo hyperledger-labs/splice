@@ -1336,6 +1336,56 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetBackfillingStatusResponse"
 
+  /v0/backfilling/votes-status:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getVotesBackfillingStatus"
+      description: |
+        Whether this Scan can serve `/v0/backfilling/votes-before` for all vote results before the
+        given record time.
+      parameters:
+        - name: "before_record_time"
+          in: "query"
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetVotesBackfillingStatusResponse"
+
+  /v0/backfilling/votes-before:
+    post:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getVotesBefore"
+      description: |
+        Retrieve vote results strictly before the given `(record_time, event_number)`, for
+        backfilling `votes_store_results`. Meant for Scan-to-Scan backfilling only, and offers no
+        compatibility guarantees.
+
+        Fails unless `/v0/backfilling/votes-status` reports "available" for the same record time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetVotesBeforeRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetVotesBeforeResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+
   /v0/acs/{party}:
     get:
       deprecated: true
@@ -3746,6 +3796,88 @@ components:
 
             To determine the progress of individual backfilling processes, inspect the corresponding metrics.
           type: boolean
+
+    GetVotesBeforeRequest:
+      type: object
+      required:
+        - before_record_time
+        - before_event_number
+        - count
+      properties:
+        before_record_time:
+          description: |
+            Only return vote results with a record time strictly smaller than this time, or with
+            this record time and an event number strictly smaller than `before_event_number`.
+          type: string
+          format: date-time
+        before_event_number:
+          type: integer
+          format: int32
+        count:
+          description: |
+            Return at most this many vote results. The actual number returned may be smaller.
+          type: integer
+          format: int32
+
+    GetVotesBackfillingStatusResponse:
+      type: object
+      required:
+        - availability
+      properties:
+        availability:
+          $ref: "#/components/schemas/VotesAvailability"
+
+    VotesAvailability:
+      type: string
+      description: |
+        Whether this Scan holds all vote results before the requested record time.
+        "available": it does.
+        "ingesting": not yet. Its vote results are fully backfilled, but its own ingestion has not
+        reached the requested record time yet; it will answer "available" once it has.
+        "backfilling": its own vote results are not fully backfilled yet, so it does not know
+        whether earlier vote results exist, and must not be used as a source for backfilling.
+      enum:
+        - "available"
+        - "ingesting"
+        - "backfilling"
+
+    GetVotesBeforeResponse:
+      type: object
+      required:
+        - votes
+      properties:
+        votes:
+          type: array
+          items:
+            $ref: "#/components/schemas/VoteResultForBackfilling"
+
+    VoteResultForBackfilling:
+      description: |
+        All essential data for a vote result. Scans store additional information that can be derived from the choice result.
+        Such properties are not included here to keep the API stable.
+      type: object
+      required:
+        - record_time
+        - synchronizer_id
+        - update_id
+        - event_number
+        - choice_result
+      properties:
+        record_time:
+          type: string
+          format: date-time
+        synchronizer_id:
+          type: string
+        update_id:
+          type: string
+        event_number:
+          type: integer
+          format: int32
+        choice_result:
+          description: |
+            The JSON-encoded `DsoRules_CloseVoteRequestResult`, as stored by the Scan that serves it.
+          type: object
+
     EventHistoryRequest:
       type: object
       required:

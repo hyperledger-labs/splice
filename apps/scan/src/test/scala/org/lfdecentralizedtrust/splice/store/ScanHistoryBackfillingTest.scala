@@ -7,6 +7,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
 import org.lfdecentralizedtrust.splice.scan.store.ScanHistoryBackfilling
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BackfillingScanConnection
+import org.lfdecentralizedtrust.splice.scan.store.db.DbVotesStore
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import com.digitalasset.canton.data.CantonTimestamp
@@ -368,6 +369,14 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
       )(tc)
       .map(
         _.map(_.update)
+      )
+
+    override def getVotesBefore(
+        before: DbVotesStore.VotesBackfillCursor,
+        count: Int,
+    )(implicit tc: TraceContext): Future[Seq[DbVotesStore.PeerVoteResult]] =
+      throw new UnsupportedOperationException(
+        "TestBackfillingScanConnection does not simulate vote store backfilling"
       )
   }
 }
