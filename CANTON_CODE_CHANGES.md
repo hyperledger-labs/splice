@@ -30,7 +30,6 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added `suppressFailedClues` to `BaseTest` trait.
 * Support specifying `darData` on `upload.dars`.
 * Turned `synchronize_topology` into a noop.
-* Added `addTraceContextToCallOptions`, `inferCallerTraceContext` and `inferClientRequestTraceContext` to `TraceContextGrpc`, and made its client interceptor generate a trace id when the caller supplies none; pending upstream (#7058)
 * Added priority shutdown tasks in `OnShutdownRunner` that run before other tasks, and added `setAsClosing` method.
 * Disabled `logConfigOnStartup` by default as it also logs secrets.
 * Changed `metrics.filterByNodeAndAttribute` in `InstanceReference ` to filter by `node_name` instead of `node` to match the Splice metrics
