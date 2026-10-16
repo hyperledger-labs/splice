@@ -27,6 +27,7 @@ import {
   splitwellDarPaths,
 } from '@canton-network/splice-pulumi-common-validator';
 import { installValidatorApp } from '@canton-network/splice-pulumi-common-validator/src/validator';
+import { multiValidatorConfig } from '@canton-network/splice-pulumi-multi-validator/src/config';
 
 import { spliceConfig } from '../../common/src/config/config';
 import { splitwellConfig } from '../../common/src/config/splitwellConfig';
@@ -139,15 +140,14 @@ export async function installSplitwell(
 
   const participantPruningConfig = splitwellConfig?.participantPruningSchedule;
 
-  const additionalEnvVars = splitwellConfig.validatorApp?.additionalEnvVars
-    ? [...splitwellConfig.validatorApp.additionalEnvVars]
-    : [];
-
-  additionalEnvVars.push({
-    name: 'ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
-    value:
-      'canton.validator-apps.validator_backend.enable-internal-auto-onboarding-through-sv-traffic-faucet = true',
-  });
+  const additionalEnvVars = [
+    ...(splitwellConfig.validatorApp?.additionalEnvVars || []),
+    {
+      name: 'ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
+      value:
+        'canton.validator-apps.validator_backend.enable-internal-auto-onboarding-through-sv-traffic-faucet = true',
+    },
+  ];
 
   return await installValidatorApp({
     xns,

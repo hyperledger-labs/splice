@@ -31,6 +31,7 @@ import {
 } from '@canton-network/splice-pulumi-common-validator/src/validator';
 
 import { spliceConfig } from '../../common/src/config/config';
+import { splitwellConfig } from '../../common/src/config/splitwellConfig';
 import { validator1Config } from './config';
 
 export async function installValidator1(
@@ -52,15 +53,14 @@ export async function installValidator1(
 
   const participantPruningConfig = validator1Config?.participantPruningSchedule;
 
-  const additionalEnvVars = validator1Config?.validatorApp?.additionalEnvVars
-    ? [...validator1Config.validatorApp.additionalEnvVars]
-    : [];
-
-  additionalEnvVars.push({
-    name: 'ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
-    value:
-      'canton.validator-apps.validator_backend.enable-internal-auto-onboarding-through-sv-traffic-faucet = true',
-  });
+  const additionalEnvVars = [
+    ...(validator1Config?.validatorApp?.additionalEnvVars || []),
+    {
+      name: 'ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
+      value:
+        'canton.validator-apps.validator_backend.enable-internal-auto-onboarding-through-sv-traffic-faucet = true',
+    },
+  ];
 
   const imagePullDeps = imagePullSecret(xns);
 
