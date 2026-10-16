@@ -67,6 +67,20 @@
           },
           "type": "Literal"
         },
+        "GHA_RUNNER_DIGEST": {
+          "secret": {
+            "key": "GHA_RUNNER_DIGEST",
+            "name": "deployment-env"
+          },
+          "type": "Secret"
+        },
+        "GHA_RUNNER_VERSION": {
+          "secret": {
+            "key": "GHA_RUNNER_VERSION",
+            "name": "deployment-env"
+          },
+          "type": "Secret"
+        },
         "PRIVATE_CONFIGS_PATH": {
           "literal": {
             "value": "/share/source/cluster/configs/configs-private"
