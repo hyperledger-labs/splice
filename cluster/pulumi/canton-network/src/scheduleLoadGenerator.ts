@@ -41,12 +41,30 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
     const prometheusRw =
       'http://prometheus-prometheus.observability.svc.cluster.local:9090/api/v1/write';
 
-    const validators = [
-      ...(function* () {
-        if (multiValidatorConfig !== undefined && multiValidatorConfig.instanceCount > 0) {
-          for (let instance = 0; instance < multiValidatorConfig.instanceCount; ++instance) {
-            yield* generatePortSequence(5000, numNodesPerInstance, [{ id: 3 }]).map(
-              (p, validator) => ({
+    const validator1 = {
+      walletBaseUrl: `https://wallet.validator1.${clusterHostname}`,
+      auth: {
+        kind: 'oauth',
+        oauthDomain,
+        oauthClientId,
+        audience,
+        usersPassword,
+        managementApi: {
+          clientId: config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID'),
+          clientSecret: config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET'),
+        },
+        admin: {
+          email: config.optionalEnv('K6_VALIDATOR_ADMIN_USERNAME') || 'admin@validator1.com',
+          password: config.requireEnv('K6_VALIDATOR_ADMIN_PASSWORD'),
+        },
+      },
+    };
+
+    const validators =
+      multiValidatorConfig !== undefined && multiValidatorConfig.instanceCount > 0
+        ? Array.from({ length: multiValidatorConfig.instanceCount }, (_, index) => index).flatMap(
+            instance =>
+              generatePortSequence(5000, numNodesPerInstance, [{ id: 3 }]).map((p, validator) => ({
                 walletBaseUrl: `http://multi-validator-${instance}.multi-validator.svc.cluster.local:${p.port}`,
                 auth: {
                   kind: 'self-signed',
@@ -54,31 +72,9 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
                   audience,
                   secret: 'test',
                 },
-              })
-            );
-          }
-        } else {
-          yield {
-            walletBaseUrl: `https://wallet.validator1.${clusterHostname}`,
-            auth: {
-              kind: 'oauth',
-              oauthDomain,
-              oauthClientId,
-              audience,
-              usersPassword,
-              managementApi: {
-                clientId: config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID'),
-                clientSecret: config.requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET'),
-              },
-              admin: {
-                email: config.optionalEnv('K6_VALIDATOR_ADMIN_USERNAME') || 'admin@validator1.com',
-                password: config.requireEnv('K6_VALIDATOR_ADMIN_PASSWORD'),
-              },
-            },
-          };
-        }
-      })(),
-    ];
+              }))
+          )
+        : [validator1];
 
     installSpliceHelmChart(
       xns,
