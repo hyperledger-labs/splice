@@ -1,6 +1,6 @@
-# 14.18@sha256:c0aab7962b283cf24a0defa5d0d59777f5045a7be59905f21ba81a20b1a110c9
-FROM postgres@sha256:c0aab7962b283cf24a0defa5d0d59777f5045a7be59905f21ba81a20b1a110c9
-LABEL org.opencontainers.image.base.name="postgres:14.18"
+# 14.24-bookworm@sha256:5a05f61a534e50e679d27fb45953afec7821f2ffc2aa6c738b94515ca0891ac2
+FROM postgres@sha256:5a05f61a534e50e679d27fb45953afec7821f2ffc2aa6c738b94515ca0891ac2
+LABEL org.opencontainers.image.base.name="postgres:14.24-bookworm"
 
 COPY cmd.sh /usr/local/bin/
 COPY target/LICENSE .
