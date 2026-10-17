@@ -49,7 +49,7 @@ class DsoPartyMigration(
     loggerFactory,
   )
 
-  def prepareParticipantForHostingDsoParty(
+  def authorizeParticipantForHostingDsoParty(
       participantId: ParticipantId
   )(implicit
       tc: TraceContext
