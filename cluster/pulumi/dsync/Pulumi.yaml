@@ -1,3 +1,0 @@
-name: dsync
-runtime: nodejs
-description: Deploy a dedicated synchronizer
