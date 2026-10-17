@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.admin.api.client
 
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.Materializer
@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesC
 import org.lfdecentralizedtrust.splice.environment.{HttpAppConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient
+import org.lfdecentralizedtrust.splice.sv.onboarding.SvOnboardingSnapshotId
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -41,25 +42,20 @@ final class SvConnection private (
 
   /** Ask the sponsoring SV to authorize hosting the DSO party at the candidate participant and to prepare the ACS snapshot.
     */
-  def authorizeDsoPartyHosting(
-      candidateParticipantId: ParticipantId,
-      candidateParty: PartyId,
+  def prepareDsoPartyHostingSnapshot(
+      candidateParty: PartyId
   )(implicit
       httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[Either[
-    HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound,
-    HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeResponse,
-  ]] =
-    runHttpCmd(
-      config.url,
-      HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorize(
-        candidateParticipantId,
-        candidateParty,
-      ),
-    )
+  ): Future[
+    Either[
+      HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound,
+      SvOnboardingSnapshotId,
+    ]
+  ] =
+    runHttpCmd(config.url, HttpSvPublicAppClient.OnboardSvPartyMigrationPrepare(candidateParty))
 
   def onboardSvSequencer(
       sequencerId: SequencerId
@@ -75,6 +71,14 @@ final class SvConnection private (
         sequencerId
       ),
     )
+
+  def downloadOnboardingSnapshot(id: SvOnboardingSnapshotId)(implicit
+      httpClient: HttpClient,
+      templateDecoder: TemplateJsonDecoder,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[SvStreamClient.OnboardSvDownloadResponse] =
+    runHttpCmd(config.url, HttpSvPublicAppClient.OnboardSvDownload(id))
 
   def getMigrationId()(implicit
       httpClient: HttpClient,

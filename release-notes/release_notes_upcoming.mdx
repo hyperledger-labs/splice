@@ -19,6 +19,17 @@
 
       - `/v0/admin/sv/voterequest`: `vote_request_contract_ids`
 
+    - Joining SVs now download the DSO party ACS from their sponsor as a file instead of receiving it in memory,
+      so onboarding works with large snapshots. The joining SV and its sponsor must both run this version or later.
+      SVs that restrict SV app ingress must allow other SVs to reach the new `/v0/onboard/sv/party-migration/prepare`
+      and `/v0/onboard/sv/download/{id}` endpoints.
+
+  - Deployment
+
+    - SV onboarding snapshots are kept in `canton.sv-apps.sv.onboarding-snapshots.directory`, which must point to
+      persistent storage. The SV Helm chart now sets this up by default with a 35 GiB `persistentDataPvc` mounted at
+      `/persistent-data`. The volume also stores JVM heap dumps, which are not cleaned up automatically.
+
 ## Upcoming for next minor release (template):
 
 {/* If you introduce any breaking changes in the next minor release,

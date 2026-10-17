@@ -475,7 +475,7 @@ tests:
       - equal:
           path: spec.template.spec.serviceAccountName
           value: "custom-sv-sa"
-  - it: "persistentDataPvc creates volume and mount for heap dumps at /persistent-data"
+  - it: "persistentDataPvc creates volume and mount for snapshots and heap dumps at /persistent-data"
     set:
       persistentDataPvc:
         size: "5Gi"
@@ -498,6 +498,7 @@ tests:
 
   - it: "persistentDataPvc creates a PersistentVolumeClaim resource"
     set:
+      pvc.volumeStorageClass: "migration-storage"
       persistentDataPvc:
         size: "5Gi"
         volumeStorageClass: "standard"
@@ -519,7 +520,53 @@ tests:
           value:
             helm.sh/resource-policy: keep
 
-  - it: "persistentDataPvc is not created by default"
+  - it: "snapshot storage inherits the existing storage class by default"
+    set:
+      pvc.volumeStorageClass: "operator-storage"
+    documentSelector:
+      path: metadata.name
+      value: mock-sv-sv-app-pvc
+    asserts:
+      - equal:
+          path: spec.resources.requests.storage
+          value: "35Gi"
+      - equal:
+          path: spec.storageClassName
+          value: "operator-storage"
+
+  - it: "snapshot storage renders without the migration pvc"
+    set:
+      migration.attachPvc: false
+      pvc: null
+    documentSelector:
+      path: metadata.name
+      value: mock-sv-sv-app-pvc
+    asserts:
+      - equal:
+          path: spec.resources.requests.storage
+          value: "35Gi"
+      - equal:
+          path: spec.storageClassName
+          value: null
+
+  - it: "onboarding snapshots use persistent storage by default"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: sv-app-volume
+            mountPath: /persistent-data
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name=='ADDITIONAL_CONFIG_ONBOARDING_SNAPSHOTS')].value
+          value: |
+            canton.sv-apps.sv.onboarding-snapshots.directory = "/persistent-data/onboarding-snapshots"
+
+  - it: "persistentDataPvc can be disabled for ephemeral deployments"
+    set:
+      persistentDataPvc: null
     documentSelector:
       path: kind
       value: Deployment

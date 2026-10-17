@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.Topol
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound
-import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig
+import org.lfdecentralizedtrust.splice.sv.config.{SvOnboardingConfig, SvOnboardingSnapshotsConfig}
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
@@ -25,6 +25,7 @@ import io.grpc.Status
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.util.Success
 
 class JoiningNodeDsoPartyHosting(
     participantAdminConnection: ParticipantAdminConnection,
@@ -32,6 +33,7 @@ class JoiningNodeDsoPartyHosting(
     upgradesConfig: UpgradesConfig,
     dsoParty: PartyId,
     dsoPartyHosting: DsoPartyHosting,
+    onboardingSnapshotsConfig: SvOnboardingSnapshotsConfig,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -51,8 +53,10 @@ class JoiningNodeDsoPartyHosting(
   ): Future[Either[String, Unit]] = {
     getSponsorSvConfig(onboardingConfig) match {
       case Some(sponsorSvConfig) =>
-        for {
-          response <- retryProvider.retry(
+        val snapshotDownload =
+          SvOnboardingSnapshotDownload(onboardingSnapshotsConfig, "dso-party-acs", retryProvider)
+        (for {
+          acsSnapshot <- retryProvider.retry(
             RetryFor.WaitingOnInitDependency,
             "onboard_dso_party",
             "Onboard to DSO party hosting and decentralized namespace membership",
@@ -73,35 +77,35 @@ class JoiningNodeDsoPartyHosting(
                 _ = logger.info("Disconnecting from all domains")
                 _ <- participantAdminConnection.disconnectFromAllSynchronizers()
                 _ = logger.info("candidate SV participant disconnected from global domain")
-                response <- retryProvider
+                acsSnapshot <- retryProvider
                   .retry(
-                    RetryFor.WaitingOnInitDependency,
+                    RetryFor.WaitingOnInitDependencyLong,
                     "authorize_dso_party",
                     "authorize DSO party hosting on sponsor",
-                    svConnection
-                      .authorizeDsoPartyHosting(
-                        participantId,
-                        svParty,
-                      )
-                      .flatMap {
-                        case Left(proposalNotFound) =>
-                          if (
-                            proposalNotFound.partyToParticipantMappingSerial < partyToParticipantProposal.base.serial
-                          ) {
-                            // We can just retry in this case without resubmitting the proposal, the sponsor will eventually catch up
-                            // and our proposal will either be valid or fail with an invalid error.
-                            Future.failed(
-                              Status.FAILED_PRECONDITION
-                                .withDescription(
-                                  s"Sponsor failed with missing proposal for serial ${proposalNotFound.partyToParticipantMappingSerial} which is smaller than our proposal for serial ${partyToParticipantProposal.base.serial}, sponsor is likely lagging behind."
-                                )
-                                .asRuntimeException()
-                            )
-                          } else {
-                            Future.failed(proposalNotFound)
-                          }
-                        case Right(acsSnapshot) => Future.successful(acsSnapshot)
-                      },
+                    snapshotDownload.prepareAndDownload(
+                      svConnection
+                        .prepareDsoPartyHostingSnapshot(svParty)
+                        .flatMap {
+                          case Left(proposalNotFound) =>
+                            if (
+                              proposalNotFound.partyToParticipantMappingSerial < partyToParticipantProposal.base.serial
+                            ) {
+                              // We can just retry in this case without resubmitting the proposal, the sponsor will eventually catch up
+                              // and our proposal will either be valid or fail with an invalid error.
+                              Future.failed(
+                                Status.FAILED_PRECONDITION
+                                  .withDescription(
+                                    s"Sponsor failed with missing proposal for serial ${proposalNotFound.partyToParticipantMappingSerial} which is smaller than our proposal for serial ${partyToParticipantProposal.base.serial}, sponsor is likely lagging behind."
+                                  )
+                                  .asRuntimeException()
+                              )
+                            } else {
+                              Future.failed(proposalNotFound)
+                            }
+                          case Right(id) => Future.successful(id)
+                        },
+                      svConnection.downloadOnboardingSnapshot,
+                    ),
                     logger,
                   )
                   .recoverWith {
@@ -142,7 +146,7 @@ class JoiningNodeDsoPartyHosting(
                         .asRuntimeException()
                   }
               } yield {
-                response
+                acsSnapshot
               }).andThen(_ => svConnection.close())
             },
             logger,
@@ -150,8 +154,8 @@ class JoiningNodeDsoPartyHosting(
           _ = logger.info(
             "Received Acs snapshot from sponsor, importing into candidate participant"
           )
-          _ <- participantAdminConnection.importPartyAcs(
-            response.acsSnapshot,
+          _ <- participantAdminConnection.importPartyAcsFromFile(
+            acsSnapshot,
             synchronizerId,
             dsoParty,
           )
@@ -170,7 +174,7 @@ class JoiningNodeDsoPartyHosting(
           _ = logger.info(
             s"DSO party is now hosted in the candidate SV participant $participantId"
           )
-        } yield Right(())
+        } yield Right(())).andThen { case Success(Right(_)) => snapshotDownload.delete() }
       case None =>
         Future.successful(Left("unexpected onboarding config"))
     }

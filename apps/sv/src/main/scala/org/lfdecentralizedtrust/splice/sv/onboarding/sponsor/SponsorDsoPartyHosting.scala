@@ -11,8 +11,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   TopologyResult,
   TopologySnapshot,
 }
-import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
-import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
+import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting.{
   DsoPartyMigrationFailure,
   RequiredProposalNotFound,
@@ -24,45 +23,18 @@ import com.digitalasset.canton.topology.transaction.PartyToParticipant
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 
-import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class SponsorDsoPartyHosting(
     participantAdminConnection: ParticipantAdminConnection,
     dsoParty: PartyId,
-    dsoPartyHosting: DsoPartyHosting,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor
 ) extends NamedLogging {
 
-  def authorizeDsoPartyToParticipant(
-      domain: SynchronizerId,
-      participantId: ParticipantId,
-  )(implicit traceContext: TraceContext): EitherT[Future, DsoPartyMigrationFailure, Instant] =
-    for {
-      _ <- proposePartyHostingAndEnsureAuthorized(
-        domain,
-        dsoParty,
-        participantId,
-      )
-      authorizedAt <- EitherT.liftF(
-        dsoPartyHosting.waitForDsoPartyToParticipantAuthorization(
-          domain,
-          participantId,
-          RetryFor.ClientCalls,
-        )
-      )
-    } yield {
-      logger.info(
-        s"Party $dsoParty is authorized on participant $participantId"
-      )
-      authorizedAt
-    }
-
-  private def proposePartyHostingAndEnsureAuthorized(
+  def ensureDsoPartyToParticipantProposalSigned(
       synchronizerId: SynchronizerId,
-      party: PartyId,
       newParticipant: ParticipantId,
   )(implicit
       traceContext: TraceContext
@@ -75,9 +47,10 @@ class SponsorDsoPartyHosting(
           participantAdminConnection
             .ensurePartyToParticipantAdditionProposalWithSerial(
               synchronizerId,
-              party,
+              dsoParty,
               newParticipant,
               PositiveInt.tryCreate(proposal.base.serial.value - 1),
+              waitForAuthorization = false,
             )
             .map(Right(_))
             .recover { case AuthorizedStateChanged(serial) =>

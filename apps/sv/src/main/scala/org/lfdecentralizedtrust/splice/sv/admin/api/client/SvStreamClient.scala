@@ -11,6 +11,7 @@ import org.apache.pekko.http.scaladsl.util.FastFuture
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Sink
 import org.apache.pekko.util.ByteString
+import org.lfdecentralizedtrust.splice.http.v0.Implicits.*
 import org.lfdecentralizedtrust.splice.http.v0.PekkoHttpImplicits.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
@@ -32,13 +33,9 @@ object SvStreamClient {
   )(implicit ec: ExecutionContext, mat: Materializer): SvStreamClient =
     new SvStreamClient(host = host)(httpClient = httpClient, ec = ec, mat = mat)
 
-  sealed abstract class OnboardSvPartyMigrationAuthorizeResponse
-  object OnboardSvPartyMigrationAuthorizeResponse {
-
-    case class OK(value: Seq[ByteString]) extends OnboardSvPartyMigrationAuthorizeResponse
-    case class BadRequest(value: definitions.OnboardSvPartyMigrationAuthorizeErrorResponse)
-        extends OnboardSvPartyMigrationAuthorizeResponse
-    case class Unauthorized(value: ErrorResponse) extends OnboardSvPartyMigrationAuthorizeResponse
+  sealed abstract class OnboardSvDownloadResponse
+  object OnboardSvDownloadResponse {
+    case class OK(entity: ResponseEntity) extends OnboardSvDownloadResponse
   }
 
   sealed abstract class OnboardSvSequencerResponse
@@ -53,7 +50,7 @@ class SvStreamClient(host: String = "https://example.com")(implicit
     ec: ExecutionContext,
     mat: Materializer,
 ) {
-  import SvStreamClient.{OnboardSvPartyMigrationAuthorizeResponse, OnboardSvSequencerResponse}
+  import SvStreamClient.{OnboardSvDownloadResponse, OnboardSvSequencerResponse}
 
   val basePath: String = "/api/sv"
 
@@ -84,17 +81,6 @@ class SvStreamClient(host: String = "https://example.com")(implicit
     )
   }
 
-  private val jsonDecoder = {
-    structuredJsonEntityUnmarshaller.flatMap(_ =>
-      _ =>
-        json =>
-          io.circe
-            .Decoder[definitions.OnboardSvPartyMigrationAuthorizeErrorResponse]
-            .decodeJson(json)
-            .fold(FastFuture.failed, FastFuture.successful)
-    )
-  }
-
   private val errorResponseDecoder = {
     structuredJsonEntityUnmarshaller.flatMap(_ =>
       _ =>
@@ -106,43 +92,23 @@ class SvStreamClient(host: String = "https://example.com")(implicit
     )
   }
 
-  def onboardSvPartyMigrationAuthorize(
-      body: definitions.OnboardSvPartyMigrationAuthorizeRequest,
+  def onboardSvDownload(
+      id: String,
       headers: List[HttpHeader] = Nil,
-  ): EitherT[Future, Either[Throwable, HttpResponse], OnboardSvPartyMigrationAuthorizeResponse] = {
-    val allHeaders = headers ++ scala.collection.immutable.Seq[Option[HttpHeader]]().flatten
+  ): EitherT[Future, Either[Throwable, HttpResponse], OnboardSvDownloadResponse] = {
     makeRequest(
-      HttpMethods.POST,
-      host + basePath + "/v0/onboard/sv/party-migration/authorize",
-      allHeaders,
-      body,
+      HttpMethods.GET,
+      host + basePath + "/v0/onboard/sv/download/" + Formatter.addPath(id),
+      headers,
+      HttpEntity.Empty,
       HttpProtocols.`HTTP/1.1`,
     ).flatMap(req =>
       EitherT(
         httpClient(req)
-          .flatMap(resp =>
+          .flatMap[Either[Either[Throwable, HttpResponse], OnboardSvDownloadResponse]](resp =>
             resp.status match {
               case StatusCodes.OK =>
-                resp.entity.dataBytes
-                  .runWith(Sink.seq)
-                  .map(chunks =>
-                    Right(OnboardSvPartyMigrationAuthorizeResponse.OK(chunks)): Either[Either[
-                      Throwable,
-                      HttpResponse,
-                    ], OnboardSvPartyMigrationAuthorizeResponse]
-                  )
-              case StatusCodes.BadRequest =>
-                Unmarshal(resp.entity)
-                  .to[definitions.OnboardSvPartyMigrationAuthorizeErrorResponse](
-                    jsonDecoder,
-                    implicitly,
-                    implicitly,
-                  )
-                  .map(x => Right(OnboardSvPartyMigrationAuthorizeResponse.BadRequest(x)))
-              case StatusCodes.Unauthorized =>
-                Unmarshal(resp.entity)
-                  .to[ErrorResponse](errorResponseDecoder, implicitly, implicitly)
-                  .map(x => Right(OnboardSvPartyMigrationAuthorizeResponse.Unauthorized(x)))
+                FastFuture.successful(Right(OnboardSvDownloadResponse.OK(resp.entity)))
               case _ => FastFuture.successful(Left(Right(resp)))
             }
           )
