@@ -9,21 +9,20 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerSnapshot as Canto
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.{PartyId, SequencerId}
 import com.google.protobuf.ByteString
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes, Uri}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,
   SvOnboardingRequest,
 }
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpCommand, HttpCommandException}
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_public as http}
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvStreamClient
 import org.lfdecentralizedtrust.splice.sv.http.SvHttpClient.BaseCommandPublic
 import org.lfdecentralizedtrust.splice.util.{Codec, TemplateJsonDecoder}
 
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.concurrent.Future
 
 object HttpSvPublicAppClient {
 
@@ -188,22 +187,6 @@ object HttpSvPublicAppClient {
   ) extends QuietNonRetryableException(
         s"Party migration failed as required proposals were not found. Found base mappings: PartyToParticipant($partyToParticipantMappingSerial)"
       )
-
-  case class OnboardingSnapshotsNotSupported(sponsor: Uri)
-      extends QuietNonRetryableException(
-        s"Sponsor SV $sponsor does not support onboarding snapshot downloads and must be upgraded before it can onboard new SVs"
-      )
-
-  def onboardingSnapshotsNotSupported(sponsor: Uri, checkActive: => Future[Unit])(implicit
-      ec: ExecutionContext
-  ): PartialFunction[Throwable, Future[Nothing]] = {
-    case error @ HttpCommandException(_, StatusCodes.NotFound, responseBody)
-        if responseBody.message.startsWith("The requested resource could not be found") =>
-      checkActive.transformWith {
-        case Success(_) => Future.failed(OnboardingSnapshotsNotSupported(sponsor))
-        case Failure(_) => Future.failed(error)
-      }
-  }
 
   case class OnboardSvPartyMigrationPrepare(
       candidate: PartyId

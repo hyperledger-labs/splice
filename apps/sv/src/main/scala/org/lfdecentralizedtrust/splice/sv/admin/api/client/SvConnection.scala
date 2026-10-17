@@ -53,7 +53,6 @@ final class SvConnection private (
     ]
   ] =
     runHttpCmd(config.url, HttpSvPublicAppClient.OnboardSvPartyMigrationPrepare(candidateParty))
-      .recoverWith(HttpSvPublicAppClient.onboardingSnapshotsNotSupported(config.url, checkActive()))
 
   def onboardSvSequencer(
       sequencerId: SequencerId

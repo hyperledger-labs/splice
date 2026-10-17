@@ -15,7 +15,6 @@ import org.apache.pekko.http.scaladsl.model.{
   HttpRequest,
   StatusCode,
   StatusCodes,
-  Uri,
 }
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
@@ -24,7 +23,6 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvStreamClient.{
   OnboardSvDownloadResponse
 }
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingSnapshotsConfig
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -214,50 +212,6 @@ class SvOnboardingSnapshotDownloadTest
       Files.isDirectory(snapshotDownload.directory) shouldBe true
       snapshotDownload.delete()
       Files.exists(snapshotDownload.directory) shouldBe false
-    }
-  }
-
-  "onboardingSnapshotsNotSupported" should {
-
-    def notFound(message: String) =
-      HttpCommandException(
-        HttpRequest(),
-        StatusCodes.NotFound,
-        HttpCommandException.ErrorResponseBody(definitions.ErrorResponse(message)),
-      )
-    val sponsor = Uri("http://sponsor")
-    val missingEndpoint = notFound(
-      "The requested resource could not be found: http://sponsor/api/sv/v0/onboard/sv/party-migration/prepare"
-    )
-    val notSupported = HttpSvPublicAppClient.onboardingSnapshotsNotSupported(sponsor, Future.unit)
-
-    "fail without retrying when an active sponsor does not have the prepare endpoints" in {
-      notSupported(missingEndpoint).failed.futureValue shouldBe
-        HttpSvPublicAppClient.OnboardingSnapshotsNotSupported(sponsor)
-    }
-
-    "keep the missing-endpoint error retryable while the sponsor is initializing" in {
-      val recovering = HttpSvPublicAppClient.onboardingSnapshotsNotSupported(
-        sponsor,
-        Future.failed(
-          Status.FAILED_PRECONDITION.withDescription("Node is not active").asRuntimeException()
-        ),
-      )
-      recovering(missingEndpoint).failed.futureValue shouldBe missingEndpoint
-    }
-
-    "keep the missing-endpoint error retryable when the sponsor health check fails" in {
-      val recovering = HttpSvPublicAppClient.onboardingSnapshotsNotSupported(
-        sponsor,
-        Future.failed(new IOException("connection reset during startup")),
-      )
-      recovering(missingEndpoint).failed.futureValue shouldBe missingEndpoint
-    }
-
-    "keep other not found errors retryable" in {
-      notSupported.isDefinedAt(
-        notFound("Candidate party is not an sv and no `SvOnboardingConfirmed` for the candidate")
-      ) shouldBe false
     }
   }
 }
