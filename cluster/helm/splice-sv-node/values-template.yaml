@@ -51,6 +51,9 @@ persistence:
 #  secretOverrides:
 #    postgresPassword: ""
 
+persistentDataPvc:
+  size: 35Gi
+
 migration:
   attachPvc: true
 # pvc used for migrations

@@ -49,6 +49,11 @@ spec:
           imagePullPolicy: {{ . }}
           {{- end }}
           env:
+            {{- if .Values.persistentDataPvc }}
+            - name: ADDITIONAL_CONFIG_ONBOARDING_SNAPSHOTS
+              value: |
+                canton.sv-apps.sv.onboarding-snapshots.directory = "/persistent-data/onboarding-snapshots"
+            {{- end }}
             - name: JAVA_TOOL_OPTIONS
               value: "{{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }} -Dlogback.configurationFile=/app/logback/logback.xml"
             {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "sv" "keyName" "sv" "fixedTokens" .Values.cluster.fixedTokens "secretOverrides" (.Values.auth).secretOverrides) | indent 12}}
@@ -714,7 +719,7 @@ spec:
   resources:
     requests:
       storage: {{ .Values.persistentDataPvc.size }}
-  storageClassName: {{ .Values.persistentDataPvc.volumeStorageClass }}
+  storageClassName: {{ .Values.persistentDataPvc.volumeStorageClass | default (.Values.pvc).volumeStorageClass }}
 {{- end }}
 ---
 apiVersion: v1
