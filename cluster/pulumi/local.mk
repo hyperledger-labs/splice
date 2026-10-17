@@ -24,7 +24,6 @@ $(dir)/format: $(dir)/.build
 $(dir)/unit-test: $(dir)/.build
 	cd $(@D) && npm run test
 
-# TODO(splice#7780): add dsync once its expected config has something
 pulumi_projects ::= operator deployment gcp infra observability canton-network sv-runbook validator-runbook multi-validator cluster sv-canton validator1 splitwell sv
 
 .PHONY: $(dir)/test $(dir)/update-expected
