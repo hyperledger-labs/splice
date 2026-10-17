@@ -49,7 +49,7 @@ export async function installCantonComponents(
   },
   opts?: SpliceCustomResourceOptions,
   disableProtection?: boolean,
-  imagePullServiceAccountName?: string,
+  imagePullServiceAccountName?: string
 ): Promise<InstalledMigrationSpecificSv | undefined> {
   const isActiveMigration = migrationConfig.active.id === migrationId;
 
