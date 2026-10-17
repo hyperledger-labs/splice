@@ -77,6 +77,34 @@ class SvOnboardingSnapshotServiceTest
 
   "SvOnboardingSnapshotService" should {
 
+    "start without a directory but reject prepare" in {
+      val clock = new SimClock(loggerFactory = loggerFactory)
+      val retryProvider =
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)
+      val service =
+        new SvOnboardingSnapshotService(
+          SvOnboardingSnapshotsConfig(),
+          clock,
+          retryProvider,
+          loggerFactory,
+        )
+      def notConfigured(result: Future[?]) =
+        inside(result.failed.futureValue) { case e: StatusRuntimeException =>
+          e.getStatus.getCode shouldBe Status.Code.INTERNAL
+          e.getStatus.getDescription should include("onboarding-snapshots.directory")
+        }
+      try {
+        service.exportsDirectory shouldBe None
+        service.removeExpired(clock.now).futureValue shouldBe 0
+        notConfigured(service.checkConfigured())
+        notConfigured(service.prepare(key("sv1"), writeSnapshot(Future.unit)))
+        service.lookup(SvOnboardingSnapshotId(UUID.randomUUID().toString)) shouldBe None
+      } finally {
+        retryProvider.close()
+        service.close()
+      }
+    }
+
     "export in the background and reuse the snapshot for the same key" in withService() {
       (service, _, _) =>
         val exported = Promise[Unit]()
@@ -123,7 +151,7 @@ class SvOnboardingSnapshotServiceTest
           },
           forExactly(1, _)(_.warningMessage should include("failed")),
         )
-      eventually()(File(service.exportsDirectory).list.toSeq shouldBe empty)
+      eventually()(service.exportsDirectory.toList.flatMap(File(_).list) shouldBe empty)
 
       val id =
         service.prepare(key("sv1"), writeSnapshot(Future.unit)).futureValue

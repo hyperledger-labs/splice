@@ -297,12 +297,21 @@ class SvOnboardingSnapshotDownloadTest
         sponsor.requests shouldBe Seq("id")
     }
 
-    "use a temporary directory when none is configured" in {
-      val snapshotDownload =
-        SvOnboardingSnapshotDownload(SvOnboardingSnapshotsConfig(), "acs", retryProvider)
-      Files.isDirectory(snapshotDownload.directory) shouldBe true
-      snapshotDownload.delete()
-      Files.exists(snapshotDownload.directory) shouldBe false
+    "refuse to join without a configured directory" in {
+      def notConfigured(error: Throwable) = inside(error) { case e: StatusRuntimeException =>
+        e.getStatus.getCode shouldBe Status.Code.FAILED_PRECONDITION
+        e.getStatus.getDescription should include("onboarding-snapshots.directory")
+      }
+      notConfigured(
+        SvOnboardingSnapshotDownload
+          .checkConfigured(SvOnboardingSnapshotsConfig())
+          .failed
+          .futureValue
+      )
+      notConfigured(
+        the[StatusRuntimeException] thrownBy
+          SvOnboardingSnapshotDownload(SvOnboardingSnapshotsConfig(), "acs", retryProvider)
+      )
     }
   }
 }

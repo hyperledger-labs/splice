@@ -896,6 +896,7 @@ class JoiningNodeInitializer(
           SvUtil.keyPairMatches(publicKey, privateKey) match {
             case Right(privateKey_) =>
               for {
+                _ <- SvOnboardingSnapshotDownload.checkConfigured(config.onboardingSnapshots)
                 _ <- svStore.lookupSvOnboardingConfirmed().flatMap {
                   // We're already in the process of onboarding
                   case Some(_) =>

@@ -48,70 +48,83 @@ class SvOnboardingSnapshotService(
     with FlagCloseableAsync
     with RetryProvider.Has {
 
-  private[sponsor] val exportsDirectory: Path = config.directory match {
-    case Some(directory) => (File(directory) / "exports").createDirectories().path
-    case None => Files.createTempDirectory("sv-onboarding-snapshots")
-  }
+  private[sponsor] val exportsDirectory: Option[Path] =
+    config.directory.map(directory => (File(directory) / "exports").createDirectories().path)
 
   private val mutex = Mutex()
   private val jobs = mutable.Map.empty[SvOnboardingSnapshotId, Snapshot]
 
   private def shuttingDown: Boolean = isClosing || retryProvider.isClosing
 
+  private def notConfigured =
+    Status.INTERNAL
+      .withDescription(
+        "onboarding-snapshots.directory must point to persistent storage to sponsor SV onboarding"
+      )
+      .asRuntimeException()
+
   private def shutdownError =
     Status.UNAVAILABLE
       .withDescription("SV onboarding snapshot exports are shutting down")
       .asRuntimeException()
 
-  private def directory(id: SvOnboardingSnapshotId): Path = exportsDirectory.resolve(id.value)
+  private def directory(id: SvOnboardingSnapshotId): Option[Path] =
+    exportsDirectory.map(_.resolve(id.value))
 
   private def storedIds: Seq[SvOnboardingSnapshotId] =
-    File(exportsDirectory).children.flatMap { entry =>
-      val name = entry.name
-      Try(UUID.fromString(name)).toOption
-        .filter(_.toString == name)
-        .map(_ => SvOnboardingSnapshotId(name))
-    }.toSeq
+    exportsDirectory.toList.flatMap { exports =>
+      File(exports).children.flatMap { entry =>
+        val name = entry.name
+        Try(UUID.fromString(name)).toOption
+          .filter(_.toString == name)
+          .map(_ => SvOnboardingSnapshotId(name))
+      }
+    }
+
+  def checkConfigured(): Future[Unit] =
+    if (exportsDirectory.isDefined) Future.unit else Future.failed(notConfigured)
 
   private def readSnapshot(
       id: SvOnboardingSnapshotId
   )(implicit tc: TraceContext): Option[Snapshot] = {
     val validId = Try(UUID.fromString(id.value)).toOption.exists(_.toString == id.value)
     if (!validId) None
-    else {
-      val metadata = directory(id).resolve("metadata.json")
-      if (!Files.isRegularFile(metadata)) None
-      else
-        Try {
-          val persisted =
-            decode[PersistedSnapshot](Files.readString(metadata)).fold(throw _, identity)
-          val file = directory(id).resolve("snapshot")
-          val state: SnapshotState =
-            if (Files.notExists(file)) SnapshotState.Failed("Snapshot file is missing")
-            else if (!Files.isRegularFile(file) || Files.size(file) != persisted.size)
-              SnapshotState.Failed("Snapshot file size has changed")
-            else SnapshotState.Ready(file)
-          Snapshot(
-            SnapshotKey.Acs(
-              SynchronizerId.tryFromString(persisted.synchronizerId),
-              PartyId.tryFromProtoPrimitive(persisted.party),
-              Instant.parse(persisted.activationTime),
-            ),
-            CantonTimestamp.assertFromInstant(Instant.parse(persisted.createdAt)),
-            state,
-          )
-        } match {
-          case Success(snapshot) => Some(snapshot)
-          case Failure(error) =>
-            logger.warn(s"Cannot recover onboarding snapshot $id; it will be removed", error)
-            None
-        }
-    }
+    else
+      directory(id).flatMap { dir =>
+        val metadata = dir.resolve("metadata.json")
+        if (!Files.isRegularFile(metadata)) None
+        else
+          Try {
+            val persisted =
+              decode[PersistedSnapshot](Files.readString(metadata)).fold(throw _, identity)
+            val file = dir.resolve("snapshot")
+            val state: SnapshotState =
+              if (Files.notExists(file)) SnapshotState.Failed("Snapshot file is missing")
+              else if (!Files.isRegularFile(file) || Files.size(file) != persisted.size)
+                SnapshotState.Failed("Snapshot file size has changed")
+              else SnapshotState.Ready(file)
+            Snapshot(
+              SnapshotKey.Acs(
+                SynchronizerId.tryFromString(persisted.synchronizerId),
+                PartyId.tryFromProtoPrimitive(persisted.party),
+                Instant.parse(persisted.activationTime),
+              ),
+              CantonTimestamp.assertFromInstant(Instant.parse(persisted.createdAt)),
+              state,
+            )
+          } match {
+            case Success(snapshot) => Some(snapshot)
+            case Failure(error) =>
+              logger.warn(s"Cannot recover onboarding snapshot $id; it will be removed", error)
+              None
+          }
+      }
   }
 
-  private def deleteSnapshot(id: SvOnboardingSnapshotId)(implicit tc: TraceContext): Boolean =
+  private def deleteSnapshot(id: SvOnboardingSnapshotId, dir: Path)(implicit
+      tc: TraceContext
+  ): Boolean =
     Try {
-      val dir = directory(id)
       if (Files.isDirectory(dir)) {
         Seq("metadata.json", "metadata.tmp", "snapshot").foreach(name =>
           Files.deleteIfExists(dir.resolve(name)).discard
@@ -135,7 +148,7 @@ class SvOnboardingSnapshotService(
           snapshot.state.isInstanceOf[SnapshotState.Ready] &&
           snapshot.createdAt.plus(config.retention.asJava) > now
         }
-        !keep && deleteSnapshot(id)
+        !keep && directory(id).exists(deleteSnapshot(id, _))
       }
     }
   }
@@ -217,8 +230,9 @@ class SvOnboardingSnapshotService(
           )
         }
       existing.getOrElse {
+        val exports = exportsDirectory.getOrElse(throw notConfigured)
         val id = SvOnboardingSnapshotId(UUID.randomUUID().toString)
-        val file = directory(id).resolve("snapshot")
+        val file = exports.resolve(id.value).resolve("snapshot")
         queue.offer(QueuedExport(id, file, exportTo, tc)) match {
           case Enqueued =>
             jobs.update(id, Snapshot(key, clock.now, SnapshotState.Exporting))
@@ -277,11 +291,11 @@ class SvOnboardingSnapshotService(
                       snapshot.createdAt.toInstant.toString,
                       Files.size(queued.file),
                     )
-                    val temporary = directory(queued.id).resolve("metadata.tmp")
+                    val temporary = queued.file.resolveSibling("metadata.tmp")
                     Files.writeString(temporary, metadata.asJson.noSpaces)
                     Files.move(
                       temporary,
-                      directory(queued.id).resolve("metadata.json"),
+                      queued.file.resolveSibling("metadata.json"),
                       StandardCopyOption.ATOMIC_MOVE,
                     )
                     ()
@@ -297,7 +311,8 @@ class SvOnboardingSnapshotService(
                         s"Onboarding snapshot export ${queued.id} stopped by shutdown: $error"
                       )
                     else logger.warn(s"Onboarding snapshot export ${queued.id} failed", error)
-                    if (Files.exists(directory(queued.id))) deleteSnapshot(queued.id).discard
+                    val dir = queued.file.getParent
+                    if (Files.exists(dir)) deleteSnapshot(queued.id, dir).discard
                 }
               }
             }
@@ -313,11 +328,7 @@ class SvOnboardingSnapshotService(
     Seq(
       AsyncCloseable(
         "waiting for onboarding snapshot exports to finish",
-        queueTerminated.map { done =>
-          if (config.directory.isEmpty)
-            blocking(File(exportsDirectory).delete(swallowIOExceptions = true)).discard
-          done
-        },
+        queueTerminated,
         timeouts.shutdownShort,
       )
     )

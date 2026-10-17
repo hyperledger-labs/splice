@@ -132,19 +132,26 @@ object SvOnboardingSnapshotDownload {
   private implicit val encoder: Encoder[DownloadMetadata] = deriveEncoder
   private implicit val decoder: Decoder[DownloadMetadata] = deriveDecoder
 
+  private def notConfigured =
+    Status.FAILED_PRECONDITION
+      .withDescription(
+        "onboarding-snapshots.directory must point to persistent storage to join as an SV"
+      )
+      .asRuntimeException()
+
+  def checkConfigured(config: SvOnboardingSnapshotsConfig): Future[Unit] =
+    if (config.directory.isDefined) Future.unit else Future.failed(notConfigured)
+
   def apply(
       config: SvOnboardingSnapshotsConfig,
       name: String,
       retryProvider: RetryProvider,
-  ): SvOnboardingSnapshotDownload =
+  ): SvOnboardingSnapshotDownload = {
+    val directory = config.directory.getOrElse(throw notConfigured)
     new SvOnboardingSnapshotDownload(
-      config.directory match {
-        case Some(directory) =>
-          val downloads = File(directory) / "downloads" / name
-          downloads.createDirectories().path
-        case None => Files.createTempDirectory(s"sv-onboarding-$name")
-      },
+      (File(directory) / "downloads" / name).createDirectories().path,
       retryProvider,
       config,
     )
+  }
 }

@@ -462,6 +462,7 @@ class HttpSvPublicHandler(
           errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
           candidateParty =>
             for {
+              _ <- onboardingSnapshotService.checkConfigured()
               participantId <- candidateParticipant(candidateParty)
               prepared <- HttpSvPublicHandler.unavailableOnGrpcFailure(
                 s"Preparing DSO party hosting on $participantId",

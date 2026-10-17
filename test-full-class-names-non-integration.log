@@ -18,6 +18,7 @@ org.lfdecentralizedtrust.splice.http.HttpRateLimiterTest
 org.lfdecentralizedtrust.splice.http.InvalidResponseContentTest
 org.lfdecentralizedtrust.splice.http.NonProxyHostsTest
 org.lfdecentralizedtrust.splice.http.UrlValidatorTest
+org.lfdecentralizedtrust.splice.integration.plugins.OnboardingSnapshotDirectoriesTest
 org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutorTest
 org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnectionTest
 org.lfdecentralizedtrust.splice.scan.admin.api.client.SingleScanConnectionTest
