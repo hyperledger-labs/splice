@@ -62,13 +62,11 @@ class DsoPartyMigration(
           .getDsoPartyToParticipantTransaction(dsoRules.domain, participantId, dsoParty)
           .value
       )
-    } yield activationTx.map(tx =>
-      SnapshotKey.Acs(dsoRules.domain, participantId, dsoParty, tx.base.validFrom)
-    )
+    } yield activationTx.map(tx => SnapshotKey.Acs(dsoRules.domain, dsoParty, tx.base.validFrom))
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  def exportSnapshotToFile(key: SnapshotKey.Acs, file: Path)(implicit
-      tc: TraceContext
+  def exportSnapshotToFile(key: SnapshotKey.Acs, targetParticipantId: ParticipantId, file: Path)(
+      implicit tc: TraceContext
   ): Future[Unit] = {
 
     def submitDummyTransaction(): Future[Unit] =
@@ -96,7 +94,7 @@ class DsoPartyMigration(
             .exportPartyAcsToFile(
               key.party,
               key.synchronizerId,
-              key.targetParticipantId,
+              targetParticipantId,
               key.activationTime,
               file,
             )

@@ -10,7 +10,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.server.Directives.provide
@@ -78,8 +78,7 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
       .prepare(
         SnapshotKey.Acs(
           SynchronizerId.tryFromString("synchronizer::dummy"),
-          ParticipantId(UniqueIdentifier.tryFromProtoPrimitive(s"$name::dummy")),
-          PartyId.tryFromProtoPrimitive("dso::dummy"),
+          PartyId.tryFromProtoPrimitive(s"$name::dummy"),
           Instant.EPOCH,
         ),
         exportTo,

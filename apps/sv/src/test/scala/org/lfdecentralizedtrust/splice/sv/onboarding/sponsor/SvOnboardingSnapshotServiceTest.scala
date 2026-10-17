@@ -10,7 +10,7 @@ import com.digitalasset.canton.config.PositiveFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import io.grpc.{Status, StatusRuntimeException}
 import org.lfdecentralizedtrust.splice.automation.{TriggerContext, TriggerEnabledSynchronization}
@@ -40,8 +40,7 @@ class SvOnboardingSnapshotServiceTest
   private def key(name: String) =
     SnapshotKey.Acs(
       SynchronizerId.tryFromString("synchronizer::dummy"),
-      ParticipantId(UniqueIdentifier.tryFromProtoPrimitive(s"$name::dummy")),
-      PartyId.tryFromProtoPrimitive("dso::dummy"),
+      PartyId.tryFromProtoPrimitive(s"$name::dummy"),
       Instant.EPOCH,
     )
 
