@@ -154,7 +154,7 @@ const SvValidatorAppConfigSchema = z
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
 
-// FIXME: move more stuff from SingleSvConfigSchema here.
+// TODO(splice#7780): consider what else we need to support out of SingleSvConfigSchema also for dsyncs, and move those here.
 export const SyncNodeSchema = z
   .object({
     participant: SvParticipantConfigSchema.optional(),
