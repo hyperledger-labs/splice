@@ -747,5 +747,5 @@ final case class SvOnboardingSnapshotsConfig(
     directory: Option[Path] = None,
     retention: PositiveFiniteDuration = PositiveFiniteDuration.ofHours(24),
     parallelism: PositiveInt = PositiveInt.one,
-    queueSize: PositiveInt = PositiveInt.tryCreate(16),
+    queueSize: PositiveInt = PositiveInt.tryCreate(4),
 )
