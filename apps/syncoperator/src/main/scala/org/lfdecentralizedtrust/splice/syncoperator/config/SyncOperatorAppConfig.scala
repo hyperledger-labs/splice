@@ -10,7 +10,7 @@ import com.digitalasset.canton.admin.api.client.data.{
   SynchronizerLimits,
 }
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveLong}
 import com.digitalasset.canton.version.ProtocolVersion
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
@@ -98,6 +98,17 @@ case class SyncOperatorAppBackendConfig(
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
     trafficBalanceReconciliationDelay: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(10),
+    // Bytes each participant on this synchronizer may use past what has been bought for it. The
+    // operator sets it while the global synchronizer is unavailable, so nothing can be bought, and
+    // removes it once it is back. Setting or removing it only takes effect on a restart of this
+    // app, and the app only starts once the configured Scan is reachable. While it is set, this app
+    // keeps every participant's limit at its purchased total plus this; while it is unset, at its
+    // purchased total. Every participant gets it, including ones with no purchase on record and
+    // ones that join while it is set, so keep onboarding to the synchronizer restricted meanwhile.
+    // Where several operators run the synchronizer's sequencers, they set and remove it together.
+    // While their targets differ, as while only some have it set, limits only stay stable with a
+    // sequencer threshold above half the active sequencers.
+    outageTrafficAllowance: Option[PositiveLong] = None,
     // Set to false to disable the DB-level exclusive lock that prevents two sync operator instances
     // from running concurrently against the same database.  Only disable for migration scenarios
     // where intentional overlap is required.

@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.automation
 
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
-import com.digitalasset.canton.topology.{Member, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -19,10 +19,11 @@ import org.lfdecentralizedtrust.splice.util.AssignedContract
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Grants the traffic purchased via `MemberTraffic` contracts on the sequencer this trigger's
-  * connection serves, skipping contracts that name another synchronizer. One instance per
-  * sequencer, so a BFT synchronizer runs one operator app per sequencer.
+  * connection serves, skipping contracts that name another synchronizer. Only the SV app's
+  * `ReconcileSequencerLimitWithMemberTrafficTrigger` extends it: each SV runs one, which grants on
+  * that SV's own sequencer of the decentralized synchronizer.
   *
-  * This trigger currently relies on enough nodes working on the same set traffic balance request
+  * This trigger currently relies on enough SVs working on the same set traffic balance request
   * around the same time. It also depends on the sorting of tasks done in OnAssignedContractTrigger
   * to make this more likely to succeed.
   *
@@ -90,6 +91,19 @@ abstract class ReconcileSequencerLimitWithMemberTrafficTriggerBase(
   }
 
   private def processMember(memberId: Member, synchronizerId: SynchronizerId)(implicit
+      tc: TraceContext
+  ): Future[TaskOutcome] =
+    if (ReconcileSequencerLimitWithMemberTrafficTriggerBase.reconcilesPurchasedTraffic(memberId))
+      reconcileMemberOnSequencer(memberId, synchronizerId)
+    else
+      Future.successful(
+        TaskSuccess(
+          s"Skipping MemberTraffic contract for $memberId: only participants' purchased traffic " +
+            "is reconciled"
+        )
+      )
+
+  private def reconcileMemberOnSequencer(memberId: Member, synchronizerId: SynchronizerId)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] =
     sequencerAdminConnection().flatMap { connection =>
@@ -171,5 +185,17 @@ abstract class ReconcileSequencerLimitWithMemberTrafficTriggerBase(
             }
         } yield taskOutcome
     }
+  }
+}
+
+object ReconcileSequencerLimitWithMemberTrafficTriggerBase {
+
+  /** Whether the traffic purchased for `member` is reconciled with its limit. Only for participants:
+    * a mediator has no purchase path and is granted unlimited traffic instead, which a purchase
+    * someone made for it must not lower, and a sequencer is not charged traffic.
+    */
+  def reconcilesPurchasedTraffic(member: Member): Boolean = member match {
+    case _: ParticipantId => true
+    case _ => false
   }
 }

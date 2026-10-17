@@ -48,4 +48,41 @@ trait MemberTrafficQueries extends AcsJdbcTypes with LimitHelpers { this: NamedL
         )
         .value
     } yield sum.getOrElse(0L)
+
+  /** Total traffic purchased on `synchronizerId`, for every member with a purchase on record. */
+  protected def sumPurchasedMemberTrafficPerMember(
+      storage: DbStorage,
+      acsTableName: String,
+      acsStoreId: AcsStoreId,
+      migrationId: Long,
+      synchronizerId: SynchronizerId,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+      closeContext: CloseContext,
+  ): Future[Map[Member, Long]] = {
+    // Throws on a member that does not parse: ingestion stores a member only once it parses, so
+    // that would be a corrupt row.
+    import Member.DbStorageImplicits.getResultMember
+    for {
+      rows <- storage
+        .query(
+          sql"""
+               select member_traffic_member, sum(total_traffic_purchased)
+               from #$acsTableName
+               where store_id = $acsStoreId
+                and migration_id = $migrationId
+                and package_name = ${MemberTraffic.PACKAGE_NAME}
+                and template_id_qualified_name = ${QualifiedName(
+              MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
+            )}
+                and member_traffic_domain = $synchronizerId
+                and member_traffic_member is not null
+               group by member_traffic_member
+             """.as[(Member, Long)],
+          // the callers' method name, which is what the DB retry logs report
+          "listTotalPurchasedMemberTraffic",
+        )
+    } yield rows.toMap
+  }
 }

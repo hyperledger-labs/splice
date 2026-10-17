@@ -76,7 +76,7 @@ class DbSyncOperatorStore(
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[
     SyncOperatorAcsStoreRowData,
     AcsInterfaceViewRowData.NoInterfacesIngested,
-  ] = SyncOperatorStore.contractFilter(key)
+  ] = SyncOperatorStore.contractFilter(key, logger)
 
   import multiDomainAcsStore.waitUntilAcsIngested
 
@@ -91,6 +91,18 @@ class DbSyncOperatorStore(
       acsStoreId,
       domainMigrationId,
       memberId,
+      key.synchronizerId,
+    )
+  }
+
+  override def listTotalPurchasedMemberTraffic()(implicit
+      tc: TraceContext
+  ): Future[Map[Member, Long]] = waitUntilAcsIngested {
+    sumPurchasedMemberTrafficPerMember(
+      storage,
+      SyncOperatorTables.acsTableName,
+      acsStoreId,
+      domainMigrationId,
       key.synchronizerId,
     )
   }

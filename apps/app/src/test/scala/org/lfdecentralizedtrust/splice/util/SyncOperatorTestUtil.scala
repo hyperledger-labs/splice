@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.RegisteredSynchronizer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
+import org.lfdecentralizedtrust.splice.console.SyncOperatorAppBackendReference
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
@@ -82,10 +83,18 @@ trait SyncOperatorTestUtil extends TestCommon {
       .exerciseResult
   }
 
+  /** The sync operator app that is running, as a test may run another instance in its place. */
+  protected def runningSyncOperatorBackend(implicit
+      env: SpliceTestConsoleEnvironment
+  ): SyncOperatorAppBackendReference =
+    env.syncOperators.local
+      .find(_.is_running)
+      .getOrElse(fail("No sync operator app is running"))
+
   protected def trafficState(
       member: Member
   )(implicit env: SpliceTestConsoleEnvironment): Option[SequencerAdminConnection.TrafficState] =
-    syncOperatorBackend.appState.sequencerAdminConnection
+    runningSyncOperatorBackend.appState.sequencerAdminConnection
       .lookupSequencerTrafficControlState(member)
       .futureValue
 
