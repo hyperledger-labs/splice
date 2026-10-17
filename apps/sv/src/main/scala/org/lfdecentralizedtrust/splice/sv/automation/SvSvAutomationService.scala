@@ -22,6 +22,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ExpireValidatorOnb
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.SvOnboardingSnapshotService
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, LifeCycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
@@ -108,11 +109,21 @@ class SvSvAutomationService(
     )
   }
 
-  def registerOnboardingSnapshotCleanupTrigger(
-      onboardingSnapshotService: SvOnboardingSnapshotService
-  ): Unit =
-    registerTrigger(
-      new SvOnboardingSnapshotCleanupTrigger(triggerContext, onboardingSnapshotService)
+  val onboardingSnapshotService = new SvOnboardingSnapshotService(
+    config.onboardingSnapshots,
+    clock,
+    retryProvider,
+    loggerFactory,
+  )
+
+  registerTrigger(
+    new SvOnboardingSnapshotCleanupTrigger(triggerContext, onboardingSnapshotService)
+  )
+
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
+    super.closeAsync() :+ SyncCloseable(
+      "onboarding snapshot service",
+      LifeCycle.close(onboardingSnapshotService)(logger),
     )
 }
 
