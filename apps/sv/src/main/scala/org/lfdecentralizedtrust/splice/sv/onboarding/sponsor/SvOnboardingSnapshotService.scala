@@ -52,7 +52,7 @@ class SvOnboardingSnapshotService(
     config.directory.map(directory => (File(directory) / "exports").createDirectories().path)
 
   private val mutex = Mutex()
-  private val jobs = mutable.Map.empty[SvOnboardingSnapshotId, Snapshot]
+  private val jobs = mutable.Map.empty[SvOnboardingSnapshotId, SnapshotKey]
 
   private def shuttingDown: Boolean = isClosing || retryProvider.isClosing
 
@@ -217,10 +217,7 @@ class SvOnboardingSnapshotService(
     mutex.exclusive {
       if (shuttingDown) throw shutdownError
       val existing = jobs
-        .collectFirst {
-          case (id, snapshot) if snapshot.key == key =>
-            id
-        }
+        .collectFirst { case (id, jobKey) if jobKey == key => id }
         .orElse {
           storedIds.find(id =>
             readSnapshot(id).exists(snapshot =>
@@ -235,7 +232,7 @@ class SvOnboardingSnapshotService(
         val file = exports.resolve(id.value).resolve("snapshot")
         queue.offer(QueuedExport(id, file, exportTo, tc)) match {
           case Enqueued =>
-            jobs.update(id, Snapshot(key, clock.now, SnapshotState.Exporting))
+            jobs.update(id, key)
             logger.info(s"Queued onboarding snapshot export $id for $key")
             id
           case Dropped =>
@@ -254,7 +251,8 @@ class SvOnboardingSnapshotService(
   def lookup(id: SvOnboardingSnapshotId): Option[SnapshotState] = blocking {
     mutex.exclusive {
       if (shuttingDown) None
-      else jobs.get(id).orElse(readSnapshot(id)(TraceContext.empty)).map(_.state)
+      else if (jobs.contains(id)) Some(SnapshotState.Exporting)
+      else readSnapshot(id)(TraceContext.empty).map(_.state)
     }
   }
 
@@ -280,15 +278,15 @@ class SvOnboardingSnapshotService(
         .transform { result =>
           blocking {
             mutex.exclusive {
-              jobs.get(queued.id).foreach { snapshot =>
+              jobs.get(queued.id).foreach { key =>
                 val published = result.flatMap { _ =>
                   Try {
-                    val SnapshotKey.Acs(synchronizerId, party, activationTime) = snapshot.key
+                    val SnapshotKey.Acs(synchronizerId, party, activationTime) = key
                     val metadata = PersistedSnapshot(
                       synchronizerId.toProtoPrimitive,
                       party.toProtoPrimitive,
                       activationTime.toString,
-                      snapshot.createdAt.toInstant.toString,
+                      clock.now.toInstant.toString,
                       Files.size(queued.file),
                     )
                     val temporary = queued.file.resolveSibling("metadata.tmp")

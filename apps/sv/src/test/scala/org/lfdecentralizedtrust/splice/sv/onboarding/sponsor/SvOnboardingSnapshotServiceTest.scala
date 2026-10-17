@@ -288,7 +288,13 @@ class SvOnboardingSnapshotServiceTest
         val exportedFile = eventually() {
           inside(service.lookup(exporting)) { case Some(SnapshotState.Ready(file)) => file }
         }
-        service.removeExpired(clock.now).futureValue shouldBe 1
+        service.removeExpired(clock.now).futureValue shouldBe 0
+        service
+          .prepare(key("sv2"), _ => fail("must reuse the finished export"))
+          .futureValue shouldBe exporting
+
+        clock.advance(Duration.ofHours(24))
+        trigger.performWorkIfAvailable().futureValue
         service.lookup(exporting) shouldBe None
         Files.exists(exportedFile) shouldBe false
       } finally {
