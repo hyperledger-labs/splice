@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.sv.automation.SvOnboardingSnapshotCleanupTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingSnapshotsConfig
+import org.lfdecentralizedtrust.splice.sv.onboarding.SvOnboardingSnapshotId
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.SvOnboardingSnapshotService.{
   SnapshotKey,
   SnapshotState,
@@ -180,7 +181,7 @@ class SvOnboardingSnapshotServiceTest
       final class Export(name: String) {
         val started = Promise[Unit]()
         val done = Promise[Unit]()
-        def prepare(): String = service
+        def prepare(): SvOnboardingSnapshotId = service
           .prepare(
             key(name),
             _ => {
@@ -304,7 +305,7 @@ class SvOnboardingSnapshotServiceTest
           service.prepare(key("sv1"), writeSnapshot(Future.unit)).futureValue
         val second =
           service.prepare(key("sv2"), writeSnapshot(Future.unit)).futureValue
-        def fileOf(id: String): Path = eventually() {
+        def fileOf(id: SvOnboardingSnapshotId): Path = eventually() {
           inside(service.lookup(id)) { case Some(SnapshotState.Ready(file)) => file }
         }
         val firstFile = fileOf(first)

@@ -45,6 +45,7 @@ import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftClient
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting.DsoPartyMigrationFailure
+import org.lfdecentralizedtrust.splice.sv.onboarding.SvOnboardingSnapshotId
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.{
   DsoPartyMigration,
   SvOnboardingSnapshotService,
@@ -550,7 +551,10 @@ class HttpSvPublicHandler(
   )(id: String)(extracted: TraceContext): Future[rStream.OnboardSvDownloadResponse] = {
     implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.onboardSvDownload") { _ => _ =>
-      HttpSvPublicHandler.onboardSvDownloadResponse(onboardingSnapshotService, id)
+      HttpSvPublicHandler.onboardSvDownloadResponse(
+        onboardingSnapshotService,
+        SvOnboardingSnapshotId(id),
+      )
     }
   }
 
@@ -924,13 +928,13 @@ object HttpSvPublicHandler {
       case Right(Some(key)) =>
         snapshotService
           .prepare(key, exportSnapshot(key, _))
-          .map(id => respond.OK(definitions.OnboardSvSnapshotPrepareResponse(id)))
+          .map(id => respond.OK(definitions.OnboardSvSnapshotPrepareResponse(id.value)))
     }
   }
 
   private[http] def onboardSvDownloadResponse(
       snapshotService: SvOnboardingSnapshotService,
-      id: String,
+      id: SvOnboardingSnapshotId,
   )(implicit
       ec: ExecutionContext
   ): Future[rStream.OnboardSvDownloadResponse] = {

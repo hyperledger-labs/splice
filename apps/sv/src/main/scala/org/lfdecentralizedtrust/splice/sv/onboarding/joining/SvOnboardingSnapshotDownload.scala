@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvStreamClient.{
   OnboardSvDownloadResponse
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingSnapshotsConfig
+import org.lfdecentralizedtrust.splice.sv.onboarding.SvOnboardingSnapshotId
 
 import java.nio.file.{Files, Path}
 import java.util.concurrent.atomic.AtomicReference
@@ -30,13 +31,13 @@ final class SvOnboardingSnapshotDownload private (
   override val loggerFactory: NamedLoggerFactory = retryProvider.loggerFactory
 
   private val file = directory.resolve("snapshot")
-  private val preparedId = new AtomicReference[Option[String]](None)
+  private val preparedId = new AtomicReference[Option[SvOnboardingSnapshotId]](None)
 
   def prepareAndDownload(
-      prepare: => Future[String],
-      downloadFrom: String => Future[OnboardSvDownloadResponse],
+      prepare: => Future[SvOnboardingSnapshotId],
+      downloadFrom: SvOnboardingSnapshotId => Future[OnboardSvDownloadResponse],
   )(implicit ec: ExecutionContext, mat: Materializer): Future[Path] = {
-    def prepareSnapshot(): Future[String] =
+    def prepareSnapshot(): Future[SvOnboardingSnapshotId] =
       prepare.map { id =>
         preparedId.set(Some(id))
         id
@@ -57,8 +58,8 @@ final class SvOnboardingSnapshotDownload private (
   }
 
   def download(
-      id: String,
-      downloadFrom: String => Future[OnboardSvDownloadResponse],
+      id: SvOnboardingSnapshotId,
+      downloadFrom: SvOnboardingSnapshotId => Future[OnboardSvDownloadResponse],
   )(implicit ec: ExecutionContext, mat: Materializer): Future[Path] =
     downloadFrom(id).flatMap { case OnboardSvDownloadResponse.OK(entity) =>
       entity.dataBytes

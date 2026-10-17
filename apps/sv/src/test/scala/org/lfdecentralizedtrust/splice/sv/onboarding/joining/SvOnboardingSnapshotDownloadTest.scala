@@ -24,6 +24,7 @@ import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvStreamClient.{
   OnboardSvDownloadResponse
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingSnapshotsConfig
+import org.lfdecentralizedtrust.splice.sv.onboarding.SvOnboardingSnapshotId
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.io.IOException
@@ -71,8 +72,8 @@ class SvOnboardingSnapshotDownloadTest
   private class Sponsor(responses: OnboardSvDownloadResponse*) {
     private val remaining = mutable.Queue(responses*)
     val requests = mutable.ListBuffer.empty[String]
-    def download(id: String): Future[OnboardSvDownloadResponse] = {
-      requests += id
+    def download(id: SvOnboardingSnapshotId): Future[OnboardSvDownloadResponse] = {
+      requests += id.value
       Future.successful(remaining.dequeue())
     }
   }
@@ -81,10 +82,10 @@ class SvOnboardingSnapshotDownloadTest
     private val remaining = mutable.Queue(responses*)
     val prepares = new AtomicInteger()
     val downloads = mutable.ListBuffer.empty[String]
-    def prepare(): Future[String] =
-      Future.successful(s"id-${prepares.incrementAndGet()}")
-    def download(id: String): Future[OnboardSvDownloadResponse] = {
-      downloads += id
+    def prepare(): Future[SvOnboardingSnapshotId] =
+      Future.successful(SvOnboardingSnapshotId(s"id-${prepares.incrementAndGet()}"))
+    def download(id: SvOnboardingSnapshotId): Future[OnboardSvDownloadResponse] = {
+      downloads += id.value
       remaining.dequeue().fold(Future.failed, Future.successful)
     }
   }
@@ -171,7 +172,8 @@ class SvOnboardingSnapshotDownloadTest
 
     "download the whole snapshot" in withDownload { snapshotDownload =>
       val sponsor = new Sponsor(full())
-      val file = snapshotDownload.download("id", sponsor.download).futureValue
+      val file =
+        snapshotDownload.download(SvOnboardingSnapshotId("id"), sponsor.download).futureValue
       Files.readAllBytes(file) shouldBe content
       sponsor.requests shouldBe Seq("id")
     }
@@ -183,7 +185,9 @@ class SvOnboardingSnapshotDownloadTest
         retryProvider,
       )
       val file =
-        snapshotDownload.download("../../unrelated", new Sponsor(full()).download).futureValue
+        snapshotDownload
+          .download(SvOnboardingSnapshotId("../../unrelated"), new Sponsor(full()).download)
+          .futureValue
       file.getParent shouldBe snapshotDownload.directory
       directory.listRecursively.map(_.name).toSeq should not contain "unrelated"
     }

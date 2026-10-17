@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesC
 import org.lfdecentralizedtrust.splice.environment.{HttpAppConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient
+import org.lfdecentralizedtrust.splice.sv.onboarding.SvOnboardingSnapshotId
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -49,7 +50,7 @@ final class SvConnection private (
   ): Future[
     Either[
       HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound,
-      String,
+      SvOnboardingSnapshotId,
     ]
   ] =
     runHttpCmd(config.url, HttpSvPublicAppClient.OnboardSvPartyMigrationPrepare(candidateParty))
@@ -69,7 +70,7 @@ final class SvConnection private (
       ),
     )
 
-  def downloadOnboardingSnapshot(id: String)(implicit
+  def downloadOnboardingSnapshot(id: SvOnboardingSnapshotId)(implicit
       httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,

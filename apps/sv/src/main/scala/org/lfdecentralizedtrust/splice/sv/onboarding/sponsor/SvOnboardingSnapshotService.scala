@@ -24,6 +24,7 @@ import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingSnapshotsConfig
+import org.lfdecentralizedtrust.splice.sv.onboarding.SvOnboardingSnapshotId
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.SvOnboardingSnapshotService.*
 
 import java.nio.file.{Files, Path}
@@ -54,10 +55,10 @@ class SvOnboardingSnapshotService(
   }
 
   private val mutex = Mutex()
-  private val snapshots = mutable.Map.empty[String, Snapshot]
-  private val snapshotIds = mutable.Map.empty[SnapshotKey, String]
-  private val pendingDeletions = mutable.Map.empty[String, Path]
-  private val activeExports = mutable.Set.empty[String]
+  private val snapshots = mutable.Map.empty[SvOnboardingSnapshotId, Snapshot]
+  private val snapshotIds = mutable.Map.empty[SnapshotKey, SvOnboardingSnapshotId]
+  private val pendingDeletions = mutable.Map.empty[SvOnboardingSnapshotId, Path]
+  private val activeExports = mutable.Set.empty[SvOnboardingSnapshotId]
   private val exportsTerminated: Promise[Done] = Promise()
 
   private def shuttingDown: Boolean = isClosing || retryProvider.isClosing
@@ -104,7 +105,7 @@ class SvOnboardingSnapshotService(
 
   def prepare(key: SnapshotKey, exportTo: Path => Future[Unit])(implicit
       tc: TraceContext
-  ): Future[String] = Future.fromTry(blocking {
+  ): Future[SvOnboardingSnapshotId] = Future.fromTry(blocking {
     mutex.exclusive {
       if (shuttingDown) Failure(shutdownError)
       else
@@ -118,8 +119,8 @@ class SvOnboardingSnapshotService(
           ) match {
           case Some(id) => Success(id)
           case None =>
-            val id = UUID.randomUUID().toString
-            val file = exportsDirectory.resolve(id)
+            val id = SvOnboardingSnapshotId(UUID.randomUUID().toString)
+            val file = exportsDirectory.resolve(id.value)
             queue.offer(QueuedExport(id, file, exportTo, tc)) match {
               case Enqueued =>
                 snapshots.update(id, Snapshot(key, clock.now, file, SnapshotState.Exporting))
@@ -142,13 +143,13 @@ class SvOnboardingSnapshotService(
     }
   })
 
-  def lookup(id: String): Option[SnapshotState] = blocking {
+  def lookup(id: SvOnboardingSnapshotId): Option[SnapshotState] = blocking {
     mutex.exclusive {
       if (shuttingDown) None else snapshotState(id)
     }
   }
 
-  private def snapshotState(id: String): Option[SnapshotState] =
+  private def snapshotState(id: SvOnboardingSnapshotId): Option[SnapshotState] =
     snapshots.get(id).map { snapshot =>
       snapshot.state match {
         case SnapshotState.Ready(file) if Files.notExists(file) =>
@@ -244,7 +245,9 @@ class SvOnboardingSnapshotService(
     }
   }
 
-  private def deleteSnapshotFile(id: String, file: Path)(implicit tc: TraceContext): Boolean =
+  private def deleteSnapshotFile(id: SvOnboardingSnapshotId, file: Path)(implicit
+      tc: TraceContext
+  ): Boolean =
     Try(blocking(Files.deleteIfExists(file))) match {
       case Success(deleted) =>
         val removed = blocking(mutex.exclusive(pendingDeletions.remove(id).isDefined))
@@ -301,7 +304,7 @@ object SvOnboardingSnapshotService {
   )
 
   private final case class QueuedExport(
-      id: String,
+      id: SvOnboardingSnapshotId,
       file: Path,
       exportTo: Path => Future[Unit],
       traceContext: TraceContext,

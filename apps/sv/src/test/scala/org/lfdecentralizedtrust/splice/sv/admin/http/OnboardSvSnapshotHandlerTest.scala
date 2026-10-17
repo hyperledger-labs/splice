@@ -26,6 +26,7 @@ import org.lfdecentralizedtrust.splice.http.v0.sv_public_stream.{
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingSnapshotsConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
+import org.lfdecentralizedtrust.splice.sv.onboarding.SvOnboardingSnapshotId
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.SvOnboardingSnapshotService
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.SvOnboardingSnapshotService.{
   SnapshotKey,
@@ -63,7 +64,7 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
     override def onboardSvDownload(
         respond: SvPublicStreamResource.OnboardSvDownloadResponse.type
     )(id: String)(extracted: TraceContext) =
-      HttpSvPublicHandler.onboardSvDownloadResponse(snapshotService, id)
+      HttpSvPublicHandler.onboardSvDownloadResponse(snapshotService, SvOnboardingSnapshotId(id))
   }
 
   private val route = Route.seal(
@@ -72,7 +73,7 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
 
   private val content = "0123456789".getBytes
 
-  private def prepare(name: String, exportTo: Path => Future[Unit]): String =
+  private def prepare(name: String, exportTo: Path => Future[Unit]): SvOnboardingSnapshotId =
     snapshotService
       .prepare(
         SnapshotKey.Acs(
@@ -95,7 +96,8 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
       any[TraceContext]
     )
 
-  private def download(id: String) = Get(s"/api/sv/v0/onboard/sv/download/$id")
+  private def download(id: SvOnboardingSnapshotId) =
+    Get(s"/api/sv/v0/onboard/sv/download/${id.value}")
 
   "onboardSvDownload" should {
 
@@ -125,7 +127,7 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
         body should not include "Permission denied"
       }
 
-      download("unknown") ~> route ~> check {
+      download(SvOnboardingSnapshotId("unknown")) ~> route ~> check {
         status shouldBe StatusCodes.NotFound
       }
 

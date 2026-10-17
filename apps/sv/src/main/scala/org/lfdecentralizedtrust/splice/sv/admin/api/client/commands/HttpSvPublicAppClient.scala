@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryab
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_public as http}
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvStreamClient
 import org.lfdecentralizedtrust.splice.sv.http.SvHttpClient.BaseCommandPublic
+import org.lfdecentralizedtrust.splice.sv.onboarding.SvOnboardingSnapshotId
 import org.lfdecentralizedtrust.splice.util.{Codec, TemplateJsonDecoder}
 
 import scala.concurrent.Future
@@ -194,7 +195,7 @@ object HttpSvPublicAppClient {
         http.OnboardSvPartyMigrationPrepareResponse,
         Either[
           OnboardSvPartyMigrationAuthorizeProposalNotFound,
-          String,
+          SvOnboardingSnapshotId,
         ],
       ] {
     override val nonErrorStatusCodes = Set(StatusCodes.BadRequest)
@@ -237,7 +238,7 @@ object HttpSvPublicAppClient {
           )
         )
       case http.OnboardSvPartyMigrationPrepareResponse.OK(response) =>
-        Right(Right(response.id))
+        Right(Right(SvOnboardingSnapshotId(response.id)))
     }
   }
 
@@ -274,7 +275,7 @@ object HttpSvPublicAppClient {
   }
 
   case class OnboardSvDownload(
-      id: String
+      id: SvOnboardingSnapshotId
   ) extends HttpCommand[
         SvStreamClient.OnboardSvDownloadResponse,
         SvStreamClient.OnboardSvDownloadResponse,
@@ -290,7 +291,7 @@ object HttpSvPublicAppClient {
       Throwable,
       HttpResponse,
     ], SvStreamClient.OnboardSvDownloadResponse] =
-      client.onboardSvDownload(id, headers = headers)
+      client.onboardSvDownload(id.value, headers = headers)
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = { case response =>
       Right(response)
