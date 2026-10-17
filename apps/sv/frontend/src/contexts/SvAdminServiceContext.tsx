@@ -20,8 +20,10 @@ import {
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
   ListFeaturedAppRightsByProviderResponse,
+  ListSynchronizerRegistrationsResponse,
   LookupFeaturedAppRightByContractIdResponse,
   LookupSynchronizerRegistrationResponse,
+  LookupSynchronizerRegistrationByContractIdResponse,
   ListValidatorLicensesResponse,
   ListVoteRequestByTrackingCidResponse,
   ListVoteResultsRequest,
@@ -105,10 +107,15 @@ export interface SvAdminClient {
   lookupFeaturedAppRightByContractId: (
     contractId: string
   ) => Promise<LookupFeaturedAppRightByContractIdResponse>;
-  /** Resolves to undefined when the synchronizer is not registered (the endpoint 404s). */
   lookupSynchronizerRegistration: (
     synchronizerId: string
   ) => Promise<LookupSynchronizerRegistrationResponse | undefined>;
+  listSynchronizerRegistrations: (
+    synchronizerId: string
+  ) => Promise<ListSynchronizerRegistrationsResponse>;
+  lookupSynchronizerRegistrationByContractId: (
+    contractId: string
+  ) => Promise<LookupSynchronizerRegistrationByContractIdResponse>;
 }
 
 class ApiMiddleware
@@ -277,6 +284,16 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
           }
           throw e;
         }
+      },
+      listSynchronizerRegistrations: async (
+        synchronizerId: string
+      ): Promise<ListSynchronizerRegistrationsResponse> => {
+        return await svAdminClient.listSynchronizerRegistrations(synchronizerId);
+      },
+      lookupSynchronizerRegistrationByContractId: async (
+        contractId: string
+      ): Promise<LookupSynchronizerRegistrationByContractIdResponse> => {
+        return await svAdminClient.lookupSynchronizerRegistrationByContractId(contractId);
       },
     };
   }, [url, userAccessToken]);

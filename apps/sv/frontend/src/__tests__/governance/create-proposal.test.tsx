@@ -111,6 +111,9 @@ describe('Create Proposal', () => {
       expect(screen.getByText('Set Amulet Rules Configuration')).toBeInTheDocument();
       expect(screen.getByText('Update Super Validator Reward Weight')).toBeInTheDocument();
       expect(screen.getByText('Create Unclaimed Activity Record')).toBeInTheDocument();
+      expect(screen.getByText('Register Dedicated Synchronizer')).toBeInTheDocument();
+      expect(screen.getByText('Offboard Dedicated Synchronizer')).toBeInTheDocument();
+      expect(screen.getByText('Set Dedicated Synchronizer Parameters')).toBeInTheDocument();
     });
   });
 

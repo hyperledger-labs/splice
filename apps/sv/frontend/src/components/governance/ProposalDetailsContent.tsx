@@ -44,6 +44,10 @@ import { JsonDiffAccordion } from './JsonDiffAccordion';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { DetailItem } from './proposal-details/DetailItem';
 import { CreateUnallocatedUnclaimedActivityRecordSection } from './proposal-details/CreateUnallocatedUnclaimedActivityRecordSection';
+import {
+  ArchiveSynchronizerRegistrationSection,
+  SetSynchronizerGovernanceParametersSection,
+} from './proposal-details/SynchronizerRegistrationSections';
 import { CopyableIdentifier, CopyableUrl, MemberIdentifier, VoteStats } from '../ui';
 import { useQuery } from '@tanstack/react-query';
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
@@ -263,6 +267,21 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               synchronizerId={proposalDetails.proposal.synchronizerId}
               operator={proposalDetails.proposal.operator}
               discountFactor={proposalDetails.proposal.discountFactor}
+            />
+          )}
+
+          {proposalDetails.action === 'SRARC_ArchiveSynchronizerRegistration' && (
+            <ArchiveSynchronizerRegistrationSection
+              registeredSynchronizerCid={proposalDetails.proposal.registeredSynchronizerCid}
+              isOpen={!isClosed}
+            />
+          )}
+
+          {proposalDetails.action === 'SRARC_SetSynchronizerGovernanceParameters' && (
+            <SetSynchronizerGovernanceParametersSection
+              registeredSynchronizerCid={proposalDetails.proposal.registeredSynchronizerCid}
+              newGovernanceParameters={proposalDetails.proposal.newGovernanceParameters}
+              isOpen={!isClosed}
             />
           )}
 

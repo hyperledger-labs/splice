@@ -241,8 +241,8 @@ paths:
       operationId: "lookupSynchronizerRegistration"
       description: |
         Look up the registration of a dedicated synchronizer, so the SV UI can tell a
-        proposer that a synchronizer id is already registered, and resolve the registration
-        an offboard or set-parameters proposal targets. Served from the SV app's DSO store.
+        proposer that a synchronizer id is already registered. Served from the SV app's DSO
+        store.
       parameters:
         - name: "synchronizer_id"
           in: "path"
@@ -258,6 +258,30 @@ paths:
                 $ref: "#/components/schemas/LookupSynchronizerRegistrationResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/admin/sv/synchronizers/{synchronizer_id}/registrations:
+    get:
+      tags: [ sv ]
+      x-jvm-package: sv_operator
+      operationId: "listSynchronizerRegistrations"
+      description: |
+        List every active registration of a dedicated synchronizer, ordered by contract id,
+        so the SV UI can resolve the registration an offboard or set-parameters proposal
+        targets. Usually one; uniqueness is not enforced on-ledger, so a proposer can pick a
+        duplicate from the list. Empty when the synchronizer id is not registered. Served from
+        the SV app's DSO store.
+      parameters:
+        - name: "synchronizer_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSynchronizerRegistrationsResponse"
   /v0/admin/sv/synchronizers/registrations/by-contract-id/{contract_id}:
     get:
       tags: [ sv ]
@@ -1161,6 +1185,18 @@ components:
       properties:
         registration:
           $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    ListSynchronizerRegistrationsResponse:
+      description: |
+        The active `Splice.DecentralizedSynchronizer:RegisteredSynchronizer` contracts for a
+        synchronizer id, ordered by contract id.
+      type: object
+      required: ["registrations"]
+      properties:
+        registrations:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     LookupSynchronizerRegistrationByContractIdResponse:
       description: |

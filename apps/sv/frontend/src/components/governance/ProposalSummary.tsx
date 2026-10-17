@@ -12,7 +12,10 @@ import {
   THRESHOLD_DEADLINE_LABEL,
   THRESHOLD_DEADLINE_SUBTITLE,
 } from '../../utils/constants';
+import type { GovernanceParameters } from '@daml.js/splice-amulet/lib/Splice/DecentralizedSynchronizer';
+import type { ResolvedSynchronizerRegistration } from '../../hooks/useSynchronizerRegistrationPicker';
 import type { ConfigChange } from '../../utils/types';
+import { governanceParameterChanges } from '../forms/governanceParameterFields';
 import { formatDatetimeWithOffset } from '../../utils/dateFormat';
 import { ConfigValuesChanges } from './ConfigValuesChanges';
 import { ProposalReviewField } from './ProposalReviewField';
@@ -80,6 +83,15 @@ type ProposalSummaryProps = BaseProposalSummaryProps &
         synchronizerId: string;
         operator: string;
         discountFactor: string;
+      }
+    | {
+        formType: 'archive-synchronizer-registration';
+        registration: ResolvedSynchronizerRegistration;
+      }
+    | {
+        formType: 'set-synchronizer-governance-parameters';
+        registration: ResolvedSynchronizerRegistration;
+        newGovernanceParameters: GovernanceParameters;
       }
     | {
         formType: 'update-right-weight';
@@ -262,6 +274,48 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
               value={props.discountFactor}
             />
           </>
+        )}
+
+        {(formType === 'archive-synchronizer-registration' ||
+          formType === 'set-synchronizer-governance-parameters') && (
+          <>
+            <ProposalReviewField
+              id="synchronizerId"
+              label="Synchronizer ID"
+              value={props.registration.synchronizerId}
+            />
+            <ProposalReviewField
+              id="operator"
+              label="Synchronizer Operator"
+              value={
+                <ReviewPartyId
+                  partyId={props.registration.operator}
+                  data-testid="operator-party-id"
+                />
+              }
+            />
+            <ProposalReviewField
+              id="registeredSynchronizerCid"
+              label="Registration Contract ID"
+              value={props.registration.contractId}
+            />
+          </>
+        )}
+
+        {formType === 'set-synchronizer-governance-parameters' && (
+          <ProposalReviewField
+            id="governanceParameters"
+            label="Proposed Changes"
+            value={
+              <ConfigValuesChanges
+                isSummaryView
+                changes={governanceParameterChanges(
+                  props.registration.governanceParameters,
+                  props.newGovernanceParameters
+                )}
+              />
+            }
+          />
         )}
 
         {formType === 'create-unallocated-unclaimed-activity-record' && (
