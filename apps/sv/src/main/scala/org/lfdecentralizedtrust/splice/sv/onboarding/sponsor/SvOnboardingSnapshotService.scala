@@ -17,21 +17,25 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Mutex
+import io.circe.{Decoder, Encoder}
+import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
+import io.circe.parser.decode
+import io.circe.syntax.*
 import io.grpc.Status
 import org.apache.pekko.Done
 import org.apache.pekko.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
-import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
+import org.apache.pekko.stream.{Materializer, QueueOfferResult}
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingSnapshotsConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.SvOnboardingSnapshotId
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.SvOnboardingSnapshotService.*
 
-import java.nio.file.{Files, Path}
+import java.nio.file.{Files, Path, StandardCopyOption}
 import java.time.Instant
 import java.util.UUID
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.{Failure, Success, Try}
 
 class SvOnboardingSnapshotService(
@@ -45,21 +49,12 @@ class SvOnboardingSnapshotService(
     with RetryProvider.Has {
 
   private[sponsor] val exportsDirectory: Path = config.directory match {
-    case Some(directory) =>
-      val downloads = File(directory) / "downloads"
-      if (downloads.exists) downloads.delete()
-      val exports = File(directory) / "exports"
-      if (exports.exists) exports.delete()
-      exports.createDirectories().path
+    case Some(directory) => (File(directory) / "exports").createDirectories().path
     case None => Files.createTempDirectory("sv-onboarding-snapshots")
   }
 
   private val mutex = Mutex()
-  private val snapshots = mutable.Map.empty[SvOnboardingSnapshotId, Snapshot]
-  private val snapshotIds = mutable.Map.empty[SnapshotKey, SvOnboardingSnapshotId]
-  private val pendingDeletions = mutable.Map.empty[SvOnboardingSnapshotId, Path]
-  private val activeExports = mutable.Set.empty[SvOnboardingSnapshotId]
-  private val exportsTerminated: Promise[Done] = Promise()
+  private val jobs = mutable.Map.empty[SvOnboardingSnapshotId, Snapshot]
 
   private def shuttingDown: Boolean = isClosing || retryProvider.isClosing
 
@@ -68,207 +63,261 @@ class SvOnboardingSnapshotService(
       .withDescription("SV onboarding snapshot exports are shutting down")
       .asRuntimeException()
 
-  private val queueTerminated: Promise[Done] = Promise()
-  private val queue: BoundedSourceQueue[QueuedExport] =
-    Source
-      .queue[QueuedExport](config.queueSize.value)
-      .mapAsyncUnordered(config.parallelism.value)(runExport)
-      .toMat(Sink.onComplete { result =>
-        queueTerminated
-          .tryComplete(
-            if (shuttingDown) Success(Done)
-            else
-              retryProvider.logTerminationAndRecoverOnShutdown(
-                "onboarding snapshot export queue",
-                logger,
-              )(result)(TraceContext.empty)
+  private def directory(id: SvOnboardingSnapshotId): Path = exportsDirectory.resolve(id.value)
+
+  private def storedIds: Seq[SvOnboardingSnapshotId] =
+    File(exportsDirectory).children.flatMap { entry =>
+      val name = entry.name
+      Try(UUID.fromString(name)).toOption
+        .filter(_.toString == name)
+        .map(_ => SvOnboardingSnapshotId(name))
+    }.toSeq
+
+  private def readSnapshot(
+      id: SvOnboardingSnapshotId
+  )(implicit tc: TraceContext): Option[Snapshot] = {
+    val validId = Try(UUID.fromString(id.value)).toOption.exists(_.toString == id.value)
+    if (!validId) None
+    else {
+      val metadata = directory(id).resolve("metadata.json")
+      if (!Files.isRegularFile(metadata)) None
+      else
+        Try {
+          val persisted =
+            decode[PersistedSnapshot](Files.readString(metadata)).fold(throw _, identity)
+          val file = directory(id).resolve("snapshot")
+          val state: SnapshotState =
+            if (Files.notExists(file)) SnapshotState.Failed("Snapshot file is missing")
+            else if (!Files.isRegularFile(file) || Files.size(file) != persisted.size)
+              SnapshotState.Failed("Snapshot file size has changed")
+            else SnapshotState.Ready(file)
+          Snapshot(
+            SnapshotKey.Acs(
+              SynchronizerId.tryFromString(persisted.synchronizerId),
+              PartyId.tryFromProtoPrimitive(persisted.party),
+              Instant.parse(persisted.activationTime),
+            ),
+            CantonTimestamp.assertFromInstant(Instant.parse(persisted.createdAt)),
+            state,
           )
-          .discard
-      })(Keep.left)
-      .run()
+        } match {
+          case Success(snapshot) => Some(snapshot)
+          case Failure(error) =>
+            logger.warn(s"Cannot recover onboarding snapshot $id; it will be removed", error)
+            None
+        }
+    }
+  }
+
+  private def deleteSnapshot(id: SvOnboardingSnapshotId)(implicit tc: TraceContext): Boolean =
+    Try {
+      val dir = directory(id)
+      if (Files.isDirectory(dir)) {
+        Seq("metadata.json", "metadata.tmp", "snapshot").foreach(name =>
+          Files.deleteIfExists(dir.resolve(name)).discard
+        )
+      }
+      Files.deleteIfExists(dir)
+    } match {
+      case Success(_) =>
+        logger.info(s"Removed onboarding snapshot file $id")
+        true
+      case Failure(error) =>
+        logger.warn(s"Failed to delete onboarding snapshot file $id; cleanup will retry", error)
+        false
+    }
+
+  private def removeExpiredNow(now: CantonTimestamp)(implicit tc: TraceContext): Int = {
+    storedIds.count { id =>
+      if (jobs.contains(id)) false
+      else {
+        val keep = readSnapshot(id).exists { snapshot =>
+          snapshot.state.isInstanceOf[SnapshotState.Ready] &&
+          snapshot.createdAt.plus(config.retention.asJava) > now
+        }
+        !keep && deleteSnapshot(id)
+      }
+    }
+  }
+
+  private def removeExpiredDownloads(now: Instant)(implicit tc: TraceContext): Int =
+    config.directory.toList
+      .flatMap { root =>
+        val downloads = File(root) / "downloads"
+        if (downloads.isDirectory) downloads.children.toSeq else Seq.empty
+      }
+      .count { download =>
+        Try {
+          val expired = (Iterator.single(download) ++ download.listRecursively).forall(file =>
+            !Files
+              .getLastModifiedTime(file.path)
+              .toInstant
+              .plus(config.retention.asJava)
+              .isAfter(now)
+          )
+          if (expired) download.delete().discard
+          expired
+        } match {
+          case Success(removed) => removed
+          case Failure(error) =>
+            logger.warn(
+              s"Failed to clean up onboarding download ${download.name}; cleanup will retry",
+              error,
+            )
+            false
+        }
+      }
+
+  blocking(removeExpiredNow(clock.now)(TraceContext.empty)).discard
+  blocking(removeExpiredDownloads(Instant.now())(TraceContext.empty)).discard
+
+  private val (queue, queueTerminated) = Source
+    .queue[QueuedExport](config.queueSize.value)
+    .mapAsyncUnordered(config.parallelism.value)(runExport)
+    .toMat(Sink.ignore)(Keep.both)
+    .run()
+
+  queueTerminated.onComplete { result =>
+    if (!shuttingDown)
+      retryProvider
+        .logTerminationAndRecoverOnShutdown("onboarding snapshot export queue", logger)(result)(
+          TraceContext.empty
+        )
+        .discard
+  }
 
   retryProvider.runOnOrAfterClose_(new RunOnClosing {
     override def name: String = "terminate onboarding snapshot export queue"
-    override def done: Boolean = queueTerminated.isCompleted && exportsTerminated.isCompleted
+    override def done: Boolean = queueTerminated.isCompleted
     override def run()(implicit tc: TraceContext): Unit = stopExports()
   })(TraceContext.empty)
 
-  private def stopExports(): Unit = blocking {
-    mutex.exclusive {
-      try queue.fail(shutdownError)
-      catch {
-        case _: IllegalStateException => ()
-      }
-      if (activeExports.isEmpty) exportsTerminated.trySuccess(Done).discard
+  private def stopExports(): Unit =
+    try queue.complete()
+    catch {
+      case _: IllegalStateException => ()
     }
-  }
 
   def prepare(key: SnapshotKey, exportTo: Path => Future[Unit])(implicit
       tc: TraceContext
-  ): Future[SvOnboardingSnapshotId] = Future.fromTry(blocking {
+  ): Future[SvOnboardingSnapshotId] = Future.fromTry(Try(blocking {
     mutex.exclusive {
-      if (shuttingDown) Failure(shutdownError)
-      else
-        snapshotIds
-          .get(key)
-          .filter(id =>
-            snapshotState(id).exists {
-              case SnapshotState.Failed(_) => false
-              case _ => true
-            }
-          ) match {
-          case Some(id) => Success(id)
-          case None =>
-            val id = SvOnboardingSnapshotId(UUID.randomUUID().toString)
-            val file = exportsDirectory.resolve(id.value)
-            queue.offer(QueuedExport(id, file, exportTo, tc)) match {
-              case Enqueued =>
-                snapshots.update(id, Snapshot(key, clock.now, file, SnapshotState.Exporting))
-                snapshotIds.update(key, id)
-                logger.info(s"Queued onboarding snapshot export $id for $key")
-                Success(id)
-              case Dropped =>
-                Failure(
-                  Status.UNAVAILABLE
-                    .withDescription(
-                      s"Too many onboarding snapshot exports queued (max ${config.queueSize.value})"
-                    )
-                    .asRuntimeException()
-                )
-              case QueueClosed =>
-                Failure(shutdownError)
-              case QueueOfferResult.Failure(cause) => Failure(cause)
-            }
+      if (shuttingDown) throw shutdownError
+      val existing = jobs
+        .collectFirst {
+          case (id, snapshot) if snapshot.key == key =>
+            id
         }
+        .orElse {
+          storedIds.find(id =>
+            readSnapshot(id).exists(snapshot =>
+              snapshot.key == key && snapshot.state.isInstanceOf[SnapshotState.Ready] &&
+                snapshot.createdAt.plus(config.retention.asJava) > clock.now
+            )
+          )
+        }
+      existing.getOrElse {
+        val id = SvOnboardingSnapshotId(UUID.randomUUID().toString)
+        val file = directory(id).resolve("snapshot")
+        queue.offer(QueuedExport(id, file, exportTo, tc)) match {
+          case Enqueued =>
+            jobs.update(id, Snapshot(key, clock.now, SnapshotState.Exporting))
+            logger.info(s"Queued onboarding snapshot export $id for $key")
+            id
+          case Dropped =>
+            throw Status.UNAVAILABLE
+              .withDescription(
+                s"Too many onboarding snapshot exports queued (max ${config.queueSize.value})"
+              )
+              .asRuntimeException()
+          case QueueClosed => throw shutdownError
+          case QueueOfferResult.Failure(cause) => throw cause
+        }
+      }
     }
-  })
+  }))
 
   def lookup(id: SvOnboardingSnapshotId): Option[SnapshotState] = blocking {
     mutex.exclusive {
-      if (shuttingDown) None else snapshotState(id)
+      if (shuttingDown) None
+      else jobs.get(id).orElse(readSnapshot(id)(TraceContext.empty)).map(_.state)
     }
   }
 
-  private def snapshotState(id: SvOnboardingSnapshotId): Option[SnapshotState] =
-    snapshots.get(id).map { snapshot =>
-      snapshot.state match {
-        case SnapshotState.Ready(file) if Files.notExists(file) =>
-          val failed = SnapshotState.Failed("Snapshot file is missing")
-          snapshots.update(id, snapshot.copy(state = failed))
-          if (snapshotIds.get(snapshot.key).contains(id)) snapshotIds.remove(snapshot.key).discard
-          failed
-        case state => state
-      }
-    }
-
-  def removeExpired(now: CantonTimestamp)(implicit tc: TraceContext): Future[Int] = {
-    val toDelete = blocking {
-      mutex.exclusive {
-        val expired = snapshots.toSeq.filter { case (_, snapshot) =>
-          snapshot.state != SnapshotState.Exporting &&
-          snapshot.createdAt.plus(config.retention.asJava) <= now
-        }
-        expired.foreach { case (id, snapshot) =>
-          snapshots.remove(id).discard
-          if (snapshotIds.get(snapshot.key).contains(id)) snapshotIds.remove(snapshot.key).discard
-          pendingDeletions.update(id, snapshot.file)
-        }
-        pendingDeletions.toSeq
-      }
-    }
-    Future {
-      blocking {
-        toDelete.count { case (id, file) => deleteSnapshotFile(id, file) }
-      }
+  def removeExpired(now: CantonTimestamp)(implicit tc: TraceContext): Future[Int] = Future {
+    blocking {
+      val exportsRemoved = mutex.exclusive(removeExpiredNow(now))
+      exportsRemoved + removeExpiredDownloads(Instant.now())
     }
   }
 
   private def runExport(queued: QueuedExport): Future[Done] = {
     implicit val tc: TraceContext = queued.traceContext
-    val start = blocking {
-      mutex.exclusive {
-        if (shuttingDown) false
-        else {
-          activeExports.add(queued.id).discard
-          true
-        }
-      }
-    }
+    val start = blocking(mutex.exclusive(!shuttingDown))
     if (!start) Future.successful(Done)
     else {
       logger.info(s"Starting onboarding snapshot export ${queued.id}")
       Future
-        .fromTry(Try(queued.exportTo(queued.file)))
+        .fromTry(Try {
+          Files.createDirectories(queued.file.getParent)
+          queued.exportTo(queued.file)
+        })
         .flatten
         .transform { result =>
-          finishExport(queued, result)
-          Success(Done)
-        }
-        .andThen { case _ =>
           blocking {
             mutex.exclusive {
-              activeExports.remove(queued.id).discard
-              if (shuttingDown && activeExports.isEmpty)
-                exportsTerminated.trySuccess(Done).discard
+              jobs.get(queued.id).foreach { snapshot =>
+                val published = result.flatMap { _ =>
+                  Try {
+                    val SnapshotKey.Acs(synchronizerId, party, activationTime) = snapshot.key
+                    val metadata = PersistedSnapshot(
+                      synchronizerId.toProtoPrimitive,
+                      party.toProtoPrimitive,
+                      activationTime.toString,
+                      snapshot.createdAt.toInstant.toString,
+                      Files.size(queued.file),
+                    )
+                    val temporary = directory(queued.id).resolve("metadata.tmp")
+                    Files.writeString(temporary, metadata.asJson.noSpaces)
+                    Files.move(
+                      temporary,
+                      directory(queued.id).resolve("metadata.json"),
+                      StandardCopyOption.ATOMIC_MOVE,
+                    )
+                    ()
+                  }
+                }
+                jobs.remove(queued.id).discard
+                published match {
+                  case Success(_) =>
+                    logger.info(s"Finished onboarding snapshot export ${queued.id}")
+                  case Failure(error) =>
+                    if (shuttingDown)
+                      logger.info(
+                        s"Onboarding snapshot export ${queued.id} stopped by shutdown: $error"
+                      )
+                    else logger.warn(s"Onboarding snapshot export ${queued.id} failed", error)
+                    if (Files.exists(directory(queued.id))) deleteSnapshot(queued.id).discard
+                }
+              }
             }
           }
+          Success(Done)
         }
     }
   }
-
-  private def finishExport(queued: QueuedExport, result: Try[Unit])(implicit
-      tc: TraceContext
-  ): Unit = {
-    blocking {
-      mutex.exclusive {
-        snapshots.get(queued.id).filter(_ => !shuttingDown).foreach { snapshot =>
-          result match {
-            case Success(()) =>
-              snapshots.update(queued.id, snapshot.copy(state = SnapshotState.Ready(queued.file)))
-            case Failure(ex) =>
-              snapshots
-                .update(queued.id, snapshot.copy(state = SnapshotState.Failed(ex.getMessage)))
-              if (snapshotIds.get(snapshot.key).contains(queued.id))
-                snapshotIds.remove(snapshot.key).discard
-          }
-        }
-        if (result.isFailure) pendingDeletions.update(queued.id, queued.file)
-      }
-    }
-    result match {
-      case Success(_) => logger.info(s"Finished onboarding snapshot export ${queued.id}")
-      case Failure(ex) =>
-        if (shuttingDown)
-          logger.info(s"Onboarding snapshot export ${queued.id} stopped by shutdown: $ex")
-        else logger.warn(s"Onboarding snapshot export ${queued.id} failed", ex)
-        deleteSnapshotFile(queued.id, queued.file).discard
-    }
-  }
-
-  private def deleteSnapshotFile(id: SvOnboardingSnapshotId, file: Path)(implicit
-      tc: TraceContext
-  ): Boolean =
-    Try(blocking(Files.deleteIfExists(file))) match {
-      case Success(deleted) =>
-        val removed = blocking(mutex.exclusive(pendingDeletions.remove(id).isDefined))
-        if (removed && deleted) logger.info(s"Removed onboarding snapshot file $id")
-        removed
-      case Failure(ex) =>
-        logger.warn(s"Failed to delete onboarding snapshot file $id; cleanup will retry", ex)
-        false
-    }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     implicit val tc: TraceContext = TraceContext.empty
     stopExports()
     Seq(
       AsyncCloseable(
-        "waiting for onboarding snapshot exports to finish and cleaning up their directory",
-        queueTerminated.future
-          .transformWith(_ => exportsTerminated.future)
-          .map { _ =>
+        "waiting for onboarding snapshot exports to finish",
+        queueTerminated.map { done =>
+          if (config.directory.isEmpty)
             blocking(File(exportsDirectory).delete(swallowIOExceptions = true)).discard
-          },
+          done
+        },
         timeouts.shutdownShort,
       )
     )
@@ -276,19 +325,13 @@ class SvOnboardingSnapshotService(
 }
 
 object SvOnboardingSnapshotService {
-
   sealed trait SnapshotKey
-
   object SnapshotKey {
-    final case class Acs(
-        synchronizerId: SynchronizerId,
-        party: PartyId,
-        activationTime: Instant,
-    ) extends SnapshotKey
+    final case class Acs(synchronizerId: SynchronizerId, party: PartyId, activationTime: Instant)
+        extends SnapshotKey
   }
 
   sealed trait SnapshotState
-
   object SnapshotState {
     case object Exporting extends SnapshotState
     final case class Ready(file: Path) extends SnapshotState
@@ -298,14 +341,22 @@ object SvOnboardingSnapshotService {
   private final case class Snapshot(
       key: SnapshotKey,
       createdAt: CantonTimestamp,
-      file: Path,
       state: SnapshotState,
   )
-
   private final case class QueuedExport(
       id: SvOnboardingSnapshotId,
       file: Path,
       exportTo: Path => Future[Unit],
       traceContext: TraceContext,
   )
+
+  private final case class PersistedSnapshot(
+      synchronizerId: String,
+      party: String,
+      activationTime: String,
+      createdAt: String,
+      size: Long,
+  )
+  private implicit val encoder: Encoder[PersistedSnapshot] = deriveEncoder
+  private implicit val decoder: Decoder[PersistedSnapshot] = deriveDecoder
 }

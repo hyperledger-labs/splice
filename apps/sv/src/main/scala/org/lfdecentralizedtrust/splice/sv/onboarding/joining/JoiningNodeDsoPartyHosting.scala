@@ -25,6 +25,7 @@ import io.grpc.Status
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.util.Success
 
 class JoiningNodeDsoPartyHosting(
     participantAdminConnection: ParticipantAdminConnection,
@@ -173,7 +174,10 @@ class JoiningNodeDsoPartyHosting(
           _ = logger.info(
             s"DSO party is now hosted in the candidate SV participant $participantId"
           )
-        } yield Right(())).andThen(_ => snapshotDownload.delete())
+        } yield Right(())).andThen {
+          case Success(Right(_)) => snapshotDownload.delete()
+          case _ if onboardingSnapshotsConfig.directory.isEmpty => snapshotDownload.delete()
+        }
       case None =>
         Future.successful(Left("unexpected onboarding config"))
     }

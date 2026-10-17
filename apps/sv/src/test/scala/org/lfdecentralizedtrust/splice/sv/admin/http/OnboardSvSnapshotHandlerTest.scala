@@ -43,8 +43,9 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
 
   private val retryProvider =
     RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)
+  private val snapshotDirectory = better.files.File.newTemporaryDirectory()
   private val snapshotService = new SvOnboardingSnapshotService(
-    SvOnboardingSnapshotsConfig(),
+    SvOnboardingSnapshotsConfig(directory = Some(snapshotDirectory.path)),
     new SimClock(loggerFactory = loggerFactory),
     retryProvider,
     loggerFactory,
@@ -53,6 +54,7 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
   override def afterAll(): Unit = {
     retryProvider.close()
     snapshotService.close()
+    snapshotDirectory.delete()
     super.afterAll()
   }
 
@@ -100,7 +102,7 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
 
   "onboardSvDownload" should {
 
-    "report a snapshot that has failed, is unknown or is still being exported" in {
+    "report failed and unknown ids as missing and pending exports as unavailable" in {
       val failed =
         loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
           {
@@ -109,19 +111,15 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
               _ =>
                 Future.failed(new RuntimeException("/snapshots/private/export (Permission denied)")),
             )
-            eventually()(
-              snapshotService.lookup(id) shouldBe Some(
-                SnapshotState.Failed("/snapshots/private/export (Permission denied)")
-              )
-            )
+            eventually()(snapshotService.lookup(id) shouldBe None)
             id
           },
           forExactly(1, _)(_.warningMessage should include("failed")),
         )
       download(failed) ~> route ~> check {
-        status shouldBe StatusCodes.InternalServerError
+        status shouldBe StatusCodes.NotFound
         val body = responseAs[String]
-        body should include(s"Export of onboarding snapshot $failed failed")
+        body should include(s"Onboarding snapshot $failed not found")
         body should not include "/snapshots/private"
         body should not include "Permission denied"
       }
@@ -132,7 +130,13 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
 
       val exported = Promise[Unit]()
       try {
-        val exporting = prepare("exporting", _ => exported.future)
+        val exporting = prepare(
+          "exporting",
+          file => {
+            Files.write(file, content)
+            exported.future
+          },
+        )
         val queued = prepare("queued", writeSnapshot)
         Seq(exporting, queued).foreach { id =>
           download(id) ~> route ~> check {
@@ -141,6 +145,20 @@ class OnboardSvSnapshotHandlerTest extends AnyWordSpec with BaseTest with Scalat
           }
         }
       } finally exported.trySuccess(()).discard
+    }
+
+    "return a generic error when a completed snapshot file is missing" in {
+      val id = prepare("missing-file", writeSnapshot)
+      val file = eventually() {
+        inside(snapshotService.lookup(id)) { case Some(SnapshotState.Ready(file)) => file }
+      }
+      Files.delete(file)
+      download(id) ~> route ~> check {
+        status shouldBe StatusCodes.InternalServerError
+        val body = responseAs[String]
+        body should include(s"Export of onboarding snapshot $id failed")
+        body should not include file.toString
+      }
     }
   }
 

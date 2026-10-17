@@ -27,7 +27,9 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.event.Level
 
 import java.nio.file.{Files, Path}
+import java.nio.file.attribute.FileTime
 import java.time.{Duration, Instant}
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{Future, Promise, blocking}
 
@@ -57,7 +59,11 @@ class SvOnboardingSnapshotServiceTest
 
   private def withService(config: SvOnboardingSnapshotsConfig = SvOnboardingSnapshotsConfig())(
       test: (SvOnboardingSnapshotService, SimClock, RetryProvider) => Unit
-  ): Unit = {
+  ): Unit = if (config.directory.isEmpty) {
+    File.usingTemporaryDirectory() { directory =>
+      withService(config.copy(directory = Some(directory.path)))(test)
+    }
+  } else {
     val clock = new SimClock(loggerFactory = loggerFactory)
     val retryProvider =
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)
@@ -94,6 +100,7 @@ class SvOnboardingSnapshotServiceTest
           inside(service.lookup(id)) { case Some(SnapshotState.Ready(file)) => file }
         }
         File(file).contentAsString shouldBe "snapshot"
+        Files.exists(file.getParent.resolve("metadata.json")) shouldBe true
         prepare("sv1") shouldBe id
         exports.get() shouldBe 1
 
@@ -111,7 +118,7 @@ class SvOnboardingSnapshotServiceTest
                 writeSnapshot(Future.failed(new RuntimeException("boom"))),
               )
               .futureValue
-            eventually()(service.lookup(id) shouldBe Some(SnapshotState.Failed("boom")))
+            eventually()(service.lookup(id) shouldBe None)
             id
           },
           forExactly(1, _)(_.warningMessage should include("failed")),
@@ -155,7 +162,7 @@ class SvOnboardingSnapshotServiceTest
                 writeSnapshot(Future.failed(new RuntimeException("export failed"))),
               )
               .futureValue
-            eventually()(service.lookup(id) shouldBe Some(SnapshotState.Failed("export failed")))
+            eventually()(service.lookup(id) shouldBe None)
             id
           },
           entries => {
@@ -166,7 +173,7 @@ class SvOnboardingSnapshotServiceTest
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
         {
           clock.advance(Duration.ofHours(24))
-          service.removeExpired(clock.now).futureValue shouldBe 1
+          service.removeExpired(clock.now).futureValue shouldBe 0
           service.lookup(failedId) shouldBe None
         },
         entries =>
@@ -183,7 +190,8 @@ class SvOnboardingSnapshotServiceTest
         def prepare(): SvOnboardingSnapshotId = service
           .prepare(
             key(name),
-            _ => {
+            file => {
+              Files.write(file, Array[Byte](1))
               started.success(())
               done.future
             },
@@ -277,7 +285,7 @@ class SvOnboardingSnapshotServiceTest
                 },
               )
               .futureValue
-            eventually()(service.lookup(id) shouldBe Some(SnapshotState.Failed("export failed")))
+            eventually()(service.lookup(id) shouldBe None)
             id
           },
           entries => {
@@ -295,7 +303,7 @@ class SvOnboardingSnapshotServiceTest
         Files.delete(child)
         service.removeExpired(clock.now).futureValue shouldBe 1
         Files.exists(child.getParent) shouldBe false
-        service.lookup(failedId) shouldBe Some(SnapshotState.Failed("export failed"))
+        service.lookup(failedId) shouldBe None
     }
 
     "retry an expired file deletion without retaining download eligibility or blocking other cleanup" in withService() {
@@ -379,25 +387,99 @@ class SvOnboardingSnapshotServiceTest
 
           closed.futureValue
           service.lookup(active) shouldBe None
-          Files.exists(service.exportsDirectory) shouldBe false
+          Files.readAllBytes(file) shouldBe Array[Byte](1, 2)
+          Files.exists(file.getParent.resolve("metadata.json")) shouldBe true
           queuedStarted.get() shouldBe 0
       }
     }
 
-    "clear stale exports and downloads but nothing else on startup" in File
+    "recover completed snapshots with the same id and original retention after restart" in File
       .usingTemporaryDirectory() { directory =>
-        val staleExport = (directory / "exports" / "stale").createIfNotExists(createParents = true)
-        val staleDownload =
-          (directory / "downloads" / "acs" / "stale").createIfNotExists(createParents = true)
-        val otherFile = (directory / "other").createIfNotExists()
-        withService(SvOnboardingSnapshotsConfig(directory = Some(directory.path))) {
-          (service, _, _) =>
-            service.exportsDirectory shouldBe (directory / "exports").path
-            staleExport.exists shouldBe false
-            staleDownload.exists shouldBe false
-            otherFile.exists shouldBe true
+        val config = SvOnboardingSnapshotsConfig(directory = Some(directory.path))
+        val id = new java.util.concurrent.atomic.AtomicReference[SvOnboardingSnapshotId]()
+        withService(config) { (service, clock, _) =>
+          clock.advance(Duration.ofHours(1))
+          id.set(service.prepare(key("sv1"), writeSnapshot(Future.unit)).futureValue)
+          eventually()(service.lookup(id.get()) should matchPattern {
+            case Some(SnapshotState.Ready(_)) =>
+          })
+        }
+        withService(config) { (service, clock, _) =>
+          inside(service.lookup(id.get())) { case Some(SnapshotState.Ready(file)) =>
+            File(file).contentAsString shouldBe "snapshot"
+          }
+          service
+            .prepare(key("sv1"), _ => fail("must reuse the persisted export"))
+            .futureValue shouldBe id.get()
+          clock.advance(Duration.ofHours(24))
+          service.removeExpired(clock.now).futureValue shouldBe 0
+          service.lookup(id.get()) should matchPattern { case Some(SnapshotState.Ready(_)) => }
+          clock.advance(Duration.ofHours(1))
+          service.removeExpired(clock.now).futureValue shouldBe 1
+          service.lookup(id.get()) shouldBe None
+          service.prepare(key("sv1"), writeSnapshot(Future.unit)).futureValue should not be id.get()
         }
       }
+
+    "discard interrupted exports without touching downloads or completed exports on startup" in File
+      .usingTemporaryDirectory() { directory =>
+        val interrupted = directory / "exports" / UUID.randomUUID().toString
+        (interrupted / "snapshot").createIfNotExists(createParents = true)
+        (interrupted / "metadata.tmp").writeText("unfinished metadata")
+        val download =
+          (directory / "downloads" / "acs" / "snapshot").createIfNotExists(createParents = true)
+        val otherFile = (directory / "other").createIfNotExists()
+        withService(SvOnboardingSnapshotsConfig(directory = Some(directory.path))) { (_, _, _) =>
+          interrupted.exists shouldBe false
+          download.exists shouldBe true
+          otherFile.exists shouldBe true
+        }
+      }
+
+    "expire abandoned downloads while preserving recently written downloads" in File
+      .usingTemporaryDirectory() { directory =>
+        val abandoned =
+          (directory / "downloads" / "old" / "snapshot").createIfNotExists(createParents = true)
+        val recent =
+          (directory / "downloads" / "recent" / "snapshot").createIfNotExists(createParents = true)
+        withService(SvOnboardingSnapshotsConfig(directory = Some(directory.path))) {
+          (service, clock, _) =>
+            abandoned.exists shouldBe true
+            Files.setLastModifiedTime(abandoned.path, FileTime.from(Instant.EPOCH))
+            Files.setLastModifiedTime(abandoned.parent.path, FileTime.from(Instant.EPOCH))
+            service.removeExpired(clock.now).futureValue shouldBe 1
+            abandoned.parent.exists shouldBe false
+            clock.advance(Duration.ofDays(365 * 100))
+            service.removeExpired(clock.now).futureValue shouldBe 0
+            recent.exists shouldBe true
+        }
+      }
+
+    "not reuse an expired snapshot while waiting for cleanup" in withService() {
+      (service, clock, _) =>
+        val id = service.prepare(key("sv1"), writeSnapshot(Future.unit)).futureValue
+        eventually()(service.lookup(id) should matchPattern { case Some(SnapshotState.Ready(_)) =>
+        })
+        clock.advance(Duration.ofHours(24))
+        service.prepare(key("sv1"), writeSnapshot(Future.unit)).futureValue should not be id
+    }
+
+    "discard corrupt completion metadata on startup" in File.usingTemporaryDirectory() {
+      directory =>
+        val corrupt = directory / "exports" / UUID.randomUUID().toString
+        (corrupt / "snapshot").createIfNotExists(createParents = true)
+        (corrupt / "metadata.json").writeText("not json")
+        loggerFactory.assertLogs(SuppressionRule.LevelAndAbove(Level.WARN))(
+          withService(SvOnboardingSnapshotsConfig(directory = Some(directory.path))) { (_, _, _) =>
+            corrupt.exists shouldBe false
+          },
+          _.warningMessage should include("Cannot recover onboarding snapshot"),
+        )
+    }
+
+    "never resolve a download id outside the export directory" in withService() { (service, _, _) =>
+      service.lookup(SvOnboardingSnapshotId("../../other")) shouldBe None
+    }
 
     "reject exports after shutdown" in withService() { (service, _, retryProvider) =>
       retryProvider.close()

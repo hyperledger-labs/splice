@@ -138,7 +138,7 @@ class SvOnboardingSnapshotDownloadTest
         sponsor.downloads shouldBe Seq("id-1", "id-1")
     }
 
-    "prepare again when a download id is missing or its export has failed" in {
+    "prepare again when the sponsor no longer has a usable snapshot" in {
       Seq[StatusCode](StatusCodes.NotFound, StatusCodes.InternalServerError).foreach { status =>
         withDownload { snapshotDownload =>
           val interrupted = new Interrupted(4)
@@ -178,6 +178,17 @@ class SvOnboardingSnapshotDownloadTest
       sponsor.requests shouldBe Seq("id")
     }
 
+    "recreate the download directory if cleanup removes it while waiting" in withDownload {
+      snapshotDownload =>
+        val preparing = httpError(StatusCodes.ServiceUnavailable)
+        val sponsor = new PreparingSponsor(Left(preparing), Right(full()))
+        def attempt = snapshotDownload.prepareAndDownload(sponsor.prepare(), sponsor.download)
+        attempt.failed.futureValue shouldBe preparing
+        File(snapshotDownload.directory).delete()
+        Files.readAllBytes(attempt.futureValue) shouldBe content
+        sponsor.prepares.get() shouldBe 1
+    }
+
     "never write outside its directory" in File.usingTemporaryDirectory() { directory =>
       val snapshotDownload = SvOnboardingSnapshotDownload(
         SvOnboardingSnapshotsConfig(directory = Some(directory.path)),
@@ -192,7 +203,7 @@ class SvOnboardingSnapshotDownloadTest
       directory.listRecursively.map(_.name).toSeq should not contain "unrelated"
     }
 
-    "use a fresh directory below the configured one" in File.usingTemporaryDirectory() {
+    "preserve an existing directory below the configured one" in File.usingTemporaryDirectory() {
       directory =>
         val stale = (directory / "downloads" / "acs" / "stale").createIfNotExists(
           createParents = true
@@ -204,10 +215,86 @@ class SvOnboardingSnapshotDownloadTest
           retryProvider,
         )
         snapshotDownload.directory shouldBe (directory / "downloads" / "acs").path
-        stale.exists shouldBe false
+        stale.exists shouldBe true
         exports.exists shouldBe true
         snapshotDownload.delete()
         Files.exists(snapshotDownload.directory) shouldBe false
+    }
+
+    "reuse a complete download after restart only when prepare returns the same id" in File
+      .usingTemporaryDirectory() { directory =>
+        val config = SvOnboardingSnapshotsConfig(directory = Some(directory.path))
+        def downloader = SvOnboardingSnapshotDownload(config, "acs", retryProvider)
+        val id = SvOnboardingSnapshotId("id")
+        val first = downloader
+          .prepareAndDownload(Future.successful(id), new Sponsor(full()).download)
+          .futureValue
+        val reused = downloader
+          .prepareAndDownload(
+            Future.successful(id),
+            _ => fail("must not download the completed snapshot again"),
+          )
+          .futureValue
+        reused shouldBe first
+        Files.readAllBytes(reused) shouldBe content
+        val changed = new Sponsor(full())
+        downloader
+          .prepareAndDownload(Future.successful(SvOnboardingSnapshotId("new-id")), changed.download)
+          .futureValue
+        changed.requests shouldBe Seq("new-id")
+      }
+
+    "redownload an incomplete or truncated snapshot after restart" in File
+      .usingTemporaryDirectory() { directory =>
+        val config = SvOnboardingSnapshotsConfig(directory = Some(directory.path))
+        def downloader = SvOnboardingSnapshotDownload(config, "acs", retryProvider)
+        val id = SvOnboardingSnapshotId("id")
+        val interrupted = new Interrupted(4)
+        val first = downloader
+        interrupted.after(first, first.download(id, new Sponsor(interrupted.response).download))
+        val complete = downloader.download(id, new Sponsor(full()).download).futureValue
+        Files.readAllBytes(complete) shouldBe content
+        Files.write(complete, Array[Byte](1))
+        val sponsor = new Sponsor(full())
+        Files.readAllBytes(downloader.download(id, sponsor.download).futureValue) shouldBe content
+        sponsor.requests shouldBe Seq("id")
+      }
+
+    "redownload when completion metadata is corrupt or expired" in File.usingTemporaryDirectory() {
+      directory =>
+        val config = SvOnboardingSnapshotsConfig(directory = Some(directory.path))
+        def downloader = SvOnboardingSnapshotDownload(config, "acs", retryProvider)
+        val id = SvOnboardingSnapshotId("id")
+        val first = downloader
+        first.download(id, new Sponsor(full()).download).futureValue
+        val metadata = first.directory.resolve("metadata.json")
+        Seq("not json", """{"id":"id","createdAt":"1970-01-01T00:00:00Z","size":10}""").foreach {
+          invalid =>
+            Files.writeString(metadata, invalid)
+            val sponsor = new Sponsor(full())
+            Files.readAllBytes(
+              downloader.download(id, sponsor.download).futureValue
+            ) shouldBe content
+            sponsor.requests shouldBe Seq("id")
+        }
+    }
+
+    "not reuse a response that ended before its declared length" in withDownload {
+      snapshotDownload =>
+        val short = OnboardSvDownloadResponse.OK(
+          HttpEntity.Default(
+            ContentTypes.`application/octet-stream`,
+            content.length.toLong,
+            Source.single(ByteString(content.take(4))),
+          )
+        )
+        val id = SvOnboardingSnapshotId("id")
+        failsUnavailable(snapshotDownload.download(id, new Sponsor(short).download))
+        val sponsor = new Sponsor(full())
+        Files.readAllBytes(
+          snapshotDownload.download(id, sponsor.download).futureValue
+        ) shouldBe content
+        sponsor.requests shouldBe Seq("id")
     }
 
     "use a temporary directory when none is configured" in {

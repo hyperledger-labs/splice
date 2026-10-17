@@ -40,6 +40,8 @@ final class SvConnection private (
   ): Future[Unit] =
     runHttpCmd(config.url, HttpSvPublicAppClient.StartSvOnboarding(token))
 
+  /** Ask the sponsoring SV to authorize hosting the DSO party at the candidate participant and to prepare the ACS snapshot.
+    */
   def prepareDsoPartyHostingSnapshot(
       candidateParty: PartyId
   )(implicit
