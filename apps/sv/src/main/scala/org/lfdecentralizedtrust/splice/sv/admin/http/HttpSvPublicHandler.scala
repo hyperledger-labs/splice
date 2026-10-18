@@ -341,10 +341,10 @@ class HttpSvPublicHandler(
   )(extracted: TraceContext): Future[r0.InternalBuyMemberTrafficResponse] = {
     implicit val traceContext: TraceContext = extracted
     withSpan(s"$workflowId.internalBuyMemberTraffic") { _ => _ =>
-      if (!isDevNet) {
+      if (!config.enableInternalAutoOnboardingThroughSvTrafficFaucet) {
         Future.failed(
           HttpErrorHandler.notImplemented(
-            "Traffic purchasing self-service is only available in DevNet."
+            "Traffic purchasing internal service is disabled."
           )
         )
       } else {

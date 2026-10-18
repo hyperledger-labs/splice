@@ -44,7 +44,7 @@
                 ],
                 "paths": [
                   "/api/sv/v0/devnet/onboard/validator/prepare",
-                  "/api/sv/v0/devnet/onboard/validator/purchase-traffic",
+                  "/api/sv/v0/internal/onboard/validator/purchase-traffic",
                   "/api/sv/v0/onboard/validator",
                   "/api/sv/version"
                 ]
