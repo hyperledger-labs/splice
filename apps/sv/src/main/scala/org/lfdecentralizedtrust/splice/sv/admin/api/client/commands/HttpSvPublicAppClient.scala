@@ -143,8 +143,8 @@ object HttpSvPublicAppClient {
     }
   }
 
-  case class DevNetBuyMemberTraffic(participantId: String)
-      extends BaseCommandPublic[http.DevNetBuyMemberTrafficResponse, Unit] {
+  case class InternalBuyMemberTraffic(participantId: String)
+      extends BaseCommandPublic[http.InternalBuyMemberTrafficResponse, Unit] {
 
     override def submitRequest(
         client: Client,
@@ -152,15 +152,15 @@ object HttpSvPublicAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.DevNetBuyMemberTrafficResponse] =
-      client.devNetBuyMemberTraffic(
-        body = definitions.DevNetBuyMemberTrafficRequest(participantId),
+    ], http.InternalBuyMemberTrafficResponse] =
+      client.internalBuyMemberTraffic(
+        body = definitions.InternalBuyMemberTrafficRequest(participantId),
         headers = headers,
       )
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.DevNetBuyMemberTrafficResponse.OK(_) =>
+    ) = { case http.InternalBuyMemberTrafficResponse.OK(_) =>
       Right(())
     }
   }

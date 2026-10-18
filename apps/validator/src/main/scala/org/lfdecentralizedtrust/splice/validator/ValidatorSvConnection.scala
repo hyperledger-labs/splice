@@ -44,13 +44,13 @@ final class ValidatorSvConnection private (
 
   /** Ask the SV's DevNet faucet to automatically purchase member traffic for the given participant. Used only for validators in test clusters
     */
-  def devNetBuyMemberTraffic(participantId: ParticipantId)(implicit
+  def internalBuyMemberTraffic(participantId: ParticipantId)(implicit
       httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Unit] =
-    runHttpCmd(config.url, ValidatorSvConnection.DevNetBuyMemberTraffic(participantId))
+    runHttpCmd(config.url, ValidatorSvConnection.InternalBuyMemberTraffic(participantId))
 }
 
 object ValidatorSvConnection {
@@ -72,20 +72,23 @@ object ValidatorSvConnection {
       retryConnectionOnInitialFailure,
     )
 
-  case class DevNetBuyMemberTraffic(participantId: ParticipantId)
-      extends BaseCommandPublic[httpPublic.DevNetBuyMemberTrafficResponse, Unit] {
+  case class InternalBuyMemberTraffic(participantId: ParticipantId)
+      extends BaseCommandPublic[httpPublic.InternalBuyMemberTrafficResponse, Unit] {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], httpPublic.DevNetBuyMemberTrafficResponse] =
-      client.devNetBuyMemberTraffic(
-        body = definitions.DevNetBuyMemberTrafficRequest(participantId.toProtoPrimitive),
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], httpPublic.InternalBuyMemberTrafficResponse] =
+      client.internalBuyMemberTraffic(
+        body = definitions.InternalBuyMemberTrafficRequest(participantId.toProtoPrimitive),
         headers = headers,
       )
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case httpPublic.DevNetBuyMemberTrafficResponse.OK(_) =>
+    ) = { case httpPublic.InternalBuyMemberTrafficResponse.OK(_) =>
       Right(())
     }
   }

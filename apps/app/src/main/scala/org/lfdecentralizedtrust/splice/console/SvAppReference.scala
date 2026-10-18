@@ -95,10 +95,10 @@ abstract class SvAppReference(
     }
   }
 
-  @Help.Summary("Buy member traffic for a new validator (DevNet only) (via client API)")
-  def devNetBuyMemberTraffic(participantId: ParticipantId): Unit =
+  @Help.Summary("Buy member traffic for a new validator (Internal only) (via client API)")
+  def internalBuyMemberTraffic(participantId: ParticipantId): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpSvPublicAppClient.DevNetBuyMemberTraffic(participantId.toProtoPrimitive))
+      httpCommand(HttpSvPublicAppClient.InternalBuyMemberTraffic(participantId.toProtoPrimitive))
     }
 
   @Help.Summary("Prepare a validator onboarding and return an onboarding secret (via client API)")

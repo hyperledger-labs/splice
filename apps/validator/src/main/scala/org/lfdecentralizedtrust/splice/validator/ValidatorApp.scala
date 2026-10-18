@@ -589,12 +589,12 @@ class ValidatorApp(
       svConfig: SvAppClientConfig,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    logger.info("Auto-purchasing DevNet traffic via SV faucet")
+    logger.info("Auto-purchasing Internal traffic via SV faucet")
     retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
       "auto_purchase_traffic",
-      "auto purchase DevNet traffic",
-      withSvConnection(svConfig.adminApi)(_.devNetBuyMemberTraffic(participantId)),
+      "auto purchase Internal traffic",
+      withSvConnection(svConfig.adminApi)(_.internalBuyMemberTraffic(participantId)),
       logger,
     )
   }
