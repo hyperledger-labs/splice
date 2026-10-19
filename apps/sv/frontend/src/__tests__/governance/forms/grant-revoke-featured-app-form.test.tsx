@@ -325,6 +325,73 @@ describe('Grant Featured App Form', () => {
     });
   });
 
+  test('sends opsParties to backend when provided', async () => {
+    let requestBody = '';
+    server.use(
+      http.post(`${svUrl}/v0/admin/sv/voterequest/create`, async ({ request }) => {
+        requestBody = await request.text();
+        return HttpResponse.json({});
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_GrantFeaturedAppRight" />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('grant-featured-app-action');
+    const submitButton = screen.getByTestId('submit-button');
+
+    await user.type(screen.getByTestId('grant-featured-app-summary'), 'Summary of the proposal');
+    await user.type(screen.getByTestId('grant-featured-app-url'), 'https://example.com');
+    await user.type(screen.getByTestId('grant-featured-app-idValue'), 'a-party-id::1014912492');
+
+    // add one ops party
+    await user.click(screen.getByTestId('grant-featured-app-opsParties-add'));
+    await user.type(
+      screen.getByTestId('grant-featured-app-opsParties-row-0'),
+      'ops-alice::1014912493'
+    );
+
+    await user.click(actionInput); // trigger provider onBlur validation
+
+    await waitFor(() => {
+      expect(screen.queryByText('Validating provider...')).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(submitButton).not.toBeDisabled();
+    });
+
+    await user.click(submitButton); // review proposal
+    await user.click(submitButton); // submit proposal
+
+    await waitFor(() => {
+      expect(requestBody).toContain('"opsParties":["ops-alice::1014912493"]');
+    });
+  });
+
+  test('warns when the provider already has a featured app right', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <GrantRevokeFeaturedAppForm selectedAction="SRARC_GrantFeaturedAppRight" />
+      </Wrapper>
+    );
+
+    // the mock returns an existing right for this provider party id
+    await user.type(screen.getByTestId('grant-featured-app-idValue'), 'a-party-id::1014912492');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('grant-featured-app-provider-warning').textContent).toMatch(
+        /already has a featured app right/
+      );
+    });
+  });
+
   test('activity weight rejects negative numbers and more than 10 decimal places', async () => {
     const user = userEvent.setup();
 

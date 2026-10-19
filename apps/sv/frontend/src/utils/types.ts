@@ -23,6 +23,8 @@ export interface OffBoardMemberProposal {
 export interface FeatureAppProposal {
   provider: string;
   activityWeight: string;
+  appKind?: string;
+  opsParties?: string[];
 }
 
 export interface UnfeatureAppProposal {

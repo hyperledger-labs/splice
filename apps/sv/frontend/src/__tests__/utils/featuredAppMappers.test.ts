@@ -2,12 +2,78 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect } from 'vitest';
+import type { Contract } from '@canton-network/splice-common-frontend-utils';
+import type { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {
   appKindSelectOptions,
   appKindToOptional,
   diffOpsParties,
+  extractInFlightOpsParties,
   opsPartiesToOptional,
 } from '../../utils/governance';
+
+const grantVoteRequest = (opsParties: string[] | null): Contract<VoteRequest> =>
+  ({
+    payload: {
+      action: {
+        tag: 'ARC_DsoRules',
+        value: { dsoAction: { tag: 'SRARC_GrantFeaturedAppRight', value: { opsParties } } },
+      },
+    },
+  }) as unknown as Contract<VoteRequest>;
+
+const amendVoteRequest = (opsParties: string[] | null): Contract<VoteRequest> =>
+  ({
+    payload: {
+      action: {
+        tag: 'ARC_DsoRules',
+        value: {
+          dsoAction: {
+            tag: 'SRARC_CreateFeaturedAppConfigUpdateInstruction',
+            value: {
+              updates: [
+                {
+                  _1: 'provider::1220aaaa',
+                  _2: {
+                    baseConfig: { appKind: null, activityWeight: null, opsParties: null },
+                    newConfig: { appKind: null, activityWeight: null, opsParties },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+  }) as unknown as Contract<VoteRequest>;
+
+describe('extractInFlightOpsParties', () => {
+  const alice = 'alice::1220bbbb';
+  const bob = 'bob::1220cccc';
+
+  it('returns [] for no proposals', () => {
+    expect(extractInFlightOpsParties(undefined)).toEqual([]);
+    expect(extractInFlightOpsParties([])).toEqual([]);
+  });
+
+  it('collects opsParties from grant vote requests', () => {
+    expect(extractInFlightOpsParties([grantVoteRequest([alice, bob])])).toEqual([alice, bob]);
+  });
+
+  it('collects opsParties from amend vote requests (newConfig)', () => {
+    expect(extractInFlightOpsParties([amendVoteRequest([bob])])).toEqual([bob]);
+  });
+
+  it('treats null opsParties as empty', () => {
+    expect(extractInFlightOpsParties([grantVoteRequest(null), amendVoteRequest(null)])).toEqual([]);
+  });
+
+  it('combines across grant and amend requests', () => {
+    expect(extractInFlightOpsParties([grantVoteRequest([alice]), amendVoteRequest([bob])])).toEqual(
+      [alice, bob]
+    );
+  });
+});
 
 describe('appKindToOptional', () => {
   it('maps blank to null (DAML default)', () => {

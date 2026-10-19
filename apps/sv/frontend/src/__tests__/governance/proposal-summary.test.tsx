@@ -145,6 +145,8 @@ describe('Review Proposal Component', () => {
         formType="grant-right"
         grantRight={provider}
         activityWeight={activityWeight}
+        appKind={''}
+        opsParties={[]}
         onEdit={() => {}}
         onSubmit={() => {}}
       />

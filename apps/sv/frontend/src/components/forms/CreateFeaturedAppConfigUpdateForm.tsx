@@ -274,8 +274,10 @@ export const CreateFeaturedAppConfigUpdateForm: React.FC = () => {
             <form.Field
               name="opsParties"
               validators={{
+                // No onChangeListenTo on partyId: it has an async validator, and re-validating
+                // opsParties on every partyId change prevents canSubmit from settling.
+                // provider-not-in-opsParties is still enforced on submit.
                 onChange: ({ value }) => validateOpsParties(value, form.state.values.partyId),
-                onChangeListenTo: ['partyId'],
               }}
             >
               {field => (

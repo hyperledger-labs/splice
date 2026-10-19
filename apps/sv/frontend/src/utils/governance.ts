@@ -217,7 +217,9 @@ export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: Dso
       case 'SRARC_GrantFeaturedAppRight':
         return createGrantFeatureAppProposal(
           dsoAction.value.provider,
-          dsoAction.value.activityWeight ?? ''
+          dsoAction.value.activityWeight ?? '',
+          dsoAction.value.appKind ?? '',
+          dsoAction.value.opsParties ?? []
         );
       case 'SRARC_RevokeFeaturedAppRight':
         return createRevokeFeatureAppProposal(dsoAction.value.rightCid);
@@ -249,11 +251,15 @@ function createOffboardMemberProposal(memberToOffboard: string): OffBoardMemberP
 
 function createGrantFeatureAppProposal(
   provider: string,
-  activityWeight: string
+  activityWeight: string,
+  appKind: string,
+  opsParties: string[]
 ): FeatureAppProposal {
   return {
     provider: provider,
     activityWeight: activityWeight,
+    appKind: appKind,
+    opsParties: opsParties,
   };
 }
 
@@ -486,6 +492,35 @@ export function buildFeaturedAppConfigUpdateEntry(
     newConfig.opsParties ?? []
   );
   return { provider, scalarChanges, opsAdded: added, opsRemoved: removed };
+}
+
+// Collect all opsParties referenced by in-flight (pending) vote requests — both
+// SRARC_GrantFeaturedAppRight (opsParties) and SRARC_CreateFeaturedAppConfigUpdateInstruction
+// (updates[].newConfig.opsParties). Used by the grant/amend forms to warn (non-blocking) when
+// the author picks an opsParty already pending in another vote. Shared by #7665/#7674.
+export function extractInFlightOpsParties(
+  proposals: Contract<VoteRequest>[] | undefined
+): string[] {
+  if (!proposals?.length) {
+    return [];
+  }
+
+  const result: string[] = [];
+  for (const proposal of proposals) {
+    const action = proposal.payload.action;
+    if (action.tag !== 'ARC_DsoRules') {
+      continue;
+    }
+    const dsoAction = action.value.dsoAction;
+    if (dsoAction.tag === 'SRARC_GrantFeaturedAppRight') {
+      result.push(...(dsoAction.value.opsParties ?? []));
+    } else if (dsoAction.tag === 'SRARC_CreateFeaturedAppConfigUpdateInstruction') {
+      for (const update of dsoAction.value.updates) {
+        result.push(...(update._2.newConfig.opsParties ?? []));
+      }
+    }
+  }
+  return result;
 }
 
 export function buildPendingConfigFields(

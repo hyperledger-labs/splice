@@ -15,7 +15,7 @@ import {
 import type { ConfigChange } from '../../utils/types';
 import { formatDatetimeWithOffset } from '../../utils/dateFormat';
 import { ConfigValuesChanges } from './ConfigValuesChanges';
-import { OpsPartiesDiff } from './OpsPartiesDisplay';
+import { OpsPartiesDiff, OpsPartiesDisplay } from './OpsPartiesDisplay';
 import { ProposalReviewField } from './ProposalReviewField';
 
 /** Figma review party IDs: Source Code Pro 14px + copy (node 4832:4323). */
@@ -58,6 +58,8 @@ type ProposalSummaryProps = BaseProposalSummaryProps &
         formType: 'grant-right';
         grantRight: string;
         activityWeight: string;
+        appKind: string;
+        opsParties: string[];
       }
     | {
         formType: 'revoke-right';
@@ -176,6 +178,21 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
               id="grantRightActivityWeight"
               label="Activity Weight"
               value={props.activityWeight}
+            />
+            <ProposalReviewField
+              id="grantRightAppKind"
+              label="App Kind"
+              value={props.appKind || 'Default (General)'}
+            />
+            <ProposalReviewField
+              id="grantRightOpsParties"
+              label="Ops Parties"
+              value={
+                <OpsPartiesDisplay
+                  parties={props.opsParties.filter(p => p.trim() !== '')}
+                  idPrefix="grant-review-ops"
+                />
+              }
             />
           </>
         )}

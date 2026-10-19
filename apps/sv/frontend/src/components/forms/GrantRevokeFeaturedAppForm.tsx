@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { Alert } from '@mui/material';
 import { useSearchParams } from 'react-router';
 import { useDsoInfos } from '../../contexts/SvContext';
 import dayjs from 'dayjs';
 import {
   activityWeightToOptional,
+  appKindSelectOptions,
+  appKindToOptional,
   createProposalActions,
   getInitialExpiration,
+  opsPartiesToOptional,
 } from '../../utils/governance';
 import { dateTimeFormatISO } from '@canton-network/splice-common-frontend-utils';
 import { useAppForm } from '../../hooks/form';
@@ -32,18 +36,21 @@ import {
   validateEffectiveDate,
   validateExpiration,
   validateExpiryEffectiveDate,
+  validateOpsParties,
   validatePartyId,
   validateSummary,
   validateUrl,
 } from './formValidators';
 import { FormLayout } from './FormLayout';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
+import { OpsPartiesField } from '../form-components/OpsPartiesField';
 import { useEffect, useState } from 'react';
 import { ProposalSummary } from '../governance/ProposalSummary';
 import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
 import { useProposalMutation } from '../../hooks/useProposalMutation';
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useFeaturedAppRightPicker } from '../../hooks/useFeaturedAppRightPicker';
+import { useFeaturedAppGrantWarnings } from '../../hooks/useFeaturedAppGrantWarnings';
 
 type ProviderId = string;
 type FeaturedAppRightId = string;
@@ -53,6 +60,8 @@ interface ExtraFormField {
   partyId: ProviderId;
   rightCid: FeaturedAppRightId;
   activityWeight: string;
+  appKind: string;
+  opsParties: string[];
 }
 
 export type GrantRevokeFeaturedAppFormData = CommonProposalFormData & ExtraFormField;
@@ -124,6 +133,8 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
     partyId: '',
     rightCid: '',
     activityWeight: '',
+    appKind: '',
+    opsParties: [],
   };
 
   const form = useAppForm({
@@ -142,8 +153,8 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
               value: {
                 provider: formValues.idValue,
                 activityWeight: activityWeightToOptional(formValues.activityWeight),
-                appKind: null,
-                opsParties: null,
+                appKind: appKindToOptional(formValues.appKind),
+                opsParties: opsPartiesToOptional(formValues.opsParties),
               },
             },
           },
@@ -195,6 +206,10 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
   const providerHasNoRights =
     picker.providerSearched && picker.rightOptions.length === 0 && !validatePartyId(partyId);
 
+  const grantProvider = useStore(form.store, state => state.values.idValue);
+  const grantOpsParties = useStore(form.store, state => state.values.opsParties);
+  const grantWarnings = useFeaturedAppGrantWarnings(grantProvider, grantOpsParties);
+
   return (
     <>
       <FormLayout
@@ -213,6 +228,8 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
             formType={reviewFormKey}
             grantRight={form.state.values.idValue}
             activityWeight={form.state.values.activityWeight}
+            appKind={form.state.values.appKind}
+            opsParties={form.state.values.opsParties}
             providerPartyId={form.state.values.partyId}
             revokeRight={form.state.values.rightCid}
             onEdit={() => setShowConfirmation(false)}
@@ -267,6 +284,66 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
                   />
                 )}
               </form.AppField>
+            )}
+
+            {formAction === 'SRARC_GrantFeaturedAppRight' && (
+              <form.AppField name="appKind">
+                {field => (
+                  <field.SelectField
+                    title="App Kind"
+                    id={`${testIdPrefix}-appKind`}
+                    options={appKindSelectOptions()}
+                    placeholder="Default (General)"
+                  />
+                )}
+              </form.AppField>
+            )}
+
+            {formAction === 'SRARC_GrantFeaturedAppRight' && (
+              <form.Field
+                name="opsParties"
+                validators={{
+                  // No onChangeListenTo on idValue: idValue has an async validator, and
+                  // re-validating opsParties on every idValue change prevents canSubmit from
+                  // settling. provider-not-in-opsParties is still enforced on submit.
+                  onChange: ({ value }) => validateOpsParties(value, form.state.values.idValue),
+                }}
+              >
+                {field => (
+                  <OpsPartiesField
+                    id={`${testIdPrefix}-opsParties`}
+                    title="Ops Parties"
+                    subtitle="Optional. Parties whose submissions count as this app's activity."
+                    value={field.state.value}
+                    onChange={field.handleChange}
+                    onBlur={field.handleBlur}
+                    error={field.state.meta.errors?.[0]}
+                  />
+                )}
+              </form.Field>
+            )}
+
+            {formAction === 'SRARC_GrantFeaturedAppRight' &&
+              grantWarnings.providerHasRightWarning && (
+                <Alert
+                  severity="info"
+                  color="warning"
+                  variant="outlined"
+                  data-testid="grant-featured-app-provider-warning"
+                >
+                  {grantWarnings.providerHasRightWarning}
+                </Alert>
+              )}
+
+            {formAction === 'SRARC_GrantFeaturedAppRight' && grantWarnings.opsOverlapWarning && (
+              <Alert
+                severity="info"
+                color="warning"
+                variant="outlined"
+                data-testid="grant-featured-app-ops-overlap-warning"
+              >
+                {grantWarnings.opsOverlapWarning}
+              </Alert>
             )}
 
             {formAction === 'SRARC_RevokeFeaturedAppRight' && (

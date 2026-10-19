@@ -41,7 +41,7 @@ import {
 } from '../../utils/types';
 import { ProposalVoteForm } from './ProposalVoteForm';
 import { ConfigValuesChanges } from './ConfigValuesChanges';
-import { OpsPartiesDiff } from './OpsPartiesDisplay';
+import { OpsPartiesDiff, OpsPartiesDisplay } from './OpsPartiesDisplay';
 import { JsonDiffAccordion } from './JsonDiffAccordion';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { DetailItem } from './proposal-details/DetailItem';
@@ -238,6 +238,8 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             <FeatureAppSection
               provider={proposalDetails.proposal.provider}
               activityWeight={proposalDetails.proposal.activityWeight}
+              appKind={proposalDetails.proposal.appKind}
+              opsParties={proposalDetails.proposal.opsParties}
             />
           )}
 
@@ -808,9 +810,16 @@ const OffboardMemberSection = ({ memberPartyId }: OffboardMemberSectionProps) =>
 interface FeatureAppSectionProps {
   provider: string;
   activityWeight: string;
+  appKind?: string;
+  opsParties?: string[];
 }
 
-const FeatureAppSection = ({ provider, activityWeight }: FeatureAppSectionProps) => {
+const FeatureAppSection = ({
+  provider,
+  activityWeight,
+  appKind,
+  opsParties,
+}: FeatureAppSectionProps) => {
   return (
     <Box
       id="proposal-details-feature-app-section"
@@ -833,6 +842,22 @@ const FeatureAppSection = ({ provider, activityWeight }: FeatureAppSectionProps)
         value={activityWeight}
         labelId="proposal-details-feature-app-activity-weight-label"
         valueId="proposal-details-feature-app-activity-weight-value"
+      />
+      <DetailItem
+        label="App Kind"
+        value={appKind || 'Default (General)'}
+        labelId="proposal-details-feature-app-kind-label"
+        valueId="proposal-details-feature-app-kind-value"
+      />
+      <DetailItem
+        label="Ops Parties"
+        value={
+          <OpsPartiesDisplay
+            parties={opsParties ?? []}
+            idPrefix="proposal-details-feature-app-ops"
+          />
+        }
+        labelId="proposal-details-feature-app-ops-label"
       />
     </Box>
   );
