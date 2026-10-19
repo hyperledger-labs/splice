@@ -29,6 +29,7 @@ import Splice.AmuletAllocation as AmuletAllocationV1
 import Splice.AmuletAllocationV2 as AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
+import Splice.GovernanceLock
 import Splice.Types
 import Splice.Util
 
@@ -343,6 +344,8 @@ amulet_transferFactoryV1_transferImpl
   -> [Party]
   -> Api.Token.TransferInstructionV1.TransferFactory_Transfer
   -> Update Api.Token.TransferInstructionV1.TransferInstructionResult
+amulet_transferFactoryV1_transferImpl this actors arg | arg.transfer.receiver == lockManagerParty =
+  governanceLock_transferFactoryV1_transferImpl this.dso actors arg
 amulet_transferFactoryV1_transferImpl this actors arg = do
   let Api.Token.TransferInstructionV1.TransferFactory_Transfer {expectedAdmin, transfer, extraArgs} = arg
   let dso = this.dso

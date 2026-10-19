@@ -105,6 +105,8 @@ defaultAmuletConfig = AmuletConfig with
 
   amuletSwitchOverTimes = None
 
+  governanceLockConfig = None
+
 -- | Default configuration schedule with single current amulet config
 defaultAmuletConfigSchedule : Schedule Time (AmuletConfig USD)
 defaultAmuletConfigSchedule = Schedule with

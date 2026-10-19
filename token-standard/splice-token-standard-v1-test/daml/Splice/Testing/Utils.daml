@@ -14,6 +14,7 @@ module Splice.Testing.Utils
     FailureStatusCheck(..),
     submitMustFail'',
     submitWithDisclosuresMustFail'',
+    actionMustFail,
     expectErrorId,
     expectMessageContains,
     expectUnmetRequirement,
@@ -135,6 +136,16 @@ submitMustFail''
   -> Script ()
 submitMustFail'' check options cmds = do
   result <- trySubmit options cmds
+  checkSubmitFailure check result
+
+-- | Use this to check whether a submitting script fails with the expected 'FailureStatus'
+actionMustFail
+  : Show a
+  => FailureStatusCheck
+  -> Script (Either SubmitError a)
+  -> Script ()
+actionMustFail check action = do
+  result <- action
   checkSubmitFailure check result
 
 -- | Internal helper to validate that a submission failed with the expected 'FailureStatus'.

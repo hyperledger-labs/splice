@@ -9,7 +9,7 @@ dependencies:
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
-  - --target=2.1
+  - --target=2.3
   - -Wno-upgrade-exceptions
   - -Wno-deprecated-exceptions
   - -Wno-template-interface-depends-on-daml-script
