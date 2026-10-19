@@ -3,34 +3,36 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-Given the "Reference commit" from a digital-asset/canton snapshot commit message,
-list the closest Canton release tags in DACH-NY/canton that contain it, nearest first.
+"""Given the "Reference commit" from a digital-asset/canton snapshot commit
+message, list the closest Canton release tags in DACH-NY/canton that contain it,
+nearest first.
 
-The first tag, without its leading "v" (v3.6.0 -> 3.6.0), is the preferred value for
-`canton_library_version`; it is a published, stable release, unlike a daily snapshot.
-Only final vX.Y.Z tags are considered, not -rc tags. A release is usually a handful to a
-few dozen commits after the snapshot's reference commit, never before it. Skim
-`git log <reference-commit>..<tag>` in the closed checkout before accepting a tag.
+The first tag, without its leading "v" (v3.6.0 -> 3.6.0), is the preferred value
+for `canton_library_version`.  Only final vX.Y.Z tags are considered, not -rc
+tags. A release is after the snapshot's reference commit, never before it. Skim
+`git log <reference-commit>..<tag>` in the closed checkout before accepting a
+tag.
 
 RELEASE_LINE is the release line from the OSS commit subject, e.g. 3.6 for
 `[release-line-3.6]`; only tags of that line are considered.
 
-If no release contains the commit yet, the script falls back to older snapshots: it walks the `release-line-<RELEASE_LINE>` history of the OSS repo,
-newest first, to the most recent OSS commit whose reference commit has a release. It
-prints that OSS commit, its reference commit, and the tags that follow it. You would
-bump to that older OSS commit instead. If even that finds nothing, the script exits with
-status 1. In any case, the snapshot of the original commit is still available through
-search-canton-snapshot.py.
+If no release contains the commit yet, the script falls back to the most recent
+OSS commit whose reference commit has a release.  If its choice is satisfactory,
+bump to that older commit instead. If even that finds nothing, the script exits
+with status 1. In any case, the exact snapshot of the given commit is still
+available through search-canton-snapshot.py.
 
-Needs local checkouts of https://github.com/DACH-NY/canton (the closed-source repo),
-given with --closed-canton, and of https://github.com/digital-asset/canton, given with
---oss-canton. Their `origin` is fetched first, so brand new releases and
-snapshots are found.
+Needs local checkouts of DACH-NY/canton (the closed-source repo), given with
+--closed-canton, and of digital-asset/canton, given with --oss-canton. Their
+`origin` is fetched first, so brand-new releases and snapshots are found.
 
-Example, to check the fallback for a commit not yet released on release-line-3.6:
-  scripts/find-canton-release.py --closed-canton ~/canton-closed --oss-canton ~/canton-oss \\
+Example, to check the fallback for a commit not yet released on
+release-line-3.6:
+
+  scripts/find-canton-release.py \\
+      --closed-canton ~/canton-closed --oss-canton ~/canton-oss \\
       $(git -C ~/canton-closed rev-parse origin/release-line-3.6) 3.6
+
 """
 
 import argparse
