@@ -109,6 +109,9 @@ SET TIME ZONE 'UTC';
 bq query --use_legacy_sql=false --label=testing:pgpart-pr7737 "<query>"
 ```
 
+The BigQuery samples below are written for that double-quoted argument: their
+backticks are escaped, and the shell expands `$BQ_DATASET`.
+
 Datastream writes with a delay of a few minutes, even with `dataFreshness: 0s`.
 Re-run BigQuery checks until the numbers stop changing before you conclude anything.
 To check the stream status and per-object errors:
@@ -122,12 +125,12 @@ gcloud datastream objects list --stream="$STREAM" --location=us-central1
 
 ```sql
 SELECT pubname, pubviaroot FROM pg_publication;
-SELECT * FROM pg_publication_tables WHERE pubname = 'pgpart_stag_prod_pub';
-```
+-- pgpart_stag_prod_pub, t
 
-- **Expected:** `pgpart_stag_prod_pub` has `pubviaroot = t`. The table list shows
-  `partitioned_events` and `cutover_events` only, with no partitions such as
-  `partitioned_events_import`.
+SELECT * FROM pg_publication_tables WHERE pubname = 'pgpart_stag_prod_pub';
+-- partitioned_events and cutover_events only, with no partitions such as
+-- partitioned_events_import
+```
 
 ## 1. Partitions and CDC
 
@@ -146,6 +149,7 @@ BEGIN
       (extract(epoch FROM (d + 1)::timestamp AT TIME ZONE 'UTC') * 1000000)::bigint);
   END LOOP;
 END $$;
+-- DO
 ```
 
 Confirm the partitions exist:
@@ -192,19 +196,58 @@ SELECT count(*), min(row_id), max(row_id)
 SELECT row_id, count(*) FROM \`$BQ_DATASET.partition_test_partitioned_events\`
   GROUP BY row_id HAVING count(*) > 1;
 -- expect no rows, empty output (meaning no duplicates)
+
+SELECT datastream_metadata.change_type, count(*)
+  FROM \`$BQ_DATASET.partition_test_partitioned_events\` GROUP BY 1;
+-- expect INSERT, 13 (no other change types)
 ```
 
-- **Expected:**
-  - The dataset has exactly one table per parent and nothing named after a
-    partition, such as `…_partitioned_events_p20261012` or `…_import`.
-  - `datastream_metadata.change_type` is `INSERT` for every row.
+- **Expected:** the dataset has exactly one table per parent and nothing named
+  after a partition, such as `…_partitioned_events_p20261012` or `…_import`.
 - **Failure signal:** the stream lists only the parents in `includeObjects`, so a
   publication without `pubviaroot` would most likely **silently drop** the rows
   rather than create per-partition tables. That is why this step compares counts
   and not only table names.
 
-Then add a partition for the day after tomorrow, insert a row into it, and check
-that the row arrives in the same BigQuery table.
+Then add a partition for the day after tomorrow, after the stream is already
+running, and insert a row into it:
+
+```sql
+DO $$
+DECLARE d date := current_date + 2;
+BEGIN
+  EXECUTE format(
+    'CREATE TABLE %I PARTITION OF partitioned_events FOR VALUES FROM (%s) TO (%s)',
+    'partitioned_events_p' || to_char(d, 'YYYYMMDD'),
+    (extract(epoch FROM d::timestamp AT TIME ZONE 'UTC') * 1000000)::bigint,
+    (extract(epoch FROM (d + 1)::timestamp AT TIME ZONE 'UTC') * 1000000)::bigint);
+END $$;
+-- DO
+
+INSERT INTO partitioned_events (record_time, payload)
+  VALUES ((extract(epoch FROM current_date + 2 + interval '12 hours') * 1000000)::bigint,
+          'phase1 new partition');
+-- INSERT 0 1
+
+SELECT tableoid::regclass, row_id, payload FROM partitioned_events
+  WHERE payload = 'phase1 new partition';
+-- partitioned_events_p<day after tomorrow>, 14, phase1 new partition
+```
+
+Check that the row arrives in the same BigQuery table:
+
+```sql
+SELECT table_name FROM \`$BQ_DATASET\`.INFORMATION_SCHEMA.TABLES ORDER BY 1;
+-- expect still only partition_test_partitioned_events
+
+SELECT row_id, payload FROM \`$BQ_DATASET.partition_test_partitioned_events\`
+  WHERE payload = 'phase1 new partition';
+-- expect 14, phase1 new partition
+
+SELECT count(*), min(row_id), max(row_id)
+  FROM \`$BQ_DATASET.partition_test_partitioned_events\`;
+-- expect 14, 1, 14
+```
 
 ## 2. Cutover simulation (#6312 rename swap)
 
@@ -214,11 +257,15 @@ Seed the plain table and confirm the rows reach BigQuery:
 INSERT INTO cutover_events (record_time, payload)
   SELECT (extract(epoch FROM t) * 1000000)::bigint, 'pre-cutover ' || t
   FROM generate_series(now() - interval '2 hours', now(), interval '30 minutes') AS t;
+-- INSERT 0 5
+
 SELECT count(*), max(row_id) FROM cutover_events;
+-- 5, 5
 ```
 
 ```sql
 SELECT count(*), max(row_id) FROM \`$BQ_DATASET.partition_test_cutover_events\`;
+-- expect 5, 5 (matching above pg version)
 ```
 
 ### 2a. Rename alone: what the publication does by default
@@ -229,12 +276,12 @@ Publications track tables by OID, so a renamed table stays published under its n
 BEGIN;
 ALTER TABLE cutover_events RENAME TO cutover_events_legacy;
 SELECT * FROM pg_publication_tables WHERE pubname = 'pgpart_stag_prod_pub';
+-- partitioned_events and cutover_events_legacy
 ROLLBACK;
 ```
 
-- **Expected:** `cutover_events_legacy` is listed. This is why the migration in 2b
-  needs a publication step. After the cutover the publication must **not**
-  contain the `*_legacy` tables.
+That is why the migration in 2b needs a publication step: after the cutover the
+publication must **not** contain the `*_legacy` tables.
 
 ### 2b. Pseudo-Flyway migration
 
@@ -300,14 +347,14 @@ BEGIN
 END $$;
 
 COMMIT;
+-- COMMIT, with no warnings
 ```
 
 ```sql
 SELECT * FROM pg_publication_tables WHERE pubname = 'pgpart_stag_prod_pub';
+-- partitioned_events and cutover_events; cutover_events_legacy is *not* listed
 ```
 
-- **Expected:** `partitioned_events` and `cutover_events` are listed, and
-  `cutover_events_legacy` is **not**.
 - Re-running only the last `DO` block changes nothing.
 - **Robust without a publication:** in a scratch schema, create a plain
   `cutover_events` with `row_id bigserial PRIMARY KEY`, then run the whole
@@ -327,30 +374,33 @@ INSERT INTO cutover_events (record_time, payload)
   SELECT (extract(epoch FROM t) * 1000000)::bigint, 'post-cutover ' || t
   FROM generate_series(current_date - 1 + interval '3 hours',
                        current_date + 1 + interval '21 hours', interval '6 hours') AS t;
+-- INSERT 0 12
+
 SELECT (SELECT count(*) FROM cutover_events_legacy) AS legacy,
        (SELECT count(*) FROM cutover_events) AS new,
        (SELECT min(row_id) FROM cutover_events) AS new_min_row_id;
+-- 5, 12, 6 (the new parent continues the legacy row_id sequence)
 ```
 
 Check BigQuery:
 
 ```sql
 SELECT table_name FROM \`$BQ_DATASET\`.INFORMATION_SCHEMA.TABLES ORDER BY 1;
+-- expect only partition_test_cutover_events and partition_test_partitioned_events;
+-- no …_cutover_events_legacy and no per-partition table
 
 SELECT starts_with(payload, 'pre-cutover') AS pre, count(*), min(row_id), max(row_id)
-  FROM \`$BQ_DATASET.partition_test_cutover_events\` GROUP BY 1;
+  FROM \`$BQ_DATASET.partition_test_cutover_events\` GROUP BY 1 ORDER BY 1;
+-- expect false, 12, 6, 17 (all post-cutover rows) and
+--        true, 5, 1, 5 (the pre-cutover rows, unchanged), in the same table
 
 SELECT row_id, count(*) FROM \`$BQ_DATASET.partition_test_cutover_events\`
   GROUP BY row_id HAVING count(*) > 1;
+-- expect no rows, empty output (meaning no duplicates)
 ```
 
-- **Expected:**
-  - The same single `partition_test_cutover_events` table holds the pre-cutover
-    rows, unchanged, plus all the post-cutover rows.
-  - Post-cutover `row_id`s continue the sequence.
-  - The duplicate query returns no rows.
-  - There is no `…_cutover_events_legacy` table and no per-partition table.
-  - The stream stays `RUNNING`, with no errors in `gcloud datastream objects list`.
+- **Expected:** the stream stays `RUNNING`, with no errors in
+  `gcloud datastream objects list`.
 - **Record:** how Datastream treats the new relation behind the same name, for
   example a new object entry, a schema change, or object errors in the console.
   The `includeObjects` filter matches by name, and the primary key changed from
@@ -363,23 +413,34 @@ nothing for it, so the append-only BigQuery tables must not change.
 
 ```sql
 DROP TABLE partitioned_events_p<yesterday>;   -- e.g. partitioned_events_p20261011
+-- DROP TABLE
 DROP TABLE cutover_events_p<yesterday>;
+-- DROP TABLE
 DROP TABLE cutover_events_legacy;             -- already out of the publication
+-- DROP TABLE
+
 SELECT count(*) FROM partitioned_events;
+-- 10 (14 minus yesterday's 4)
+
+SELECT count(*) FROM cutover_events;
+-- 8 (12 minus yesterday's 4; the 5 pre-cutover rows went with the legacy table)
 ```
 
 Wait a few minutes, then:
 
 ```sql
 SELECT count(*) FROM \`$BQ_DATASET.partition_test_partitioned_events\`;
+-- expect 14, unchanged from section 1
+
 SELECT count(*) FROM \`$BQ_DATASET.partition_test_cutover_events\`;
+-- expect 17, unchanged from section 2
+
 SELECT datastream_metadata.change_type, count(*)
   FROM \`$BQ_DATASET.partition_test_partitioned_events\` GROUP BY 1;
+-- expect INSERT, 14 (no DELETE)
 ```
 
-- **Expected:** both BigQuery counts are unchanged from sections 1 and 2, even
-  though Postgres now has fewer rows. There are no `DELETE` change types, and the
-  stream is still `RUNNING`.
+- **Expected:** the stream is still `RUNNING`.
 
 ## 4. Read-only check for real clusters
 
@@ -388,6 +449,7 @@ On clusters with the stag-prod stream enabled, check only:
 
 ```sql
 SELECT pubname, pubviaroot FROM pg_publication;
+-- update_history_datastream_stag_prod_pub should have t; see below if it has f
 ```
 
 `bigquery-cloudsql.sh` sets `publish_via_partition_root` only when it **creates**
