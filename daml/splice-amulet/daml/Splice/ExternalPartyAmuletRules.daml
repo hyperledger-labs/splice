@@ -29,7 +29,8 @@ import Splice.AmuletAllocation as AmuletAllocationV1
 import Splice.AmuletAllocationV2 as AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
-import Splice.GovernanceLock
+import Splice.GovernanceLock (lockManagerParty)
+import Splice.GovernanceLock.Request (governanceLock_transferFactoryV1_transferImpl)
 import Splice.Types
 import Splice.Util
 

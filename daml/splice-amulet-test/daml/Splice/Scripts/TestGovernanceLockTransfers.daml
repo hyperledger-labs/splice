@@ -14,6 +14,8 @@ import Splice.Amulet.TokenApiUtils (amuletInstrumentId)
 import Splice.Api.Token.MetadataV1 (emptyMetadata)
 import Splice.Api.Token.TransferInstructionV1 qualified as V1
 import Splice.GovernanceLock
+import Splice.GovernanceLock.Request
+import Splice.GovernanceLock.Transfer
 import Splice.Scripts.TestGovernanceLocks
 import Splice.Scripts.TokenStandard.TestAmuletTokenStandardTestEnv
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2

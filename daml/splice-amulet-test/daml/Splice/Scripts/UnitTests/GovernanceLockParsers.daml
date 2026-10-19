@@ -18,6 +18,7 @@ import Daml.Script
 import Splice.Amulet.TokenApiUtils (reasonMetaKey)
 import Splice.Api.Token.MetadataV1
 import Splice.GovernanceLock
+import Splice.GovernanceLock.Request
 
 -- Test parties and helpers
 ---------------------------

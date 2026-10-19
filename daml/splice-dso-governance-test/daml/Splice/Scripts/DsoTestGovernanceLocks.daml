@@ -13,6 +13,8 @@ import Daml.Script
 import Splice.Amulet (Amulet, FeaturedAppRight(..), LockedAmulet, LockedAmulet_OwnerExpireLockV2(..))
 import Splice.DsoRules (DsoRules, DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLock(..), DsoRules_GovernanceLockSubstitution_WithdrawExpired(..), DsoRules_GovernanceLockTransfer_Expire(..), DsoRules_GovernanceLock_DsoExpire(..))
 import Splice.GovernanceLock
+import Splice.GovernanceLock.Substitution
+import Splice.GovernanceLock.Transfer
 import Splice.Scripts.DsoTestUtils (initDevNet)
 import Splice.Scripts.TestGovernanceLocks
 import Splice.Scripts.Util

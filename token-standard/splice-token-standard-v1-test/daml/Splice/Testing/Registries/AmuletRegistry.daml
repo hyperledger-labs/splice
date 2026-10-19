@@ -60,6 +60,8 @@ import Splice.ExternalPartyConfigState
 import Splice.ExternalPartyAmuletRules
 import Splice.Fees
 import Splice.GovernanceLock
+import Splice.GovernanceLock.Substitution
+import Splice.GovernanceLock.Transfer
 import Splice.Issuance
 import Splice.Schedule
 import Splice.Round

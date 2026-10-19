@@ -22,6 +22,8 @@ import Splice.Amulet.RewardAccountingV2 qualified as RewardAccountingV2
 import Splice.AmuletRules
 import Splice.ExternalPartyAmuletRules
 import Splice.GovernanceLock
+import Splice.GovernanceLock.Substitution
+import Splice.GovernanceLock.Transfer
 import Splice.TokenStandard.Utils qualified as TSU
 
 import Splice.ExternalPartyConfigState

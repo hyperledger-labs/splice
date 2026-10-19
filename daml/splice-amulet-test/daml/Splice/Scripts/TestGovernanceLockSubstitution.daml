@@ -18,6 +18,8 @@ import Splice.Api.Token.HoldingV1 qualified as V1
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as V1
 import Splice.GovernanceLock
+import Splice.GovernanceLock.Request
+import Splice.GovernanceLock.Substitution
 import Splice.Scripts.TestGovernanceLocks
 import Splice.Scripts.TokenStandard.TestAmuletTokenStandardTestEnv
 import Splice.Scripts.UnitTests.GovernanceLockParsers (substitutionTSv1Parser)

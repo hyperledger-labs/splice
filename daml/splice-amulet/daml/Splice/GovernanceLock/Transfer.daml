@@ -1,0 +1,233 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.GovernanceLock.Transfer (
+  -- * Templates and choices
+  GovernanceLockTransfer(..),
+  GovernanceLockTransfer_DsoExpire(..),
+  GovernanceLockTransfer_DsoExpireResult(..),
+
+  -- * Operations
+  LockTransfer(..),
+  LockTransferArgs(..),
+  createGovernanceLockTransfer,
+
+  -- * Metadata
+  transferGovernanceLockMetadata,
+) where
+
+import DA.Assert
+import DA.Map qualified as Map
+import DA.Time
+
+import Splice.Amulet
+import Splice.Amulet.TokenApiUtils
+import Splice.AmuletConfig (getTokenStandardMaxTTL)
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1 qualified as V1
+import Splice.GovernanceLock
+import Splice.TokenStandard.Utils hiding (require, reasonMetaKey)
+import Splice.Types
+
+-- | The terms of a lock transfer: how much of the owner's locks moves to the receiver.
+data LockTransfer = LockTransfer with
+    source : GovernanceLockKey
+      -- ^ Source locks to be transferred. Locks are resolved by key.
+    receiver : Party
+      -- ^ New owner, who accepts the transfer.
+    amount : Decimal
+      -- ^ Amount moved out of the source locks.
+    requestedAt : Time
+      -- ^ When the sender requested the transfer.
+  deriving (Eq, Show, Serializable)
+
+-- | Arguments of `createGovernanceLockTransfer`.
+data LockTransferArgs = LockTransferArgs with
+    transfer : LockTransfer
+    extraArgs : ExtraArgs
+
+data TransferTransferInstructionViewArgs = TransferTransferInstructionViewArgs with
+  transfer : LockTransfer
+  expiresAt : Time
+  meta : Metadata
+
+transfer_transferInstructionView : TransferTransferInstructionViewArgs -> V1.TransferInstructionView
+transfer_transferInstructionView TransferTransferInstructionViewArgs{..} =
+  V1.TransferInstructionView with
+    originalInstructionCid = None -- implement and use `originalTransferCid` when adding custom controllers
+    transfer = V1.Transfer with
+      sender = transfer.source.owner
+      receiver = transfer.receiver
+      amount = transfer.amount
+      instrumentId = amuletInstrumentId transfer.source.dso
+      requestedAt = transfer.requestedAt
+      executeBefore = expiresAt
+      inputHoldingCids = []
+      meta
+    status = V1.TransferPendingInternalWorkflow with
+      pendingActions = Map.fromListWithR (\x y -> x <> "; " <> y)
+        [(transfer.receiver, "accept transfer; reject transfer"), (transfer.source.owner, "withdraw transfer")]
+    meta = emptyMetadata
+
+transferTransferResult_completed : V1.TransferInstructionResult
+transferTransferResult_completed = V1.TransferInstructionResult with
+  output = V1.TransferInstructionResult_Completed with
+    receiverHoldingCids = []
+  senderChangeCids = []
+  meta = emptyMetadata
+
+transferTransferResult_failed : V1.TransferInstructionResult
+transferTransferResult_failed = V1.TransferInstructionResult with
+  output = V1.TransferInstructionResult_Failed
+  senderChangeCids = []
+  meta = emptyMetadata
+
+transferTransferUpdateUnsupported = "Transfers representing governance lock transfers cannot be updated"
+
+transferGovernanceLockMetadata : GovernanceLockSpecification -> Metadata
+transferGovernanceLockMetadata = encodeGovernanceLockMetadataWithRequest "accept-to-transfer-lock"
+
+-- | A proposal by the owner of `GovernanceLock`s to transfer all or part of
+-- them to a new owner. The proposal holds no funds: on accept, the locks
+-- matching `transfer.source` are resolved by key, merged and split.
+template GovernanceLockTransfer with
+    transfer : LockTransfer
+    expiresAt : Time
+      -- ^ When the transfer proposal expires.
+  where
+    signatory transfer.source.dso, transfer.source.owner
+    observer transfer.receiver
+    ensure isValidLockTransfer expiresAt transfer
+
+    interface instance V1.TransferInstruction for GovernanceLockTransfer where
+      view = transfer_transferInstructionView TransferTransferInstructionViewArgs with
+        transfer
+        expiresAt
+        meta = transferGovernanceLockMetadata transfer.source.specification
+
+      transferInstruction_acceptImpl self V1.TransferInstruction_Accept{..} = do
+        governanceLockTransfer_acceptImpl (fromInterfaceContractId self) this [transfer.receiver] extraArgs
+        pure $ transferTransferResult_completed
+
+      transferInstruction_rejectImpl _self _arg = do
+        governanceLockTransfer_rejectImpl this [transfer.receiver]
+        pure $ transferTransferResult_failed
+
+      transferInstruction_withdrawImpl _self _arg = do
+        governanceLockTransfer_withdrawImpl this [transfer.source.owner]
+        pure $ transferTransferResult_failed
+
+      transferInstruction_updateImpl _ _ = assertFail transferTransferUpdateUnsupported
+
+    choice GovernanceLockTransfer_DsoExpire : GovernanceLockTransfer_DsoExpireResult
+      -- ^ Garbage-collect proposal that receiver never accepted, so SV nodes
+      -- are not left storing it forever.
+      controller transfer.source.dso
+      do
+        assertDeadlineExceeded "GovernanceLockTransfer.expiresAt" expiresAt
+        pure GovernanceLockTransfer_DsoExpireResult
+
+data GovernanceLockTransfer_DsoExpireResult = GovernanceLockTransfer_DsoExpireResult {}
+  deriving (Serializable)
+
+data GovernanceLockTransfer_AcceptResult
+  = GovernanceLockTransfer_AcceptResult with
+    lockCid : ContractId GovernanceLock
+      -- ^ The new lock of the receiver, which holds the transferred funds.
+    remainingLockCid : Optional (ContractId GovernanceLock)
+      -- ^ The lock of the sender that keeps the funds that were not transferred, if any.
+    lockedAmulet : ContractId LockedAmulet
+      -- ^ The transferred funds, now locked for the owner of the new lock.
+
+-- | Creates a proposal to transfer `amount` of the governance locks with key
+-- `source` from their owner to `receiver`. Requires the authority of the
+-- source's DSO party and `owner`. The proposal expires
+-- `tokenStandardMaxTTL` after `requestedAt`.
+--
+-- The source locks are not looked up: they will be resolved by key when the
+-- receiver accepts. So no funds move, and a proposal for a key that matches no
+-- lock is still created.
+createGovernanceLockTransfer : LockTransferArgs -> Update (ContractId GovernanceLockTransfer, GovernanceLockTransfer)
+createGovernanceLockTransfer LockTransferArgs{transfer, extraArgs} = do
+  maxExpiresAt <- lockTransferExpiresAt transfer extraArgs
+  expiresAt <- case transfer.source.specification of
+    GLS_FullLock _ -> pure maxExpiresAt
+    GLS_VestingLock VestingLockSpecification{endTime} -> do
+      assertWithinDeadline "source lock endTime" endTime
+      pure $ min maxExpiresAt endTime
+
+  validateLockTransfer expiresAt transfer
+
+  let governanceLockTransfer = GovernanceLockTransfer with
+        transfer
+        expiresAt
+  transferCid <- create governanceLockTransfer
+  pure (transferCid, governanceLockTransfer)
+
+governanceLockTransfer_acceptImpl : ContractId GovernanceLockTransfer -> GovernanceLockTransfer -> [Party] -> ExtraArgs -> Update GovernanceLockTransfer_AcceptResult
+governanceLockTransfer_acceptImpl self GovernanceLockTransfer{..} actors extraArgs = do
+  checkActors actors [[transfer.receiver]]
+  let dso = transfer.source.dso
+  (context, state) <- unfeaturedPaymentContextAndConfigFromChoiceContext dso extraArgs.context
+  FetchAndMergeLocksResult{lockCid} <- fetchAndMergeGovernanceLocks transfer.source context state
+  result <- exercise lockCid GovernanceLock_DsoTransfer with
+    transferredAmount = transfer.amount
+    extraArgs
+  -- Lock the unlocked funds of the sender again, now for the receiver.
+  -- This needs the authority of the receiver.
+  ([newLockedAmulet], None) <- lockAmuletFor
+    (ForOwner with dso; owner = transfer.source.owner)
+    transfer.receiver
+    [(transfer.amount, governanceLockProperties transfer.source.specification)]
+    [toInterfaceContractId result.unlockedAmulet]
+    context
+    ""
+  newLockCid <- create GovernanceLock with
+    dso
+    owner = transfer.receiver
+    amount = transfer.amount
+    lockedAmulet = newLockedAmulet
+    specification = transfer.source.specification
+    originalLockCid = Some $ toAnyContractId self
+    requestedAt = transfer.requestedAt
+  pure GovernanceLockTransfer_AcceptResult with
+    lockCid = newLockCid
+    remainingLockCid = result.remainingLockCid
+    lockedAmulet = newLockedAmulet
+
+governanceLockTransfer_withdrawImpl : GovernanceLockTransfer -> [Party] -> Update ()
+governanceLockTransfer_withdrawImpl GovernanceLockTransfer{..} actors = do
+  checkActors actors [[transfer.source.owner]]
+
+governanceLockTransfer_rejectImpl : GovernanceLockTransfer -> [Party] -> Update ()
+governanceLockTransfer_rejectImpl GovernanceLockTransfer{..} actors = do
+  checkActors actors [[transfer.receiver]]
+
+-- | Checks to validate lock transfers
+validateLockTransfer : Time -> LockTransfer -> Update ()
+validateLockTransfer expiresAt transfer = do
+  assertInPast24Hours "requestedAt" transfer.requestedAt
+  require' ("receiver", transfer.receiver) (notR isEqualR) ("sender", transfer.source.owner)
+  -- TODO(canton-network/splice-sv-fa-locking#128): Validate that lock transfer
+  --   amount doesn't exceed the total amount of of locks refered by
+  --   the `transfer.source` key.
+  require' ("amount", transfer.amount) isGreaterR ("zero", 0.0)
+  case transfer.source.specification of
+    GLS_FullLock _ -> pure ()
+    GLS_VestingLock VestingLockSpecification{endTime} -> require' ("expiresAt", expiresAt) isLessOrEqualR ("vesting endTime", endTime)
+
+-- | Invariants of lock transfer proposals.
+-- To be used in the `GovernanceLockTransfer` template to `ensure` basic invariants on
+-- direct create. `createGovernanceLockTransfer` checks all of this with clearer
+-- messages.
+isValidLockTransfer : Time -> LockTransfer -> Bool
+isValidLockTransfer expiresAt transfer =
+  let validEndTime = foldGovernanceLockSpecification (const True) (\v -> expiresAt <= v.endTime) transfer.source.specification
+  in transfer.amount > 0.0 && transfer.receiver /= transfer.source.owner && validEndTime
+
+-- | When a lock transfer proposal expires
+lockTransferExpiresAt : LockTransfer -> ExtraArgs -> Update Time
+lockTransferExpiresAt transfer extraArgs = do
+  (_, state) <- unfeaturedPaymentContextAndConfigFromChoiceContext transfer.source.dso extraArgs.context
+  pure $ transfer.requestedAt `addRelTime`
+    getTokenStandardMaxTTL state.transferConfig
