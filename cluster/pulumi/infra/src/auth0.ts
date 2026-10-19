@@ -19,6 +19,7 @@ import {
   standardSvConfigsBasic,
   extraSvConfigsBasic,
 } from '@canton-network/splice-pulumi-common-sv/src/svConfigsBasic';
+import { allValidatorsConfig } from '@canton-network/splice-pulumi-common-validator/src/config';
 
 function tokenLifetime(): number {
   return fixedTokens() ? 2592000 : 86400; // TODO(DACH-NY/canton-network-internal#2114): Move this to the cluster config? We want it to be long for fixed token clusters
@@ -252,19 +253,20 @@ function newUiApp(
   name: string,
   description: string,
   urlPrefixes: string[],
-  ingressName: string,
+  ingressName: string | string[],
   clusterBasename: string,
   clusterDnsNames: string[],
   auth0DomainProvider: auth0.Provider,
   extraUrls: string[] = []
 ): auth0.Client {
   const urls = urlPrefixes
-    .map(prefix => {
-      return clusterDnsNames.map(dnsName => {
-        return `https://${prefix}.${ingressName}.${dnsName}`;
-      });
-    })
-    .flat()
+    .flatMap(prefix =>
+      [ingressName]
+        .flat()
+        .flatMap(ingress =>
+          clusterDnsNames.map(dnsName => `https://${prefix}.${ingress}.${dnsName}`)
+        )
+    )
     .concat(extraUrls);
 
   return newSpaClient(
@@ -559,12 +561,16 @@ function newWalletGatewayApp(
   resourceName: string,
   name: string,
   description: string,
-  ingressName: string,
+  ingressName: string | string[],
   clusterBasename: string,
   clusterDnsNames: string[],
   auth0DomainProvider: auth0.Provider
 ): auth0.Client {
-  const origins = clusterDnsNames.map(dnsName => `https://walletgateway.${ingressName}.${dnsName}`);
+  const origins = [ingressName]
+    .flat()
+    .flatMap(ingress =>
+      clusterDnsNames.map(dnsName => `https://walletgateway.${ingress}.${dnsName}`)
+    );
 
   return newSpaClient(
     resourceName,
@@ -672,6 +678,9 @@ function validatorRunbookAuth0(
   const auth0Domain = 'canton-network-validator-test.us.auth0.com';
   const auth0MgtClientId = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID');
   const auth0MgtClientSecret = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET');
+  const validatorIngressNames = [
+    ...new Set(Object.values(allValidatorsConfig).map(v => v.namespace)),
+  ];
 
   const provider = new auth0.Provider('validator', {
     domain: auth0Domain,
@@ -684,7 +693,7 @@ function validatorRunbookAuth0(
     'Wallet UI',
     'Used for the Wallet UI for the validator runbook',
     ['wallet'],
-    'validator',
+    validatorIngressNames,
     clusterBasename,
     dnsNames,
     provider,
@@ -695,7 +704,7 @@ function validatorRunbookAuth0(
     'ANS UI',
     'Used for the ANS UI for the validator runbook',
     [ansDomainPrefix],
-    'validator',
+    validatorIngressNames,
     clusterBasename,
     dnsNames,
     provider,
@@ -705,7 +714,7 @@ function validatorRunbookAuth0(
     'validatorWalletGatewayApp',
     'Wallet Gateway',
     'Used for the Wallet Gateway UI login for the validator runbook',
-    'validator',
+    validatorIngressNames,
     clusterBasename,
     dnsNames,
     provider
