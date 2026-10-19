@@ -3744,10 +3744,10 @@ components:
           $ref: "#/components/schemas/EventHistoryTrafficSummary"
           nullable: true
         app_activity_records:
-          $ref: "#/components/schemas/EventHistoryAppActivityRecords"
+          $ref: "#/components/schemas/EventHistoryActivityRecords"
           nullable: true
         asset_activity_records:
-          $ref: "#/components/schemas/EventHistoryAssetActivityRecords"
+          $ref: "#/components/schemas/EventHistoryActivityRecords"
           nullable: true
         submitting_app_provider:
           description: |
@@ -3924,10 +3924,10 @@ components:
           items:
             type: integer
             format: int32
-    EventHistoryAppActivityRecords:
+    EventHistoryActivityRecords:
       type: object
       description: |
-        App activity record computed from verdicts and traffic summaries
+        Activity records computed from verdicts and traffic summaries
         as per [CIP-104](https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md).
       required:
         - round_number
@@ -3940,7 +3940,7 @@ components:
           format: int64
         records:
           description: |
-            App activity records, one per app provider.
+            Activity records, one per provider.
           type: array
           items:
             $ref: "#/components/schemas/ActivityRecord"
@@ -3961,26 +3961,6 @@ components:
             Activity weight in bytes of traffic.
           type: integer
           format: int64
-    EventHistoryAssetActivityRecords:
-      type: object
-      description: |
-        Asset activity record computed from verdicts and traffic summaries.
-      required:
-        - round_number
-        - records
-      properties:
-        round_number:
-          description: |
-            The round number assigned to the activity records.
-          type: integer
-          format: int64
-        records:
-          description: |
-            Asset activity records, one per asset provider.
-          type: array
-          items:
-            $ref: "#/components/schemas/ActivityRecord"
-
     ListUnclaimedDevelopmentFundCouponsResponse:
       type: object
       required: [ "unclaimed-development-fund-coupons" ]

@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   ActivityRecord,
   CreatedEvent,
   EnvelopeTrafficSummary,
-  EventHistoryAppActivityRecords,
+  EventHistoryActivityRecords,
   EventHistoryItem,
   EventHistoryTrafficSummary,
   EventHistoryVerdict,
@@ -144,7 +144,7 @@ class UpdateHistoryOmitNullStringComplianceTest extends AnyWordSpec with BaseTes
           checkNoUnsafeOptions[EventHistoryItem]("EventHistoryItem") ++
           checkNoUnsafeOptions[EventHistoryVerdict]("EventHistoryVerdict") ++
           checkNoUnsafeOptions[EventHistoryTrafficSummary]("EventHistoryTrafficSummary") ++
-          checkNoUnsafeOptions[EventHistoryAppActivityRecords]("EventHistoryAppActivityRecords") ++
+          checkNoUnsafeOptions[EventHistoryActivityRecords]("EventHistoryActivityRecords") ++
           checkNoUnsafeOptions[TransactionViews]("TransactionViews") ++
           checkNoUnsafeOptions[TransactionView]("TransactionView") ++
           checkNoUnsafeOptions[Quorum]("Quorum") ++

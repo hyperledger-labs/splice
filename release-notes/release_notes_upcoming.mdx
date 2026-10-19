@@ -9,7 +9,7 @@
       - `asset_activity_records`: asset-side activity records parallel to `app_activity_records`.
       - `submitting_app_provider`: the submitting app provider party identifier when the submitter is a featured-app.
 
-    - The `AppActivityRecord` schema has been renamed to `ActivityRecord` (shared `{party, weight}` type referenced by both `EventHistoryAppActivityRecords.records` and `EventHistoryAssetActivityRecords.records`). Wire shape unchanged; generated-client type name differs.
+    - Two activity-record schemas have been renamed: `AppActivityRecord` → `ActivityRecord` (shared `{party, weight}` type) and `EventHistoryAppActivityRecords` → `EventHistoryActivityRecords`. Wire shape unchanged; generated-client type names differ.
 
     - The following request fields now have a `maxItems` bound of 1000; requests exceeding it are rejected with 400:
 
