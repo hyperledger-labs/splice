@@ -35,7 +35,7 @@ DEFAULT_PROM_URLS = {
 DEFAULT_SPEC = "apps/scan/src/main/openapi/scan.yaml"
 DURATION_METRIC = "daml_http_requests_duration_seconds"
 
-# prevent long-running queries from being rejected by Prometheus.
+# prevent long-running queries from being rejected by prometheus
 MAX_POINTS = 11_000
 DEFAULT_HTTP_SERVICE = "scan"
 HTTP_METHODS = {"get", "put", "post", "delete"}
