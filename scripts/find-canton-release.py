@@ -19,8 +19,8 @@ RELEASE_LINE (3.6) to only consider tags of that line.
 Exits with status 1 if no release contains the commit yet (typical for snapshots of
 `main`); use search-canton-snapshot.py then.
 
-Needs read access to https://github.com/DACH-NY/canton. The clone is a blobless bare
-clone cached in $CANTON_CLOSED_CACHE (default: ~/.cache/canton-closed.git).
+Needs a local checkout of https://github.com/DACH-NY/canton (the closed-source repo),
+given with --closed-canton. Its `origin` is fetched first, so brand new releases are found.
 """
 
 import argparse
@@ -28,8 +28,6 @@ import os
 import re
 import subprocess
 import sys
-
-REPO_URL = "https://github.com/DACH-NY/canton.git"
 
 
 def parse_args():
@@ -49,34 +47,30 @@ def parse_args():
         "If omitted, tags of every line are considered.",
     )
     parser.add_argument(
+        "--closed-canton",
+        metavar="PATH",
+        required=True,
+        help="Local checkout of the closed-source DACH-NY/canton repo.",
+    )
+    parser.add_argument(
         "-n", "--max-results", type=int, default=5, help="Number of tags to print."
     )
     return parser.parse_args()
 
 
-def default_cache() -> str:
-    cache_home = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-    return os.environ.get("CANTON_CLOSED_CACHE") or os.path.join(
-        cache_home, "canton-closed.git"
-    )
-
-
 def main():
     args = parse_args()
-    cache = default_cache()
+    repo = args.closed_canton
 
     def git(*cmd: str, check: bool = True) -> subprocess.CompletedProcess:
         return subprocess.run(
-            ["git", "-C", cache, *cmd], capture_output=True, text=True, check=check
+            ["git", "-C", repo, *cmd], capture_output=True, text=True, check=check
         )
 
-    if not os.path.isdir(cache):
-        subprocess.run(
-            ["git", "clone", "--bare", "--filter=blob:none", "--no-tags", REPO_URL, cache],
-            check=True,
-        )
-    git("fetch", "--quiet", "--filter=blob:none", "origin",
-        "+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*")
+    if not os.path.isdir(repo) or git("rev-parse", "--git-dir", check=False).returncode != 0:
+        sys.exit(f"error: --closed-canton {repo!r} is not a git checkout")
+    # So that releases newer than the checkout are found.
+    git("fetch", "--quiet", "--tags", "origin")
 
     if not re.fullmatch(r"[0-9a-fA-F]+", args.reference_commit):
         sys.exit(f"error: reference commit must be a hex string, got: {args.reference_commit!r}")
