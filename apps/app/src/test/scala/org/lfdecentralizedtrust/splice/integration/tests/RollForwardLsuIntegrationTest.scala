@@ -102,7 +102,7 @@ class RollForwardLsuIntegrationTest
                     .modify(c =>
                       c.copy(
                         legacy = c.current.some,
-                        current = c.current.focus(_.protocolVersion).replace(ProtocolVersion.v36),
+                        current = c.current.focus(_.protocolVersion).replace(ProtocolVersion.v37),
                       )
                     )
                     .focus(_.onboarding)
@@ -111,7 +111,7 @@ class RollForwardLsuIntegrationTest
                         .RollForwardLsu(
                           c.value.name,
                           NonNegativeInt.tryCreate(2),
-                          ProtocolVersion.v36,
+                          ProtocolVersion.v37,
                           exportTimes = None,
                         )
                         .some
@@ -198,7 +198,7 @@ class RollForwardLsuIntegrationTest
     val newSynchronizerSerial = decentralizedSynchronizerPSId.serial + NonNegativeInt.two
     val successorPsid = decentralizedSynchronizerPSId.copy(
       serial = newSynchronizerSerial,
-      protocolVersion = ProtocolVersion.v36,
+      protocolVersion = ProtocolVersion.v37,
     )
     val topologyFreezeTime = CantonTimestamp.now()
     val upgradeTime = CantonTimestamp.now().plusSeconds(60)

@@ -206,7 +206,7 @@ class LocalNetFrontendIntegrationTest
         .list_connected()
         .loneElement
         .physicalSynchronizerId
-        .protocolVersion shouldBe ProtocolVersion.v36
+        .protocolVersion shouldBe ProtocolVersion.v37
     }
   }
 }
