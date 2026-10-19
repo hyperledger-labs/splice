@@ -4,6 +4,13 @@
 
   - Scan App
 
+    - `/v0/events` responses now include two optional per-event fields:
+
+      - `asset_activity_records`: asset-side activity records parallel to `app_activity_records`.
+      - `submitting_app_provider`: the submitting app provider party identifier when the submitter is a featured-app.
+
+    - The `AppActivityRecord` schema has been renamed to `ActivityRecord` (shared `{party, weight}` type referenced by both `EventHistoryAppActivityRecords.records` and `EventHistoryAssetActivityRecords.records`). Wire shape unchanged; generated-client type name differs.
+
     - The following request fields now have a `maxItems` bound of 1000; requests exceeding it are rejected with 400:
 
       - `/v0/open-and-issuing-mining-rounds`: `cached_open_mining_round_contract_ids`, `cached_issuing_round_contract_ids`
