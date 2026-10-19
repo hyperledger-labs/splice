@@ -226,8 +226,23 @@ class DsoDelegateBasedAutomationService(
         getPeerBftScanConnection,
       )
     )
+    registerTrigger(
+      new ExpireVestingLockTrigger(
+        config,
+        triggerContext,
+        svTaskContext,
+        unavailablePartiesStore,
+      )
+    )
+    registerTrigger(
+      new ProvisionalFeaturedAppLockConversionTrigger(
+        config,
+        triggerContext,
+        svTaskContext,
+        unavailablePartiesStore,
+      )
+    )
   }
-
 }
 
 object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
@@ -270,5 +285,7 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[BootstrapExternalPartyConfigStateInstructionTrigger],
     aTrigger[ProcessRewardsTrigger],
     aTrigger[ProcessRewardsDryRunTrigger],
+    aTrigger[ExpireVestingLockTrigger],
+    aTrigger[ProvisionalFeaturedAppLockConversionTrigger],
   )
 }

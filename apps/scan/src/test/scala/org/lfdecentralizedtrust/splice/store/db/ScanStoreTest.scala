@@ -219,6 +219,33 @@ abstract class ScanStoreTest
       }
     }
 
+    "ingest GovernanceLocks of the DSO and skip those of other parties" in {
+      val wantedFull = governanceLock(userParty(1), amount = BigDecimal(10))
+      val unwantedFull = governanceLock(userParty(2), amount = BigDecimal(20), dso = userParty(3))
+      val vestingEndTime = Instant.now().plusSeconds(3600).truncatedTo(ChronoUnit.MICROS)
+      val wantedVesting =
+        governanceLock(userParty(1), amount = BigDecimal(10), vestingEndTime = Some(vestingEndTime))
+      val unwantedVesting =
+        governanceLock(
+          userParty(2),
+          amount = BigDecimal(20),
+          vestingEndTime = Some(vestingEndTime),
+          dso = userParty(3),
+        )
+      for {
+        store <- mkStore()
+        _ <- MonadUtil.sequentialTraverse(
+          Seq(wantedFull, unwantedFull, wantedVesting, unwantedVesting)
+        )(dummyDomain.create(_)(store.multiDomainAcsStore))
+        result <- store.multiDomainAcsStore.listContracts(
+          splice.governancelock.GovernanceLock.COMPANION
+        )
+      } yield {
+        result.map(_.contractId) should contain theSameElementsAs
+          Seq(wantedFull, wantedVesting).map(_.contractId)
+      }
+    }
+
     "lookupTransferPreapprovalByParty" should {
       "return the TransferPreapproval contract signed by the specified party if available" in {
         val wanted = transferPreapproval(userParty(1), providerParty(1), time(0), time(1))

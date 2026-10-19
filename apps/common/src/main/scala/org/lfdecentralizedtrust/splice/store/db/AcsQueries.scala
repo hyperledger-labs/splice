@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.store.db
 
-import com.daml.ledger.javaapi.data.Identifier
+import com.daml.ledger.javaapi.data.{Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
@@ -307,6 +307,25 @@ trait AcsQueries extends Queries with AcsJdbcTypes {
   ): ContractState = {
     row.assignedDomain.fold[ContractState](ContractState.InFlight)(id => ContractState.Assigned(id))
   }
+
+  /** Decodes a stored ACS row without a caller-supplied companion.
+    * Resolves the template from the row via [[ContractCompanions]].
+    */
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  protected def genericContractFromRow(
+      row: AcsQueries.SelectFromAcsTableResult
+  )(implicit
+      decoder: TemplateJsonDecoder
+  ): Either[String, Contract[?, ?]] =
+    ContractCompanions
+      .lookup(row.templateId)
+      .map { companion =>
+        // `ContractCompanions.lookup` erases the companion's type parameters, so we have to cast
+        // to concrete bounds in order for the `ContractCompanion` implicit to resolve
+        row.toContract(
+          companion.asInstanceOf[Contract.Companion.Template[ContractId[Template], Template]]
+        )
+      }
 }
 
 object AcsQueries {
@@ -327,6 +346,12 @@ object AcsQueries {
       createdAt: Timestamp,
       contractExpiresAt: Option[Timestamp],
   ) extends StoreErrors {
+    private[AcsQueries] lazy val templateId: Identifier = new Identifier(
+      templateIdPackageId,
+      packageQualifiedName.qualifiedName.moduleName,
+      packageQualifiedName.qualifiedName.entityName,
+    )
+
     def toContract[C, TCId <: ContractId[?], T](companion: C)(implicit
         companionClass: ContractCompanion[C, TCId, T],
         decoder: TemplateJsonDecoder,
@@ -343,11 +368,7 @@ object AcsQueries {
 
       companionClass
         .fromJson(companion)(
-          new Identifier(
-            templateIdPackageId,
-            packageQualifiedName.qualifiedName.moduleName,
-            packageQualifiedName.qualifiedName.entityName,
-          ),
+          templateId,
           contractId.contractId,
           createArguments,
           ByteString.copyFrom(createdEventBlob),
