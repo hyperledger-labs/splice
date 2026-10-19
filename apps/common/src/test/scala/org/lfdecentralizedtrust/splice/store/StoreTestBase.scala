@@ -763,6 +763,8 @@ abstract class StoreTestBase
       dsoParty.toProtoPrimitive,
       providerParty.toProtoPrimitive,
       activityWeight.map(_.bigDecimal).toJava,
+      None.toJava,
+      None.toJava,
     )
     contract(
       FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID,

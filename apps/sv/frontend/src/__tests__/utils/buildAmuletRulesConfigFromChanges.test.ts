@@ -266,6 +266,18 @@ describe('buildAmuletRulesConfigFromChanges', () => {
         currentValue: '7200000000',
         newValue: '3600000000',
       },
+      {
+        fieldName: 'governanceLockConfigFeaturedAppLockThreshold',
+        label: 'Governance lock config: Featured app lock threshold (Amulet)',
+        currentValue: '5000000',
+        newValue: '10000000',
+      },
+      {
+        fieldName: 'governanceLockConfigFeaturedAppUnderlockGracePeriod',
+        label: 'Governance lock config: Featured app underlock grace period',
+        currentValue: '604800000000',
+        newValue: '302400000000',
+      },
     ];
 
     const result = buildAmuletRulesConfigFromChanges(changes);
@@ -325,6 +337,8 @@ describe('buildAmuletRulesConfigFromChanges', () => {
       minimumLockAmount: '20000',
       superValidatorLockVestingDuration: { microseconds: '7200000000' },
       featuredAppLockVestingDuration: { microseconds: '3600000000' },
+      featuredAppLockThreshold: '10000000',
+      featuredAppUnderlockGracePeriod: { microseconds: '302400000000' },
     });
   });
 
@@ -523,6 +537,18 @@ describe('buildAmuletRulesConfigFromChanges', () => {
         fieldName: 'governanceLockConfigFeaturedAppLockVestingDuration',
         label: 'Governance lock config: Featured app lock vesting duration (microseconds)',
         currentValue: '3600000000',
+        newValue: '',
+      },
+      {
+        fieldName: 'governanceLockConfigFeaturedAppLockThreshold',
+        label: 'Governance lock config: Featured app lock threshold (Amulet)',
+        currentValue: '5000000',
+        newValue: '',
+      },
+      {
+        fieldName: 'governanceLockConfigFeaturedAppUnderlockGracePeriod',
+        label: 'Governance lock config: Featured app underlock grace period',
+        currentValue: '604800000000',
         newValue: '',
       },
     ];

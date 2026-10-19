@@ -1,0 +1,57 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestFeaturedAppUnderlockAmulet where
+
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+import Splice.Amulet
+import Splice.Scripts.Util
+import Splice.Testing.Registries.AmuletRegistry (convertAllFeaturedAppActivityMarkers)
+
+testUnderlockSuspendedEarnsNoFeaturedRewards : Script ()
+testUnderlockSuspendedEarnsNoFeaturedRewards = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  rightCid <- featureApp app provider1
+  _ <- tap app provider1 100.0
+
+  -- While compliant, a transfer the provider runs earns a featured app reward coupon
+  pay app provider1 alice.primaryParty 1.0
+  convertAllFeaturedAppActivityMarkers app.dso
+  before <- queryFilter @AppRewardCoupon app.dso (\r -> r.provider == provider1.primaryParty)
+  [ (c.provider, c.featured) | (_, c) <- before ] === [(provider1.primaryParty, True)]
+
+  -- Suspend directly - no DsoRules machinery
+  now <- getTime
+  _ <- submit app.dso $ exerciseCmd rightCid FeaturedAppRight_SetUnderlock with
+    permanentAt = now `addRelTime` days 7
+
+  let previousCoupons = map fst before
+  pay app provider1 alice.primaryParty 1.0
+  convertAllFeaturedAppActivityMarkers app.dso
+  after <- queryFilter @AppRewardCoupon app.dso (\r -> r.provider == provider1.primaryParty)
+  -- No coupons are issued to a suspended provider
+  [ c | (cid, c) <- after, cid `notElem` previousCoupons ] === []
+
+testUnderlockMarkersFromBeforeSuspensionStillConvert : Script ()
+testUnderlockMarkersFromBeforeSuspensionStillConvert = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  rightCid <- featureApp app provider1
+  _ <- tap app provider1 100.0
+
+  -- earn a marker while compliant, and leave it unconverted
+  pay app provider1 alice.primaryParty 1.0
+  markers <- query @FeaturedAppActivityMarker app.dso
+  map (\(_, m) -> m.provider) markers === [provider1.primaryParty]
+
+  now <- getTime
+  _ <- submit app.dso $ exerciseCmd rightCid FeaturedAppRight_SetUnderlock with
+    permanentAt = now `addRelTime` days 7
+
+  -- suspension stops accrual; it is not clawback. AmuletRules_ConvertFeaturedAppActivityMarkers
+  -- never looks at the right, so markers earned before suspension still pay out.
+  convertAllFeaturedAppActivityMarkers app.dso
+  coupons <- query @AppRewardCoupon app.dso
+  [ (c.provider, c.featured) | (_, c) <- coupons ] === [(provider1.primaryParty, True)]

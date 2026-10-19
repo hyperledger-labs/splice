@@ -301,6 +301,8 @@ final case class InitialGovernanceLockConfig(
     minimumLockAmount: Option[NonNegativeNumeric[BigDecimal]] = None,
     superValidatorLockVestingDuration: Option[NonNegativeFiniteDuration] = None,
     featuredAppLockVestingDuration: Option[NonNegativeFiniteDuration] = None,
+    featuredAppLockThreshold: Option[NonNegativeNumeric[BigDecimal]] = None,
+    featuredAppUnderlockGracePeriod: Option[NonNegativeFiniteDuration] = None,
 ) {
   final def toGovernanceLockConfig: splice.amuletconfig.GovernanceLockConfig = {
     def toRelTime(optDuration: Option[NonNegativeFiniteDuration]) =
@@ -316,6 +318,8 @@ final case class InitialGovernanceLockConfig(
       minimumLockAmount.map(_.value.bigDecimal).toJava,
       toRelTime(superValidatorLockVestingDuration),
       toRelTime(featuredAppLockVestingDuration),
+      featuredAppLockThreshold.map(_.value.bigDecimal).toJava,
+      toRelTime(featuredAppUnderlockGracePeriod),
     )
   }
 }

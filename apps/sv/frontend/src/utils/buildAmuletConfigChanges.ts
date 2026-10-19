@@ -501,5 +501,21 @@ function buildGovernanceLockConfigChanges(
       newValue: after?.featuredAppLockVestingDuration?.microseconds || '',
       description: 'Vesting duration for featured app governance locks (default: 60 days)',
     },
+    {
+      fieldName: 'governanceLockConfigFeaturedAppLockThreshold',
+      label: 'Governance lock config: Featured app lock threshold (Amulet)',
+      currentValue: before?.featuredAppLockThreshold || '',
+      newValue: after?.featuredAppLockThreshold || '',
+      description:
+        'Amount of Amulet a featured app must keep locked to retain its right (default: 5 million)',
+    },
+    {
+      fieldName: 'governanceLockConfigFeaturedAppUnderlockGracePeriod',
+      label: 'Governance lock config: Featured app underlock grace period',
+      currentValue: before?.featuredAppUnderlockGracePeriod || '',
+      newValue: after?.featuredAppUnderlockGracePeriod || '',
+      description:
+        'How long an underlocked featured app provider has to cure before its right becomes archivable (default: 7 days)',
+    },
   ] as ConfigChange[];
 }

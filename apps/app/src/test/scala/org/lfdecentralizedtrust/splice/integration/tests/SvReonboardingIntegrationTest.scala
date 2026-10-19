@@ -517,6 +517,7 @@ class SvReonboardingIntegrationTest
               new DsoRules_GrantFeaturedAppRight(
                 sv4PartyNew.toProtoPrimitive,
                 java.util.Optional.empty(),
+                java.util.Optional.empty(),
               )
             )
           )

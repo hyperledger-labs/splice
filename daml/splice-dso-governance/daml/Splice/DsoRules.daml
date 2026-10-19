@@ -38,6 +38,7 @@ import Splice.Ans
 import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
+import Splice.DSO.Instruction
 import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
@@ -125,6 +126,10 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create BootstrapExternalPartyConfigStateInstruction
   | SRARC_UpdateFeaturedAppRight DsoRules_UpdateFeaturedAppRight
     -- ^ Update a specific featured app right.
+  | SRARC_CreateFeaturedAppUnderlockInstruction DsoRules_CreateFeaturedAppUnderlockInstruction
+    -- ^ Record that a featured app provider has been observed underlocked.
+  | SRARC_CreateFeaturedAppConfigUpdateInstruction DsoRules_CreateFeaturedAppConfigUpdateInstruction
+    -- ^ Voted action to change to a featured app right's config.
   deriving (Eq, Show, Serializable)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -237,6 +242,24 @@ data DsoRules_RevokeFeaturedAppRightResult = DsoRules_RevokeFeaturedAppRightResu
 
 data DsoRules_UpdateFeaturedAppRightResult = DsoRules_UpdateFeaturedAppRightResult with
     result : FeaturedAppRight_UpdateResult
+  deriving (Serializable)
+
+data DsoRules_CreateFeaturedAppUnderlockInstructionResult = DsoRules_CreateFeaturedAppUnderlockInstructionResult with
+    instructionCid : ContractId FeaturedAppUnderlockInstruction
+  deriving (Serializable)
+
+data DsoRules_ExecuteFeaturedAppUnderlockInstructionResult = DsoRules_ExecuteFeaturedAppUnderlockInstructionResult {}
+  deriving (Serializable)
+
+data DsoRules_EnforceFeaturedAppPermanentUnderlockResult = DsoRules_EnforceFeaturedAppPermanentUnderlockResult {}
+  deriving (Serializable)
+
+data DsoRules_CreateFeaturedAppConfigUpdateInstructionResult = DsoRules_CreateFeaturedAppConfigUpdateInstructionResult with
+    instructionCid : ContractId FeaturedAppConfigUpdateInstruction
+  deriving (Serializable)
+
+data DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult = DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult with
+    result : FeaturedAppRight_UpdateConfigResult
   deriving (Serializable)
 
 data DsoRules_OnboardValidatorResult = DsoRules_OnboardValidatorResult with
@@ -1089,12 +1112,15 @@ template DsoRules with
       with
         provider : Party
         activityWeight : Optional Decimal
+        config : Optional FeaturedAppConfigInternal
       controller dso
       do
         featuredAppRight <- create FeaturedAppRight with
           dso
           provider
           activityWeight
+          config
+          underlockPermanentAt = None
         return DsoRules_GrantFeaturedAppRightResult with ..
 
     nonconsuming choice DsoRules_RevokeFeaturedAppRight : DsoRules_RevokeFeaturedAppRightResult
@@ -1117,6 +1143,65 @@ template DsoRules with
         result <- exercise rightCid update
         return DsoRules_UpdateFeaturedAppRightResult with result
 
+    nonconsuming choice DsoRules_CreateFeaturedAppUnderlockInstruction : DsoRules_CreateFeaturedAppUnderlockInstructionResult
+      with
+        provider : Party
+        underlocked : Bool
+      controller dso
+      do
+        instructionCid <- create FeaturedAppUnderlockInstruction with dso; provider; underlocked
+        pure DsoRules_CreateFeaturedAppUnderlockInstructionResult with instructionCid
+
+    nonconsuming choice DsoRules_ExecuteFeaturedAppUnderlockInstruction : DsoRules_ExecuteFeaturedAppUnderlockInstructionResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        instructionCid : ContractId FeaturedAppUnderlockInstruction
+        rightCid : ContractId FeaturedAppRight
+        sv : Party
+      controller sv
+      do
+        void $ getAndValidateSvParty this (Some sv)
+        instruction <- fetchAndArchive (ForDso dso) instructionCid
+        void $ exercise amuletRulesCid AmuletRules_UpdateFeaturedAppUnderlockState with
+          rightCid
+          provider = instruction.provider
+          underlocked = instruction.underlocked
+        pure DsoRules_ExecuteFeaturedAppUnderlockInstructionResult
+
+    nonconsuming choice DsoRules_EnforceFeaturedAppPermanentUnderlock : DsoRules_EnforceFeaturedAppPermanentUnderlockResult
+      with
+        rightCid : ContractId FeaturedAppRight
+        sv : Party
+      controller sv
+      do
+        void $ getAndValidateSvParty this (Some sv)
+        void $ fetchChecked (ForDso with dso) rightCid
+        void $ exercise rightCid FeaturedAppRight_EnforcePermanentUnderlock
+        pure DsoRules_EnforceFeaturedAppPermanentUnderlockResult
+
+    nonconsuming choice DsoRules_CreateFeaturedAppConfigUpdateInstruction : DsoRules_CreateFeaturedAppConfigUpdateInstructionResult
+      with
+        provider : Party
+        update : FeaturedAppRight_UpdateConfig
+      controller dso
+      do
+        instructionCid <- create FeaturedAppConfigUpdateInstruction with
+          dso; provider; update
+        pure DsoRules_CreateFeaturedAppConfigUpdateInstructionResult with
+          instructionCid
+
+    nonconsuming choice DsoRules_ExecuteFeaturedAppConfigUpdateInstruction : DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult
+      with
+        instructionCid : ContractId FeaturedAppConfigUpdateInstruction
+        rightCid : ContractId FeaturedAppRight
+        sv : Party
+      controller sv
+      do
+        void $ getAndValidateSvParty this (Some sv)
+        instruction <- fetchAndArchive (ForDso dso) instructionCid
+        void $ fetchChecked (ForOwner with dso; owner = instruction.provider) rightCid
+        result <- exercise rightCid instruction.update
+        pure DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult with result
 
     -- Validator onboarding
     -----------------------
@@ -1939,6 +2024,8 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateBootstrapExternalPartyConfigStateInstruction choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_CreateFeaturedAppUnderlockInstruction choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_CreateFeaturedAppConfigUpdateInstruction choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of

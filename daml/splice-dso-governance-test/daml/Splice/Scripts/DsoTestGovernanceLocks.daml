@@ -131,6 +131,8 @@ setupGovernanceLock kind = do
     dso = app.dso
     provider = alice.primaryParty
     activityWeight = None
+    config = None
+    underlockPermanentAt = None
 
   pure GovernanceLockEnv with ..
 
@@ -303,6 +305,8 @@ testDsoRulesConvertProvisionalFeaturedAppLockWrongFeaturedAppRight = do
     dso = env.app.dso
     provider = env.sv1
     activityWeight = None
+    config = None
+    underlockPermanentAt = None
 
   submitMustFail (actAs env.sv1 <> readAs env.app.dso) $
     exerciseCmd env.dsoRulesCid DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLock with

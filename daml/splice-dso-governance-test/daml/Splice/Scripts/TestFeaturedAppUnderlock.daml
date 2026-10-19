@@ -1,0 +1,308 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestFeaturedAppUnderlock where
+
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+import Splice.Amulet
+import Splice.AmuletConfig (governanceLockFeaturedAppUnderlockGracePeriod)
+import Splice.AmuletRules
+import Splice.Api.FeaturedAppRightV1 qualified as FAR1
+import Splice.Api.FeaturedAppRightV2 qualified as FAR2
+import Splice.DSO.Instruction
+import Splice.DsoRules
+
+import Splice.Scripts.DsoTestUtils
+import Splice.Scripts.Util
+
+defaultGovernanceLockFeaturedAppUnderlockGracePeriod : RelTime
+defaultGovernanceLockFeaturedAppUnderlockGracePeriod = governanceLockFeaturedAppUnderlockGracePeriod None
+
+grantRight : AmuletApp -> Party -> Script (ContractId FeaturedAppRight)
+grantRight app provider = do
+  confirmAndExecutionAction app $ ARC_DsoRules with
+    dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
+      provider; activityWeight = None; config = None
+  Some rightCid <- getFeaturedAppRight app provider
+  pure rightCid
+
+setUnderlockStatus : AmuletApp -> Party -> Party -> Bool -> Script ()
+setUnderlockStatus app sv provider underlocked = do
+  confirmAndExecutionAction app $ ARC_DsoRules with
+    dsoAction = SRARC_CreateFeaturedAppUnderlockInstruction DsoRules_CreateFeaturedAppUnderlockInstruction with
+      provider; underlocked
+  [(instructionCid, _)] <- queryFilter @FeaturedAppUnderlockInstruction app.dso (\i -> i.provider == provider)
+  Some rightCid <- getFeaturedAppRight app provider
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  svSubmits app sv $ \dsoRulesCid ->
+    exerciseCmd dsoRulesCid DsoRules_ExecuteFeaturedAppUnderlockInstruction with
+      amuletRulesCid; instructionCid; rightCid; sv
+  pure ()
+
+underlockPermanentAtOf : AmuletApp -> Party -> Script (Optional Time)
+underlockPermanentAtOf app provider = do
+  Some cid <- getFeaturedAppRight app provider
+  Some right <- queryContractId provider cid
+  pure right.underlockPermanentAt
+
+testUnderlockSuspend : Script ()
+testUnderlockSuspend = do
+  (app, _, (sv1, _, _, _)) <- initMainNet
+  provider <- allocateParty "provider"
+
+  _ <- grantRight app provider
+
+  initialUnderlockState <- underlockPermanentAtOf app provider
+  initialUnderlockState === None
+
+  now <- getTime
+  setUnderlockStatus app sv1 provider True
+
+  suspendedAt <- underlockPermanentAtOf app provider
+  suspendedAt === Some (now `addRelTime` defaultGovernanceLockFeaturedAppUnderlockGracePeriod)
+
+  -- Check that the instruction has been consumed
+  pending <- queryFilter @FeaturedAppUnderlockInstruction app.dso (\i -> i.provider == provider)
+  pending === []
+
+testUnderlockEnforceBeforeDeadlineFails : Script ()
+testUnderlockEnforceBeforeDeadlineFails = do
+  (app, dso, (sv1, _, _, _)) <- initMainNet
+  provider <- allocateParty "provider"
+  _ <- grantRight app provider
+  setUnderlockStatus app sv1 provider True
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  Some rightCid <- getFeaturedAppRight app provider
+  submitMustFail (actAs sv1 <> readAs dso) $
+    exerciseCmd dsoRulesCid DsoRules_EnforceFeaturedAppPermanentUnderlock with
+      rightCid
+      sv = sv1
+
+  -- still suspended, and still there
+  Some _ <- getFeaturedAppRight app provider
+  pure ()
+
+testUnderlockEnforcePermanent : Script ()
+testUnderlockEnforcePermanent = do
+  (app, _, (sv1, _, _, _)) <- initMainNet
+  provider <- allocateParty "provider"
+  _ <- grantRight app provider
+  setUnderlockStatus app sv1 provider True
+
+  passTime (defaultGovernanceLockFeaturedAppUnderlockGracePeriod + seconds 1)
+
+  Some rightCid <- getFeaturedAppRight app provider
+  svSubmits app sv1 $ \dsoRulesCid ->
+    exerciseCmd dsoRulesCid DsoRules_EnforceFeaturedAppPermanentUnderlock with
+      rightCid
+      sv = sv1
+
+  -- the right is gone
+  None <- getFeaturedAppRight app provider
+  pure ()
+
+testUnderlockCure : Script ()
+testUnderlockCure = do
+  (app, _, (sv1, _, _, _)) <- initMainNet
+  provider <- allocateParty "provider"
+  _ <- grantRight app provider
+
+  setUnderlockStatus app sv1 provider True
+  Some _ <- underlockPermanentAtOf app provider
+
+  setUnderlockStatus app sv1 provider False
+  state <- underlockPermanentAtOf app provider
+  state === None
+
+testUnderlockReobservationIsNoOp : Script ()
+testUnderlockReobservationIsNoOp = do
+  (app, _, (sv1, _, _, _)) <- initMainNet
+  provider <- allocateParty "provider"
+  _ <- grantRight app provider
+  setUnderlockStatus app sv1 provider True
+
+  Some cidBefore <- getFeaturedAppRight app provider
+  deadlineBefore <- underlockPermanentAtOf app provider
+
+  passTime (days 1)
+  setUnderlockStatus app sv1 provider True
+
+  Some cidAfter <- getFeaturedAppRight app provider
+  deadlineAfter <- underlockPermanentAtOf app provider
+  cidAfter === cidBefore              -- contract untouched, no cid churn
+  deadlineAfter === deadlineBefore
+
+testUnderlockSetTakesMinimum : Script ()
+testUnderlockSetTakesMinimum = do
+  (app, dso, (sv1, _, _, _)) <- initMainNet
+  provider <- allocateParty "provider"
+  _ <- grantRight app provider
+  setUnderlockStatus app sv1 provider True
+  Some later <- underlockPermanentAtOf app provider
+
+  -- bypass the wrapper, which would skip an already-underlocked right
+  let earlier = later `addRelTime` days (-1)
+  Some rightCid <- getFeaturedAppRight app provider
+  _ <- submit dso $ exerciseCmd rightCid FeaturedAppRight_SetUnderlock with permanentAt = earlier
+  pinned <- underlockPermanentAtOf app provider
+  pinned === Some earlier
+
+  -- a later time does not push it back out
+  Some rightCid' <- getFeaturedAppRight app provider
+  _ <- submit dso $ exerciseCmd rightCid' FeaturedAppRight_SetUnderlock with permanentAt = later
+  stillPinned <- underlockPermanentAtOf app provider
+  stillPinned === Some earlier
+
+testUnderlockSuspendedCreatesNoMarkers : Script ()
+testUnderlockSuspendedCreatesNoMarkers = do
+  (app, _, (sv1, _, _, _)) <- initMainNet
+  provider <- allocateParty "provider"
+  _ <- grantRight app provider
+
+  [(ifaceCid, _)] <- queryInterface @FAR1.FeaturedAppRight provider
+  FAR1.FeaturedAppRight_CreateActivityMarkerResult [_] <- submit provider $
+    exerciseCmd ifaceCid FAR1.FeaturedAppRight_CreateActivityMarker with
+      beneficiaries = [FAR1.AppRewardBeneficiary provider 1.0]
+
+  setUnderlockStatus app sv1 provider True
+
+  -- succeeds, but creates nothing
+  [(ifaceCid', _)] <- queryInterface @FAR1.FeaturedAppRight provider
+  FAR1.FeaturedAppRight_CreateActivityMarkerResult [] <- submit provider $
+    exerciseCmd ifaceCid' FAR1.FeaturedAppRight_CreateActivityMarker with
+      beneficiaries = [FAR1.AppRewardBeneficiary provider 1.0]
+  pure ()
+
+-----------------
+
+testUnderlockWrongProviderFails : Script ()
+testUnderlockWrongProviderFails = do
+  (app, dso, (sv1, _, _, _)) <- initMainNet
+  alice <- allocateParty "alice"
+  bob <- allocateParty "bob"
+  _ <- grantRight app alice
+  _ <- grantRight app bob
+
+  confirmAndExecutionAction app $ ARC_DsoRules with
+    dsoAction = SRARC_CreateFeaturedAppUnderlockInstruction DsoRules_CreateFeaturedAppUnderlockInstruction with
+      provider = alice
+      underlocked = True
+  [(instructionCid, _)] <- queryFilter @FeaturedAppUnderlockInstruction app.dso (\i -> i.provider == alice)
+
+  Some bobRight <- getFeaturedAppRight app bob
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  submitMustFail (actAs sv1 <> readAs dso) $
+    exerciseCmd dsoRulesCid DsoRules_ExecuteFeaturedAppUnderlockInstruction with
+      amuletRulesCid
+      instructionCid
+      rightCid = bobRight
+      sv = sv1
+
+testUnderlockSuspendedCreatesNoMarkersV2 : Script ()
+testUnderlockSuspendedCreatesNoMarkersV2 = do
+  (app, _, (sv1, _, _, _)) <- initMainNet
+  provider <- allocateParty "provider"
+  _ <- grantRight app provider
+
+  [(ifaceCid, _)] <- queryInterface @FAR2.FeaturedAppRight provider
+  FAR2.FeaturedAppRight_CreateActivityMarkerResult [_] <- submit provider $
+    exerciseCmd ifaceCid FAR2.FeaturedAppRight_CreateActivityMarker with
+      beneficiaries = [FAR2.AppRewardBeneficiary provider 1.0]
+      weight = Some 50.0
+
+  setUnderlockStatus app sv1 provider True
+
+  [(ifaceCid', _)] <- queryInterface @FAR2.FeaturedAppRight provider
+  FAR2.FeaturedAppRight_CreateActivityMarkerResult [] <- submit provider $
+    exerciseCmd ifaceCid' FAR2.FeaturedAppRight_CreateActivityMarker with
+      beneficiaries = [FAR2.AppRewardBeneficiary provider 1.0]
+      weight = Some 50.0
+  pure ()
+
+testUnderlockCureWhenNotSuspendedIsNoOp : Script ()
+testUnderlockCureWhenNotSuspendedIsNoOp = do
+  (app, _, (sv1, _, _, _)) <- initMainNet
+  provider <- allocateParty "provider"
+  _ <- grantRight app provider
+  Some cidBefore <- getFeaturedAppRight app provider
+
+  setUnderlockStatus app sv1 provider False   -- cure a right that was never suspended
+
+  Some cidAfter <- getFeaturedAppRight app provider
+  cidAfter === cidBefore -- no churn on the FeaturedAppRight
+  deadline <- underlockPermanentAtOf app provider
+  deadline === None
+
+testUnderlockEnforceNotUnderlockedFails : Script ()
+testUnderlockEnforceNotUnderlockedFails = do
+  (app, dso, (sv1, _, _, _)) <- initMainNet
+  provider <- allocateParty "provider"
+  rightCid <- grantRight app provider
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  submitMustFail (actAs sv1 <> readAs dso) $
+    exerciseCmd dsoRulesCid DsoRules_EnforceFeaturedAppPermanentUnderlock with
+      rightCid
+      sv = sv1
+
+testUnderlockEnforceAfterCureFails : Script ()
+testUnderlockEnforceAfterCureFails = do
+  (app, dso, (sv1, _, _, _)) <- initMainNet
+  provider <- allocateParty "provider"
+  _ <- grantRight app provider
+
+  -- underlock
+  setUnderlockStatus app sv1 provider True
+  Some _ <- underlockPermanentAtOf app provider
+
+  -- cure
+  setUnderlockStatus app sv1 provider False
+  underlockState <- underlockPermanentAtOf app provider
+  underlockState === None
+
+  -- well past the deadline the suspension had set
+  passTime (defaultGovernanceLockFeaturedAppUnderlockGracePeriod + days 1)
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  Some rightCid <- getFeaturedAppRight app provider
+  -- enforcement fails
+  submitMustFail (actAs sv1 <> readAs dso) $
+    exerciseCmd dsoRulesCid DsoRules_EnforceFeaturedAppPermanentUnderlock with
+      rightCid
+      sv = sv1
+
+  -- and the right survives
+  Some _ <- getFeaturedAppRight app provider
+  pure ()
+
+testUnderlockRegrantedRightNotEnforceable : Script ()
+testUnderlockRegrantedRightNotEnforceable = do
+  (app, dso, (sv1, _, _, _)) <- initMainNet
+  provider <- allocateParty "provider"
+  _ <- grantRight app provider
+
+  setUnderlockStatus app sv1 provider True
+  passTime (defaultGovernanceLockFeaturedAppUnderlockGracePeriod + seconds 1)
+
+  Some oldRight <- getFeaturedAppRight app provider
+  _ <- svSubmits app sv1 $ \dsoRulesCid ->
+    exerciseCmd dsoRulesCid DsoRules_EnforceFeaturedAppPermanentUnderlock with
+      rightCid = oldRight
+      sv = sv1
+  None <- getFeaturedAppRight app provider
+
+  -- a freshly granted right carries nothing over from the archived one, even
+  -- though we are now well past the old deadline
+  _ <- grantRight app provider
+  Some newRight <- getFeaturedAppRight app provider
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  submitMustFail (actAs sv1 <> readAs dso) $
+    exerciseCmd dsoRulesCid DsoRules_EnforceFeaturedAppPermanentUnderlock with
+      rightCid = newRight
+      sv = sv1
+

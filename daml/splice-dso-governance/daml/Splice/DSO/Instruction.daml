@@ -1,0 +1,34 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Instruction contracts recording governance decisions to be applied by any SV against whichever
+-- contract is current at execution time.
+module Splice.DSO.Instruction where
+
+import Splice.Amulet (FeaturedAppRight_UpdateConfig)
+import Splice.Types
+import Splice.Util
+
+-- | A governance-approved change to a FeaturedAppRight config.
+template FeaturedAppConfigUpdateInstruction with
+    dso : Party
+    provider : Party -- ^ Provider whose featured app right should be updated.
+    update : FeaturedAppRight_UpdateConfig
+  where
+    signatory dso
+
+-- | A record of governance consensus that a FeaturedApp provider was underlocked.
+template FeaturedAppUnderlockInstruction with
+    dso : Party
+    provider : Party
+    underlocked : Bool
+      -- ^ True indicates that governance parties observed the given provider to be underlocked.
+      -- False indicates that they observed their recovery from underlock.
+  where
+    signatory dso
+
+instance HasCheckedFetch FeaturedAppConfigUpdateInstruction ForDso where
+  contractGroupId FeaturedAppConfigUpdateInstruction {..} = ForDso with dso
+
+instance HasCheckedFetch FeaturedAppUnderlockInstruction ForDso where
+  contractGroupId FeaturedAppUnderlockInstruction {..} = ForDso with dso
