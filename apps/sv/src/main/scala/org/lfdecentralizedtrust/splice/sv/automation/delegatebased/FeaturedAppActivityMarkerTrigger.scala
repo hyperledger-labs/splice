@@ -209,6 +209,7 @@ class FeaturedAppActivityMarkerTrigger(
       task.informees,
       // ignoring a party would mean their featured app activity markers do not get converted into rewards
       ignoreUnresponsiveParties = false,
+      restoreOnSuccess = false,
     )(completeExpiryTaskAsDsoDelegate(task, controller))
   }
 
@@ -235,34 +236,47 @@ class FeaturedAppActivityMarkerTrigger(
         }
       // Note that we don't group by provider or beneficiary. There is no strong need to do so
       // as we want to
-      update = dsoRules.exercise(
-        _.exerciseDsoRules_AmuletRules_ConvertFeaturedAppActivityMarkers(
-          amuletRules.contractId,
-          new amuletrules.AmuletRules_ConvertFeaturedAppActivityMarkers(
-            task.markers.map(_.contractId).asJava,
-            openMiningRound.contractId,
-            Option
-              .when(
-                supportsConvertFeaturedAppActivityMarkerObservers
-              )(stakeholders.toSeq.map(_.toProtoPrimitive).asJava)
-              .toJava,
-          ),
-          Optional.of(controller),
+      outcome <- submitBatchWithSplitting(
+        task.markers,
+        (m: Marker) => getStakeholders(m.payload).toSet,
+      ) { markers =>
+        val batchStakeholders = getInformeesFromContracts(markers) + store.key.dsoParty
+        val update = dsoRules.exercise(
+          _.exerciseDsoRules_AmuletRules_ConvertFeaturedAppActivityMarkers(
+            amuletRules.contractId,
+            new amuletrules.AmuletRules_ConvertFeaturedAppActivityMarkers(
+              markers.map(_.contractId).asJava,
+              openMiningRound.contractId,
+              Option
+                .when(
+                  supportsConvertFeaturedAppActivityMarkerObservers
+                )(batchStakeholders.toSeq.map(_.toProtoPrimitive).asJava)
+                .toJava,
+            ),
+            Optional.of(controller),
+          )
         )
-      )
-      _ <- svTaskContext
-        .connection(SpliceLedgerConnectionPriority.Medium)
-        .submit(
-          actAs = Seq(store.key.svParty),
-          readAs = Seq(store.key.dsoParty),
-          update = update,
+        svTaskContext
+          .connection(SpliceLedgerConnectionPriority.Medium)
+          .submit(
+            actAs = Seq(store.key.svParty),
+            readAs = Seq(store.key.dsoParty),
+            update = update,
+          )
+          .noDedup
+          .yieldUnit()
+      }
+    } yield outcome match {
+      case TaskSuccess(description) =>
+        TaskSuccess(
+          s"Converted featured app activity markers (retrieved ${task.retrievalKind}): $description"
         )
-        .noDedup
-        .yieldUnit()
-    } yield TaskSuccess(
-      s"Converted ${task.markers.size} featured app activity markers (retrieved ${task.retrievalKind})."
-    )
+      case other => other
+    }
   }
+
+  private type Marker =
+    Contract[amulet.FeaturedAppActivityMarker.ContractId, amulet.FeaturedAppActivityMarker]
 
   override protected def isStaleTask(task: Task)(implicit tc: TraceContext): Future[Boolean] =
     for {

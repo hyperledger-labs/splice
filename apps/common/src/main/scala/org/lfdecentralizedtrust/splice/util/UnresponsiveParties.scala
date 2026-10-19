@@ -6,8 +6,19 @@ package org.lfdecentralizedtrust.splice.util
 import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.topology.PartyId
+import io.grpc.StatusRuntimeException
+import io.grpc.protobuf.StatusProto
 
 object UnresponsiveParties {
+
+  def fromThrowable(t: Throwable): Option[Set[PartyId]] = t match {
+    case ex: StatusRuntimeException =>
+      ErrorDetails.from(StatusProto.fromThrowable(ex)).collectFirst {
+        case UnresponsiveParties(parties) => parties
+      }
+    case _ => None
+  }
+
   def unapply(errorDetail: ErrorDetails.ErrorDetail): Option[Set[PartyId]] =
     errorDetail match {
       case ErrorDetails.ErrorInfoDetail(MediatorError.Timeout.id, metadata) =>

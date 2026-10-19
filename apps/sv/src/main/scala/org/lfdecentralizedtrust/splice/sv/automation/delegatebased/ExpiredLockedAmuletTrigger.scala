@@ -11,7 +11,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
-import ExpiredLockedAmuletTrigger.{Task, getStakeholders}
+import ExpiredLockedAmuletTrigger.{ExpiredLockedAmulet, Task, getStakeholders}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.UnavailablePartiesStore
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
@@ -53,6 +53,7 @@ class ExpiredLockedAmuletTrigger(
       task.work.vettedVersion.toString,
       task.work.stakeholders,
       ignoreUnresponsiveParties = true,
+      restoreOnSuccess = false,
     )(completeExpiryTaskAsDsoDelegate(task, controller))
   }
 
@@ -68,61 +69,68 @@ class ExpiredLockedAmuletTrigger(
         Seq(store.key.dsoParty),
         context.clock.now,
       )
-      cmds <-
+      cmdsFor <-
         if (supports24hSubmissionDelay.supported) {
-          store.getExternalPartyConfigStatesPair().map { externalPartyConfigStates =>
-            task.work.expiredContracts.flatMap(co =>
-              dsoRules
-                .exercise(
-                  _.exerciseDsoRules_LockedAmulet_ExpireAmuletV2(
-                    co.contractId,
-                    new splice.amulet.LockedAmulet_ExpireAmuletV2(
-                      externalPartyConfigStates.oldest.contractId,
-                      externalPartyConfigStates.newest.contractId,
-                    ),
-                    Optional.of(controller),
+          store.getExternalPartyConfigStatesPair().map {
+            externalPartyConfigStates => (contracts: Seq[ExpiredLockedAmulet]) =>
+              contracts.flatMap(co =>
+                dsoRules
+                  .exercise(
+                    _.exerciseDsoRules_LockedAmulet_ExpireAmuletV2(
+                      co.contractId,
+                      new splice.amulet.LockedAmulet_ExpireAmuletV2(
+                        externalPartyConfigStates.oldest.contractId,
+                        externalPartyConfigStates.newest.contractId,
+                      ),
+                      Optional.of(controller),
+                    )
                   )
-                )
-                .update
-                .commands()
-                .asScala
-                .toSeq
-            )
+                  .update
+                  .commands()
+                  .asScala
+                  .toSeq
+              )
           }
         } else {
-          store.getLatestActiveOpenMiningRound().map { round =>
-            task.work.expiredContracts.flatMap(co =>
-              dsoRules
-                .exercise(
-                  _.exerciseDsoRules_LockedAmulet_ExpireAmulet(
-                    co.contractId,
-                    new splice.amulet.LockedAmulet_ExpireAmulet(
-                      round.contractId
-                    ),
-                    Optional.of(controller),
+          store.getLatestActiveOpenMiningRound().map {
+            round => (contracts: Seq[ExpiredLockedAmulet]) =>
+              contracts.flatMap(co =>
+                dsoRules
+                  .exercise(
+                    _.exerciseDsoRules_LockedAmulet_ExpireAmulet(
+                      co.contractId,
+                      new splice.amulet.LockedAmulet_ExpireAmulet(
+                        round.contractId
+                      ),
+                      Optional.of(controller),
+                    )
                   )
-                )
-                .update
-                .commands()
-                .asScala
-                .toSeq
-            )
+                  .update
+                  .commands()
+                  .asScala
+                  .toSeq
+              )
           }
         }
       // remove once TAPS use partial information from pass 1 in pass 2 (https://github.com/DACH-NY/canton/issues/31450)
       preferredPackageIds = supports24hSubmissionDelay.packageIds
-      _ <- svTaskContext
-        .connection(SpliceLedgerConnectionPriority.AmuletExpiry)
-        .submit(
-          Seq(store.key.svParty),
-          Seq(store.key.dsoParty),
-          update = cmds,
-        )
-        .noDedup
-        .withPreferredPackage(preferredPackageIds)
-        .withSynchronizerId(dsoRules.domain)
-        .yieldUnit()
-    } yield TaskSuccess(s"archived expired locked amulet")
+      outcome <- submitBatchWithSplitting[ExpiredLockedAmulet](
+        task.work.expiredContracts,
+        co => getStakeholders(co.payload).toSet,
+      )(contracts =>
+        svTaskContext
+          .connection(SpliceLedgerConnectionPriority.AmuletExpiry)
+          .submit(
+            Seq(store.key.svParty),
+            Seq(store.key.dsoParty),
+            update = cmdsFor(contracts),
+          )
+          .noDedup
+          .withPreferredPackage(preferredPackageIds)
+          .withSynchronizerId(dsoRules.domain)
+          .yieldUnit()
+      )
+    } yield outcome
   }
 }
 
@@ -134,6 +142,11 @@ object ExpiredLockedAmuletTrigger extends ContractStakeholders[splice.amulet.Loc
         splice.amulet.LockedAmulet,
       ]
     ]
+
+  type ExpiredLockedAmulet = org.lfdecentralizedtrust.splice.util.AssignedContract[
+    splice.amulet.LockedAmulet.ContractId,
+    splice.amulet.LockedAmulet,
+  ]
 
   override def informees(payload: splice.amulet.LockedAmulet): Seq[String] =
     Seq(payload.amulet.owner) ++ payload.lock.holders.asScala

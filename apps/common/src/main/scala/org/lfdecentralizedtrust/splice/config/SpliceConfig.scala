@@ -96,6 +96,7 @@ final case class EnabledFeaturesConfig(
     ignorePartyIdWithIgnoredAmulet: Boolean = true,
     naiveUnresponsivePartiesAutoIgnore: Boolean = true,
     enablePersistedUnavailableParties: Boolean = false,
+    enableVettingFailureBatchSplitting: Boolean = false,
 )
 
 final case class SpliceCachingConfigs(
