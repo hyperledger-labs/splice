@@ -57,17 +57,9 @@ Current Canton commit: `8bae1f1b4a3d7176efc7c293146182e366086126`
    4. Create a commit to ease review, `git add canton/ && git commit -s -m"Undo our changes" --no-verify`
 3. Checkout the commit of the Canton OSS repo to which you have decided to upgrade in Step 1.1
    1. Learn the Daml SDK version used by Canton from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`.
-   2. The OSS repo commit will mention a "Reference commit" (the DACH-NY/canton commit that was snapshotted), and its subject
-      may name a release line, e.g. `[release-line-3.6]`.
-   3. Prefer a release over a snapshot: with read access to [DACH-NY/canton](https://github.com/DACH-NY/canton), run
-      `scripts/find-canton-release.py <reference-commit> [<release-line>]`, e.g. `scripts/find-canton-release.py 367247bb41 3.6`.
-      It lists the closest release tags (e.g. `v3.6.0`) that contain the reference commit, nearest first, with the number of commits
-      between the two. The release is usually a handful to a few dozen commits after the snapshot, never before it.
-      Use the version of the first one listed without the `v` (e.g. `3.6.0`) as `canton_library_version` below;
-      the release is a published, stable artifact. Skim the commits between the reference commit and the tag
-      (`git log <reference-commit>..<tag>` in the DACH-NY/canton clone) to make sure you are happy with them.
-   4. Only if you have no access to DACH-NY/canton, or the script finds no tag containing the commit yet (e.g. snapshots of `main`),
-      fall back to the snapshot: in Splice repo run `scripts/search-canton-snapshot.py` with the reference commit hash.
+   2. The OSS repo commit will mention a "Reference commit". In Splice repo run `scripts/find-canton-release.py <reference-commit>`
+      (needs access to DACH-NY/canton) to find the closest release containing it, and use that release's version.
+      If there is none, run `scripts/search-canton-snapshot.py` with the hash to find a snapshot version instead.
 5. Execute the following steps in your Splice repo:
    1. Copy the Canton changes: `./scripts/copy-canton.sh $PATH_TO_CANTON_OSS`
    2. Create a commit to ease review, `git add canton/ && git commit -s -m"Bump Canton commit" --no-verify`
@@ -75,7 +67,7 @@ Current Canton commit: `8bae1f1b4a3d7176efc7c293146182e366086126`
    4. Create a commit to ease review `git add canton/ && git reset '*.rej' && git commit -s -m"Reapply our changes" --no-verify`
    5. Bump the SDK/Canton versions in the following places:
       1. The current Canton OSS commit in this `README.md`
-      2. The `canton_library_version` in `CantonDependencies.scala` to the release version found by `find-canton-release.py` above, or else the value produced by `search-canton-snapshot.py`
+      2. The `canton_library_version` in `CantonDependencies.scala` to the version found in the previous step
    6. Create another commit, `git add -A && git reset '*.rej' && git commit -s -m"Bump Canton commit" --no-verify`
 6. Check if the `protocolVersions` in our `BuildInfoKeys` in `BuildCommon.scala` needs to be bumped.
    - One way to do this is to run `start-canton.sh -w` with an updated Canton binary, and check `ProtocolVersion.latest` in the console.

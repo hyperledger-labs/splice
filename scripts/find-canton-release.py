@@ -6,8 +6,18 @@
 """
 Given the "Reference commit" from a digital-asset/canton snapshot commit message,
 list the closest Canton release tags in DACH-NY/canton that contain it, nearest first.
-The first one is a candidate for `canton_library_version` as an alternative to the
-snapshot version found by search-canton-snapshot.py.
+
+The first tag, without its leading "v" (v3.6.0 -> 3.6.0), is the preferred value for
+`canton_library_version`; it is a published, stable release, unlike a daily snapshot.
+Only final vX.Y.Z tags are considered, not -rc tags. A release is usually a handful to a
+few dozen commits after the snapshot's reference commit, never before it. Skim
+`git log <reference-commit>..<tag>` in the clone (see below) before accepting a tag.
+
+If the OSS commit subject names a release line, e.g. `[release-line-3.6]`, pass it as
+RELEASE_LINE (3.6) to only consider tags of that line.
+
+Exits with status 1 if no release contains the commit yet (typical for snapshots of
+`main`); use search-canton-snapshot.py then.
 
 Needs read access to https://github.com/DACH-NY/canton. The clone is a blobless bare
 clone cached in $CANTON_CLOSED_CACHE (default: ~/.cache/canton-closed.git).
@@ -24,7 +34,7 @@ REPO_URL = "https://github.com/DACH-NY/canton.git"
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Find the closest Canton release tags containing a reference commit."
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
         "reference_commit",
