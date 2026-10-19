@@ -1967,7 +1967,7 @@ class DbSvDsoStore(
                 "acs.create_arguments->>'owner'",
                 ignoredParties,
               ) ++ sql" and " ++ notInClause(
-                "acs.provisional_featured_app_lock_for",
+                "acs.governance_lock_subject",
                 ignoredParties,
               )).toActionBuilder
             else sql""
@@ -1987,7 +1987,7 @@ class DbSvDsoStore(
                 splice.governancelock.GovernanceLock.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and acs.assigned_domain = $synchronizerId
-              and acs.provisional_featured_app_lock_for is not null
+              and acs.governance_lock_type = 'f:pfa'
               and exists (
                 select 1
                 from #${DsoTables.acsTableName} fa_right
@@ -1998,7 +1998,7 @@ class DbSvDsoStore(
                 FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
                   and fa_right.assigned_domain is not null
-                  and fa_right.featured_app_right_provider = acs.provisional_featured_app_lock_for
+                  and fa_right.featured_app_right_provider = acs.governance_lock_subject
               )
               """ ++ filterClause ++ sql"""
             limit 1000

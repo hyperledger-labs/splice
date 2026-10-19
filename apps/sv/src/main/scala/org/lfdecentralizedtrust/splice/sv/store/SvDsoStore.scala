@@ -1701,17 +1701,12 @@ object SvDsoStore {
         val expiresAt = GovernanceLockUtil
           .getVestingLockSpecification(contract.payload)
           .map(v => Timestamp.assertFromInstant(v.endTime))
-        val provisionalFeaturedAppLockFor = GovernanceLockUtil.foldSpecification(contract.payload)(
-          _.kind match {
-            case kind: splice.governancelock.governancelockkind.GLK_ProvisionalFeaturedApp =>
-              Some(PartyId.tryFromProtoPrimitive(kind.provider))
-            case _ => None
-          },
-          _ => None,
-        )
+        val (lockType, lockSubject) =
+          GovernanceLockUtil.governanceLockTypeAndSubject(contract.payload)
         DsoAcsStoreRowData(
           contract,
-          provisionalFeaturedAppLockFor = provisionalFeaturedAppLockFor,
+          governanceLockType = Some(lockType),
+          governanceLockSubject = Some(lockSubject),
           contractExpiresAt = expiresAt,
         )
       },
