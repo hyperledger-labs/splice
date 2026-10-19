@@ -15,7 +15,7 @@ validator1:
         value: ADDITIONAL_CONFIG_VALIDATOR1_DUMMY_NAME
   walletGateway:
     enabled: true
-multiValidator:
+multiValidator: !include(../../configs/shared/multi-validator.yaml)
   # Load Tests
   # 5 deployments with 10 validators in each so 50 total
   instanceCount: 5
