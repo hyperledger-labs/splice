@@ -32,13 +32,22 @@ check_grafana_dashboards() {
   fi
 
   changed=false
+  classic=false
 
   for dashboard_file in "${dashboard_files[@]}"; do
     dashboard_data=$(jq . "$dashboard_file")
 
+    if ! echo "$dashboard_data" | jq -e '.apiVersion == "dashboard.grafana.app/v2"' >/dev/null; then
+      echo "ERROR: $dashboard_file is not in the Grafana V2 resource format." >&2
+      classic=true
+      continue
+    fi
+
     dashboard_data_modified=$(
       echo "$dashboard_data" | jq '
-        .timezone = "" # Reset timezone to default
+        # Drop server-side fields included in exports
+        {apiVersion, kind, metadata: {name: .metadata.name}, spec}
+        | del(.spec.timeSettings.timezone) # Reset timezone to default
       '
     )
 
@@ -48,6 +57,11 @@ check_grafana_dashboards() {
       changed=true
     fi
   done
+
+  if [[ $classic == true ]]; then
+    echo "ERROR: Dashboards must use the V2 resource format, please convert them."
+    return 1
+  fi
 
   if [[ $changed == true ]]; then
     if [[ ${CI-} == true ]]; then
