@@ -4179,15 +4179,30 @@ components:
         total_app_activity_weight:
           type: integer
           format: int64
+        total_asset_activity_weight:
+          type: integer
+          format: int64
         active_parties_count:
           type: integer
           format: int64
         activity_records_count:
           type: integer
           format: int64
+        total_app_reward:
+          type: string
+          description: The total of all rewards from app activity for this round, including thresholded.
+        total_asset_reward:
+          type: string
+          description: The total of all rewards from asset activity for this round, including thresholded.
+        issuance_per_featured_app_activity:
+          type: string
+          description: The issuance of rewards for a unit of app activity in this round.
+        issuance_per_featured_asset_activity:
+          type: string
+          description: The issuance of rewards for a unit of asset activity in this round.
         total_app_reward_minting_allowance:
           type: string
-          description: The total of all minting allowances granted to app providers in this round.
+          description: The total of all minting allowances granted to app providers in this round. Includes asset activity rewards.
         total_app_reward_thresholded:
           type: string
           description: Total amount of minting allowances that fell below the configured app reward threshold and was thus burned.
