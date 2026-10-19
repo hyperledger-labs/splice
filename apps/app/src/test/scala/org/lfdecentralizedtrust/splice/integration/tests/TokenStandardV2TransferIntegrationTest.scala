@@ -576,9 +576,9 @@ class TokenStandardV2TransferIntegrationTest
       val spentAmuletAmount = minimumCostAmulet * 2
       val purchasedTrafficAmount = computeTrafficForAmuletAmount(spentAmuletAmount)
       val memo =
-        s"cip-128/memo:memberId=${memberId.toProtoPrimitive}" +
-          s"&synchronizerId=${synchronizerId.toProtoPrimitive}" +
-          s"&migrationId=${sv1ScanBackend.getMigrationId()}"
+        s"cip-128/memo:member-id=${memberId.toProtoPrimitive}" +
+          s"&synchronizer-id=${synchronizerId.toProtoPrimitive}" +
+          s"&migration-id=${sv1ScanBackend.getMigrationId()}"
       val purchasedTrafficBefore = getTotalPurchasedTraffic(memberId, synchronizerId)
       val balanceBefore = aliceWalletClient.balance().unlockedQty
 

@@ -30,9 +30,9 @@ expectedMemo = TrafficPurchaseMemo with
 
 memoParams : Text
 memoParams =
-  "memberId=" <> testMemberId <>
-  "&synchronizerId=" <> testSynchronizerId <>
-  "&migrationId=3"
+  "member-id=" <> testMemberId <>
+  "&synchronizer-id=" <> testSynchronizerId <>
+  "&migration-id=3"
 
 completeMemo : Text
 completeMemo = "cip-128/memo:" <> memoParams
@@ -63,21 +63,21 @@ test_trafficPurchaseReason_includesPurchasedTraffic = script do
 test_parseMemo_keyOrderIrrelevant : Script ()
 test_parseMemo_keyOrderIrrelevant = script do
   let reordered =
-        "cip-128/memo:migrationId=3" <>
-        "&synchronizerId=" <> testSynchronizerId <>
-        "&memberId=" <> testMemberId
+        "cip-128/memo:migration-id=3" <>
+        "&synchronizer-id=" <> testSynchronizerId <>
+        "&member-id=" <> testMemberId
   parse reordered === Right expectedMemo
 
 test_parseMemo_forfeitValidatorRewardCoupon : Script ()
 test_parseMemo_forfeitValidatorRewardCoupon = script do
   parse completeMemo === Right expectedMemo
-  parse (completeMemo <> "&forfeitValidatorRewardCoupon=true") ===
+  parse (completeMemo <> "&forfeit-validator-reward-coupon=true") ===
     Right (expectedMemo with forfeitValidatorRewardCoupon = True)
-  parse (completeMemo <> "&forfeitValidatorRewardCoupon=false") === Right expectedMemo
-  parse (completeMemo <> "&forfeitValidatorRewardCoupon=yes") ===
-    Left "Expected true or false for forfeitValidatorRewardCoupon in traffic purchase memo, got: yes"
+  parse (completeMemo <> "&forfeit-validator-reward-coupon=false") === Right expectedMemo
+  parse (completeMemo <> "&forfeit-validator-reward-coupon=yes") ===
+    Left "Expected true or false for forfeit-validator-reward-coupon in traffic purchase memo, got: yes"
   assertMsg "duplicate forfeit key is rejected" $ isRejected $
-    parse $ completeMemo <> "&forfeitValidatorRewardCoupon=true&forfeitValidatorRewardCoupon=true"
+    parse $ completeMemo <> "&forfeit-validator-reward-coupon=true&forfeit-validator-reward-coupon=true"
 
 test_parseMemo_rejectsMissingPrefix : Script ()
 test_parseMemo_rejectsMissingPrefix = script do
@@ -86,8 +86,8 @@ test_parseMemo_rejectsMissingPrefix = script do
 
 test_parseMemo_rejectsMissingKey : Script ()
 test_parseMemo_rejectsMissingKey = script do
-  parse ("cip-128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId) ===
-    Left "Missing key in traffic purchase memo: migrationId"
+  parse ("cip-128/memo:member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId) ===
+    Left "Missing key in traffic purchase memo: migration-id"
 
 test_parseMemo_rejectsUnknownKey : Script ()
 test_parseMemo_rejectsUnknownKey = script do
@@ -95,13 +95,13 @@ test_parseMemo_rejectsUnknownKey = script do
 
 test_parseMemo_rejectsDuplicateKey : Script ()
 test_parseMemo_rejectsDuplicateKey = script do
-  assertMsg "duplicate key is rejected" $ isRejected $ parse $ completeMemo <> "&migrationId=4"
+  assertMsg "duplicate key is rejected" $ isRejected $ parse $ completeMemo <> "&migration-id=4"
 
 test_parseMemo_rejectsMalformedField : Script ()
 test_parseMemo_rejectsMalformedField = script do
   assertMsg "field without a value is rejected" $ isRejected $ parse $ completeMemo <> "&migration"
   assertMsg "field with two separators is rejected" $
-    isRejected $ parse $ "cip-128/memo:memberId=a=b&synchronizerId=s&migrationId=0"
+    isRejected $ parse $ "cip-128/memo:member-id=a=b&synchronizer-id=s&migration-id=0"
   assertMsg "empty memo is rejected" $ isRejected $ parse ""
   assertMsg "prefix without parameters is rejected" $ isRejected $ parse "cip-128/memo:"
 
@@ -109,5 +109,5 @@ test_parseMemo_rejectsNonIntegerValues : Script ()
 test_parseMemo_rejectsNonIntegerValues = script do
   assertMsg "non-integer migrationId is rejected" $
     isRejected $ parse $
-      "cip-128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <>
-      "&migrationId=latest"
+      "cip-128/memo:member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId <>
+      "&migration-id=latest"

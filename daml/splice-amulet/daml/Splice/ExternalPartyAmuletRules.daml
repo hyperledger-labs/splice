@@ -417,7 +417,7 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
           openRoundCid <- case optOpenRoundCid of
             None -> fail $
               "Traffic purchase needs an OpenMiningRound under the choice context key " <> openRoundContextKey <>
-              " to issue the validator reward coupon; set forfeitValidatorRewardCoupon=true in the memo to purchase without it"
+              " to issue the validator reward coupon; set forfeit-validator-reward-coupon=true in the memo to purchase without it"
             Some cid -> pure cid
           openRound <- fetchPublicReferenceData (ForDso dso) openRoundCid (OpenMiningRound_Fetch transfer.sender)
           assertDeadlineExceeded "openRound.opensAt" openRound.opensAt

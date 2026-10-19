@@ -108,22 +108,22 @@ trafficPurchaseMemoPrefix : Text
 trafficPurchaseMemoPrefix = "cip-128/memo:"
 
 -- | Parse the purchase arguments from memo tag using url query param style:
--- `cip-128/memo:memberId=...&synchronizerId=...&migrationId=...[&forfeitValidatorRewardCoupon=true|false]`.
+-- `cip-128/memo:member-id=...&synchronizer-id=...&migration-id=...[&forfeit-validator-reward-coupon=true|false]`.
 parseTrafficPurchaseMemo : Text -> Either Text TrafficPurchaseMemo
 parseTrafficPurchaseMemo memo = do
   params <- case T.stripPrefix trafficPurchaseMemoPrefix memo of
     None -> Left $ "Traffic purchase memo must start with " <> trafficPurchaseMemoPrefix
     Some params -> Right params
   fields <- foldlA addField TextMap.empty (T.splitOn "&" params)
-  memberId <- requiredField fields "memberId"
-  synchronizerId <- requiredField fields "synchronizerId"
-  migrationId <- requiredField fields "migrationId" >>= parseIntField "migrationId"
-  forfeitValidatorRewardCoupon <- case TextMap.lookup "forfeitValidatorRewardCoupon" fields of
+  memberId <- requiredField fields "member-id"
+  synchronizerId <- requiredField fields "synchronizer-id"
+  migrationId <- requiredField fields "migration-id" >>= parseIntField "migration-id"
+  forfeitValidatorRewardCoupon <- case TextMap.lookup "forfeit-validator-reward-coupon" fields of
     None -> Right False
-    Some value -> parseBoolField "forfeitValidatorRewardCoupon" value
+    Some value -> parseBoolField "forfeit-validator-reward-coupon" value
   pure TrafficPurchaseMemo with ..
   where
-    knownKeys = ["memberId", "synchronizerId", "migrationId", "forfeitValidatorRewardCoupon"]
+    knownKeys = ["member-id", "synchronizer-id", "migration-id", "forfeit-validator-reward-coupon"]
     addField fields field = case T.splitOn "=" field of
       [key, value]
         | not (key `elem` knownKeys) ->
@@ -145,9 +145,9 @@ parseTrafficPurchaseMemo memo = do
 
 trafficPurchaseReason : MemberTrafficPurchase -> Text
 trafficPurchaseReason purchase =
-  "purchased traffic: " <> show purchase.trafficAmount <> " bytes for memberId=" <> purchase.memberId <>
-  "&synchronizerId=" <> purchase.synchronizerId <>
-  "&migrationId=" <> show purchase.migrationId
+  "purchased traffic: " <> show purchase.trafficAmount <> " bytes for member-id=" <> purchase.memberId <>
+  "&synchronizer-id=" <> purchase.synchronizerId <>
+  "&migration-id=" <> show purchase.migrationId
 
 data ForMemberTraffic = ForMemberTraffic with
     dso : Party

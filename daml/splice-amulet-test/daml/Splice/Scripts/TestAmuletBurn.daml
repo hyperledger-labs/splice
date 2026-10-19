@@ -101,9 +101,9 @@ testBuyMemberTraffic_burnReasonIsMemoTag = do
   let memberId = "PAR::alice-participant::1220abcd"
   let trafficAmount = syncConfig.fees.minTopupAmount
   let memoTag =
-        "memberId=" <> memberId <>
-        "&synchronizerId=" <> syncConfig.activeSynchronizer <>
-        "&migrationId=0"
+        "member-id=" <> memberId <>
+        "&synchronizer-id=" <> syncConfig.activeSynchronizer <>
+        "&migration-id=0"
   let reason = "purchased traffic: " <> show trafficAmount <> " bytes for " <> memoTag
   context <- getTransferContext app alice None
   amuletCid <- tap app alice 50.0

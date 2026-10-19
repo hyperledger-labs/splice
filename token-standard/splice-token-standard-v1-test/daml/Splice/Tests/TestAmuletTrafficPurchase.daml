@@ -46,11 +46,11 @@ testSynchronizerId = "decentralized-synchronizer-id-0"
 
 defaultMemoTag : Text
 defaultMemoTag =
-  "cip-128/memo:memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=0"
+  "cip-128/memo:member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId <> "&migration-id=0"
 
 defaultReason : Text
 defaultReason =
-  "purchased traffic: 1000000 bytes for memberId=" <> testMemberId <> "&synchronizerId=" <> testSynchronizerId <> "&migrationId=0"
+  "purchased traffic: 1000000 bytes for member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId <> "&migration-id=0"
 
 data TestSetup = TestSetup with
   registry : AmuletRegistry.AmuletRegistry
@@ -176,7 +176,7 @@ test_trafficPurchase_forfeitsValidatorRewardCoupon : Script ()
 test_trafficPurchase_forfeitsValidatorRewardCoupon = script do
   setup@TestSetup{..} <- setupTest
   let transfer = defaultTransfer with
-        meta = memoTagMeta (defaultMemoTag <> "&forfeitValidatorRewardCoupon=true")
+        meta = memoTagMeta (defaultMemoTag <> "&forfeit-validator-reward-coupon=true")
   enrichedChoice <- dropOpenRound <$> transferFactoryChoice registry transfer
   _ <- submitTrafficPurchase setup enrichedChoice
   coupons <- query @ValidatorRewardCoupon registry.dso
@@ -188,7 +188,7 @@ test_trafficPurchase_acceptsMemoTagInAnyOrder : Script ()
 test_trafficPurchase_acceptsMemoTagInAnyOrder = script do
   setup@TestSetup{..} <- setupTest
   let memoTag =
-        "cip-128/memo:migrationId=0&synchronizerId=" <> testSynchronizerId <> "&memberId=" <> testMemberId
+        "cip-128/memo:migration-id=0&synchronizer-id=" <> testSynchronizerId <> "&member-id=" <> testMemberId
   result <- buyTraffic setup defaultTransfer with meta = memoTagMeta memoTag
   TextMap.lookup reasonMetaKey result.meta.values === Some defaultReason
 
@@ -205,7 +205,7 @@ test_trafficPurchase_rejectsUnknownSynchronizer = script do
   buyTrafficMustFailWith
     (expectErrorId "splice.lfdecentralizedtrust.org/unknown-synchronizer")
     setup defaultTransfer with
-      meta = memoTagMeta ("cip-128/memo:memberId=" <> testMemberId <> "&synchronizerId=unknown-synchronizer&migrationId=0")
+      meta = memoTagMeta ("cip-128/memo:member-id=" <> testMemberId <> "&synchronizer-id=unknown-synchronizer&migration-id=0")
 
 test_trafficPurchase_rejectsAmountBelowMinTopup : Script ()
 test_trafficPurchase_rejectsAmountBelowMinTopup = script do
@@ -237,7 +237,7 @@ test_trafficPurchase_rejectsMissingOpenRoundWithoutForfeit : Script ()
 test_trafficPurchase_rejectsMissingOpenRoundWithoutForfeit = script do
   setup@TestSetup{..} <- setupTest
   enrichedChoice <- dropOpenRound <$> transferFactoryChoice registry defaultTransfer
-  submitTrafficPurchaseMustFailWith (expectMessageContains "forfeitValidatorRewardCoupon=true") setup enrichedChoice
+  submitTrafficPurchaseMustFailWith (expectMessageContains "forfeit-validator-reward-coupon=true") setup enrichedChoice
 
 test_trafficPurchase_rejectsExpiredTransfer : Script ()
 test_trafficPurchase_rejectsExpiredTransfer = script do
