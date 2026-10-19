@@ -32,7 +32,7 @@ class ValidatorRightTrigger(
     walletManager: ExternalPartyWalletManager,
     connection: SpliceLedgerConnection,
     participantAdminConnection: ParticipantAdminConnection,
-    enableEmbeddedPartySigningKeys: Boolean,
+    supportEmbeddedPartySigningKeys: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -91,7 +91,7 @@ class ValidatorRightTrigger(
       )
       .flatMap { partyToKeyMappings =>
         if (partyToKeyMappings.nonEmpty) Future.successful(true)
-        else if (!enableEmbeddedPartySigningKeys) Future.successful(false)
+        else if (!supportEmbeddedPartySigningKeys) Future.successful(false)
         else
           participantAdminConnection
             .listPartyToParticipant(

@@ -790,7 +790,7 @@ class ValidatorApp(
         config.parameters.enabledFeatures,
         config.additionalPackagesToUnvet,
         config.domains.global.alias,
-        config.enableEmbeddedPartySigningKeys,
+        config.supportEmbeddedPartySigningKeys,
         loggerFactory,
         packageVersionSupport,
       )

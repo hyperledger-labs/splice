@@ -83,7 +83,7 @@ class ValidatorAutomationService(
     enabledFeatures: EnabledFeaturesConfig,
     additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
     globalSynchronizerAlias: SynchronizerAlias,
-    enableEmbeddedPartySigningKeys: Boolean,
+    supportEmbeddedPartySigningKeys: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
     packageVersionSupport: PackageVersionSupport,
 )(implicit
@@ -144,7 +144,7 @@ class ValidatorAutomationService(
         walletManager.externalPartyWalletManager,
         connection(SpliceLedgerConnectionPriority.Medium),
         participantAdminConnection,
-        enableEmbeddedPartySigningKeys,
+        supportEmbeddedPartySigningKeys,
       )
     )
 
