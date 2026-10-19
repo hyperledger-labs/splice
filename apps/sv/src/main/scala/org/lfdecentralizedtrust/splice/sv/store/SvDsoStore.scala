@@ -769,6 +769,20 @@ trait SvDsoStore
       ignoredPartyFields = Seq("owner"),
     )
 
+  /** List lock transfer proposals that are past their `expiresAt`.
+    *
+    * Implemented in `DbSvDsoStore` rather than through
+    * `listExpiredFromPayloadExpiry`, whose `ignoredPartyFields` resolves a
+    * single JSON level. The parties to skip are nested: the sender is at
+    * `transfer.source.owner` and the receiver at `transfer.receiver`.
+    */
+  def listExpiredGovernanceLockTransfers(
+      unavailablePartiesStore: Option[UnavailablePartiesStore] = None
+  ): ListExpiredContracts[
+    splice.governancelock.transfer.GovernanceLockTransfer.ContractId,
+    splice.governancelock.transfer.GovernanceLockTransfer,
+  ]
+
   def listExpiredAnsEntries(
       unavailablePartiesStore: Option[UnavailablePartiesStore]
   ): ListExpiredContracts[
@@ -1708,6 +1722,17 @@ object SvDsoStore {
           governanceLockType = Some(lockType),
           governanceLockSubject = Some(lockSubject),
           contractExpiresAt = expiresAt,
+        )
+      },
+      mkFilter(splice.governancelock.transfer.GovernanceLockTransfer.COMPANION)(
+        co => co.payload.source.dso == dso,
+        versionGuard = { case (pkgVersionSupport, now) =>
+          (tc) => pkgVersionSupport.supportsGovernanceLock(Seq(dsoParty), now)(tc)
+        },
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
         )
       },
     )
