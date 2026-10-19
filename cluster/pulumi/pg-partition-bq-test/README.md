@@ -152,9 +152,13 @@ Confirm the partitions exist:
 
 ```sql
 \d+ partitioned_events
+-- 'Partitions:' should show 4: the _import created in index.ts,
+-- and 3 dated ones with different ranges
+
 SELECT inhrelid::regclass AS partition, pg_get_expr(c.relpartbound, c.oid) AS bound
   FROM pg_inherits JOIN pg_class c ON c.oid = inhrelid
   WHERE inhparent = 'partitioned_events'::regclass ORDER BY 1;
+-- lower-level version of the above
 ```
 
 Insert rows into every partition, including the import partition, and count them per partition:
@@ -164,10 +168,15 @@ INSERT INTO partitioned_events (record_time, payload)
   SELECT (extract(epoch FROM t) * 1000000)::bigint, 'phase1 ' || t
   FROM generate_series(current_date - 1 + interval '1 hour',
                        current_date + 1 + interval '23 hours', interval '6 hours') AS t;
+-- INSERT 0 12
 INSERT INTO partitioned_events (record_time, payload) VALUES (-62135596800000000, 'phase1 import');
+-- INSERT 0 1
 
 SELECT tableoid::regclass, count(*) FROM partitioned_events GROUP BY 1 ORDER BY 1;
+-- 1 in import, 4 in each other partition
+
 SELECT count(*), min(row_id), max(row_id) FROM partitioned_events;
+-- 13, 1, 13
 ```
 
 Check BigQuery:
@@ -180,13 +189,12 @@ SELECT count(*), min(row_id), max(row_id)
 
 SELECT row_id, count(*) FROM `<BQ_DATASET>.partition_test_partitioned_events`
   GROUP BY row_id HAVING count(*) > 1;
+-- expect no rows, empty output (meaning no duplicates)
 ```
 
 - **Expected:**
   - The dataset has exactly one table per parent and nothing named after a
     partition, such as `…_partitioned_events_p20261012` or `…_import`.
-  - Count, min and max equal the Postgres numbers.
-  - The duplicate query returns no rows.
   - `datastream_metadata.change_type` is `INSERT` for every row.
 - **Failure signal:** the stream lists only the parents in `includeObjects`, so a
   publication without `pubviaroot` would most likely **silently drop** the rows
