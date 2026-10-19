@@ -13,7 +13,7 @@ module Splice.GovernanceLock.Request (
   governanceLockRequestTagToText,
   parseGovernanceLockRequestTSv1,
 
-  -- * Parsers
+  -- * Parsers (for testing only)
   Parser(..),
   runParser,
   assertParsed,
@@ -45,7 +45,6 @@ import Splice.ExternalPartyConfigState
 import Splice.GovernanceLock
 import Splice.GovernanceLock.Substitution
 import Splice.GovernanceLock.Transfer
-import Splice.Iso8601 (parseIso8601UtcTime)
 import Splice.TokenStandard.Utils hiding (require, reasonMetaKey)
 import Splice.TokenStandard.Utils.Internal.Conversions (relTimeFromMeta, timeFromMeta)
 import Splice.Util
@@ -139,7 +138,7 @@ governanceLock_transferFactoryV1_transferImpl dso actors arg@V1.TransferFactory_
         newOwner
         transferAmount
     GLR_WithdrawVestingLock{vestingSpecification, vestedUntilTime} ->
-      governanceLock_transferFactoryV1_withdrawImpl dso arg vestingSpecification vestedUntilTime context state
+      governanceLock_transferFactoryV1_withdrawVestedFundsImpl dso arg vestingSpecification vestedUntilTime context state
     GLR_SubstituteLock{target} ->
       governanceLock_transferFactoryV1_substituteImpl dso arg target context state
 
@@ -198,12 +197,12 @@ governanceLock_transferFactoryV1_transferLockImpl
   -> Decimal
   -> Update V1.TransferInstructionResult
 governanceLock_transferFactoryV1_transferLockImpl V1.TransferFactory_Transfer{transfer = inputTransfer, extraArgs} source newOwner transferAmount = do
-  let lockTransfer = LockTransfer with
-        source
-        receiver = newOwner
-        amount = transferAmount
-        requestedAt = inputTransfer.requestedAt
-  (transferCid, transfer) <- createGovernanceLockTransfer LockTransferArgs with transfer = lockTransfer; extraArgs
+  (transferCid, transfer) <- createGovernanceLockTransfer LockTransferArgs with
+    source
+    receiver = newOwner
+    amount = transferAmount
+    requestedAt = inputTransfer.requestedAt
+    extraArgs
 
   let outputTransfer = (view $ toInterface @V1.TransferInstruction transfer).transfer
   requireMatchExpected ("transfer", outputTransfer) inputTransfer with
@@ -220,7 +219,7 @@ governanceLock_transferFactoryV1_transferLockImpl V1.TransferFactory_Transfer{tr
     senderChangeCids = []
     meta = emptyMetadata
 
-governanceLock_transferFactoryV1_withdrawImpl
+governanceLock_transferFactoryV1_withdrawVestedFundsImpl
   :  Party
   -> V1.TransferFactory_Transfer
   -> VestingLockSpecification
@@ -228,7 +227,7 @@ governanceLock_transferFactoryV1_withdrawImpl
   -> ExternalPartyTransferContext
   -> ExternalPartyConfigState
   -> Update V1.TransferInstructionResult
-governanceLock_transferFactoryV1_withdrawImpl dso V1.TransferFactory_Transfer{..} specification vestedUntilTime context state = do
+governanceLock_transferFactoryV1_withdrawVestedFundsImpl dso V1.TransferFactory_Transfer{..} specification vestedUntilTime context state = do
   let key = GovernanceLockKey with
         dso
         owner = transfer.sender

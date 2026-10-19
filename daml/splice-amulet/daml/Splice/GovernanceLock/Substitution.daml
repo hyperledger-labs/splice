@@ -218,17 +218,16 @@ createSubstitution : CreateSubstitutionArgs -> Update (ContractId V1.TransferIns
 createSubstitution CreateSubstitutionArgs {..} = do
   assertDeadlineExceeded "requestedAt" requestedAt
   requireMinimumLock state amount
-  let lockProperties = LockProperties with
-        -- TODO(canton-network/splice-sv-fa-locking#118): context decscription reads a bit strangely
-        -- TODO(canton-network/splice-sv-fa-locking#118): actually format this at all.
-        context = "" -- "Substitution proposal for " <> describeGovernanceLockKind target.specification
-        expiresAt = governanceLockExpiresAt target.specification
   -- A substitution proposed by the owner of the target lock is funded by the target lock on acceptance,
   -- so it locks no funds and ignores `inputHoldingCids`
   (lockedAmulet, changeHolding) <- if target.owner == owner
     then pure (None, None)
     else do
-      ([lockedAmulet], changeHolding) <- lockAmulet (ForOwner with dso; owner) [(amount, lockProperties)] inputHoldingCids context ""
+      ([lockedAmulet], changeHolding) <- lockAmulet
+        (ForOwner with dso; owner)
+        [(amount, governanceLockExpiresAt target.specification)]
+        inputHoldingCids
+        context
       pure (Some lockedAmulet, changeHolding)
   let expiresAt = requestedAt `addRelTime` getTokenStandardMaxTTL state.transferConfig
   let substitution = GovernanceLockSubstitution with

@@ -382,6 +382,8 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
   -- meta: no extra account information allowed, as Amulet only supports basic accounts
   ensureNoAccountMeta "transfer" "sender" transfer.meta
   ensureNoAccountMeta "transfer" "receiver" transfer.meta
+  -- meta: the reason must not look like a CIP memo, e.g. the memo of a governance lock
+  require "Transfer reason must not start with a cip-<number>/memo prefix" (not $ reasonIsCipMemo transfer.meta)
 
   case optPreapprovalCid of
     _ | transfer.receiver `elem` actors -> do

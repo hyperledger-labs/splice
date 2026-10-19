@@ -357,10 +357,10 @@ data DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLockResult = DsoRules_
 data DsoRules_GovernanceLock_DsoExpireResult = DsoRules_GovernanceLock_DsoExpireResult {}
   deriving (Serializable)
 
-data DsoRules_GovernanceLockSubstitution_WithdrawExpiredResult = DsoRules_GovernanceLockSubstitution_WithdrawExpiredResult {}
+data DsoRules_GovernanceLockSubstitution_DsoExpireResult = DsoRules_GovernanceLockSubstitution_DsoExpireResult {}
   deriving (Serializable)
 
-data DsoRules_GovernanceLockTransfer_ExpireResult = DsoRules_GovernanceLockTransfer_ExpireResult {}
+data DsoRules_GovernanceLockTransfer_DsoExpireResult = DsoRules_GovernanceLockTransfer_DsoExpireResult {}
   deriving (Serializable)
 
 data DsoRules_MiningRound_CloseResult = DsoRules_MiningRound_CloseResult with
@@ -1648,7 +1648,7 @@ template DsoRules with
         exercise governanceLockCid GovernanceLock_DsoExpire
         pure $ DsoRules_GovernanceLock_DsoExpireResult
 
-    nonconsuming choice DsoRules_GovernanceLockSubstitution_WithdrawExpired : DsoRules_GovernanceLockSubstitution_WithdrawExpiredResult
+    nonconsuming choice DsoRules_GovernanceLockSubstitution_DsoExpire : DsoRules_GovernanceLockSubstitution_DsoExpireResult
       -- ^ Withdraws an expired substitution proposal, so that SVs can garbage-collect
       -- proposals that nobody accepted or withdrew, returning the funds to their owner.
       with
@@ -1658,9 +1658,9 @@ template DsoRules with
       do
         _ <- getAndValidateSvParty this (Some sv)
         _ <- exercise substitutionCid GovernanceLockSubstitution_DsoExpire
-        pure $ DsoRules_GovernanceLockSubstitution_WithdrawExpiredResult
+        pure $ DsoRules_GovernanceLockSubstitution_DsoExpireResult
 
-    nonconsuming choice DsoRules_GovernanceLockTransfer_Expire : DsoRules_GovernanceLockTransfer_ExpireResult
+    nonconsuming choice DsoRules_GovernanceLockTransfer_DsoExpire : DsoRules_GovernanceLockTransfer_DsoExpireResult
       -- ^ Expires a lock transfer proposal that the receiver never accepted, so
       -- that SVs can garbage-collect proposals left behind by their senders.
       with
@@ -1670,7 +1670,7 @@ template DsoRules with
       do
         _ <- getAndValidateSvParty this (Some sv)
         _ <- exercise transferCid GovernanceLockTransfer_DsoExpire
-        pure $ DsoRules_GovernanceLockTransfer_ExpireResult
+        pure $ DsoRules_GovernanceLockTransfer_DsoExpireResult
 
     nonconsuming choice DsoRules_MiningRound_Close : DsoRules_MiningRound_CloseResult
       with

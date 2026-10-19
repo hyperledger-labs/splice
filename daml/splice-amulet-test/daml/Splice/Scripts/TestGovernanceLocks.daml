@@ -57,6 +57,9 @@ testGovernanceLockHappyPathScenario ops = do
   checkLockedHolding alice aliceVesting 80000.0
   [(remainingLockCid, remainingLock)] <- queryFilter @GovernanceLock alice isFullLock
   remainingLock.amount === 100000.0
+  -- The remaining lock continues the lineage of the original lock, and the vesting lock starts a new one.
+  remainingLock.originalLockCid === Some (toAnyContractId aliceLock)
+  vestingLock.originalLockCid === None
   checkLockedHolding alice remainingLockCid 100000.0
 
   -- Check that we can't withdraw before the withdraw time has arrived on-ledger
@@ -88,6 +91,9 @@ testGovernanceLockHappyPathScenario ops = do
   let withdrawTime = unlockTime `addRelTime` (days 45 + hours 15 + minutes 45)
 
   Some newVestingLock <- expectSuccess $ ops.vestingWithdraw env aliceVesting alice (withdrawMeta withdrawTime)
+  -- The remaining vesting lock continues the lineage of the withdrawn vesting lock.
+  Some newVesting <- queryContractId alice newVestingLock
+  newVesting.originalLockCid === Some (toAnyContractId aliceVesting)
 
   -- A second withdrawal up to the same time has nothing left to withdraw.
   actionMustFail (expectMessageContains "'withdraw amount' is not greater than 'zero'") $
@@ -508,7 +514,7 @@ transferredGovernanceLock env sender receiver amount kind = do
   AmuletRegistryV2.tapFaucet registry sender amount
   lockForGovernance env.registries registry sender amount kind
   requestedAt <- getTime
-  transferCid <- expectSuccess $ proposeGovernanceLockTransfer' env.registries registry sender LockTransfer with
+  transferCid <- expectSuccess $ proposeGovernanceLockTransfer' env.registries registry sender LockTransferArgs with
     source = GovernanceLockKey with
       dso = env.instrId.admin
       owner = sender
@@ -516,6 +522,7 @@ transferredGovernanceLock env sender receiver amount kind = do
     receiver
     amount
     requestedAt
+    extraArgs = emptyExtraArgs
   locksBefore <- receiverLocks
   expectSuccess $ acceptInstructionV1 env (coerceContractId transferCid) receiver
   locksAfter <- receiverLocks
@@ -625,7 +632,7 @@ proposeSubstitution registries registry proposer substitution amount =
   expectTransferPending =<< expectSuccess (proposeSubstitution' registries registry proposer substitution amount)
 
 -- | The TSv1 request of the owner of the source lock to propose the lock transfer `transfer`.
-lockTransferRequest : AmuletRegistryV2.AmuletRegistry -> LockTransfer -> Script V1.Transfer
+lockTransferRequest : AmuletRegistryV2.AmuletRegistry -> LockTransferArgs -> Script V1.Transfer
 lockTransferRequest registry transfer = do
   let memo = tsv1RequestMemo' GLRT_TransferLock (governanceLockKind transfer.source.specification) $
         [ (newLockOwnerMetaKey, partyToText transfer.receiver)
@@ -636,7 +643,7 @@ lockTransferRequest registry transfer = do
 
 -- | Proposes the lock transfer `transfer`, submitted as `proposer`.
 proposeGovernanceLockTransfer'
-  :  MultiRegistry.MultiRegistry -> AmuletRegistryV2.AmuletRegistry -> Party -> LockTransfer
+  :  MultiRegistry.MultiRegistry -> AmuletRegistryV2.AmuletRegistry -> Party -> LockTransferArgs
   -> Script (Either SubmitError (ContractId GovernanceLockTransfer))
 proposeGovernanceLockTransfer' registries registry proposer transfer = do
   request <- lockTransferRequest registry transfer

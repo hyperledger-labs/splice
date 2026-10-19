@@ -92,8 +92,8 @@ instance RegistryApi AmuletRegistry where
   getAllocation_CancelContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
   getAllocationInstruction_WithdrawContext _app _cid _meta = fail "getAllocationInstruction_WithdrawContext: amulet does not create allocation instructions"
   getTransferInstruction_AcceptContext app cid _meta = registryApi_getTransferInstruction_AcceptContext app cid
-  getTransferInstruction_RejectContext app cid _meta = registryApi_getTransferInstruction_abortTwoStepTransferContext app cid
-  getTransferInstruction_WithdrawContext app cid _meta = registryApi_getTransferInstruction_abortTwoStepTransferContext app cid
+  getTransferInstruction_RejectContext app cid _meta = registryApi_getTransferInstruction_abortContext app cid
+  getTransferInstruction_WithdrawContext app cid _meta = registryApi_getTransferInstruction_abortContext app cid
 
 
 -- Registry initialization
@@ -276,9 +276,9 @@ registryApi_getTransferInstruction_AcceptContext registry instrCid = do
   governanceLockTransferC <- registryApi_getTransferInstruction_governanceLockTransfer registry (coerceContractId instrCid)
   pure $ transferC <> fold amuletTransferInstrC <> fold governanceLockTransferC
 
-registryApi_getTransferInstruction_abortTwoStepTransferContext
+registryApi_getTransferInstruction_abortContext
   : AmuletRegistry -> ContractId TransferInstruction -> Script OpenApiChoiceContext
-registryApi_getTransferInstruction_abortTwoStepTransferContext registry instrCid = do
+registryApi_getTransferInstruction_abortContext registry instrCid = do
   amuletTransferInstrC <- registryApi_getTransferFactory_optGetContext @AmuletTransferInstruction registry (coerceContractId instrCid) \amuletInstr -> do
     optLockedAmulet <- queryContractId @LockedAmulet registry.dso amuletInstr.lockedAmulet
     let lockedAmuletActive = isSome optLockedAmulet
@@ -330,7 +330,7 @@ registryApi_getTransferInstruction_governanceLockTransfer registry lockTransferC
     transferC <- getExternalPartyConfigStateContext registry
     -- the accept resolves the source locks by key, and the receiver has no visibility into them,
     -- so disclose the locks and their locked amulets
-    let source = lockTransfer.transfer.source
+    let source = lockTransfer.source
     locks <- queryAllByKey @GovernanceLock registry.dso source
     lockD <- case locks of
       [] -> assertFail $ "Failed to find lock with key " <> show source <> " originating from lock transfer " <> show lockTransferCid

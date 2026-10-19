@@ -4,132 +4,20 @@
 -- | Tests for the substitution of governance locks and vesting locks.
 module Splice.Scripts.TestGovernanceLockSubstitution where
 
-import DA.Action (unless)
 import DA.Assert ((===))
 import DA.Map qualified as Map
-import DA.NonEmpty qualified as NonEmpty
-import DA.Text qualified as Text
-import DA.TextMap qualified as TextMap
 import DA.Time
-import DA.Validation
 
 import Daml.Script
 import Splice.Api.Token.HoldingV1 qualified as V1
-import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as V1
 import Splice.GovernanceLock
-import Splice.GovernanceLock.Request
 import Splice.GovernanceLock.Substitution
 import Splice.Scripts.TestGovernanceLocks
 import Splice.Scripts.TokenStandard.TestAmuletTokenStandardTestEnv
-import Splice.Scripts.UnitTests.GovernanceLockParsers (substitutionTSv1Parser)
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
 import Splice.Testing.Utils
-import Splice.TokenStandard.Utils.Internal.Conversions (encodeRelTime, encodeTime)
-
-expectParsed : Show a => Validation Text a -> Script a
-expectParsed (Success a) = pure a
-expectParsed (Errors es) = fail $ "Expected a successful parse, got errors: " <> show es
-
-expectParseError : Show a => Text -> Validation Text a -> Script ()
-expectParseError needle (Success a) =
-  fail $ "Expected a parse error containing '" <> needle <> "', got " <> show a
-expectParseError needle (Errors es) =
-  unless (any (needle `Text.isInfixOf`) (NonEmpty.toList es)) $
-    fail $ "Expected a parse error containing '" <> needle <> "', got " <> show es
-
-lockKindMetadata : GovernanceLockTag -> Metadata
-lockKindMetadata tag = Metadata $ TextMap.singleton lockKindMetaKey (governanceLockTagToText tag)
-
-substitutionRequestMetadata : Metadata
-substitutionRequestMetadata = Metadata $ TextMap.singleton requestMetaKey (governanceLockRequestTagToText GLRT_SubstituteLock)
-
-parseSubstitutionTSv1 : Party -> GovernanceLockTag -> Metadata -> Validation Text GovernanceLockKey
-parseSubstitutionTSv1 admin tag meta =
-  runParser (substitutionTSv1Parser admin) (substitutionRequestMetadata <> lockKindMetadata tag <> meta)
-
-encodeVestingLockSubstitutionTargetMetadata : GovernanceLockKey -> VestingLockSpecification -> Metadata
-encodeVestingLockSubstitutionTargetMetadata key spec =
-  Metadata $ TextMap.fromList $
-    [ (targetLockOwnerMetaKey, partyToText key.owner)
-    , (lockStatusMetaKey, lockStateToText LS_Vesting)
-    , (lockVestingDurationMetaKey, encodeRelTime spec.vestingPeriod)
-    , (lockVestingEndTimeMetaKey, encodeTime spec.endTime)
-    ]
-
-testSubstitutionMeta_lockedTargetDefaults : Script ()
-testSubstitutionMeta_lockedTargetDefaults = do
-  admin <- allocateParty "admin"
-  alice <- allocateParty "alice"
-  let kind = GLK_SuperValidatorRightsOwner "TestSV"
-      meta = Metadata $ TextMap.fromList
-        [ (lockSubjectMetaKey, "TestSV")
-        , (targetLockOwnerMetaKey, partyToText alice)
-        ]
-  parsed <- expectParsed $ parseSubstitutionTSv1 admin GLT_SuperValidator meta
-  parsed === GovernanceLockKey with
-    dso = admin
-    owner = alice
-    specification = fullLockSpecification kind
-
-testSubstitutionMeta_lockedTargetRoundTrip : Script ()
-testSubstitutionMeta_lockedTargetRoundTrip = do
-  admin <- allocateParty "admin"
-  alice <- allocateParty "alice"
-  x <- allocateParty "x"
-  let kind = GLK_FeaturedApp x
-      targetKey = GovernanceLockKey with
-        dso = admin
-        owner = alice
-        specification = fullLockSpecification kind
-      meta = Metadata $ TextMap.fromList
-        [ (lockSubjectMetaKey, partyToText x)
-        , (targetLockOwnerMetaKey, partyToText targetKey.owner)
-        , (lockStatusMetaKey, lockStateToText LS_Locked)
-        ]
-  parsed <- expectParsed $ parseSubstitutionTSv1 admin GLT_FeaturedApp meta
-  parsed === targetKey
-
-testSubstitutionMeta_vestingTargetRoundTrip : Script ()
-testSubstitutionMeta_vestingTargetRoundTrip = do
-  now <- getTime
-  admin <- allocateParty "admin"
-  alice <- allocateParty "alice"
-  let kind = GLK_SuperValidatorRightsOwner "TestSV"
-      spec = VestingLockSpecification with
-        kind
-        vestingPeriod = days 60
-        endTime = now `addRelTime` days 45
-      targetKey = GovernanceLockKey with
-        dso = admin
-        owner = alice
-        specification = GLS_VestingLock spec
-      meta = encodeVestingLockSubstitutionTargetMetadata targetKey spec <>
-        (Metadata $ TextMap.fromList [(lockSubjectMetaKey, "TestSV")])
-  parsed <- expectParsed $ parseSubstitutionTSv1 admin GLT_SuperValidator meta
-  parsed === targetKey
-
-testSubstitutionMeta_failures : Script ()
-testSubstitutionMeta_failures = do
-  admin <- allocateParty "admin"
-  alice <- allocateParty "alice"
-  let base = TextMap.fromList
-        [ (lockSubjectMetaKey, "TestSV")
-        , (targetLockOwnerMetaKey, partyToText alice)
-        ]
-      parse values = parseSubstitutionTSv1 admin GLT_SuperValidator (Metadata values)
-
-  expectParseError lockStatusMetaKey $
-    parse $ TextMap.insert lockStatusMetaKey "unlocking" base
-  expectParseError targetLockOwnerMetaKey $
-    parse $ TextMap.insert targetLockOwnerMetaKey "bad$party" base
-  expectParseError lockSubjectMetaKey $
-    parse $ TextMap.delete lockSubjectMetaKey base
-  expectParseError lockVestingDurationMetaKey $
-    parse $ TextMap.insert lockStatusMetaKey (lockStateToText LS_Vesting) base
-  expectParseError lockVestingEndTimeMetaKey $
-    parse $ TextMap.insert lockStatusMetaKey (lockStateToText LS_Vesting) base
 
 testSubstitution_governanceLock : Script ()
 testSubstitution_governanceLock = do

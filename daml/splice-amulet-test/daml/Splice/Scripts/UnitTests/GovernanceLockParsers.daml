@@ -396,17 +396,25 @@ test_substitutionTSv1Parser_examples = do
 
   -- Minimal example: bob substitutes funds of the SV lock of alice for "someSv", for example a lock that alice
   -- created in compatibility mode.
-  expectSuccess
-    (GovernanceLockKey with
-      dso = testAdmin
-      owner = alice
-      specification = GLS_FullLock FullLockSpecification with kind = GLK_SuperValidatorRightsOwner "someSv")
-    $ run
-        [ ("cip-127/request", "substitute-lock")
-        , ("cip-127/lock-kind", "sv-lock")
-        , ("cip-127/lock-subject", "someSv")
-        , ("cip-127/target-lock-owner", "alice")
-        ]
+  let
+    testLockedSvLock : [(Text, Text)] -> Script ()
+    testLockedSvLock moreEntries =
+      expectSuccess
+        (GovernanceLockKey with
+          dso = testAdmin
+          owner = alice
+          specification = GLS_FullLock FullLockSpecification with kind = GLK_SuperValidatorRightsOwner "someSv")
+        $ run $
+            [ ("cip-127/request", "substitute-lock")
+            , ("cip-127/lock-kind", "sv-lock")
+            , ("cip-127/lock-subject", "someSv")
+            , ("cip-127/target-lock-owner", "alice")
+            ] <> moreEntries
+
+  -- Leaving out `lock-status` defaults to a full lock
+  testLockedSvLock []
+  -- Including an explicit `lock-status=locked` parses a full lock
+  testLockedSvLock [("cip-127/lock-status", "locked")]
 
   -- Staking app example: alice locks funds for the featured app "provider", and a staking app (charlie) can
   -- approve substitutions together with the provider. Bob substitutes funds of that lock with a lock whose

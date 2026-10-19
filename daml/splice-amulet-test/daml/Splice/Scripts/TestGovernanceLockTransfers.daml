@@ -30,14 +30,15 @@ lockTransferTTL = days 90
 
 -- | Terms of a valid transfer of `amount` of the locks with key `source` to
 -- `receiver`, requested now.
-validLockTransfer : GovernanceLockKey -> Party -> Decimal -> Script LockTransfer
+validLockTransfer : GovernanceLockKey -> Party -> Decimal -> Script LockTransferArgs
 validLockTransfer source receiver amount = do
   now <- getTime
-  pure LockTransfer with
+  pure LockTransferArgs with
     source
     receiver
     amount
     requestedAt = now
+    extraArgs = emptyExtraArgs
 
 -- | Creates an SV governance lock of `amount` for `owner`, funded by the
 -- faucet.
@@ -114,7 +115,10 @@ testLockTransfer_governanceLock = do
   -- The proposal stores the terms and the source key as given, and expires 90
   -- days after `requestedAt`.
   let expected = GovernanceLockTransfer with
-        transfer
+        source = transfer.source
+        receiver = transfer.receiver
+        amount = transfer.amount
+        requestedAt = transfer.requestedAt
         expiresAt = transfer.requestedAt `addRelTime` lockTransferTTL
   forA_ [alice, bob, instrId.admin] \p -> do
     governanceLockTransfer <- queryContractId p transferCid
@@ -151,7 +155,10 @@ testLockTransfer_governanceLock = do
     proposeGovernanceLockTransfer' env.registries env.registriesEnv.amuletV2 alice faTransfer
   faVestingLockTransfer <- queryContractId bob faTransferCid
   faVestingLockTransfer === Some GovernanceLockTransfer with
-    transfer = faTransfer
+    source = faTransfer.source
+    receiver = faTransfer.receiver
+    amount = faTransfer.amount
+    requestedAt = faTransfer.requestedAt
     expiresAt = faVestingTimes.endTime
   Some view <- queryInterfaceContractId bob (asTransferInstruction faTransferCid)
   view.transfer.meta === transferGovernanceLockMetadata faVestingLock.specification
@@ -267,7 +274,7 @@ testLockTransferV1_view = do
       receiver = bob
       amount = 40000.0
       instrumentId = amuletInstrumentId instrId.admin
-      requestedAt = proposal.transfer.requestedAt
+      requestedAt = proposal.requestedAt
       executeBefore = proposal.expiresAt
       inputHoldingCids = []
       meta = transferGovernanceLockMetadata lock.specification
@@ -424,7 +431,7 @@ testLockTransferV1_acceptFailures = do
   let noLockKey = (key lock) with specification = fullLockSpecification $ GLK_SuperValidatorRightsOwner "NoSuchSV"
   noLock <- validLockTransfer noLockKey bob 40000.0
   noLockCid <- expectSuccess $ proposeGovernanceLockTransfer' env.registries env.registriesEnv.amuletV2 alice noLock
-  expectFailureContaining "" =<<
+  expectFailureContaining "No locks found with key" =<<
     submitWithTransferContext registriesEnv.amuletV2 (actAs bob) \context ->
       exerciseCmd (asTransferInstruction noLockCid) V1.TransferInstruction_Accept with
         extraArgs = emptyExtraArgs with context

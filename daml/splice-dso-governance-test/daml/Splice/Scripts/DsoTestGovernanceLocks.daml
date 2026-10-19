@@ -11,7 +11,7 @@ import DA.Time
 import Daml.Script
 
 import Splice.Amulet (Amulet, FeaturedAppRight(..), LockedAmulet, LockedAmulet_OwnerExpireLockV2(..))
-import Splice.DsoRules (DsoRules, DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLock(..), DsoRules_GovernanceLockSubstitution_WithdrawExpired(..), DsoRules_GovernanceLockTransfer_Expire(..), DsoRules_GovernanceLock_DsoExpire(..))
+import Splice.DsoRules (DsoRules, DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLock(..), DsoRules_GovernanceLockSubstitution_DsoExpire(..), DsoRules_GovernanceLockTransfer_DsoExpire(..), DsoRules_GovernanceLock_DsoExpire(..))
 import Splice.GovernanceLock
 import Splice.GovernanceLock.Substitution
 import Splice.GovernanceLock.Transfer
@@ -21,7 +21,7 @@ import Splice.Scripts.Util
 import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
 import Splice.Testing.TokenStandard.MultiRegistry qualified as MultiRegistry
 import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
-import Splice.Testing.Utils (actionMustFail, expectMessageContains)
+import Splice.Testing.Utils (actionMustFail, emptyExtraArgs, expectMessageContains)
 import Splice.TokenStandard.Utils qualified as TSU
 
 data SharedLockEnv = SharedLockEnv with
@@ -259,6 +259,7 @@ testDsoRulesConvertProvisionalFeaturedAppLock = do
   -- New GovernanceLock is created and is equivalent to the provisional lock with its kind updated to GLK_FeaturedApp
   let expectedConvertedLock = provisionalLock with
         specification = fullLockSpecification GLK_FeaturedApp with provider = env.alice.primaryParty
+        originalLockCid = Some $ TSU.toAnyContractId env.governanceLockCid
   [(_, actualConvertedLock)] <- query @GovernanceLock env.app.dso
   actualConvertedLock === expectedConvertedLock
 
@@ -364,7 +365,7 @@ testDsoRulesWithdrawExpiredGovernanceSubstitution = do
   passTime (days 91)
 
   submit (actAs env.sv1 <> readAs env.app.dso) $
-    exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockSubstitution_WithdrawExpired with
+    exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockSubstitution_DsoExpire with
       substitutionCid
       sv = env.sv1
 
@@ -382,7 +383,7 @@ testDsoRulesWithdrawExpiredVestingSubstitution = do
   passTime (days 91)
 
   submit (actAs env.sv1 <> readAs env.app.dso) $
-    exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockSubstitution_WithdrawExpired with
+    exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockSubstitution_DsoExpire with
       substitutionCid
       sv = env.sv1
 
@@ -400,7 +401,7 @@ testDsoRulesWithdrawExpiredGovernanceSubstitutionRejectsNonSv = do
   passTime (days 91)
 
   submitMustFail (actAs env.bob.primaryParty <> readAs env.app.dso) $
-    exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockSubstitution_WithdrawExpired with
+    exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockSubstitution_DsoExpire with
       substitutionCid
       sv = env.bob.primaryParty
 
@@ -414,7 +415,7 @@ testDsoRulesWithdrawExpiredVestingSubstitutionNotYetExpired = do
 
   actionMustFail (expectMessageContains "Ledger time is strictly before deadline 'GovernanceLockSubstitution.expiresAt'") do
     r <- trySubmit (actAs env.sv1 <> readAs env.app.dso) $
-      exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockSubstitution_WithdrawExpired with
+      exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockSubstitution_DsoExpire with
         substitutionCid
         sv = env.sv1
     pure (() <$ r)
@@ -436,7 +437,7 @@ setupGovernanceLockTransfer = do
   bob <- setupUser app "bob" app.dso
 
   now <- getTime
-  transferCid <- errorIfLeft =<< proposeGovernanceLockTransfer' registries registry alice.primaryParty LockTransfer with
+  transferCid <- errorIfLeft =<< proposeGovernanceLockTransfer' registries registry alice.primaryParty LockTransferArgs with
     source = GovernanceLockKey with
       dso = app.dso
       owner = alice.primaryParty
@@ -444,6 +445,7 @@ setupGovernanceLockTransfer = do
     receiver = bob.primaryParty
     amount = testVestingAmount
     requestedAt = now
+    extraArgs = emptyExtraArgs
   pure (TransferEnv with .., transferCid)
 
 setupVestingLockTransfer : Script (TransferEnv, ContractId GovernanceLockTransfer)
@@ -457,7 +459,7 @@ setupVestingLockTransfer = do
   Some vestingLock <- queryContractId alice.primaryParty vestingLockCid
 
   now <- getTime
-  transferCid <- errorIfLeft =<< proposeGovernanceLockTransfer' registries registry alice.primaryParty LockTransfer with
+  transferCid <- errorIfLeft =<< proposeGovernanceLockTransfer' registries registry alice.primaryParty LockTransferArgs with
     source = GovernanceLockKey with
       dso = app.dso
       owner = alice.primaryParty
@@ -465,6 +467,7 @@ setupVestingLockTransfer = do
     receiver = bob.primaryParty
     amount = testVestingAmount
     requestedAt = now
+    extraArgs = emptyExtraArgs
   pure (TransferEnv with .., transferCid)
 
 -- | Happy path: an SV expires a governance lock transfer proposal.
@@ -477,7 +480,7 @@ testDsoRulesExpireGovernanceLockTransfer = do
   passTime (days 91)
 
   submit (actAs env.sv1 <> readAs env.app.dso) $
-    exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockTransfer_Expire with
+    exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockTransfer_DsoExpire with
       transferCid
       sv = env.sv1
 
@@ -491,7 +494,7 @@ testDsoRulesExpireVestingLockTransfer = do
   passTime (days 91)
 
   submit (actAs env.sv1 <> readAs env.app.dso) $
-    exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockTransfer_Expire with
+    exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockTransfer_DsoExpire with
       transferCid
       sv = env.sv1
 
@@ -505,7 +508,7 @@ testDsoRulesExpireGovernanceLockTransferRejectsNonSv = do
   passTime (days 91)
 
   submitMustFail (actAs env.bob.primaryParty <> readAs env.app.dso) $
-    exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockTransfer_Expire with
+    exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockTransfer_DsoExpire with
       transferCid
       sv = env.bob.primaryParty
 
@@ -519,7 +522,7 @@ testDsoRulesExpireVestingLockTransferNotYetExpired = do
 
   actionMustFail (expectMessageContains "Ledger time is strictly before deadline 'GovernanceLockTransfer.expiresAt'") do
     r <- trySubmit (actAs env.sv1 <> readAs env.app.dso) $
-      exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockTransfer_Expire with
+      exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockTransfer_DsoExpire with
         transferCid
         sv = env.sv1
     pure (() <$ r)

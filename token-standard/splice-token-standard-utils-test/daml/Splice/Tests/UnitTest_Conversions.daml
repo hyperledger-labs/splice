@@ -180,6 +180,27 @@ test_metaConversions = do
   pure ()
 
 
+test_reasonIsCipMemo : Script ()
+test_reasonIsCipMemo = do
+  let testReason reason expected = (TSU.reasonIsCipMemo (TSU.reasonToMeta reason (mkMeta dummyMeta)), expected)
+  checkEq' "reasonIsCipMemo"
+    [ testReason "" False
+    , testReason "payment" False
+    , testReason "cip-127/memo:request=create-lock&lock-kind=sv-lock&lock-subject=X" True
+    , testReason "cip-1/memo" True
+    , testReason "cip-/memo" True
+    , testReason "cip-127/memos" True -- only the prefix matters
+    , testReason "cip-12a/memo" False
+    , testReason "cip-127/other" False
+    , testReason " cip-127/memo" False
+    , testReason "payment for cip-127/memo" False
+    ]
+  -- only the reason is checked, not other metadata values
+  checkEq "reasonIsCipMemo ignores other keys"
+    (TSU.reasonIsCipMemo (mkMeta [("cip-127/request", "cip-127/memo")]))
+    False
+
+
 test_HoldingConversion : Script ()
 test_HoldingConversion = do
   let h1 = V1.HoldingView with

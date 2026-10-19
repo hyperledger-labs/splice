@@ -1,14 +1,14 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
-module Splice.Scripts.UnitTests.Iso8601 where
+module Splice.Tests.UnitTest_Iso8601 where
 
 import DA.Assert
 import DA.Date
 
 import Daml.Script
 
-import Splice.Iso8601
+import Splice.TokenStandard.Utils (parseIso8601UtcTime)
 
 expectParsed : Text -> Time -> Script ()
 expectParsed input expected = case parseIso8601UtcTime input of
