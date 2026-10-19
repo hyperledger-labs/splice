@@ -4,6 +4,7 @@ org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandlerBftCallFailedTest
 org.lfdecentralizedtrust.splice.auth.AuthTokenManagerTest
 org.lfdecentralizedtrust.splice.auth.SignatureVerifierTest
 org.lfdecentralizedtrust.splice.automation.AutomationMetricsTest
+org.lfdecentralizedtrust.splice.automation.PartitionMaintenanceTriggerTest
 org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTriggerTest
 org.lfdecentralizedtrust.splice.automation.SqlIndexInitializationTriggerStoreTest
 org.lfdecentralizedtrust.splice.build_tools.DarLockCheckerTest
