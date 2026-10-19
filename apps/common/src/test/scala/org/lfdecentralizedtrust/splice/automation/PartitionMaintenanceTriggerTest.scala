@@ -6,6 +6,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.stream.scaladsl.Source
+import org.postgresql.util.PSQLException
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   LedgerClient,
@@ -48,6 +49,24 @@ class PartitionMaintenanceTriggerTest extends UpdateHistoryTestBase {
       now,
       logger,
     )
+
+  private def mkTrigger(store: UpdateHistory, now: CantonTimestamp): PartitionMaintenanceTrigger = {
+    val clock = new SimClock(loggerFactory = loggerFactory)
+    clock.advanceTo(now)
+    new PartitionMaintenanceTrigger(
+      store,
+      7,
+      TriggerContext(
+        AutomationConfig(),
+        clock,
+        clock,
+        TriggerEnabledSynchronization.Noop,
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+        loggerFactory,
+        NoOpMetricsFactory,
+      ),
+    )
+  }
 
   "PartitionMaintenanceTrigger.createMissingPartitions" should {
 
@@ -101,21 +120,7 @@ class PartitionMaintenanceTriggerTest extends UpdateHistoryTestBase {
 
     "create a task for each missing day" in {
       val store = mkStore()
-      val clock = new SimClock(loggerFactory = loggerFactory)
-      clock.advanceTo(daysAfter(20))
-      val trigger = new PartitionMaintenanceTrigger(
-        store,
-        7,
-        TriggerContext(
-          AutomationConfig(),
-          clock,
-          clock,
-          TriggerEnabledSynchronization.Noop,
-          RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-          loggerFactory,
-          NoOpMetricsFactory,
-        ),
-      )
+      val trigger = mkTrigger(store, daysAfter(20))
       for {
         workDoneBeforeReady <- trigger.performWorkIfAvailable()
         _ <- initStore(store, timeStart = time(0), partitionRunwayDays = 1)
@@ -128,6 +133,27 @@ class PartitionMaintenanceTriggerTest extends UpdateHistoryTestBase {
         workDone shouldBe true
         workDoneAgain shouldBe false
         stillMissing shouldBe empty
+      }
+    }
+
+    "fail ingestion until trigger creates the partition" in {
+      val store = mkStore()
+      val trigger = mkTrigger(store, daysAfter(1))
+      for {
+        _ <- initStore(store, timeStart = time(0), partitionRunwayDays = 1)
+        _ <- create(domain1, cid1, offset1, party1, store, time(10))
+        failure <- recoverToExceptionIf[PSQLException](
+          create(domain1, cid2, offset2, party1, store, daysAfter(3))
+        )
+        updatesAfterFailure <- store.getAllUpdates(None, PageLimit.tryCreate(1000))
+        workDone <- trigger.performWorkIfAvailable()
+        _ <- create(domain1, cid2, offset2, party1, store, daysAfter(3))
+        updatesAfterRetry <- store.getAllUpdates(None, PageLimit.tryCreate(1000))
+      } yield {
+        failure.getMessage should include("no partition of relation")
+        updatesAfterFailure should have size 1
+        workDone shouldBe true
+        updatesAfterRetry should have size 2
       }
     }
   }
