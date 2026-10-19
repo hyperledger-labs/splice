@@ -90,9 +90,12 @@ def main():
         results.append((distance, tag, date))
     results.sort()
 
-    print("TAG\tCOMMITS_AFTER_REF\tTAG_DATE")
-    for distance, tag, date in results[: args.max_results]:
-        print(f"{tag}\t{distance}\t{date}")
+    rows = [("TAG", "COMMITS_AFTER_REF", "TAG_DATE")] + [
+        (tag, str(distance), date) for distance, tag, date in results[: args.max_results]
+    ]
+    widths = [max(len(row[i]) for row in rows) for i in range(3)]
+    for row in rows:
+        print("  ".join(cell.ljust(width) for cell, width in zip(row, widths)).rstrip())
     if not results:
         print("no release tag contains this commit yet; use the snapshot version", file=sys.stderr)
         sys.exit(1)
