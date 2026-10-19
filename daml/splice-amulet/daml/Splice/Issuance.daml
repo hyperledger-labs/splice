@@ -95,6 +95,20 @@ validateOpenMiningRoundSummary summary = do
     require "totalFeaturedAppRewardCoupons >= 0.0" (summary.totalFeaturedAppRewardCoupons >= 0.0)
     require "totalUnfeaturedAppRewardCoupons >= 0.0" (summary.totalUnfeaturedAppRewardCoupons >= 0.0)
     require "totalValidatorFaucetCoupons >= 0" (getTotalValidatorFaucetCoupons summary >= 0)
+    let cip104Fields =
+          [ isSome summary.optIssuancePerFeaturedAppRewardCoupon
+          , isSome summary.optUnclaimedAppRewards
+          , isSome summary.optIssuancePerFeaturedAssetRewardCoupon
+          ]
+    require "optIssuancePerFeaturedAppRewardCoupon, optUnclaimedAppRewards and optIssuancePerFeaturedAssetRewardCoupon are either all set or all unset"
+      (and cip104Fields || not (or cip104Fields))
+    let cip104Fields =
+          [ isSome summary.optIssuancePerFeaturedAppRewardCoupon
+          , isSome summary.optUnclaimedAppRewards
+          , isSome summary.optIssuancePerFeaturedAssetRewardCoupon
+          ]
+    require "optIssuancePerFeaturedAppRewardCoupon, optUnclaimedAppRewards and optIssuancePerFeaturedAssetRewardCoupon are either all set or all unset"
+      (and cip104Fields || not (or cip104Fields))
 
 computeIssuingRoundParameters : RelTime -> Decimal -> IssuanceConfig -> OpenMiningRoundSummary -> IssuingRoundParameters
 computeIssuingRoundParameters tickDuration amuletPrice config summary =

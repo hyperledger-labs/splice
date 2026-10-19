@@ -4,6 +4,9 @@
 module Splice.Scripts.UnitTests.Issuance where
 
 import DA.Assert
+import DA.Either (isRight)
+import DA.Foldable (forA_)
+import DA.Optional (isNone, isSome)
 import DA.Time
 
 import Daml.Script
@@ -387,6 +390,21 @@ testZeroFaucetCap = script do
   let config = withZeroFaucetCap issuanceConfig_0_0p5
   expectedParameters_E1_0_0p5_ZeroFaucetCap === computeIssuingRoundParameters tickDuration amuletPrice config summaryExample1
   expectedParameters_E1_0_0p5_ZeroFaucetCap === computeIssuingRoundParameters tickDuration amuletPrice config summaryExample4
+
+
+-- The CIP-0104 off-ledger computed fields must be either all set or all unset.
+testValidateSummaryCip104Fields : Script ()
+testValidateSummaryCip104Fields = script do
+  let validate s = validateOpenMiningRoundSummary s : Either Text ()
+  let withFields featuredApp unclaimed featuredAsset = summaryExample1 with
+        optIssuancePerFeaturedAppRewardCoupon = featuredApp
+        optUnclaimedAppRewards = unclaimed
+        optIssuancePerFeaturedAssetRewardCoupon = featuredAsset
+  let opts = [None, Some 1.0]
+  forA_ [(a, u, f) | a <- opts, u <- opts, f <- opts] $ \(a, u, f) -> do
+    let allSet = isSome a && isSome u && isSome f
+    let allUnset = isNone a && isNone u && isNone f
+    isRight (validate (withFields a u f)) === (allSet || allUnset)
 
 
 -- Utilities
