@@ -81,6 +81,8 @@ import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
 
+import scala.util.Try
+
 /** Stores all original daml updates visible to `updateStreamParty`.
   *
   * ==Related triggers==
@@ -356,6 +358,94 @@ class UpdateHistory private (
       "createPartitions",
     )
   }
+
+  def readLastIngestedRecordTime()(implicit
+      tc: TraceContext
+  ): Future[Option[CantonTimestamp]] = {
+    val updateTables = Seq(
+      "update_history_transactions",
+      "update_history_assignments",
+      "update_history_unassignments",
+    )
+    val legacyTables = updateTables.map(table => s"${table}_legacy")
+    for {
+      // These might not exist after pruning
+      existingLegacyTables <- storage.query(
+        sql"""
+          select t
+          from unnest($legacyTables) t
+          where to_regclass(t) is not null -- checks that the table exists
+        """.as[String],
+        "readLastIngestedRecordTime.getExistingLegacyTables",
+      )
+      maxRecordTimes = (updateTables ++ existingLegacyTables)
+        .map { table =>
+          SQLActionBuilderChain(
+            sql"(select max(record_time) from #$table where history_id = $historyId and migration_id = $domainMigrationId)"
+          )
+        }
+        .reduceOption((acc, next) => acc ++ sql"," ++ next)
+        .getOrElse(SQLActionBuilderChain(sql""))
+      result <- storage.query(
+        (sql"select greatest(" ++ maxRecordTimes ++ sql")").toActionBuilder
+          .as[Option[CantonTimestamp]]
+          .head,
+        "readLastIngestedRecordTime",
+      )
+    } yield result
+  }
+
+  def listDatesWithAllPartitions()(implicit tc: TraceContext): Future[Set[LocalDate]] = {
+    def partitionDay(parent: String, child: String): LocalDate = {
+      val dateSuffix = child.stripPrefix(s"${parent}_")
+      // the dates MUST be parseable
+      Try(LocalDate.parse(dateSuffix, DateTimeFormatter.BASIC_ISO_DATE)).getOrElse(
+        throw io.grpc.Status.INTERNAL
+          .withDescription(s"Failed to parse date suffix from $child")
+          .asRuntimeException()
+      )
+    }
+
+    storage
+      .query(
+        sql"""
+          select parent.relname, child.relname
+          from pg_inherits i
+          join pg_class parent on parent.oid = i.inhparent
+          join pg_class child on child.oid = i.inhrelid
+          join pg_namespace n on n.oid = parent.relnamespace
+          where n.nspname = current_schema
+            and parent.relname in (#${PartitionedTables.map(t => s"'$t'").mkString(", ")})
+        """.as[(String, String)],
+        "listPartitionDays",
+      )
+      .map { rows =>
+        val dateToTablesWithPartition = rows.groupMap { case (parent, child) =>
+          partitionDay(parent, child)
+        } { case (parent, _) =>
+          parent
+        }
+
+        dateToTablesWithPartition
+          .filter { case (date, tablesWithPartition) =>
+            val diffWithExpected = PartitionedTables.diff(tablesWithPartition)
+            if (diffWithExpected.nonEmpty) {
+              logger.warn(
+                s"Bug: Date $date is missing partitions for $diffWithExpected. This means that createPartitions is broken. It will be re-created."
+              )
+              false
+            } else true
+          }
+          .keys
+          .toSet
+      }
+  }
+
+  def analyzePartitionedTables()(implicit tc: TraceContext): Future[Unit] =
+    storage.update(
+      DBIO.sequence(PartitionedTables.map(table => sqlu"analyze #$table")).map(_ => ()),
+      "analyzePartitionedTables",
+    )
 
   private def ingestUpdateOrCheckpoint_(
       updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint,

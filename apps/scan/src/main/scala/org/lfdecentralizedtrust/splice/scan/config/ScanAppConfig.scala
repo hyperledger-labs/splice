@@ -122,6 +122,7 @@ case class ScanAppBackendConfig(
     updateHistoryBackfillBatchSize: Int = 100,
     updateHistoryBackfillImportUpdatesEnabled: Boolean = true,
     updateHistoryMaxPageSize: Int = Limit.DefaultMaxPageSize,
+    updateHistoryPartitionRunwayDays: Int = 7,
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
     cache: ScanCacheConfig = ScanCacheConfig(),
