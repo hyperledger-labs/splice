@@ -421,7 +421,8 @@ object UpdateHistoryTestBase {
       /*interfaceViews = */ java.util.Collections.emptyMap(), // Not preserved
       /*failedInterfaceViews = */ java.util.Collections.emptyMap(), // Not preserved
 
-      /*contractKey = */ created.getContractKey,
+      // Contract keys can be computed from the contract payload if you know the daml model.
+      /*contractKey = */ java.util.Optional.empty(), // Not preserved
       /*signatories = */ created.getSignatories,
       /*observers = */ created.getObservers,
       /*createdAt = */ created.getCreatedAt,

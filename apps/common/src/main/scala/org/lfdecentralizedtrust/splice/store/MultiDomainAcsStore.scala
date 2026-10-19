@@ -123,6 +123,13 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       traceContext: TraceContext
   ): Future[Option[ContractState]]
 
+  /** Like `#lookupContractById` but does not require the caller to know the contract's template.
+    * The template is resolved from the row and looked up via [[ContractCompanions]].
+    */
+  def lookupGenericContractById(id: ContractId[?])(implicit
+      traceContext: TraceContext
+  ): Future[Option[Contract[?, ?]]]
+
   /** True if the ids contains an id that has been archived. */
   def containsArchived(ids: Seq[ContractId[?]])(implicit
       traceContext: TraceContext
