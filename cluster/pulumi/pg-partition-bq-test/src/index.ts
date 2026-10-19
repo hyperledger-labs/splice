@@ -58,7 +58,7 @@ function pickDatastreamPeeringCidr(): string {
 // CloudSQL
 // ============================================================================
 
-const instance = new gcp.sql.DatabaseInstance(`${prefix}-db`, {
+const pgsqlInstance = new gcp.sql.DatabaseInstance(`${prefix}-db`, {
   databaseVersion: 'POSTGRES_18',
   deletionProtection: false,
   region: GCP_REGION,
@@ -90,26 +90,26 @@ const instance = new gcp.sql.DatabaseInstance(`${prefix}-db`, {
 
 const database = new gcp.sql.Database(
   `${prefix}-db-${databaseName}`,
-  { instance: instance.name, name: databaseName },
-  { parent: instance, deletedWith: instance }
+  { instance: pgsqlInstance.name, name: databaseName },
+  { parent: pgsqlInstance, deletedWith: pgsqlInstance }
 );
 
 const adminPassword = generatePassword(`${prefix}-${defaultUserName}-passwd`, {
-  parent: instance,
+  parent: pgsqlInstance,
 }).result;
 const adminUser = new gcp.sql.User(
   `${prefix}-user-${defaultUserName}`,
-  { instance: instance.name, name: defaultUserName, password: adminPassword },
-  { parent: instance, deletedWith: instance, dependsOn: [database] }
+  { instance: pgsqlInstance.name, name: defaultUserName, password: adminPassword },
+  { parent: pgsqlInstance, deletedWith: pgsqlInstance, dependsOn: [database] }
 );
 
 const replicatorPassword = generatePassword(`${prefix}-${replicatorUserName}-passwd`, {
-  parent: instance,
+  parent: pgsqlInstance,
 }).result;
 const replicatorUser = new gcp.sql.User(
   `${prefix}-user-${replicatorUserName}`,
-  { instance: instance.name, name: replicatorUserName, password: replicatorPassword },
-  { parent: instance, deletedWith: instance, dependsOn: [database] }
+  { instance: pgsqlInstance.name, name: replicatorUserName, password: replicatorPassword },
+  { parent: pgsqlInstance, deletedWith: pgsqlInstance, dependsOn: [database] }
 );
 
 // ============================================================================
@@ -158,8 +158,8 @@ const initDb = new command.local.Command(
     create: pulumi.interpolate`'${commandScriptPath('cluster/pulumi/pg-partition-bq-test/import-sql.sh')}' \
       --project="${project.projectId}" \
       --compute-region="${GCP_REGION}" \
-      --service-account-email="${instance.serviceAccountEmailAddress}" \
-      --postgres-instance-name="${instance.name}" \
+      --service-account-email="${pgsqlInstance.serviceAccountEmailAddress}" \
+      --postgres-instance-name="${pgsqlInstance.name}" \
       --database="${databaseName}" \
       --user="${defaultUserName}" \
       --bucket-labels="${bucketLabels}"`,
@@ -172,14 +172,14 @@ function pubRepSlotCommand(action: string): pulumi.Output<string> {
   const args = [
     pulumi.interpolate`--private-network-project="${project.projectId}"`,
     pulumi.interpolate`--compute-region="${GCP_REGION}"`,
-    pulumi.interpolate`--service-account-email="${instance.serviceAccountEmailAddress}"`,
+    pulumi.interpolate`--service-account-email="${pgsqlInstance.serviceAccountEmailAddress}"`,
     pulumi.interpolate`--schema-name="${schemaName}"`,
     pulumi.interpolate`--tables-to-replicate-joined="${tablesToReplicate.join(', ')}"`,
     pulumi.interpolate`--postgres-user-name="${defaultUserName}"`,
     pulumi.interpolate`--publication-name="${publicationName}"`,
     pulumi.interpolate`--replication-slot-name="${replicationSlotName}"`,
     pulumi.interpolate`--replicator-user-name="${replicatorUserName}"`,
-    pulumi.interpolate`--postgres-instance-name="${instance.name}"`,
+    pulumi.interpolate`--postgres-instance-name="${pgsqlInstance.name}"`,
     pulumi.interpolate`--scan-app-database-name="${databaseName}"`,
     pulumi.interpolate`--flyway-migration-to-wait-for="${fakeFlywayMigration}"`,
   ];
@@ -204,7 +204,7 @@ const pubRepSlot = new command.local.Command(
 
 // from https://cloud.google.com/datastream/docs/private-connectivity#set-up-reverse-proxy
 const natStartupScript = pulumi.interpolate`#! /bin/bash
-export DB_ADDR=${instance.privateIpAddress}
+export DB_ADDR=${pgsqlInstance.privateIpAddress}
 export DB_PORT=${dbPort}
 echo 1 > /proc/sys/net/ipv4/ip_forward
 md_url_prefix="http://169.254.169.254/computeMetadata/v1/instance"
@@ -352,8 +352,8 @@ const stream = new gcp.datastream.Stream(
   { dependsOn: [sourceProfile, destinationProfile, dataset, pubRepSlot] }
 );
 
-export const instanceName = instance.name;
-export const privateIp = instance.privateIpAddress;
+export const instanceName = pgsqlInstance.name;
+export const privateIp = pgsqlInstance.privateIpAddress;
 export const natVmName = natVm.name;
 export const natVmZone = natVm.zone;
 export const postgresDatabase = databaseName;
