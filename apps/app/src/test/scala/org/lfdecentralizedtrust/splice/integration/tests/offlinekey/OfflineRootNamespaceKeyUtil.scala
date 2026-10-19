@@ -6,6 +6,7 @@ import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.console.InstanceReference
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
   DelegationRestriction,
   NamespaceDelegation,
@@ -121,6 +122,14 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
       waitForReady = false,
       delegations = Seq(rootNamespaceDelegation, delegationTopologyTransaction),
     )
+    node.id.member match {
+      case _: ParticipantId => ()
+      case _ =>
+        node.topology.transactions.load(
+          Seq(rootNamespaceDelegation, delegationTopologyTransaction),
+          TopologyStoreId.Authorized,
+        )
+    }
     val encryptionKey =
       node.keys.secret.generate_encryption_key("ecryption")
     node.topology.owner_to_key_mappings.propose(

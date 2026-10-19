@@ -381,6 +381,7 @@ class ParticipantRepairAdministration(
             representativePackageIdOverride,
             excludedStakeholders,
             synchronizerId,
+            forceRepairWhenTopologyTransactionAtLedgerEnd = false,
           )
         )
       }

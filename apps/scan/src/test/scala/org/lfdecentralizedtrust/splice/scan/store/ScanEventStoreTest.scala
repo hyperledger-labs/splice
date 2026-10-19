@@ -1060,21 +1060,20 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       partitionRunwayDays: Int,
   ): Future[UpdateHistory] = {
     val participantId = mkParticipantId("ScanEventStoreTest")
-    val updateHistory = new UpdateHistory(
-      storage.underlying,
-      migrationId,
-      "scan_event_store_test",
-      participantId,
-      dsoParty,
-      BackfillingRequirement.BackfillingNotRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = true,
-      HistoryMetrics(NoOpMetricsFactory, migrationId),
-    )
     for {
+      updateHistory <- UpdateHistory.create(
+        storage.underlying,
+        migrationId,
+        "scan_event_store_test",
+        participantId,
+        dsoParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
+        loggerFactory,
+        enableImportUpdateBackfill = true,
+        HistoryMetrics(NoOpMetricsFactory, migrationId),
+      )
       _ <- updateHistory.ingestionSink.initialize()
       _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
         updateHistory,
