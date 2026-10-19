@@ -266,6 +266,24 @@ object SqlIndexInitializationTrigger {
       ),
     IndexAction
       .Create(
+        indexName = "dso_acs_store_sid_mid_glt_gls",
+        createAction = sqlu"""
+          create index concurrently if not exists dso_acs_store_sid_mid_glt_gls
+          on dso_acs_store (store_id, migration_id, governance_lock_type, governance_lock_subject)
+          where governance_lock_type is not null
+        """,
+      ),
+    IndexAction
+      .Create(
+        indexName = "scan_acs_store_sid_mid_glt_gls",
+        createAction = sqlu"""
+          create index concurrently if not exists scan_acs_store_sid_mid_glt_gls
+          on scan_acs_store (store_id, migration_id, governance_lock_type, governance_lock_subject)
+          where governance_lock_type is not null
+        """,
+      ),
+    IndexAction
+      .Create(
         indexName = "scan_txlog_store_sid_effat_en_vot",
         createAction = sqlu"""
           create index concurrently if not exists scan_txlog_store_sid_effat_en_vot

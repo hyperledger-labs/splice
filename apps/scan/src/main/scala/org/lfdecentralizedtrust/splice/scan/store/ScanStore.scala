@@ -505,14 +505,18 @@ object ScanStore {
           versionGuard = { case (pkgVersionSupport, now) =>
             (tc) => pkgVersionSupport.supportsGovernanceLock(Seq(key.dsoParty), now)(tc)
           },
-        )(contract =>
+        ) { contract =>
+          val (lockType, lockSubject) =
+            GovernanceLockUtil.governanceLockTypeAndSubject(contract.payload)
           ScanAcsStoreRowData(
             contract = contract,
             contractExpiresAt = GovernanceLockUtil
               .getVestingLockSpecification(contract.payload)
               .map(v => Timestamp.assertFromInstant(v.endTime)),
+            governanceLockType = Some(lockType),
+            governanceLockSubject = Some(lockSubject),
           )
-        ),
+        },
         mkFilter(splice.governancelock.substitution.GovernanceLockSubstitution.COMPANION)(
           co => co.payload.target.dso == dso,
           versionGuard = { case (pkgVersionSupport, now) =>
