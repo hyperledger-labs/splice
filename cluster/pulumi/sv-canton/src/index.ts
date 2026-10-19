@@ -27,7 +27,7 @@ async function auth0CacheAndInstallNode(
 ): Promise<InstalledMigrationSpecificSv | undefined> {
   await auth0Fetch.loadAuth0Cache();
 
-  const node = await installNode(migrationId, auth0Fetch, sv, dsyncNode);
+  const node = await installNode(migrationId, auth0Fetch, (sv || dsyncNode)!, sv ? 'sv' : 'dsync');
 
   await auth0Fetch.saveAuth0Cache();
 

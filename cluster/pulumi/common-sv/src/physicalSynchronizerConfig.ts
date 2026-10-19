@@ -9,6 +9,7 @@ import {
   spliceConfig,
   SplicePostgresSchema,
 } from '@canton-network/splice-pulumi-common';
+import { mergeConfigFragments } from '@canton-network/splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
 export const CloudSqlWithOverrideConfigSchema = CloudSqlConfigSchema.partial()
@@ -60,3 +61,41 @@ export const PhysicalSynchronizersConfigOverridesSchema = z
       ),
     { error: 'physical synchronizer configuration must only include running synchronizers' }
   );
+
+type SyncNodeConfigWithOverrides = {
+  physicalSynchronizerOverrides: z.infer<typeof PhysicalSynchronizersConfigOverridesSchema>;
+  sequencer: SvSequencerConfig;
+  mediator: SvMediatorConfig;
+};
+
+// Replaces the top-level sequencer and mediator configs with a per-migration `physicalSynchronizers`
+// map, in which each migration's config is the top-level config merged with its overrides.
+// Implicit config merging is confusing but for now I don't really see a better way of introducing these overrides.
+// Perhaps a proper revisit of the synchronizerMigration config structure will lead to a better solution here.
+export function withPhysicalSynchronizers<C extends SyncNodeConfigWithOverrides>(
+  { physicalSynchronizerOverrides, sequencer, mediator, ...rest }: C,
+  migrations: { id: number }[]
+): Omit<C, keyof SyncNodeConfigWithOverrides> & {
+  physicalSynchronizers: Record<
+    number,
+    { mediator: SvMediatorConfig; sequencer: SvSequencerConfig }
+  >;
+} {
+  const physicalSynchronizers = migrations.map(migration => [
+    migration.id,
+    {
+      mediator: mergeConfigFragments(
+        mediator,
+        physicalSynchronizerOverrides[migration.id]?.mediator || {}
+      ) as SvMediatorConfig,
+      sequencer: mergeConfigFragments(
+        sequencer,
+        physicalSynchronizerOverrides[migration.id]?.sequencer || {}
+      ) as SvSequencerConfig,
+    },
+  ]);
+  return {
+    ...rest,
+    physicalSynchronizers: _.fromPairs(physicalSynchronizers),
+  };
+}

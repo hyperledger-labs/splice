@@ -26,38 +26,34 @@ import { installCantonComponents } from './canton';
 export async function installNode(
   migrationId: DomainMigrationIndex,
   auth0Client: Auth0Client,
-  sv?: string,
-  dsyncNode?: string
+  nodeName: string,
+  nodeType: 'sv' | 'dsync',
 ): Promise<InstalledMigrationSpecificSv | undefined> {
-  if (!sv && !dsyncNode) {
-    throw new Error('Either sv or dsyncNode must be specified');
-  }
-
   let nodeConfig: StaticSvConfig;
-  if (sv) {
+  if (nodeType === 'sv') {
     const svConfig = svConfigs.concat([svRunbookConfig]).find(config => {
-      return config.nodeName === sv;
+      return config.nodeName === nodeName;
     });
     if (svConfig === undefined) {
-      throw new Error(`No sv config found for ${sv}`);
+      throw new Error(`No sv config found for ${nodeName}`);
     }
     nodeConfig = svConfig!;
-  } else if (dsyncNode) {
-    const dsyncNodeConfig = staticSvConfigFromDSyncNodeConfig(dsyncNode);
+  } else if (nodeType === 'dsync') {
+    const dsyncNodeConfig = staticSvConfigFromDSyncNodeConfig(nodeName);
     if (dsyncNodeConfig === undefined) {
-      throw new Error(`No dsync node config found for ${dsyncNode}`);
+      throw new Error(`No dsync node config found for ${nodeName}`);
     }
     nodeConfig = {
       ...dsyncNodeConfig,
     };
   } else {
-    throw new Error('Either sv or dsyncNode must be specified');
+    throw new Error(`Unknown node type ${nodeType} for ${nodeName}`);
   }
   const isCoreSv = nodeConfig.nodeName !== svRunbookConfig.nodeName;
   const isFirstSv = nodeConfig.nodeName === sv1Config.nodeName;
   const isSvRunbook = nodeConfig.nodeName === svRunbookConfig.nodeName;
 
-  const config = sv ? configForSv(nodeConfig.nodeName) : configForDSyncNode(nodeConfig.nodeName);
+  const config = nodeType === 'sv' ? configForSv(nodeConfig.nodeName) : configForDSyncNode(nodeConfig.nodeName);
   const supportsReset = isSvRunbook ? supportsSvRunbookReset : undefined;
 
   // namespace lifecycle is managed by the main canton-network stack
@@ -66,7 +62,7 @@ export async function installNode(
   const serviceAccountName = `sv-canton-migration-${migrationId}`;
   const imagePullDeps = imagePullSecretWithNonDefaultServiceAccount(xns, serviceAccountName);
 
-  const migrationConfig = sv ? DecentralizedSynchronizerUpgradeConfig : dSyncMigrationConfig!;
+  const migrationConfig = nodeType === 'sv' ? DecentralizedSynchronizerUpgradeConfig : dSyncMigrationConfig!;
 
   return await installCantonComponents(
     xns,
@@ -104,7 +100,7 @@ export async function installNode(
             : [],
       },
     },
-    sv ? 'sv' : 'dsync',
+    nodeType,
     undefined,
     { dependsOn: imagePullDeps },
     supportsReset,

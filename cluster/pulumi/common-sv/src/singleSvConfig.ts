@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
-import * as _ from 'lodash';
 import {
   DecentralizedSynchronizerUpgradeConfig,
   EnvVarConfigSchema,
@@ -11,7 +10,6 @@ import {
 } from '@canton-network/splice-pulumi-common';
 import { ValidatorAppConfigSchema } from '@canton-network/splice-pulumi-common-validator/src/config';
 import { clusterYamlConfig } from '@canton-network/splice-pulumi-common/src/config/config';
-import { mergeConfigFragments } from '@canton-network/splice-pulumi-common/src/config/configLoader';
 import { CnChartVersionSchema } from '@canton-network/splice-pulumi-common/src/config/versionSchema';
 import util from 'node:util';
 import { z } from 'zod';
@@ -20,10 +18,9 @@ import { TopologySnapshotSchema } from './config';
 import {
   CloudSqlWithOverrideConfigSchema,
   PhysicalSynchronizersConfigOverridesSchema,
-  SvMediatorConfig,
   SvMediatorConfigSchema,
-  SvSequencerConfig,
   SvSequencerConfigSchema,
+  withPhysicalSynchronizers,
 } from './physicalSynchronizerConfig';
 import { CatchupTestSchema } from './testing';
 
@@ -215,29 +212,9 @@ const SingleSvConfigSchema = SyncNodeSchema.extend({
   versionOverride: CnChartVersionSchema.optional(),
 })
   .strict()
-  .transform(({ physicalSynchronizerOverrides, sequencer, mediator, ...svConfig }) => {
-    // Implicit config merging is confusing but for now I don't really see a better way of introducting these overrides.
-    // Perhaps a proper revisit of the synchronizerMigration config structure will lead to a better solution here.
-    const physicalSynchronizers = DecentralizedSynchronizerUpgradeConfig.allMigrations.map(
-      migration => [
-        migration.id,
-        {
-          mediator: mergeConfigFragments(
-            mediator,
-            physicalSynchronizerOverrides[migration.id]?.mediator || {}
-          ) as SvMediatorConfig,
-          sequencer: mergeConfigFragments(
-            sequencer,
-            physicalSynchronizerOverrides[migration.id]?.sequencer || {}
-          ) as SvSequencerConfig,
-        },
-      ]
-    );
-    return {
-      ...svConfig,
-      physicalSynchronizers: _.fromPairs(physicalSynchronizers),
-    };
-  });
+  .transform(config =>
+    withPhysicalSynchronizers(config, DecentralizedSynchronizerUpgradeConfig.allMigrations)
+  );
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema);
 const SvsConfigurationSchema = z.object({
   svs: AllSvsConfigurationSchema,

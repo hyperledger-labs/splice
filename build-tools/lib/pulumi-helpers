@@ -20,9 +20,6 @@ function _pulumi() {
 function _uses_pulumi_stack() {
 
     pulumi_project=$1
-    if [ -z "${SPLICE_SV:-}" -a -z "${SPLICE_DSYNC_NODE:-}" ]; then
-      _error "Either SPLICE_SV or SPLICE_DSYNC_NODE must be specified"
-    fi
     pulumi_stack=$(_resolve_pulumi_stack "$pulumi_project")
 
     if [ ! -f "${PULUMI_STACKS_DIR}/${pulumi_project}/Pulumi.$pulumi_stack.yaml" ]; then

@@ -1,16 +1,14 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as _ from 'lodash';
 import {
   DecentralizedSynchronizerMigrationConfig,
   SynchronizerMigrationSchema,
 } from '@canton-network/splice-pulumi-common';
 import { clusterYamlConfig } from '@canton-network/splice-pulumi-common/src/config/config';
-import { mergeConfigFragments } from '@canton-network/splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
 import { StaticSvConfig } from './config';
-import { SvMediatorConfig, SvSequencerConfig } from './physicalSynchronizerConfig';
+import { withPhysicalSynchronizers } from './physicalSynchronizerConfig';
 import { SyncNodeSchema } from './singleSvConfig';
 
 export const dsyncConfigSchema = z.object({
@@ -28,28 +26,8 @@ export const dSyncMigrationConfig = dsyncConfig.dsync
   ? new DecentralizedSynchronizerMigrationConfig(dsyncConfig.dsync.migration)
   : undefined;
 
-const DSyncNodeSchema = SyncNodeSchema.extend({}).transform(
-  ({ physicalSynchronizerOverrides, sequencer, mediator, ...svConfig }) => {
-    // Implicit config merging is confusing but for now I don't really see a better way of introducting these overrides.
-    // Perhaps a proper revisit of the synchronizerMigration config structure will lead to a better solution here.
-    const physicalSynchronizers = dSyncMigrationConfig?.allMigrations.map(migration => [
-      migration.id,
-      {
-        mediator: mergeConfigFragments(
-          mediator,
-          physicalSynchronizerOverrides[migration.id]?.mediator || {}
-        ) as SvMediatorConfig,
-        sequencer: mergeConfigFragments(
-          sequencer,
-          physicalSynchronizerOverrides[migration.id]?.sequencer || {}
-        ) as SvSequencerConfig,
-      },
-    ]);
-    return {
-      ...svConfig,
-      physicalSynchronizers: _.fromPairs(physicalSynchronizers || []),
-    };
-  }
+const DSyncNodeSchema = SyncNodeSchema.extend({}).transform(config =>
+  withPhysicalSynchronizers(config, dSyncMigrationConfig?.allMigrations ?? [])
 );
 const AllDSyncNodesConfigurationSchema = z.record(z.string(), DSyncNodeSchema);
 const DSyncNodesConfigurationSchema = z.object({
