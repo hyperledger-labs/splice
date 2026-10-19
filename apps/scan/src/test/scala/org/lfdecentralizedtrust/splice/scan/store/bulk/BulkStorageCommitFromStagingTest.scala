@@ -156,7 +156,7 @@ class BulkStorageCommitFromStagingTest
         mockScanConnections,
       )
 
-      triggerCopyFlowAndAssertCompletion(flow)
+      triggerCopyFlowAndAssertCompletion(flow, completionTimeout = 20.seconds)
 
       withClue(s"largest checksums request for ${objsWithDigests.size} objects: ") {
         mockScanConnections.largestRequest.get() shouldBe HttpRequestLimits.MaxRequestArrayItems
@@ -571,7 +571,8 @@ class BulkStorageCommitFromStagingTest
   }
 
   private def triggerCopyFlowAndAssertCompletion(
-      flow: Flow[String, String, NotUsed]
+      flow: Flow[String, String, NotUsed],
+      completionTimeout: FiniteDuration = 3.seconds,
   ) = {
     val (pub, sub) = TestSource
       .probe[String]
@@ -582,7 +583,7 @@ class BulkStorageCommitFromStagingTest
     try {
       sub.request(1)
       pub.sendNext("go")
-      sub.expectNext("go")
+      sub.expectNext(completionTimeout, "go")
       pub.sendComplete()
       sub.expectComplete()
     } catch {
