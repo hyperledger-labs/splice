@@ -13,8 +13,8 @@ Only final vX.Y.Z tags are considered, not -rc tags. A release is usually a hand
 few dozen commits after the snapshot's reference commit, never before it. Skim
 `git log <reference-commit>..<tag>` in the clone (see below) before accepting a tag.
 
-If the OSS commit subject names a release line, e.g. `[release-line-3.6]`, pass it as
-RELEASE_LINE (3.6) to only consider tags of that line.
+RELEASE_LINE is the release line from the OSS commit subject, e.g. 3.6 for
+`[release-line-3.6]`; only tags of that line are considered.
 
 Exits with status 1 if no release contains the commit yet (typical for snapshots of
 `main`); use search-canton-snapshot.py then.
@@ -42,9 +42,7 @@ def parse_args():
     parser.add_argument(
         "release_line",
         metavar="RELEASE_LINE",
-        nargs="?",
-        help="Release line from the OSS commit subject, e.g. 3.6 for [release-line-3.6]. "
-        "If omitted, tags of every line are considered.",
+        help="Release line from the OSS commit subject, e.g. 3.6 for [release-line-3.6].",
     )
     parser.add_argument(
         "--closed-canton",
@@ -79,9 +77,8 @@ def main():
         sys.exit(f"error: {args.reference_commit} is not a commit in DACH-NY/canton")
     ref = rev.stdout.strip()
 
-    # Only final releases (v3.6.1), not -rc tags; optionally only for one release line.
-    line = re.escape(args.release_line) if args.release_line else r"\d+\.\d+"
-    pattern = re.compile(rf"v{line}\.\d+")
+    # Only final releases (v3.6.1), not -rc tags, and only for the given release line.
+    pattern = re.compile(rf"v{re.escape(args.release_line)}\.\d+")
 
     tags = [t for t in git("tag", "--list").stdout.split() if pattern.fullmatch(t)]
     # Tags that contain the reference commit, i.e. include everything in the snapshot.

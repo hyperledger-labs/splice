@@ -57,7 +57,7 @@ Current Canton commit: `8bae1f1b4a3d7176efc7c293146182e366086126`
    4. Create a commit to ease review, `git add canton/ && git commit -s -m"Undo our changes" --no-verify`
 3. Checkout the commit of the Canton OSS repo to which you have decided to upgrade in Step 1.1
    1. Learn the Daml SDK version used by Canton from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`.
-   2. The OSS repo commit will mention a "Reference commit". In Splice repo run `scripts/find-canton-release.py --closed-canton <path-to-closed-canton-checkout> <reference-commit>`
+   2. The OSS repo commit will mention a "Reference commit" and a release line such as `[release-line-3.6]`. In Splice repo run `scripts/find-canton-release.py --closed-canton <path-to-closed-canton-checkout> <reference-commit> <release-line>`
       (a checkout of DACH-NY/canton) to find the closest release containing it, and use that release's version.
       If there is none, run `scripts/search-canton-snapshot.py` with the hash to find a snapshot version instead.
 5. Execute the following steps in your Splice repo:
