@@ -33,6 +33,7 @@ import { sanitizeUrl } from '@canton-network/splice-common-frontend-utils';
 import { Link as RouterLink } from 'react-router';
 import {
   ConfigChange,
+  FeatureAppConfigUpdateEntry,
   ProposalDetails,
   ProposalVote,
   ProposalVotingInformation,
@@ -40,6 +41,7 @@ import {
 } from '../../utils/types';
 import { ProposalVoteForm } from './ProposalVoteForm';
 import { ConfigValuesChanges } from './ConfigValuesChanges';
+import { OpsPartiesDiff } from './OpsPartiesDisplay';
 import { JsonDiffAccordion } from './JsonDiffAccordion';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { DetailItem } from './proposal-details/DetailItem';
@@ -248,6 +250,10 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               rightContractId={proposalDetails.proposal.rightContractId}
               newActivityWeight={proposalDetails.proposal.newActivityWeight}
             />
+          )}
+
+          {proposalDetails.action === 'SRARC_CreateFeaturedAppConfigUpdateInstruction' && (
+            <AmendFeatureAppSection updates={proposalDetails.proposal.updates} />
           )}
 
           {proposalDetails.action === 'SRARC_UpdateSvRewardWeight' && (
@@ -950,6 +956,56 @@ const UpdateFeatureAppSection = ({
           />
         }
       />
+    </Box>
+  );
+};
+
+interface AmendFeatureAppSectionProps {
+  updates: FeatureAppConfigUpdateEntry[];
+}
+
+// Amend (#7674) details: one block per provider — provider id, scalar changes
+// (appKind / activityWeight) via ConfigValuesChanges, and opsParties as an added/removed
+// diff (Option D-alt). The amend form authors a single provider; the list form here keeps
+// the details forward-compatible with multi-provider instructions.
+const AmendFeatureAppSection = ({ updates }: AmendFeatureAppSectionProps) => {
+  return (
+    <Box
+      id="proposal-details-amend-feature-app-section"
+      data-testid="proposal-details-amend-feature-app-section"
+      sx={{ display: 'contents' }}
+    >
+      {updates.map((update, i) => (
+        <React.Fragment key={i}>
+          <DetailItem
+            label="Provider Party ID"
+            value={
+              <CopyableIdentifier
+                value={update.provider}
+                size="large"
+                data-testid={`proposal-details-amend-provider-${i}`}
+              />
+            }
+            labelId={`proposal-details-amend-provider-label-${i}`}
+          />
+          {update.scalarChanges.length > 0 && (
+            <DetailItem
+              label="Config Changes"
+              value={<ConfigValuesChanges changes={update.scalarChanges} />}
+            />
+          )}
+          <DetailItem
+            label="Ops Parties Changes"
+            value={
+              <OpsPartiesDiff
+                added={update.opsAdded}
+                removed={update.opsRemoved}
+                idPrefix={`proposal-details-amend-ops-${i}`}
+              />
+            }
+          />
+        </React.Fragment>
+      ))}
     </Box>
   );
 };
