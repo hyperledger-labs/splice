@@ -42,9 +42,9 @@ HTTP_METHODS = {"get", "put", "post", "delete"}
 
 
 def load_api_metadata(spec_path):
-    """load operation metadata from an OpenAPI spec file.
+    """load api metadata from an OpenAPI spec file.
 
-    returns a mapping of operationId -> {method, path, tags}.
+    returns a mapping of api operationId -> {method, path, tags}.
     """
     meta = {}
 
