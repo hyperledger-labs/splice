@@ -6,9 +6,9 @@
     "kind": "Service",
     "metadata": {
       "labels": {
-        "app": "multi-participant-2-2"
+        "app": "multi-participant-1"
       },
-      "name": "multi-participant-2-2",
+      "name": "multi-participant-1",
       "namespace": "multi-validator"
     },
     "spec": {
@@ -103,11 +103,11 @@
         }
       ],
       "selector": {
-        "app": "multi-participant-2-2"
+        "app": "multi-participant-1"
       }
     }
   },
-  "name": "multi-participant-2-2",
+  "name": "multi-participant-1",
   "provider": "",
   "type": "kubernetes:core/v1:Service"
 }

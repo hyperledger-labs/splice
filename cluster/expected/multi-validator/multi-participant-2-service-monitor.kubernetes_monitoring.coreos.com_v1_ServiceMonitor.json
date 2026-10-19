@@ -8,7 +8,7 @@
       "labels": {
         "release": "prometheus-grafana-monitoring"
       },
-      "name": "multi-participant-3-2-service-monitor",
+      "name": "multi-participant-2-service-monitor",
       "namespace": "multi-validator"
     },
     "spec": {
@@ -23,12 +23,12 @@
       },
       "selector": {
         "matchLabels": {
-          "app": "multi-participant-3-2"
+          "app": "multi-participant-2"
         }
       }
     }
   },
-  "name": "multi-participant-3-2-service-monitor",
+  "name": "multi-participant-2-service-monitor",
   "provider": "",
   "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
 }

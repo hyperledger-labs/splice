@@ -6,7 +6,7 @@
     "kind": "Deployment",
     "metadata": {
       "labels": {
-        "app": "multi-participant-0-2"
+        "app": "multi-participant-4"
       },
       "namespace": "multi-validator"
     },
@@ -14,7 +14,7 @@
       "replicas": 1,
       "selector": {
         "matchLabels": {
-          "app": "multi-participant-0-2"
+          "app": "multi-participant-4"
         }
       },
       "strategy": {
@@ -23,7 +23,7 @@
       "template": {
         "metadata": {
           "labels": {
-            "app": "multi-participant-0-2"
+            "app": "multi-participant-4"
           }
         },
         "spec": {
@@ -55,7 +55,7 @@
               "env": [
                 {
                   "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
-                  "value": "postgres-0.multi-validator.svc.cluster.local"
+                  "value": "postgres-4.multi-validator.svc.cluster.local"
                 },
                 {
                   "name": "CANTON_PARTICIPANT_POSTGRES_DB",
@@ -70,7 +70,7 @@
                   "valueFrom": {
                     "secretKeyRef": {
                       "key": "postgresPassword",
-                      "name": "postgres-0-secret"
+                      "name": "postgres-4-secret"
                     }
                   }
                 },
@@ -254,7 +254,7 @@
               "command": [
                 "bash",
                 "-c",
-                "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-0.multi-validator.svc.cluster.local --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_2_00\ncreateDb participant_2_01\ncreateDb participant_2_02\ncreateDb participant_2_03\ncreateDb participant_2_04\ncreateDb participant_2_05\ncreateDb participant_2_06\ncreateDb participant_2_07\ncreateDb participant_2_08\ncreateDb participant_2_09\n                      "
+                "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-4.multi-validator.svc.cluster.local --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_2_00\ncreateDb participant_2_01\ncreateDb participant_2_02\ncreateDb participant_2_03\ncreateDb participant_2_04\ncreateDb participant_2_05\ncreateDb participant_2_06\ncreateDb participant_2_07\ncreateDb participant_2_08\ncreateDb participant_2_09\n                      "
               ],
               "env": [
                 {
@@ -262,7 +262,7 @@
                   "valueFrom": {
                     "secretKeyRef": {
                       "key": "postgresPassword",
-                      "name": "postgres-0-secret"
+                      "name": "postgres-4-secret"
                     }
                   }
                 }
@@ -287,7 +287,7 @@
       }
     }
   },
-  "name": "multi-participant-0-2",
+  "name": "multi-participant-4",
   "provider": "",
   "type": "kubernetes:apps/v1:Deployment"
 }

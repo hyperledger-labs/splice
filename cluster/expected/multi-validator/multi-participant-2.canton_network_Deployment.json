@@ -2,7 +2,7 @@
   "custom": false,
   "id": "",
   "inputs": {},
-  "name": "multi-participant-3-2",
+  "name": "multi-participant-2",
   "provider": "",
   "type": "canton:network:Deployment"
 }

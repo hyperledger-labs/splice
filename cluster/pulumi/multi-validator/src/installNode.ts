@@ -33,7 +33,7 @@ export async function installNode(config: MultiValidatorConfig): Promise<void> {
     };
 
     const participant = new MultiParticipant(
-      `multi-participant-${i}-${DecentralizedSynchronizerUpgradeConfig.activeMigrationId}`,
+      `multi-participant-${i}`,
       {
         namespace: namespace.ns,
         postgres: {
