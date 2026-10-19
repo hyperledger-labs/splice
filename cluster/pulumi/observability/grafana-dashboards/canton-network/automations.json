@@ -1095,7 +1095,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by(trigger_name, instance, node_type, trigger_type) (histogram_sum(rate(splice_trigger_latency_duration_seconds{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\"}[$__rate_interval])))",
+          "expr": "sum by(trigger_name, instance, node_type, trigger_type) (histogram_sum(rate(splice_trigger_latency_duration_seconds{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\"}[$__rate_interval]))) / on(trigger_name, instance, node_type, trigger_type) max by(trigger_name, instance, node_type, trigger_type) (splice_trigger_parallelism{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"$trigger_type\"})",
           "instant": false,
           "legendFormat": "{{node_type}} {{instance}} {{trigger_name}}",
           "range": true,
