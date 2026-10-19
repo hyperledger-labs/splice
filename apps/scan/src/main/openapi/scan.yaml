@@ -3818,6 +3818,8 @@ components:
             Return at most this many vote results. The actual number returned may be smaller.
           type: integer
           format: int32
+          minimum: 1
+          maximum: 1000
 
     GetVotesBackfillingStatusResponse:
       type: object
