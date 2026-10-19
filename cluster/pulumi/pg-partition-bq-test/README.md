@@ -61,17 +61,40 @@ STREAM=...              # datastreamStreamId
 ### psql
 
 The instance has only a private IP. The scratchnet's GKE cluster is in the same
-VPC, so run a client pod there:
+VPC, so run a client pod there. Every node pool carries a `NoSchedule` taint
+(`cn_apps`, or `cloud.google.com/compute-class` on clusters with compute
+classes; see `cluster/pulumi/cluster/src/nodePools.ts`), so the pod needs a
+toleration, or it stays `Pending` until kubectl gives up with `timed out
+waiting for the condition`:
 
 ```bash
 kubectl run pgpart-psql --rm -it --restart=Never --image=postgres:18 \
   --labels=testing=pgpart-pr7737 \
+  --pod-running-timeout=5m \
+  --overrides='{"apiVersion": "v1", "spec": {"tolerations": [
+    {"key": "cn_apps", "operator": "Exists", "effect": "NoSchedule"},
+    {"key": "cloud.google.com/compute-class", "operator": "Exists", "effect": "NoSchedule"}]}}' \
   --env=PGPASSWORD="$PGPASSWORD" \
   -- psql -h "$PRIVATE_IP" -U cnadmin -d partition_test
 ```
 
+If it still doesn't start, `kubectl describe pod pgpart-psql` from a second
+terminal shows why.
+
 As a fallback, `gcloud compute ssh <natVmName> --zone <natVmZone>`, then
 `sudo apt-get install -y postgresql-client` and run the same `psql` command.
+The VM uses OS Login, which has two common failure modes:
+
+- `Permission denied (publickey)`: your account lacks an OS Login role.
+  `apt-get` needs sudo, so that's `roles/compute.osAdminLogin` on the project
+  or the VM. `gcloud compute ssh <natVmName> --zone <natVmZone> --troubleshoot`
+  checks this, among other things.
+- A prompt for the passphrase of `~/.ssh/google_compute_engine` means that key
+  is passphrase-protected; with a passphrase-free key ssh never asks.
+  `ssh-keygen -y -f ~/.ssh/google_compute_engine` asks too in that case. Enter
+  its passphrase, or move the key pair aside and let `gcloud compute ssh`
+  generate a new one (just press enter at `Enter passphrase (empty for no
+  passphrase)`).
 
 Start every psql session with:
 
