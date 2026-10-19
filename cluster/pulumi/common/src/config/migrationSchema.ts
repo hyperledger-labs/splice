@@ -31,7 +31,7 @@ export const MigrationInfoSchema = z
     releaseReference: GitReferenceSchema.optional(),
     sequencer: z
       .object({
-        enableBftSequencer: z.boolean().default(false),
+        enableBftSequencer: z.boolean().default(true),
         // Use a separate DB server for DABFT.
         dedicatedBftSequencerDb: z.boolean().default(true),
       })

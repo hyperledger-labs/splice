@@ -113,6 +113,9 @@
           "sequencer": "global-domain-9-sequencer"
         },
         "legacy": {
+          "cantonBft": {
+            "p2pUrl": "https://sequencer-p2p-8.sv-2.mock.global.canton.network.digitalasset.com"
+          },
           "mediator": "global-domain-8-mediator",
           "sequencer": "global-domain-8-sequencer"
         },
