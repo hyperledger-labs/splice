@@ -88,11 +88,8 @@ instance RegistryApi AmuletRegistry where
   getTransferFactory = registryApi_getTransferFactory
   getAllocationFactory = registryApi_getAllocationFactory
   getSettlementFactory = registryApi_getSettlementFactory
-  getAllocation_WithdrawContext app cid _meta = do
-    abortC <- registryApi_getAllocation_abortTwoStepTransferContext app cid
-    -- Governance and vesting locks need the external party config state to unlock their amulets.
-    externalPartyC <- getExternalPartyConfigStateContext app
-    pure $ abortC <> externalPartyC
+  getAllocation_WithdrawContext app cid _meta =
+    registryApi_getAllocation_abortTwoStepTransferContext app cid
   getAllocation_CancelContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
   -- Amulet does not have AllocationInstructions.
   getAllocationInstruction_WithdrawContext _ _ _ = error "unimplemented"

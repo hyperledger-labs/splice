@@ -34,12 +34,7 @@ import org.lfdecentralizedtrust.splice.store.{
   UpdateHistory,
   VotesStore,
 }
-import org.lfdecentralizedtrust.splice.util.{
-  Contract,
-  ContractWithState,
-  GovernanceLockUtil,
-  TemplateJsonDecoder,
-}
+import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -483,30 +478,6 @@ object ScanStore {
               Some(Timestamp.assertFromInstant(contract.payload.transfer.executeBefore)),
           )
         },
-        mkFilter(splice.governancelock.GovernanceLock.COMPANION)(
-          co => co.payload.dso == dso,
-          versionGuard = { case (pkgVersionSupport, now) =>
-            (tc) => pkgVersionSupport.supportsGovernanceLock(Seq(key.dsoParty), now)(tc)
-          },
-        )(contract =>
-          ScanAcsStoreRowData(
-            contract = contract,
-            contractExpiresAt = GovernanceLockUtil
-              .getVestingLockSpecification(contract.payload)
-              .map(v => Timestamp.assertFromInstant(v.endTime)),
-          )
-        ),
-        mkFilter(splice.governancelock.GovernanceLockSubstitution.COMPANION)(
-          co => co.payload.target.dso == dso,
-          versionGuard = { case (pkgVersionSupport, now) =>
-            (tc) => pkgVersionSupport.supportsGovernanceLock(Seq(key.dsoParty), now)(tc)
-          },
-        )(contract =>
-          ScanAcsStoreRowData(
-            contract = contract,
-            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
-          )
-        ),
         mkFilter(splice.externalpartyconfigstate.ExternalPartyConfigState.COMPANION)(
           co => co.payload.dso == dso,
           versionGuard = { case (pkgVersionSupport, now) =>

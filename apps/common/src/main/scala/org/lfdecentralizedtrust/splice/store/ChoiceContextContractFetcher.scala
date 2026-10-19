@@ -14,7 +14,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
-import org.lfdecentralizedtrust.splice.util.{Contract, ContractCompanions}
+import org.lfdecentralizedtrust.splice.util.Contract
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -44,10 +44,6 @@ trait ChoiceContextContractFetcher {
       traceContext: TraceContext,
   ): Future[Seq[Contract[TCid, T]]]
 
-  def lookupGenericContractById(id: ContractId[?])(implicit
-      traceContext: TraceContext
-  ): Future[Option[Contract[?, ?]]]
-
 }
 
 object ChoiceContextContractFetcher {
@@ -69,11 +65,6 @@ object ChoiceContextContractFetcher {
         traceContext: TraceContext,
     ): Future[Seq[Contract[TCid, T]]] =
       store.multiDomainAcsStore.lookupContractsById(companion)(ids).map(_.map(_.contract))
-
-    override def lookupGenericContractById(id: ContractId[?])(implicit
-        traceContext: TraceContext
-    ): Future[Option[Contract[?, ?]]] =
-      store.multiDomainAcsStore.lookupGenericContractById(id)
   }
 
   private class StoreChoiceContextContractFetcherWithLedgerFallback(
@@ -102,28 +93,7 @@ object ChoiceContextContractFetcher {
     )(id: ContractId[?])(implicit
         companionClass: ContractCompanion[C, TCid, T],
         traceContext: TraceContext,
-    ): OptionT[Future, Contract[TCid, T]] =
-      fetchRecentLedgerEvent(id).subflatMap { javaCreatedEvent =>
-        companionClass.fromCreatedEvent(companion)(javaCreatedEvent)
-      }
-
-    override def lookupGenericContractById(id: ContractId[?])(implicit
-        traceContext: TraceContext
-    ): Future[Option[Contract[?, ?]]] =
-      OptionT(store.multiDomainAcsStore.lookupGenericContractById(id))
-        .orElse(
-          fetchRecentLedgerEvent(id).subflatMap { javaCreatedEvent =>
-            ContractCompanions
-              .lookup(javaCreatedEvent.getTemplateId)
-              .toOption
-              .flatMap(companion => Contract.fromCreatedEvent(companion)(javaCreatedEvent))
-          }
-        )
-        .value
-
-    private def fetchRecentLedgerEvent(id: ContractId[?])(implicit
-        traceContext: TraceContext
-    ): OptionT[Future, CreatedEvent] =
+    ): OptionT[Future, Contract[TCid, T]] = {
       OptionT(fallbackLedgerClient.getContract(id, Seq(store.multiDomainAcsStore.storeParty)))
         // `getContract` will return archived contracts (and thus missing from the store) until they have been pruned.
         // Thus, we verify that it was created not too long ago,
@@ -136,11 +106,13 @@ object ChoiceContextContractFetcher {
           val ignoreBefore = clock.now.minus(getContractValidity.asJava)
           createdAt.exists(_ > ignoreBefore)
         }
-        .map { createdEvent =>
+        .subflatMap { createdEvent =>
           val javaCreatedEvent = CreatedEvent.fromProto(toJavaProto(createdEvent))
           logger.debug(s"Falling back to ledger for contract $javaCreatedEvent")
-          javaCreatedEvent
+          companionClass
+            .fromCreatedEvent(companion)(javaCreatedEvent)
         }
+    }
 
     override def lookupContractsById[C, TCid <: ContractId[?], T](
         companion: C

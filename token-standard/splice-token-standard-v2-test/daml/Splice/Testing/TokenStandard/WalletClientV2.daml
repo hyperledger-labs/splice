@@ -44,7 +44,6 @@ module Splice.Testing.TokenStandard.WalletClientV2
     rejectTransferInstructionV1,
     tryRejectTransferInstructionV1Result,
     withdrawTransferInstructionV1,
-    tryWithdrawTransferInstructionV1,
     tryWithdrawTransferInstructionV1Result,
 
     -- * Managing allocations
@@ -361,11 +360,6 @@ withdrawTransferInstructionV1 : MultiRegistry.MultiRegistry -> Party -> Contract
 withdrawTransferInstructionV1 registries actor instrCid = do
   batch <- mkTransferInstruction_WithdrawV1 registries actor instrCid
   extractPendingTransferInstructionV1 <$> executeSingletonTSABatch registries actor batch
-
-tryWithdrawTransferInstructionV1 : MultiRegistry.MultiRegistry -> Party -> ContractId V1.TransferInstruction -> Metadata -> Script (Either SubmitError (Optional (ContractId V1.TransferInstruction)))
-tryWithdrawTransferInstructionV1 registries actor instrCid meta = do
-  batch <- mkTransferInstruction_WithdrawV1' registries actor instrCid meta
-  fmap extractPendingTransferInstructionV1 <$> tryExecuteSingletonTSABatch registries actor batch
 
 tryWithdrawTransferInstructionV1Result : MultiRegistry.MultiRegistry -> Party -> ContractId V1.TransferInstruction -> Metadata -> Script (Either SubmitError V1.TransferInstructionResult)
 tryWithdrawTransferInstructionV1Result registries actor instrCid meta = do
