@@ -16,6 +16,9 @@ validator1:
   walletGateway:
     enabled: true
 multiValidator:
+  # Load Tests
+  # 5 deployments with 10 validators in each so 50 total
+  instanceCount: 5
   postgresPvcSize: '100Gi'
   # Dummy values for testing
   extraValidatorEnvVars:
