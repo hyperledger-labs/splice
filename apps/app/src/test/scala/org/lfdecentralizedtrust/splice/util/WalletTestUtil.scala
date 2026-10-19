@@ -1515,6 +1515,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
           now.plus(ttl).toInstant,
           true,
           beneficiaryO.map(_.toProtoPrimitive).toJava,
+          java.util.Optional.empty(),
         ).create.commands.asScala
       },
     )

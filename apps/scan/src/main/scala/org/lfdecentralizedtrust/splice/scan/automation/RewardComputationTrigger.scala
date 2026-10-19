@@ -84,6 +84,10 @@ class RewardComputationTrigger(
       } yield eligible.map(RewardComputationTrigger.Task(_))
   }
 
+  // TODO(#111): (placeholder issue #, replace with real follow-up) dispatch on
+  // CalculateRewardsV2.kind and route validator-kind contracts to the
+  // validator-reward compute pipeline; today they compute as app-flow and
+  // produce hashes that can't match any real validator batch.
   override protected def completeTask(
       task: RewardComputationTrigger.Task
   )(implicit tc: TraceContext): Future[TaskOutcome] =

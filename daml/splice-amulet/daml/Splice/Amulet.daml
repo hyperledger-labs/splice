@@ -20,6 +20,7 @@ import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.TokenStandard.Utils hiding (require)
 
 import Splice.Amulet.TokenApiUtils
+import Splice.AmuletConfig (RewardKind)
 import Splice.AmuletEventLog (withTempAmuletEventLog)
 import Splice.Expiry
 import Splice.ExternalPartyConfigState
@@ -459,6 +460,9 @@ template RewardCouponV2
     beneficiary : Optional Party
       -- ^ The party that can mint the reward for the activity by the provider.
       -- If not set, this is the provider.
+    kind : Optional RewardKind
+      -- ^ Copied from the leaf 'ProcessRewardsV2.kind'.
+      -- See 'RewardKind' doc for the 'None'-vs-'Some RewardKind_App' encoding rule.
   where
     signatory dso
     observer if providerIsObserver then [provider] ++ optionalToList beneficiary else []

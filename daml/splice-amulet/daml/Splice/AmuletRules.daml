@@ -40,6 +40,8 @@ import Splice.AmuletConfig
   , defaultTransferPreapprovalFee, getDevelopmentFundManagerBlacklist, getExternalPartyConfigStateTickDuration
   , getTransferPreapprovalBaseDuration, useTrafficBasedAppRewards
   , RewardVersion(..), useFeaturedAppMarkers
+  , useAmuletBurnValidatorRewards, useTrafficBasedValidatorRewards
+  , RewardKind(..)
   )
 import qualified Splice.AmuletConfig as Unit
 import Splice.ExternalPartyConfigState
@@ -446,6 +448,7 @@ template AmuletRules
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
         let rewardConfig = configUsd.rewardConfig
+        let validatorRewardConfig = configUsd.validatorRewardConfig
         let trafficPrice =
               if isSome rewardConfig
                 then Some configUsd.decentralizedSynchronizer.fees.extraTrafficPrice
@@ -479,13 +482,13 @@ template AmuletRules
 
         oldest <- create OpenMiningRound with
           dso; round = Round nr0; amuletPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
-          trafficPrice; rewardConfig
+          trafficPrice; rewardConfig; validatorRewardConfig
         newestOpen <- create OpenMiningRound with
           dso; round = Round nr1; amuletPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
-          trafficPrice; rewardConfig
+          trafficPrice; rewardConfig; validatorRewardConfig
         last <- create OpenMiningRound with
           dso; round = Round nr2; amuletPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
-          trafficPrice; rewardConfig
+          trafficPrice; rewardConfig; validatorRewardConfig
 
         exercise self AmuletRules_BootstrapExternalPartyConfigState with
           openMiningRoundTriple = OpenMiningRoundTriple with
@@ -536,6 +539,7 @@ template AmuletRules
             tickDuration = roundToArchive.tickDuration
             trafficPrice = roundToArchive.trafficPrice
             rewardConfig = roundToArchive.rewardConfig
+            validatorRewardConfig = roundToArchive.validatorRewardConfig
 
         -- trigger off-ledger reward calculation if needed
         forA_ roundToArchive.rewardConfig $ \rewardConfig -> do
@@ -546,6 +550,9 @@ template AmuletRules
               roundClosedAt = now
               rewardCouponTimeToLive = rewardConfig.rewardCouponTimeToLive
               dryRun = False
+              -- See 'RewardKind' doc: app-flow writes use 'None' for
+              -- downgrade compatibility with pre-0.1.25 vetted parties.
+              kind = None
 
           when (useTrafficBasedAppRewards rewardConfig.dryRunVersion) $ do
             void $ create CalculateRewardsV2 with
@@ -554,6 +561,27 @@ template AmuletRules
               roundClosedAt = now
               rewardCouponTimeToLive = rewardConfig.rewardCouponTimeToLive
               dryRun = True
+              kind = None
+
+        -- trigger off-ledger validator-reward calculation if needed (CIP-0120)
+        forA_ roundToArchive.validatorRewardConfig $ \validatorRewardConfig -> do
+          when (useTrafficBasedValidatorRewards (Some validatorRewardConfig.mintingVersion)) $ do
+            void $ create CalculateRewardsV2 with
+              dso
+              round = roundToArchive.round
+              roundClosedAt = now
+              rewardCouponTimeToLive = validatorRewardConfig.rewardCouponTimeToLive
+              dryRun = False
+              kind = Some RewardKind_Validator
+
+          when (useTrafficBasedValidatorRewards validatorRewardConfig.dryRunVersion) $ do
+            void $ create CalculateRewardsV2 with
+              dso
+              round = roundToArchive.round
+              roundClosedAt = now
+              rewardCouponTimeToLive = validatorRewardConfig.rewardCouponTimeToLive
+              dryRun = True
+              kind = Some RewardKind_Validator
 
         -- create the new open round
         newOpenRound <- do
@@ -563,6 +591,7 @@ template AmuletRules
               opensAt = addRelTime (max now latestRound.opensAt) tickDuration
               newOpenRoundIssuingFor = latestRound.issuingFor + latestRound.tickDuration
               rewardConfig = configUsd.rewardConfig
+              validatorRewardConfig = configUsd.validatorRewardConfig
           create OpenMiningRound with
               dso
               round = Round (latestRound.round.number + 1)
@@ -577,6 +606,7 @@ template AmuletRules
               issuanceConfig = getValueAsOf newOpenRoundIssuingFor configUsd.issuanceCurve
               tickDuration
               rewardConfig
+              validatorRewardConfig
               trafficPrice =
                 if isSome rewardConfig
                   then Some configUsd.decentralizedSynchronizer.fees.extraTrafficPrice
@@ -758,6 +788,7 @@ template AmuletRules
           dryRun = calculateRewards.dryRun
           rewardCouponTimeToLive = calculateRewards.rewardCouponTimeToLive
           batchHash
+          kind = calculateRewards.kind
 
         return AmuletRules_StartProcessingRewardsV2Result {}
 
@@ -1539,12 +1570,17 @@ summarizeAndConsumeInputs csum dso sender inps = do
     summarizeAndConsumeInput _round s (InputRewardCouponV2 couponCid) = do
       coupon <- fetchAndArchive forOwner couponCid
       assertWithinDeadline "RewardCouponV2.expiresAt" coupon.expiresAt
+      -- Route the amount to app-reward or validator-reward totals based on
+      -- the coupon's flow-of-origin discriminator.
+      -- See 'RewardKind' doc: 'None' is the canonical app-flow value, 'Some RewardKind_App'
+      -- is tolerated (same routing), 'Some RewardKind_Validator' routes to validator totals.
+      let (appDelta, validatorDelta) = case coupon.kind of
+            Some RewardKind_Validator -> (0.0, coupon.amount)
+            _ -> (coupon.amount, 0.0)
       return TransferInputsSummary with
         totalAmuletAmount = s.totalAmuletAmount
-        -- Note: in the current implementation RewardCouponV2 is only used for app rewards.
-        -- This may change in the future. As part of such a change we'll adjust the attribution done here.
-        totalAppRewardAmount = s.totalAppRewardAmount + coupon.amount
-        totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalAppRewardAmount = s.totalAppRewardAmount + appDelta
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount + validatorDelta
         totalUnclaimedActivityRecordAmount = s.totalUnclaimedActivityRecordAmount
         totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
         totalSvRewardAmount = s.totalSvRewardAmount
@@ -2298,12 +2334,16 @@ splitAndBurn eventLogCid sender amount inputs context dso developmentFundManager
   amulet <- fetchAndArchive (ForOwner with dso; owner = sender) amuletCid
   -- record event
   logAmuletBurn dso eventLogCid sender amount usage (toInterfaceContractId amuletCid)
-  -- create validator activity rewards over the whole burn.
-  create ValidatorRewardCoupon with
-    dso
-    round = transferResult.round
-    user = sender
-    amount = amount + sum transferResult.summary.outputFees
+  -- Gate legacy ValidatorRewardCoupon creation: skipped once the round is
+  -- configured for the CIP-0120 traffic-based scheme (batches signed by
+  -- the DSO party produce RewardCouponV2 with kind = Some RewardKind_Validator instead).
+  contextMiningRound <- fetchPublicReferenceData (ForDso dso) context.openMiningRound (OpenMiningRound_Fetch dso)
+  when (useAmuletBurnValidatorRewards ((.mintingVersion) <$> contextMiningRound.validatorRewardConfig)) $
+    void $ create ValidatorRewardCoupon with
+      dso
+      round = transferResult.round
+      user = sender
+      amount = amount + sum transferResult.summary.outputFees
   let amuletAsOfRoundZero = amulet.amount.initialAmount + amulet.amount.ratePerRound.rate * intToDecimal amulet.amount.createdAt.number
   -- adjust the balance changes to account for the archival. This primarily matters for the tx log parsers in scan and the wallet.
   let result = transferResult with

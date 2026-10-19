@@ -117,6 +117,7 @@ test_reward_accounting_v2 = do
           expiresAt = couponExpiryTime
           providerIsObserver = provider `notElem` [bob, dora]
           beneficiary = None
+          kind = None
 
   actualCoupons0 <- query @RewardCouponV2 app.dso
   let actualCoupons = sortOn (.provider) $ fmap snd actualCoupons0
@@ -161,6 +162,7 @@ test_ClaimExpiredRewardsV2 = do
       expiresAt = demoTime `addRelTime` hours 48
       providerIsObserver = False
       beneficiary
+      kind = None
 
   -- expiry works
   setTime $ demoTime `addRelTime` hours 48

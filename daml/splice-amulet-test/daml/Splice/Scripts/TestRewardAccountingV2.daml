@@ -75,7 +75,8 @@ create_and_process_reward_batches dryRun = do
   let batchesWithHiding = [(b1, [bob]), (b2, [dora]), (rootBatch, [])]
 
   -- get the contract representing the pending calculation and confirmation of rewards for round 0
-  [(calculateRewardsCid, _)] <- query @CalculateRewardsV2 app.dso
+  [(calculateRewardsCid, calculateRewards)] <- query @CalculateRewardsV2 app.dso
+  calculateRewards.kind === None
 
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
 
@@ -85,9 +86,15 @@ create_and_process_reward_batches dryRun = do
         calculateRewardsCid
         batchHash = rootBatchHash
 
+  -- root ProcessRewardsV2 must carry kind forward from CalculateRewardsV2
+  [(_, rootProcess)] <- query @ProcessRewardsV2 app.dso
+  rootProcess.kind === None
+
   let processBatches = do
         states <- query @ProcessRewardsV2 app.dso
         forA_ states $ \(processRewardsCid, processRewards) -> do
+          -- every ProcessRewardsV2 (root + BatchOfBatches recursion) carries kind
+          processRewards.kind === None
           let Some (b, badVettingState) = find (\(b, _) -> CryptoHash.hash b == processRewards.batchHash) batchesWithHiding
           void $ submit app.dso $ exerciseCmd processRewardsCid
             ProcessRewardsV2_ProcessBatch with
@@ -132,6 +139,7 @@ test_reward_accounting_v2 = do
           expiresAt = couponExpiryTime
           providerIsObserver = provider `notElem` [bob, dora]
           beneficiary = None
+          kind = None
 
   actualCoupons0 <- query @RewardCouponV2 app.dso
   let actualCoupons = sortOn (.provider) $ fmap snd actualCoupons0
@@ -225,6 +233,51 @@ test_reward_accounting_v2_only_archive_dry_run = do
   pure ()
 
 
+-- Validator-kind input propagates to the created ProcessRewardsV2; app kind
+-- is exercised by the round-close scenarios above.
+test_StartProcessingRewardsV2_propagates_validator_kind : Script ()
+test_StartProcessingRewardsV2_propagates_validator_kind = do
+  app <- setupAppWithConfig defaultAmuletConfig
+  now <- getTime
+  calculateCid <- submit app.dso $ createCmd CalculateRewardsV2 with
+    dso = app.dso
+    round = Round 0
+    roundClosedAt = now
+    rewardCouponTimeToLive = hours 36
+    dryRun = False
+    kind = Some RewardKind_Validator
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  submit [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_StartProcessingRewardsV2 with
+    calculateRewardsCid = calculateCid
+    batchHash = CryptoHash.hash (BatchOfMintingAllowances [])
+  [(_, process)] <- query @ProcessRewardsV2 app.dso
+  process.kind === Some RewardKind_Validator
+
+-- Legacy back-compat: a ProcessRewardsV2 with kind = None (pre-discriminator
+-- write) still creates RewardCouponV2 with kind = None at leaf-create.
+test_ProcessRewardsV2_legacy_kind_propagates_at_leaf : Script ()
+test_ProcessRewardsV2_legacy_kind_propagates_at_leaf = do
+  app <- setupAppWithConfig defaultAmuletConfig
+  alice <- allocateParty "alice"
+  now <- getTime
+  let batch = BatchOfMintingAllowances [MintingAllowance alice 100.0]
+  processCid <- submit app.dso $ createCmd ProcessRewardsV2 with
+    dso = app.dso
+    round = Round 0
+    roundClosedAt = now
+    dryRun = False
+    rewardCouponTimeToLive = hours 36
+    batchHash = CryptoHash.hash batch
+    kind = None
+  submit app.dso $ exerciseCmd processCid ProcessRewardsV2_ProcessBatch with
+    batch
+    providersWithWrongVettingState = Set.empty
+  [(_, coupon)] <- query @RewardCouponV2 app.dso
+  coupon.kind === None
+  coupon.provider === alice
+  coupon.amount === 100.0
+
+
 -- Reward minting
 -----------------
 
@@ -253,7 +306,7 @@ setupAliceWithCoupon' config = do
   aliceUser <- setupUserWithoutValidatorRight app "Alice"
   let alice = aliceUser.primaryParty
 
-  -- bare create a coupon
+  -- bare create a coupon (kind = None simulates a legacy pre-upgrade coupon)
   let coupon = RewardCouponV2 with
         dso = app.dso
         provider = alice
@@ -262,6 +315,7 @@ setupAliceWithCoupon' config = do
         expiresAt = demoTime `addRelTime` hours 36
         providerIsObserver = not config.hideCoupon
         beneficiary = None
+        kind = None
   submit app.dso $ createCmd coupon
   pure (app, alice, aliceUser)
 
@@ -331,6 +385,7 @@ testCouponAssignment hideCoupon = do
         expiresAt = demoTime `addRelTime` hours 36 `addRelTime` minutes 10
         providerIsObserver = not hideCoupon
         beneficiary = None
+        kind = None
 
   -- assign both coupons to bob, alice, and charlie
   let percentages = [(bob, 0.3), (alice, 0.5), (charlie, 0.2)]
@@ -356,6 +411,7 @@ testCouponAssignment hideCoupon = do
         expiresAt
         providerIsObserver = True
         beneficiary = Some beneficiary
+        kind = None
   forA_ newBeneficiariesCouponCids $ \(beneficiary, cids) -> do
     let Some (_, percentage) = find (\(p, _) -> p == beneficiary) percentages
     -- each beneficiary gets one coupon per original coupon
@@ -395,6 +451,7 @@ test_claim_expired_coupons = do
         expiresAt = demoTime `addRelTime` hours 48
         providerIsObserver = False
         beneficiary = Some bob
+        kind = None
   submit app.dso $ createCmd extraCoupon
 
   -- show that expiry doesn't work before expiry time

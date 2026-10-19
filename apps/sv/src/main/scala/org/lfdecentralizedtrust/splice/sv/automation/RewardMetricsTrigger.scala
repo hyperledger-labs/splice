@@ -35,6 +35,9 @@ class RewardMetricsTrigger(
 
   private val rewardMetrics = new RewardMetrics(context.metricsFactory)
 
+  // TODO(#111): (placeholder issue #, replace with real follow-up) partition
+  // these gauges by kind; validator-kind contracts currently roll up into
+  // the app-flow gauges below.
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
     for {
       // These listings are capped at the default page size (1000), so the dryRun/minting counts

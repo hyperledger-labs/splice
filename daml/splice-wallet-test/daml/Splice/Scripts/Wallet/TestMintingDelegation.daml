@@ -10,6 +10,7 @@ import qualified DA.Map as Map
 import DA.List (sort)
 import DA.List.Total (head)
 import Splice.Amulet
+import Splice.AmuletConfig (RewardKind(..))
 import Splice.AmuletRules
 import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
 import Splice.Testing.Utils (emptyExtraArgs, expectErrorId, expectMessageContains, submitMustFail'')
@@ -96,6 +97,7 @@ testMintingDelegation = do
     round = openRound.round
     providerIsObserver = False
     beneficiary = Some beneficiary
+    kind = None
 
   -- Wait for rounds to advance so coupons can be minted
   runNextIssuance app
@@ -378,6 +380,7 @@ testMintingDelegation_AssignAndMint = do
     round = openRound.round
     providerIsObserver = True
     beneficiary = None
+    kind = None
 
   let coupon2Amount = 500.0
   coupon2Cid <- submit app.dso $ createCmd RewardCouponV2 with
@@ -388,6 +391,7 @@ testMintingDelegation_AssignAndMint = do
     round = openRound.round
     providerIsObserver = True
     beneficiary = None
+    kind = None
 
   -- Advance rounds so coupons can be minted
   runNextIssuance app
@@ -440,6 +444,107 @@ testMintingDelegation_AssignAndMint = do
 
   pure ()
 
+-- Mixed-kind: MintingDelegation_AssignAndMint accepts one app-kind and one
+-- validator-kind coupon in the same call; both mint successfully, and the
+-- surviving InputRewardCouponV2 case routes each amount by coupon.kind.
+testMintingDelegation_AssignAndMint_mixedKinds : Script ()
+testMintingDelegation_AssignAndMint_mixedKinds = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  beneficiary <- allocateParty "beneficiary"
+  rewardCouponExtraBeneficiary <- allocateParty "rewardCouponExtraBeneficiary"
+  let delegate = aliceValidator.primaryParty
+
+  now <- getTime
+  proposalCid <- submit beneficiary $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary
+      delegate
+      expiresAt = now `addRelTime` days 30
+      amuletMergeLimit = 10
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept with
+    existingDelegationCid = None
+
+  validatorRightCid <- submit beneficiary $ createCmd ValidatorRight with
+    dso = app.dso
+    user = beneficiary
+    validator = beneficiary
+
+  (_, openRound) <- getLatestOpenRound app
+
+  let coupon1Amount = 1000.0
+  coupon1Cid <- submit app.dso $ createCmd RewardCouponV2 with
+    dso = app.dso
+    provider = beneficiary
+    amount = coupon1Amount
+    expiresAt = now `addRelTime` hours 36
+    round = openRound.round
+    providerIsObserver = True
+    beneficiary = None
+    kind = None
+
+  let coupon2Amount = 500.0
+  coupon2Cid <- submit app.dso $ createCmd RewardCouponV2 with
+    dso = app.dso
+    provider = beneficiary
+    amount = coupon2Amount
+    expiresAt = now `addRelTime` hours 36
+    round = openRound.round
+    providerIsObserver = True
+    beneficiary = None
+    kind = Some RewardKind_Validator
+
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+
+  balanceBefore <- getNormalizedBalance beneficiary
+  (openMiningRoundCid, _) <- getLatestOpenRound app
+  now2 <- getTime
+  issuingRounds <- query @IssuingMiningRound app.dso
+  let context = TransferContext with
+        openMiningRound = openMiningRoundCid
+        issuingMiningRounds = Map.fromList
+          [ (round.round, roundCid) | (roundCid, round) <- issuingRounds, round.opensAt <= now2 ]
+        validatorRights = Map.fromList [(beneficiary, validatorRightCid)]
+        featuredAppRight = None
+  (amuletRulesCid, _) <- getAmuletRules app
+
+  let weights = [(beneficiary, 0.6), (rewardCouponExtraBeneficiary, 0.4)]
+  submit (actAs delegate <> readAs beneficiary <> readAs rewardCouponExtraBeneficiary <> readAs app.dso) $ exerciseCmd mintingDelegationCid MintingDelegation_AssignAndMint with
+    couponCid = toInterfaceContractId coupon1Cid
+    assignBeneficiaries = Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+      additionalCoupons = [toInterfaceContractId coupon2Cid]
+      newBeneficiaries = map (uncurry Api.RewardAssignmentV1.RewardBeneficiary) weights
+      extraArgs = emptyExtraArgs
+    inputs = []
+    context = PaymentTransferContext with
+      context
+      amuletRules = amuletRulesCid
+
+  balanceAfter <- getNormalizedBalance beneficiary
+  let reward = balanceAfter - balanceBefore
+
+  -- Both kinds are minted at 1:1 in this test's issuance setup, so the total
+  -- reward equals 60% of the combined coupon amounts regardless of routing.
+  let expectedReward = (coupon1Amount + coupon2Amount) * 0.6
+  require ("Combined reward should match expected " <> show expectedReward <> ", got: " <> show reward)
+    (reward >= expectedReward - 1.0 && reward <= expectedReward + 1.0)
+
+  -- Beneficiaries of the extra-beneficiary side get 40% of both source
+  -- coupons; each preserves its original kind.
+  extraCoupons <- query @RewardCouponV2 rewardCouponExtraBeneficiary
+  let extraAmounts = sort $ map (\(_, c) -> c.amount) extraCoupons
+  require "extra-beneficiary amounts should be 40% of originals"
+    (extraAmounts == sort [coupon1Amount * 0.4, coupon2Amount * 0.4])
+  let extraKinds = map (\(_, c) -> c.kind) extraCoupons
+  require "extra-beneficiary should have a None (app-flow) coupon" (None `elem` extraKinds)
+  require "extra-beneficiary should have a Some RewardKind_Validator coupon" (Some RewardKind_Validator `elem` extraKinds)
+
+  pure ()
+
 testMintingDelegation_AssignAndMint_rejectsDelegateOwnCoupon : Script ()
 testMintingDelegation_AssignAndMint_rejectsDelegateOwnCoupon = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
@@ -479,6 +584,7 @@ testMintingDelegation_AssignAndMint_rejectsDelegateOwnCoupon = do
     round = openRound.round
     providerIsObserver = True
     beneficiary = None
+    kind = None
 
   let coupon2Amount = 500.0
   coupon2Cid <- submit app.dso $ createCmd RewardCouponV2 with
@@ -489,6 +595,7 @@ testMintingDelegation_AssignAndMint_rejectsDelegateOwnCoupon = do
     round = openRound.round
     providerIsObserver = True
     beneficiary = None
+    kind = None
 
   -- Advance rounds so coupons can be minted
   runNextIssuance app
@@ -528,6 +635,7 @@ testMintingDelegation_AssignAndMint_rejectsDelegateOwnCoupon = do
     round = openRound.round
     providerIsObserver = True
     expiresAt = now `addRelTime` hours 36
+    kind = None
 
   submitMustFail''
     (expectMessageContains "Contract group identifier mismatch")
@@ -590,6 +698,7 @@ testMintingDelegation_Mint_rejectsDelegateOwnedInput = do
     round = openRound.round
     providerIsObserver = False
     expiresAt = now `addRelTime` days 60
+    kind = None
   
   submitMustFail''
     (expectMessageContains "Contract group identifier mismatch")

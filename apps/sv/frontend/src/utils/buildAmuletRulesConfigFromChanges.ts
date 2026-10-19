@@ -208,6 +208,7 @@ export function buildAmuletRulesConfigFromChanges(
             },
             appRewardCouponThreshold: getValue('rewardConfigAppRewardCouponThreshold', false),
           },
+    validatorRewardConfig: null,
   };
 
   return amuletConfig;

@@ -19,6 +19,7 @@ import DA.Time
 
 import Splice.Amulet.CryptoHash qualified as CryptoHash
 import Splice.Amulet
+import Splice.AmuletConfig (RewardKind)
 import Splice.Types
 import Splice.Util
 
@@ -38,10 +39,15 @@ template CalculateRewardsV2 with
       -- the AmuletConfig later again, which could lead to inconsistencies in case of config changes.
     dryRun : Bool
       -- ^ Whether to only simulate the confirmation without creating any RewardCouponV2 contracts.
+    kind : Optional RewardKind
+      -- ^ Which reward flow this contract belongs to.
+      -- See 'RewardKind' doc for the 'None'-vs-'Some RewardKind_App' encoding rule.
   where
     signatory dso
 
--- | A minting allowance for a service provider to mint Amulet.
+-- | A minting allowance for a party to mint Amulet.
+-- The 'provider' field holds the app provider under CIP-104
+-- and the validator node under CIP-0120.
 data MintingAllowance = MintingAllowance with
     provider : Party
     amount : Decimal
@@ -49,6 +55,9 @@ data MintingAllowance = MintingAllowance with
 
 type MintingAllowances = [MintingAllowance]
 
+-- | Batch used by both the app-reward and validator-reward flows.
+-- The 'BatchOfMintingAllowances' variant carries the leaf data for either
+-- flow; differentiation happens in the choice that consumes it.
 data Batch
   = BatchOfBatches [CryptoHash.Hash]
   | BatchOfMintingAllowances MintingAllowances
@@ -69,6 +78,10 @@ template ProcessRewardsV2 with
     dryRun : Bool -- ^ Whether to only simulate the processing without creating any RewardCouponV2 contracts.
     rewardCouponTimeToLive : RelTime
     batchHash : CryptoHash.Hash
+    kind : Optional RewardKind
+      -- ^ Copied from 'CalculateRewardsV2'; propagated unchanged through
+      -- the 'BatchOfBatches' recursion. See 'RewardKind' doc for the
+      -- 'None'-vs-'Some RewardKind_App' encoding rule.
   where
     signatory dso
 
@@ -92,6 +105,7 @@ template ProcessRewardsV2 with
                 rewardCouponTimeToLive
                 dryRun
                 batchHash = newBatchHash
+                kind
           BatchOfMintingAllowances mintingAllowances -> do
             unless dryRun $ do
               -- Coupon expiry is determined here based on the time of creation to ensure
@@ -109,6 +123,7 @@ template ProcessRewardsV2 with
                   providerIsObserver =
                     not $ Set.member provider providersWithWrongVettingState
                   beneficiary = None
+                  kind
 
         -- intentionally not returning any information here to save computational overhead
         return ProcessRewardsV2_ProcessBatchResult {}

@@ -305,6 +305,7 @@ abstract class StoreTestBase
       new RelTime(1_000_000),
       Optional.empty(), // trafficPrice
       Optional.empty(), // rewardConfig
+      Optional.empty(), // validatorRewardConfig
     )
 
     contract(
@@ -363,6 +364,7 @@ abstract class StoreTestBase
       Instant.now().truncatedTo(ChronoUnit.MICROS),
       new RelTime(600_000_000L),
       dryRun,
+      java.util.Optional.empty(),
     )
     contract(
       rewardAccountingCodegen.CalculateRewardsV2.TEMPLATE_ID_WITH_PACKAGE_ID,
@@ -384,6 +386,7 @@ abstract class StoreTestBase
       dryRun,
       new RelTime(600_000_000L),
       new cryptoHashCodegen.Hash(batchHash),
+      java.util.Optional.empty(),
     )
     contract(
       rewardAccountingCodegen.ProcessRewardsV2.TEMPLATE_ID_WITH_PACKAGE_ID,
@@ -578,6 +581,7 @@ abstract class StoreTestBase
         expiresAt,
         providerIsObserver,
         beneficiary.map(_.toProtoPrimitive).fold(Optional.empty[String]())(Optional.of),
+        Optional.empty(),
       ),
     )
 
