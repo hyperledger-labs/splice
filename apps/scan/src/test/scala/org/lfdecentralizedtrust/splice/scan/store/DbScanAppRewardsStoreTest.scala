@@ -1323,21 +1323,22 @@ class DbScanAppRewardsStoreTest
   ): Future[(DbScanAppRewardsStore, Long)] = {
     val n = storeCounter.getAndIncrement()
     val participantId = mkParticipantId(s"rewards-test-$n")
-    val updateHistory = new UpdateHistory(
-      storage,
-      migrationId,
-      s"app_rewards_test_$n",
-      participantId,
-      dsoParty,
-      BackfillingRequirement.BackfillingNotRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = false,
-      HistoryMetrics(NoOpMetricsFactory, migrationId),
-    )
-    updateHistory.ingestionSink.initialize().map { _ =>
+    for {
+      updateHistory <- UpdateHistory.create(
+        storage,
+        migrationId,
+        s"app_rewards_test_$n",
+        participantId,
+        dsoParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
+        loggerFactory,
+        enableImportUpdateBackfill = false,
+        HistoryMetrics(NoOpMetricsFactory, migrationId),
+      )
+      _ <- updateHistory.ingestionSink.initialize()
+    } yield {
       val appActivityRecordStore = new DbAppActivityRecordStore(
         storage.underlying,
         updateHistory,

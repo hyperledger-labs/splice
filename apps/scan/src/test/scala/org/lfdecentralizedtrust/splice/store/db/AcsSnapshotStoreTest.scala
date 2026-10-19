@@ -1357,21 +1357,22 @@ trait AcsSnapshotStoreTest
       // Default to backfilling being always complete, to avoid unnecessary complexity in the tests
       backfillingRequired: BackfillingRequirement = BackfillingRequirement.BackfillingNotRequired,
   ): Future[UpdateHistory] = {
-    val updateHistory = new UpdateHistory(
-      storage.underlying, // not under test
-      migrationId,
-      "update_history_acs_snapshot_test",
-      mkParticipantId(participantId),
-      dsoParty,
-      backfillingRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = true,
-      HistoryMetrics(NoOpMetricsFactory, migrationId),
-    )
-    updateHistory.ingestionSink.initialize().map(_ => updateHistory)
+    for {
+      updateHistory <- UpdateHistory.create(
+        storage.underlying, // not under test
+        migrationId,
+        "update_history_acs_snapshot_test",
+        mkParticipantId(participantId),
+        dsoParty,
+        backfillingRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
+        loggerFactory,
+        enableImportUpdateBackfill = true,
+        HistoryMetrics(NoOpMetricsFactory, migrationId),
+      )
+      _ <- updateHistory.ingestionSink.initialize()
+    } yield updateHistory
   }
 
   protected def mkStore(

@@ -229,7 +229,7 @@ class ScanApp(
         loggerFactory,
         retryProvider.metricsFactory,
       )
-      updateHistory = new UpdateHistory(
+      updateHistory <- UpdateHistory.create(
         storage,
         domainMigrationId,
         store.storeName,
@@ -239,7 +239,6 @@ class ScanApp(
         internedStringStore,
         config.analyzableTimeWindow.duration,
         loggerFactory,
-        enableissue12777Workaround = true,
         enableImportUpdateBackfill = config.updateHistoryBackfillImportUpdatesEnabled,
         scanAppMetrics.dbScanStore.history,
       )
