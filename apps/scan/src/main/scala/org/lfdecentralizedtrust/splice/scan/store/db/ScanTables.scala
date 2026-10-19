@@ -57,6 +57,8 @@ object ScanTables extends AcsTables {
       transferPreapprovalReceiver: Option[PartyId] = None,
       transferPreapprovalValidFrom: Option[Timestamp] = None,
       walletParty: Option[PartyId] = None,
+      governanceLockType: Option[String] = None,
+      governanceLockSubject: Option[String] = None,
   ) extends AcsRowData.AcsRowDataFromContract {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       ScanAcsStoreRowData.IndexColumns.round -> round,
@@ -76,6 +78,12 @@ object ScanTables extends AcsTables {
       ScanAcsStoreRowData.IndexColumns.transfer_preapproval_receiver -> transferPreapprovalReceiver,
       ScanAcsStoreRowData.IndexColumns.transfer_preapproval_valid_from -> transferPreapprovalValidFrom,
       ScanAcsStoreRowData.IndexColumns.wallet_party -> walletParty,
+      ScanAcsStoreRowData.IndexColumns.governance_lock_type -> governanceLockType.map(
+        lengthLimited
+      ),
+      ScanAcsStoreRowData.IndexColumns.governance_lock_subject -> governanceLockSubject.map(
+        lengthLimited
+      ),
     )
   }
 
@@ -102,6 +110,8 @@ object ScanTables extends AcsTables {
       val transfer_preapproval_receiver = "transfer_preapproval_receiver"
       val transfer_preapproval_valid_from = "transfer_preapproval_valid_from"
       val wallet_party = "wallet_party"
+      val governance_lock_type = "governance_lock_type"
+      val governance_lock_subject = "governance_lock_subject"
       val All = Seq(
         round,
         validator,
@@ -120,6 +130,8 @@ object ScanTables extends AcsTables {
         transfer_preapproval_receiver,
         transfer_preapproval_valid_from,
         wallet_party,
+        governance_lock_type,
+        governance_lock_subject,
       )
     }
   }

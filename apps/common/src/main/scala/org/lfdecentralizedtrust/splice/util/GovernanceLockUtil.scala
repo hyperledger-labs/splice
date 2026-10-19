@@ -26,4 +26,19 @@ object GovernanceLockUtil {
 
   def getVestingLockSpecification(lock: gl.GovernanceLock): Option[gl.VestingLockSpecification] =
     foldSpecification(lock)(_ => None, Some(_))
+
+  /** Encodes a lock as the `governance_lock_type` and `governance_lock_subject` index columns. */
+  def governanceLockTypeAndSubject(lock: gl.GovernanceLock): (String, String) = {
+    val lockType = foldSpecification(lock)(_ => "f", _ => "v")
+    val (kindTag, subject) = getGovernanceLockKind(lock) match {
+      case kind: gl.governancelockkind.GLK_FeaturedApp => ("fa", kind.provider)
+      case kind: gl.governancelockkind.GLK_ProvisionalFeaturedApp => ("pfa", kind.provider)
+      case kind: gl.governancelockkind.GLK_SuperValidatorRightsOwner => ("sv", kind.svName)
+      case kind =>
+        throw Status.INTERNAL
+          .withDescription(s"Unexpected GovernanceLockKind: $kind")
+          .asRuntimeException()
+    }
+    (s"$lockType:$kindTag", subject)
+  }
 }
