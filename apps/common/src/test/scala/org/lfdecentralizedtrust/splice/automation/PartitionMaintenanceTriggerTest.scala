@@ -4,8 +4,16 @@ import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.time.SimClock
+import com.digitalasset.canton.tracing.TraceContext
+import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
-import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
+  LedgerClient,
+  TransactionTreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
+}
+import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, RetryProvider}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionFilter
 import org.lfdecentralizedtrust.splice.store.{PageLimit, UpdateHistory, UpdateHistoryTestBase}
 
 import java.time.{Duration, LocalDate, ZoneOffset}
@@ -16,12 +24,26 @@ class PartitionMaintenanceTriggerTest extends UpdateHistoryTestBase {
   private val day0 = LocalDate.ofInstant(CantonTimestamp.Epoch.toInstant, ZoneOffset.UTC)
   private def daysAfter(days: Long) = CantonTimestamp.Epoch.plus(Duration.ofDays(days))
 
+  private def mkConnection(
+      updates: Seq[LedgerClient.GetTreeUpdatesResponse] = Seq.empty
+  ): BaseLedgerConnection = {
+    val connection = mock[BaseLedgerConnection]
+    when(
+      connection.updates(eqTo(0L), any[IngestionFilter])(
+        any[TraceContext]
+      )
+    ).thenReturn(Source(updates))
+    connection
+  }
+
   private def createMissingPartitions(
       store: UpdateHistory,
       now: CantonTimestamp,
+      connection: BaseLedgerConnection = mkConnection(),
   ): Future[Seq[LocalDate]] =
     PartitionMaintenanceTrigger.createMissingPartitions(
       store,
+      connection,
       runwayDays = 7,
       now,
       logger,
@@ -29,16 +51,33 @@ class PartitionMaintenanceTriggerTest extends UpdateHistoryTestBase {
 
   "PartitionMaintenanceTrigger.createMissingPartitions" should {
 
-    "create the runway from now if nothing was ingested" in {
+    "create partitions from the first update to ingest if nothing was ingested" in {
       val store = mkStore()
-      val now = CantonTimestamp.Epoch.plus(Duration.ofHours(12))
+      val firstUpdate = LedgerClient.GetTreeUpdatesResponse(
+        TreeUpdateOrOffsetCheckpoint.Update(
+          TransactionTreeUpdate(
+            mkCreateTx(
+              offset = 11L,
+              createRequests = Seq(appRewardCoupon(0, party1, contractId = cid1)),
+              effectiveAt = daysAfter(3).toInstant,
+              createdEventSignatories = Seq(party1),
+              synchronizerId = domain1,
+              workflowId = "",
+              recordTime = daysAfter(3).toInstant,
+            )
+          ),
+          domain1,
+        )
+      )
       for {
         _ <- store.ingestionSink.initialize()
-        created <- createMissingPartitions(store, now)
-        createdAgain <- createMissingPartitions(store, now)
+        created <- createMissingPartitions(
+          store,
+          daysAfter(20),
+          mkConnection(Seq(firstUpdate)),
+        )
       } yield {
-        created shouldBe (0L to 7L).map(day0.plusDays)
-        createdAgain shouldBe empty
+        created shouldBe (3L to 27L).map(day0.plusDays)
       }
     }
 

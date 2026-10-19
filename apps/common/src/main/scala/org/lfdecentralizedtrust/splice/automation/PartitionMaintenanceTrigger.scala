@@ -10,6 +10,13 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Sink
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
+  ReassignmentUpdate,
+  TransactionTreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
+}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
 
 import java.time.{LocalDate, ZoneOffset}
@@ -32,7 +39,8 @@ class PartitionMaintenanceTrigger(
     if (!updateHistory.isReady) {
       Future.successful(Seq.empty)
     } else {
-      missingDays(updateHistory, runwayDays, context.clock.now).map { case (_, missing) =>
+      val now = context.clock.now
+      missingDays(updateHistory, runwayDays, now, Future.successful(now)).map { case (_, missing) =>
         missing.map(Task(_))
       }
     }
@@ -57,12 +65,23 @@ object PartitionMaintenanceTrigger {
 
   def createMissingPartitions(
       updateHistory: UpdateHistory,
+      connection: BaseLedgerConnection,
       runwayDays: Int,
       now: CantonTimestamp,
       logger: TracedLogger,
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Seq[LocalDate]] =
+  )(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Seq[LocalDate]] =
     for {
-      (_, missing) <- missingDays(updateHistory, runwayDays, now)
+      (_, missing) <- missingDays(
+        updateHistory,
+        runwayDays,
+        now,
+        // If there is no last update history entry, then we need to start from wherever ingestion would start.
+        firstRecordTimeToIngest(updateHistory, connection),
+      )
       _ <- MonadUtil.sequentialTraverse(missing)(day => updateHistory.createPartitions(day))
       _ <-
         if (missing.isEmpty) Future.unit
@@ -76,14 +95,22 @@ object PartitionMaintenanceTrigger {
       updateHistory: UpdateHistory,
       runwayDays: Int,
       now: CantonTimestamp,
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[(Set[LocalDate], Seq[LocalDate])] =
+      firstRecordTimeIfNothingIngested: => Future[CantonTimestamp],
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[(Set[LocalDate], Seq[LocalDate])] =
     for {
       lastRecordTimeIngested <- updateHistory.readLastIngestedRecordTime()
       existing <- updateHistory.listDatesWithAllPartitions()
-    } yield {
       // We need to have partitions _at least_ from the last update history entry,
       // otherwise we could have missing partitions when Scan is down for several days.
-      val firstDay = dayOf(lastRecordTimeIngested.getOrElse(now))
+      firstRecordTime <- lastRecordTimeIngested match {
+        case Some(last) => Future.successful(last)
+        case None => firstRecordTimeIfNothingIngested
+      }
+    } yield {
+      val firstDay = dayOf(firstRecordTime)
       val lastDay = dayOf(now.plus(java.time.Duration.ofDays(runwayDays.toLong)))
       val missing = Iterator
         .iterate(firstDay)(_.plusDays(1))
@@ -92,6 +119,29 @@ object PartitionMaintenanceTrigger {
         .toSeq
       (existing, missing)
     }
+
+  private def firstRecordTimeToIngest(
+      updateHistory: UpdateHistory,
+      connection: BaseLedgerConnection,
+  )(implicit
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[CantonTimestamp] = {
+    connection
+      .updates(
+        // From docs: "If set to zero, the lower bound is set to the beginning of the ledger"
+        beginOffset = 0L,
+        updateHistory.ingestionSink.ingestionFilter,
+      )
+      .map(_.updateOrCheckpoint)
+      .collect {
+        case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>
+          reassignment.recordTime
+        case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), _) =>
+          CantonTimestamp.assertFromInstant(tree.getRecordTime)
+      }
+      .runWith(Sink.head)
+  }
 
   private def dayOf(ts: CantonTimestamp): LocalDate =
     LocalDate.ofInstant(ts.toInstant, ZoneOffset.UTC)

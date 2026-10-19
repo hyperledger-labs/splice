@@ -343,6 +343,7 @@ class ScanApp(
       _ <- appInitStep("Create initial update history partitions") {
         PartitionMaintenanceTrigger.createMissingPartitions(
           updateHistory,
+          appInitConnection,
           config.updateHistoryPartitionRunwayDays,
           clock.now,
           logger,
