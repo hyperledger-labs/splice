@@ -401,10 +401,9 @@ SELECT row_id, count(*) FROM \`$BQ_DATASET.partition_test_cutover_events\`
 
 - **Expected:** the stream stays `RUNNING`, with no errors in
   `gcloud datastream objects list`.
-- **Record:** how Datastream treats the new relation behind the same name, for
-  example a new object entry, a schema change, or object errors in the console.
-  The `includeObjects` filter matches by name, and the primary key changed from
-  `(row_id)` to `(record_time, row_id)`. With `backfillNone`, no backfill is expected.
+- **From real run**:
+  - The Datastream didn't even notice anything changed about `cutover_events`. No backfill or stream errors.
+  - The primary key changed from `(row_id)` to `(record_time, row_id)` in psql, but **the BQ table is still clustered by `row_id` only**.
 
 ## 3. Pruning by DDL
 
