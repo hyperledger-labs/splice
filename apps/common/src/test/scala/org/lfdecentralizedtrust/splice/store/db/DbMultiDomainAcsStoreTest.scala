@@ -614,6 +614,22 @@ class DbMultiDomainAcsStoreTest
       } yield succeed
     }
 
+    "lookupGenericContractById decodes a contract without a companion" in {
+      val store = mkStore(acsId = 1, txLogId = Some(1), migrationId = 1L)
+      val coupon1 = c(1)
+      val coupon2 = c(2)
+      for {
+        _ <- initWithAcs()(store)
+        _ <- d1.create(coupon1)(store)
+        _ <- d1.create(coupon2)(store)
+        found <- store.lookupGenericContractById(coupon1.contractId)
+        missing <- store.lookupGenericContractById(c(999).contractId)
+      } yield {
+        found shouldBe Some(coupon1)
+        missing shouldBe None
+      }
+    }
+
     "can ingest large batches" in {
       implicit val store = mkStore()
       // 100 txs of 1000 CreatedEvents each

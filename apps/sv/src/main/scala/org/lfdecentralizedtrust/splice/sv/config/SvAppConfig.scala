@@ -61,6 +61,8 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{SpliceUtil, SwitchOverTimes}
 
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
+import scala.jdk.OptionConverters.*
 
 case class ExpectedValidatorOnboardingConfig(
     secret: String,
@@ -137,6 +139,7 @@ object SvOnboardingConfig {
         )
       ),
       initialProtocolVersion: ProtocolVersion = ProtocolVersion.v37,
+      initialGovernanceLockConfig: Option[InitialGovernanceLockConfig] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -296,6 +299,29 @@ final case class InitialAnsConfig(
     entryLifetime: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(90),
     entryFee: Double = 1.0,
 )
+
+final case class InitialGovernanceLockConfig(
+    minimumLockAmount: Option[NonNegativeNumeric[BigDecimal]] = None,
+    superValidatorLockVestingDuration: Option[NonNegativeFiniteDuration] = None,
+    featuredAppLockVestingDuration: Option[NonNegativeFiniteDuration] = None,
+) {
+  final def toGovernanceLockConfig: splice.amuletconfig.GovernanceLockConfig = {
+    def toRelTime(optDuration: Option[NonNegativeFiniteDuration]) =
+      optDuration
+        .map(duration =>
+          new org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime(
+            TimeUnit.NANOSECONDS.toMicros(duration.duration.toNanos)
+          )
+        )
+        .toJava
+
+    new splice.amuletconfig.GovernanceLockConfig(
+      minimumLockAmount.map(_.value.bigDecimal).toJava,
+      toRelTime(superValidatorLockVestingDuration),
+      toRelTime(featuredAppLockVestingDuration),
+    )
+  }
+}
 
 final case class SynchronizerFeesConfig(
     extraTrafficPrice: NonNegativeNumeric[BigDecimal] =
@@ -471,10 +497,13 @@ case class SvAppBackendConfig(
     delegatelessAutomationExpiredAmuletTransferInstructionBatchSize: Int = 100,
     delegatelessAutomationExpiredAmuletAllocationBatchSize: Int = 100,
     delegatelessAutomationExpiredRewardCouponV2BatchSize: Int = 100,
+    delegatelessAutomationExpiredVestingLockBatchSize: Int = 100,
     delegatelessAutomationUnhideRewardCouponV2SampleSize: Int = 100,
     // As RewardCouponV2 have default TTL of 36h, at max 216 (36*6) should be active
     // So try to unhide all in single batch and avoid race among SVs
     delegatelessAutomationUnhideRewardCouponV2BatchSize: Int = 220,
+    // How many provisional featured app locks to convert per batch
+    delegatelessAutomationProvisionalFeaturedAppLockConversionBatchSize: Int = 50,
     // configuration to periodically take topology snapshots
     topologySnapshotConfig: Option[PeriodicBackupDumpConfig] = None,
     bftSequencerConnection: Boolean = true,

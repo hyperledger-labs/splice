@@ -409,10 +409,10 @@ class UpdateHistory private (
     val safePackageName = lengthLimited(event.createdEvent.getPackageName)
     val createArguments =
       String256M.tryCreate(ProtobufCodec.serializeValue(event.createdEvent.getArguments))
-    val contractKey =
-      event.createdEvent.getContractKey.toScala
-        .map(ProtobufCodec.serializeValue)
-        .map(s => String256M.tryCreate(s))
+    // Contract keys are not stored, as they can be computed from the contract payload. Scan's HTTP API
+    // does not expose them, and storing them would make the history of an SV that ingests an update
+    // differ from the history of an SV that backfills the same update through that API.
+    val contractKey = Option.empty[String256M]
     val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
     val safeSignatories = event.createdEvent.getSignatories.asScala.toSeq.map(lengthLimited)
     val safeObservers = event.createdEvent.getObservers.asScala.toSeq.map(lengthLimited)
@@ -527,9 +527,10 @@ class UpdateHistory private (
     val templateIdPackageId = lengthLimited(templateId.getPackageId)
     val safePackageName = lengthLimited(event.getPackageName)
     val createArguments = String256M.tryCreate(ProtobufCodec.serializeValue(event.getArguments))
-    val contractKey = event.getContractKey.toScala
-      .map(ProtobufCodec.serializeValue)
-      .map(s => String256M.tryCreate(s))
+    // Contract keys are not stored, as they can be computed from the contract payload. Scan's HTTP API
+    // does not expose them, and storing them would make the history of an SV that ingests an update
+    // differ from the history of an SV that backfills the same update through that API.
+    val contractKey = Option.empty[String256M]
     val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdAt)
     val safeSignatories = event.getSignatories.asScala.toSeq.map(lengthLimited)
     val safeObservers = event.getObservers.asScala.toSeq.map(lengthLimited)

@@ -71,6 +71,7 @@ import org.lfdecentralizedtrust.splice.history.{
   DevelopmentFundCoupon_Withdraw,
   DirectTokenStandardTransfer,
   DirectTokenStandardTransferV2,
+  GovernanceLockSubstitutionExercise,
   LockedAmuletExpireAmulet,
   LockedAmuletExpireAmuletV2,
   LockedAmuletOwnerExpireLock,
@@ -151,6 +152,12 @@ class UserWalletTxLogParser(
     root match {
       case exercised: ExercisedEvent =>
         exercised match {
+
+          // Governance lock substitutions are not shown in the wallet history. Their accept and
+          // withdraw unlock amulets without any of the choices below, so they must be matched before
+          // the generic token standard choices.
+          case GovernanceLockSubstitutionExercise(_) =>
+            now(State.empty)
 
           // ------------------------------------------------------------------
           // Treasury service
