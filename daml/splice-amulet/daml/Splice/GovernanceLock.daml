@@ -203,10 +203,12 @@ template GovernanceLock
       -- substitution. Only the accept step of a `GovernanceLockSubstitution` calls this choice.
       with
         substitutedAmount : Decimal
+        reason : Text
+          -- ^ Memo of the request being handled, which the transfer legs report as their reason.
         extraArgs : ExtraArgs
       controller dso
       do
-        governanceLock_dsoSubstituteImpl self this substitutedAmount extraArgs
+        governanceLock_dsoSubstituteImpl self this substitutedAmount reason extraArgs
 
     choice GovernanceLock_DsoSplitForSubstitution : GovernanceLock_DsoSplitForSubstitutionResult
       -- ^ Split `splitAmount` of the locked funds off into a `LockedAmulet` for a new lock with
@@ -215,10 +217,12 @@ template GovernanceLock
       with
         splitAmount : Decimal
         newSpecification : GovernanceLockSpecification
+        reason : Text
+          -- ^ Memo of the request being handled, which the transfer legs report as their reason.
         extraArgs : ExtraArgs
       controller dso
       do
-        governanceLock_dsoSplitForSubstitutionImpl self this splitAmount newSpecification extraArgs
+        governanceLock_dsoSplitForSubstitutionImpl self this splitAmount newSpecification reason extraArgs
 
     choice GovernanceLock_DsoTransfer : GovernanceLock_DsoTransferResult
       -- ^ Release `transferredAmount` of the locked funds as part of an approved transfer.
@@ -226,10 +230,12 @@ template GovernanceLock
       -- funds again for the receiver, as only that step has the receiver's authority.
       with
         transferredAmount : Decimal
+        reason : Text
+          -- ^ Memo of the request being handled, which the transfer legs report as their reason.
         extraArgs : ExtraArgs
       controller dso
       do
-        governanceLock_dsoTransferImpl self this transferredAmount extraArgs
+        governanceLock_dsoTransferImpl self this transferredAmount reason extraArgs
 
     interface instance V1.TransferInstruction for GovernanceLock where
       view = V1.TransferInstructionView with
@@ -309,8 +315,9 @@ fetchAndMergeGovernanceLocks'
   -> GovernanceLockKey
   -> ExternalPartyTransferContext
   -> ExternalPartyConfigState
+  -> Text
   -> Update FetchAndMergeLocksResult
-fetchAndMergeGovernanceLocks' newFunds key context state =
+fetchAndMergeGovernanceLocks' newFunds key context state reason =
   let
     defaultNumberToMerge = 20
 
@@ -344,6 +351,7 @@ fetchAndMergeGovernanceLocks' newFunds key context state =
         [(mergedAmount, governanceLockExpiresAt key.specification)]
         inputHoldings
         context
+        reason
 
       let newLock = GovernanceLock with
             dso = key.dso
@@ -384,15 +392,15 @@ fetchAndMergeGovernanceLocks' newFunds key context state =
     (GLS_FullLock _, None) -> attemptMerge defaultNumberToMerge
     (GLS_FullLock _, Some _) -> attemptMerge defaultNumberToMerge
 
-fetchAndMergeGovernanceLocks : GovernanceLockKey -> ExternalPartyTransferContext -> ExternalPartyConfigState -> Update FetchAndMergeLocksResult
-fetchAndMergeGovernanceLocks key context state = do
+fetchAndMergeGovernanceLocks : GovernanceLockKey -> ExternalPartyTransferContext -> ExternalPartyConfigState -> Text -> Update FetchAndMergeLocksResult
+fetchAndMergeGovernanceLocks key context state reason = do
   -- `changeHolding` should always be `None` since no new funds are passed
-  result@FetchAndMergeLocksResult{changeHolding = None} <- fetchAndMergeGovernanceLocks' None key context state
+  result@FetchAndMergeLocksResult{changeHolding = None} <- fetchAndMergeGovernanceLocks' None key context state reason
   pure result
 
 -- | Unlocks `unlockAmount` of a governance lock. `optVestingStartTime` may only be `None` for locks which have no vesting period.
-governanceLock_unlockImpl : ContractId GovernanceLock -> GovernanceLock -> Decimal -> Optional Time -> [Party] -> ExternalPartyTransferContext -> ExternalPartyConfigState -> Update GovernanceLock_UnlockResult
-governanceLock_unlockImpl self this@GovernanceLock{..} unlockAmount optVestingStartTime actors context state
+governanceLock_unlockImpl : ContractId GovernanceLock -> GovernanceLock -> Decimal -> Optional Time -> [Party] -> ExternalPartyTransferContext -> ExternalPartyConfigState -> Text -> Update GovernanceLock_UnlockResult
+governanceLock_unlockImpl self this@GovernanceLock{..} unlockAmount optVestingStartTime actors context state reason
     = do
         fullSpec <- requireFullLock specification
         checkActors actors [[owner]]
@@ -420,10 +428,10 @@ governanceLock_unlockImpl self this@GovernanceLock{..} unlockAmount optVestingSt
 
         (optVestingLockedAmulet, optStillLocked, unlockedAmulet) <- if hasNoVestingPeriod
           then do
-            (optStillLocked, unlockedAmulet) <- partialUnlock forOwner lockedAmulet unlockAmount context
+            (optStillLocked, unlockedAmulet) <- partialUnlock forOwner lockedAmulet unlockAmount context reason
             pure (None, optStillLocked, Some unlockedAmulet)
           else do
-            (optStillLocked, vestingLockedAmulet) <- splitLockedAmulet forOwner lockedAmulet (unlockAmount, endTime) context
+            (optStillLocked, vestingLockedAmulet) <- splitLockedAmulet forOwner lockedAmulet (unlockAmount, endTime) context reason
             pure (Some vestingLockedAmulet, optStillLocked, None)
 
         governanceLock <- forA optStillLocked (\(lockedAmulet, stillLockedAmount) -> create
@@ -446,8 +454,8 @@ governanceLock_unlockImpl self this@GovernanceLock{..} unlockAmount optVestingSt
           governanceLock
           unlockedAmulet
 
-vestingLock_withdrawImpl : ContractId GovernanceLock -> GovernanceLock -> Time -> [Party] -> ExternalPartyTransferContext -> Update VestingLock_WithdrawResult
-vestingLock_withdrawImpl self this@GovernanceLock{..} vestedUntilTime actors context
+vestingLock_withdrawImpl : ContractId GovernanceLock -> GovernanceLock -> Time -> [Party] -> ExternalPartyTransferContext -> Text -> Update VestingLock_WithdrawResult
+vestingLock_withdrawImpl self this@GovernanceLock{..} vestedUntilTime actors context reason
     = do
         vestingSpec <- requireVestingLock specification
         checkActors actors [[owner]]
@@ -462,7 +470,7 @@ vestingLock_withdrawImpl self this@GovernanceLock{..} vestedUntilTime actors con
           Some stillLockedAmount -> do -- We have a fraction that is not the whole being withdrawn, do a partial unlock.
             let withdrawAmount = amount - stillLockedAmount
             require' ("withdraw amount", withdrawAmount) isGreaterR ("zero", 0.0)
-            (lockedOpt, unlocked) <- partialUnlock (ForOwner with dso; owner) lockedAmulet withdrawAmount context
+            (lockedOpt, unlocked) <- partialUnlock (ForOwner with dso; owner) lockedAmulet withdrawAmount context reason
             vestingLock <- forA lockedOpt (\(lockedAmulet, vestingAmount) -> create this with
               lockedAmulet
               specification = GLS_VestingLock vestingSpec with
@@ -489,8 +497,9 @@ governanceLock_lockForGovernance_impl
  -> ExtraArgs
  -> Party
  -> Time
+ -> Text
  -> Update (GovernanceLock, ContractId GovernanceLock, Optional (ContractId Amulet))
-governanceLock_lockForGovernance_impl dso amount inputs fullSpecification extraArgs owner requestedAt = do
+governanceLock_lockForGovernance_impl dso amount inputs fullSpecification extraArgs owner requestedAt reason = do
   let specification = GLS_FullLock fullSpecification
   assertInPast24Hours "requestedAt" requestedAt
   (context, state) <- unfeaturedPaymentContextAndConfigFromChoiceContext dso extraArgs.context
@@ -499,15 +508,16 @@ governanceLock_lockForGovernance_impl dso amount inputs fullSpecification extraA
     (GovernanceLockKey with dso; owner; specification)
     context
     state
+    reason
   pure (lock, lockCid, changeHolding)
 
-governanceLock_dsoSubstituteImpl : ContractId GovernanceLock -> GovernanceLock -> Decimal -> ExtraArgs -> Update GovernanceLock_DsoSubstituteResult
-governanceLock_dsoSubstituteImpl self this@GovernanceLock{..} substitutedAmount extraArgs = do
+governanceLock_dsoSubstituteImpl : ContractId GovernanceLock -> GovernanceLock -> Decimal -> Text -> ExtraArgs -> Update GovernanceLock_DsoSubstituteResult
+governanceLock_dsoSubstituteImpl self this@GovernanceLock{..} substitutedAmount reason extraArgs = do
   let forOwner = ForOwner with dso; owner
   case substitutedAmount `compare` amount of
     LT -> do
       (context, state) <- unfeaturedPaymentContextAndConfigFromChoiceContext dso extraArgs.context
-      (Some (newLockedAmulet, remainingAmount), unlockedAmulet) <- partialUnlock forOwner lockedAmulet substitutedAmount context
+      (Some (newLockedAmulet, remainingAmount), unlockedAmulet) <- partialUnlock forOwner lockedAmulet substitutedAmount context reason
       requireMinimumLock state remainingAmount
       requireMinimumLock state substitutedAmount
       remainingLockCid <- create this with
@@ -525,15 +535,15 @@ governanceLock_dsoSubstituteImpl self this@GovernanceLock{..} substitutedAmount 
     GT ->
       fail $ "substituted lock has less funds (" <> show amount <> ") than the amount proposed to be substituted (" <> show substitutedAmount <> ")"
 
-governanceLock_dsoSplitForSubstitutionImpl : ContractId GovernanceLock -> GovernanceLock -> Decimal -> GovernanceLockSpecification -> ExtraArgs -> Update GovernanceLock_DsoSplitForSubstitutionResult
-governanceLock_dsoSplitForSubstitutionImpl self this@GovernanceLock{..} splitAmount newSpecification extraArgs = do
+governanceLock_dsoSplitForSubstitutionImpl : ContractId GovernanceLock -> GovernanceLock -> Decimal -> GovernanceLockSpecification -> Text -> ExtraArgs -> Update GovernanceLock_DsoSplitForSubstitutionResult
+governanceLock_dsoSplitForSubstitutionImpl self this@GovernanceLock{..} splitAmount newSpecification reason extraArgs = do
   requireMatchExpected ("newSpecification", newSpecification) specification
   let forOwner = ForOwner with dso; owner
       splitLockExpiresAt = governanceLockExpiresAt specification
   (context, state) <- unfeaturedPaymentContextAndConfigFromChoiceContext dso extraArgs.context
   case splitAmount `compare` amount of
     LT -> do
-      (Some (newLockedAmulet, remainingAmount), (splitAmulet, _)) <- splitLockedAmulet forOwner lockedAmulet (splitAmount, splitLockExpiresAt) context
+      (Some (newLockedAmulet, remainingAmount), (splitAmulet, _)) <- splitLockedAmulet forOwner lockedAmulet (splitAmount, splitLockExpiresAt) context reason
       requireMinimumLock state remainingAmount
       requireMinimumLock state splitAmount
       remainingLockCid <- create this with
@@ -544,7 +554,7 @@ governanceLock_dsoSplitForSubstitutionImpl self this@GovernanceLock{..} splitAmo
         remainingLockCid = Some remainingLockCid
         splitAmulet
     EQ -> do
-      splitAmulet <- relockAmulet forOwner lockedAmulet splitLockExpiresAt context
+      splitAmulet <- relockAmulet forOwner lockedAmulet splitLockExpiresAt context reason
       pure GovernanceLock_DsoSplitForSubstitutionResult with
         remainingLockCid = None
         splitAmulet
@@ -589,13 +599,13 @@ unfeaturedPaymentContextAndConfigFromChoiceContext dso choiceContext = do
           featuredAppRight = None
        , configState )
 
-governanceLock_dsoTransferImpl : ContractId GovernanceLock -> GovernanceLock -> Decimal -> ExtraArgs -> Update GovernanceLock_DsoTransferResult
-governanceLock_dsoTransferImpl self this@GovernanceLock{..} transferredAmount extraArgs = do
+governanceLock_dsoTransferImpl : ContractId GovernanceLock -> GovernanceLock -> Decimal -> Text -> ExtraArgs -> Update GovernanceLock_DsoTransferResult
+governanceLock_dsoTransferImpl self this@GovernanceLock{..} transferredAmount reason extraArgs = do
   let forOwner = ForOwner with dso; owner
   case transferredAmount `compare` amount of
     LT -> do
       (context, state) <- unfeaturedPaymentContextAndConfigFromChoiceContext dso extraArgs.context
-      (Some (newLockedAmulet, remainingAmount), unlockedAmulet) <- partialUnlock forOwner lockedAmulet transferredAmount context
+      (Some (newLockedAmulet, remainingAmount), unlockedAmulet) <- partialUnlock forOwner lockedAmulet transferredAmount context reason
       requireMinimumLock state remainingAmount
       requireMinimumLock state transferredAmount
       remainingLockCid <- create this with
@@ -620,28 +630,28 @@ governanceLock_dsoTransferImpl self this@GovernanceLock{..} transferredAmount ex
 
 type LockSpecification = (Decimal, Time)
 
-splitLockedAmulet : ForOwner -> ContractId LockedAmulet -> LockSpecification -> ExternalPartyTransferContext -> Update (Optional (ContractId LockedAmulet, Decimal), (ContractId LockedAmulet, Decimal))
-splitLockedAmulet forOwner lockedAmuletCid spec@(unlockAmount, _) context = do
+splitLockedAmulet : ForOwner -> ContractId LockedAmulet -> LockSpecification -> ExternalPartyTransferContext -> Text -> Update (Optional (ContractId LockedAmulet, Decimal), (ContractId LockedAmulet, Decimal))
+splitLockedAmulet forOwner lockedAmuletCid spec@(unlockAmount, _) context reason = do
   require' ("unlockAmount", unlockAmount) isGreaterR ("zero", 0.0)
   (unlockedCid, (currentAmount, currentLockProps)) <- unlockAmulet forOwner lockedAmuletCid
   let remainderAmount = currentAmount - unlockAmount
   let specs = spec :: (if remainderAmount == 0.0 then [] else [(remainderAmount, currentLockProps)])
-  (splitLock::remainderLocks, None) <- lockAmulet forOwner specs [toInterfaceContractId unlockedCid] context
+  (splitLock::remainderLocks, None) <- lockAmulet forOwner specs [toInterfaceContractId unlockedCid] context reason
   pure $ ((, remainderAmount) <$> head remainderLocks, (splitLock, unlockAmount))
 
-partialUnlock : ForOwner -> ContractId LockedAmulet -> Decimal -> ExternalPartyTransferContext -> Update (Optional (ContractId LockedAmulet, Decimal), ContractId Amulet)
-partialUnlock forOwner lockedAmuletCid unlockAmount context = do
+partialUnlock : ForOwner -> ContractId LockedAmulet -> Decimal -> ExternalPartyTransferContext -> Text -> Update (Optional (ContractId LockedAmulet, Decimal), ContractId Amulet)
+partialUnlock forOwner lockedAmuletCid unlockAmount context reason = do
   require' ("unlockAmount", unlockAmount) isGreaterR ("zero", 0.0)
   (unlockedAmuletCid, (currentAmount, lockProps)) <- unlockAmulet forOwner lockedAmuletCid
   let stillLockedAmount = currentAmount - unlockAmount
   if stillLockedAmount == 0.0 then pure (None, unlockedAmuletCid) else do
-    ([newLockedCid], Some unlockedAmulet) <- lockAmulet forOwner [(stillLockedAmount, lockProps)] [toInterfaceContractId unlockedAmuletCid] context
+    ([newLockedCid], Some unlockedAmulet) <- lockAmulet forOwner [(stillLockedAmount, lockProps)] [toInterfaceContractId unlockedAmuletCid] context reason
     pure (Some (newLockedCid, stillLockedAmount), unlockedAmulet)
 
-relockAmulet : ForOwner -> ContractId LockedAmulet -> Time -> ExternalPartyTransferContext -> Update (ContractId LockedAmulet)
-relockAmulet forOwner lockedAmuletCid newExpiresAt context = do
+relockAmulet : ForOwner -> ContractId LockedAmulet -> Time -> ExternalPartyTransferContext -> Text -> Update (ContractId LockedAmulet)
+relockAmulet forOwner lockedAmuletCid newExpiresAt context reason = do
   (amuletCid, (currentAmount, _)) <- unlockAmulet forOwner lockedAmuletCid
-  ([newLockedCid], None) <- lockAmulet forOwner [(currentAmount, newExpiresAt)] [toInterfaceContractId amuletCid] context
+  ([newLockedCid], None) <- lockAmulet forOwner [(currentAmount, newExpiresAt)] [toInterfaceContractId amuletCid] context reason
   pure newLockedCid
 
 unlockAmulet : ForOwner -> ContractId LockedAmulet -> Update (ContractId Amulet, LockSpecification)
@@ -650,11 +660,13 @@ unlockAmulet forOwner lockedAmuletCid = do
   unlockResult <- exercise lockedAmuletCid LockedAmulet_UnlockV2
   return (unlockResult.amuletCid, (lock.amulet.amount.initialAmount, lock.lock.expiresAt))
 
-lockAmulet : ForOwner -> [LockSpecification] -> [ContractId Holding] -> ExternalPartyTransferContext -> Update ([ContractId LockedAmulet], Optional (ContractId Amulet))
+lockAmulet : ForOwner -> [LockSpecification] -> [ContractId Holding] -> ExternalPartyTransferContext -> Text -> Update ([ContractId LockedAmulet], Optional (ContractId Amulet))
 lockAmulet forOwner = lockAmuletFor forOwner forOwner.owner
 
-lockAmuletFor : ForOwner -> Party -> [LockSpecification] -> [ContractId Holding] -> ExternalPartyTransferContext -> Update ([ContractId LockedAmulet], Optional (ContractId Amulet))
-lockAmuletFor forOwner@ForOwner {..} receiver specs holdingInputs context = do
+-- | Locks `specs` for `receiver`, funded by the `holdingInputs` of the owner.
+-- `reason` is the memo of the request being handled, which the transfer legs report as their reason.
+lockAmuletFor : ForOwner -> Party -> [LockSpecification] -> [ContractId Holding] -> ExternalPartyTransferContext -> Text -> Update ([ContractId LockedAmulet], Optional (ContractId Amulet))
+lockAmuletFor forOwner@ForOwner {..} receiver specs holdingInputs context reason = do
   -- lock the amulet
   transferInputsFromHoldings <- holdingToTransferInputs forOwner holdingInputs
   let mkOutput (amount, expiresAt) =
@@ -666,7 +678,7 @@ lockAmuletFor forOwner@ForOwner {..} receiver specs holdingInputs context = do
                 expiresAt -- We don't have any call to isLedgerTimeLE, so we can use the true maxBound here for arbitrary duration.
                 holders = [dso]
                 optContext = Some cipPrefix
-              meta = Some $ reasonToMeta ("lock for " <> cipPrefix) emptyMetadata
+              meta = Some $ reasonToMeta reason emptyMetadata
   let transfer = Splice.AmuletRules.Transfer with
         sender = owner
         provider = owner -- the sender is serving as its own "app provider"

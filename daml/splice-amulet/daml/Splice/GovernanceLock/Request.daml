@@ -149,7 +149,7 @@ governanceLock_transferFactoryV1_lockImpl
   -> Update V1.TransferInstructionResult
 governanceLock_transferFactoryV1_lockImpl dso V1.TransferFactory_Transfer{transfer, extraArgs} specification = do
   (lock, lockCid, changeCid) <- governanceLock_lockForGovernance_impl
-    dso transfer.amount transfer.inputHoldingCids specification extraArgs transfer.sender transfer.requestedAt
+    dso transfer.amount transfer.inputHoldingCids specification extraArgs transfer.sender transfer.requestedAt (reasonFromMeta transfer.meta)
 
   let lockTransfer = (view $ toInterface @V1.TransferInstruction lock).transfer
   requireMatchExpected ("lock transfer", lockTransfer) transfer with
@@ -178,9 +178,10 @@ governanceLock_transferFactoryV1_unlockImpl dso V1.TransferFactory_Transfer{tran
         dso
         owner = transfer.sender
         specification = GLS_FullLock specification
-  FetchAndMergeLocksResult{lockCid, lock} <- fetchAndMergeGovernanceLocks key context state
+      reason = reasonFromMeta transfer.meta
+  FetchAndMergeLocksResult{lockCid, lock} <- fetchAndMergeGovernanceLocks key context state reason
   potentiallyUnsafeArchive lockCid
-  result <- governanceLock_unlockImpl lockCid lock unlockAmount vestingStartTime [transfer.sender] context state
+  result <- governanceLock_unlockImpl lockCid lock unlockAmount vestingStartTime [transfer.sender] context state reason
   pure V1.TransferInstructionResult with
     output = case result.vestingLock of
       Some vestingLock -> V1.TransferInstructionResult_Pending with
@@ -232,9 +233,10 @@ governanceLock_transferFactoryV1_withdrawVestedFundsImpl dso V1.TransferFactory_
         dso
         owner = transfer.sender
         specification = GLS_VestingLock specification
-  FetchAndMergeLocksResult{lockCid, lock} <- fetchAndMergeGovernanceLocks key context state
+      reason = reasonFromMeta transfer.meta
+  FetchAndMergeLocksResult{lockCid, lock} <- fetchAndMergeGovernanceLocks key context state reason
   potentiallyUnsafeArchive lockCid
-  result <- vestingLock_withdrawImpl lockCid lock vestedUntilTime [transfer.sender] context
+  result <- vestingLock_withdrawImpl lockCid lock vestedUntilTime [transfer.sender] context reason
   pure V1.TransferInstructionResult with
     output = case result.vestingLock of
       Some vestingLock -> V1.TransferInstructionResult_Pending with transferInstructionCid = toInterfaceContractId vestingLock
@@ -259,6 +261,7 @@ governanceLock_transferFactoryV1_substituteImpl dso V1.TransferFactory_Transfer{
       inputHoldingCids = transfer.inputHoldingCids
       extraArgs
       requestedAt = transfer.requestedAt
+      reason = reasonFromMeta transfer.meta
       context
       state
 

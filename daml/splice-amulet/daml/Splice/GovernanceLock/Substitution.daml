@@ -103,11 +103,14 @@ governanceLockSubstitution_acceptImpl : ContractId GovernanceLockSubstitution ->
 governanceLockSubstitution_acceptImpl self GovernanceLockSubstitution{..} actors extraArgs = do
   checkActors actors [[target.owner]]
   (context, state) <- unfeaturedPaymentContextAndConfigFromChoiceContext target.dso extraArgs.context
-  FetchAndMergeLocksResult{lockCid} <- fetchAndMergeGovernanceLocks target context state
+  -- The legs report the memo of the accepted proposal
+  let reason = reasonFromMeta $ substitutionGovernanceLockMetadata target.specification
+  FetchAndMergeLocksResult{lockCid} <- fetchAndMergeGovernanceLocks target context state reason
   (newLockedAmulet, remainingLockCid, unlockedAmulet) <- case lockedAmulet of
     Some proposalLockedAmulet -> do
       substituteResult <- exercise lockCid GovernanceLock_DsoSubstitute with
         substitutedAmount = amount
+        reason
         extraArgs
       pure (proposalLockedAmulet, substituteResult.remainingLockCid, Some substituteResult.unlockedAmulet)
     None -> do
@@ -115,6 +118,7 @@ governanceLockSubstitution_acceptImpl self GovernanceLockSubstitution{..} actors
       splitResult <- exercise lockCid GovernanceLock_DsoSplitForSubstitution with
         splitAmount = amount
         newSpecification = target.specification
+        reason
         extraArgs
       pure (splitResult.splitAmulet, splitResult.remainingLockCid, None)
   newLockCid <- create GovernanceLock with
@@ -211,6 +215,7 @@ data CreateSubstitutionArgs = CreateSubstitutionArgs with
     inputHoldingCids : [ContractId Holding] -- ^ Holdings providing the funds
     extraArgs : ExtraArgs
     requestedAt : Time -- ^ Time of the request to create the proposal
+    reason : Text -- ^ Memo of the request to create the proposal, which the transfer legs report as their reason
     context : ExternalPartyTransferContext
     state : ExternalPartyConfigState
 
@@ -228,6 +233,7 @@ createSubstitution CreateSubstitutionArgs {..} = do
         [(amount, governanceLockExpiresAt target.specification)]
         inputHoldingCids
         context
+        reason
       pure (Some lockedAmulet, changeHolding)
   let expiresAt = requestedAt `addRelTime` getTokenStandardMaxTTL state.transferConfig
   let substitution = GovernanceLockSubstitution with

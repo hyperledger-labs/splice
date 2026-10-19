@@ -165,9 +165,12 @@ governanceLockTransfer_acceptImpl self GovernanceLockTransfer{..} actors extraAr
   checkActors actors [[receiver]]
   let dso = source.dso
   (context, state) <- unfeaturedPaymentContextAndConfigFromChoiceContext dso extraArgs.context
-  FetchAndMergeLocksResult{lockCid} <- fetchAndMergeGovernanceLocks source context state
+  -- The legs report the memo of the accepted proposal
+  let reason = reasonFromMeta $ transferGovernanceLockMetadata source.specification
+  FetchAndMergeLocksResult{lockCid} <- fetchAndMergeGovernanceLocks source context state reason
   result <- exercise lockCid GovernanceLock_DsoTransfer with
     transferredAmount = amount
+    reason
     extraArgs
   -- Lock the unlocked funds of the sender again, now for the receiver.
   -- This needs the authority of the receiver.
@@ -177,6 +180,7 @@ governanceLockTransfer_acceptImpl self GovernanceLockTransfer{..} actors extraAr
     [(amount, governanceLockExpiresAt source.specification)]
     [toInterfaceContractId result.unlockedAmulet]
     context
+    reason
   newLockCid <- create GovernanceLock with
     dso
     owner = receiver
