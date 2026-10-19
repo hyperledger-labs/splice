@@ -179,15 +179,17 @@ SELECT count(*), min(row_id), max(row_id) FROM partitioned_events;
 -- 13, 1, 13
 ```
 
-Check BigQuery:
+Check BigQuery (assuming shell command from above, double-quoted argument):
 
 ```sql
-SELECT table_name FROM `<BQ_DATASET>`.INFORMATION_SCHEMA.TABLES ORDER BY 1;
+SELECT table_name FROM \`$BQ_DATASET\`.INFORMATION_SCHEMA.TABLES ORDER BY 1;
+-- expect only partition_test_partitioned_events
 
 SELECT count(*), min(row_id), max(row_id)
-  FROM `<BQ_DATASET>.partition_test_partitioned_events`;
+  FROM \`$BQ_DATASET.partition_test_partitioned_events\`;
+-- expect 13, 1, 13 (matching above pg version)
 
-SELECT row_id, count(*) FROM `<BQ_DATASET>.partition_test_partitioned_events`
+SELECT row_id, count(*) FROM \`$BQ_DATASET.partition_test_partitioned_events\`
   GROUP BY row_id HAVING count(*) > 1;
 -- expect no rows, empty output (meaning no duplicates)
 ```
@@ -216,7 +218,7 @@ SELECT count(*), max(row_id) FROM cutover_events;
 ```
 
 ```sql
-SELECT count(*), max(row_id) FROM `<BQ_DATASET>.partition_test_cutover_events`;
+SELECT count(*), max(row_id) FROM \`$BQ_DATASET.partition_test_cutover_events\`;
 ```
 
 ### 2a. Rename alone: what the publication does by default
@@ -333,12 +335,12 @@ SELECT (SELECT count(*) FROM cutover_events_legacy) AS legacy,
 Check BigQuery:
 
 ```sql
-SELECT table_name FROM `<BQ_DATASET>`.INFORMATION_SCHEMA.TABLES ORDER BY 1;
+SELECT table_name FROM \`$BQ_DATASET\`.INFORMATION_SCHEMA.TABLES ORDER BY 1;
 
 SELECT starts_with(payload, 'pre-cutover') AS pre, count(*), min(row_id), max(row_id)
-  FROM `<BQ_DATASET>.partition_test_cutover_events` GROUP BY 1;
+  FROM \`$BQ_DATASET.partition_test_cutover_events\` GROUP BY 1;
 
-SELECT row_id, count(*) FROM `<BQ_DATASET>.partition_test_cutover_events`
+SELECT row_id, count(*) FROM \`$BQ_DATASET.partition_test_cutover_events\`
   GROUP BY row_id HAVING count(*) > 1;
 ```
 
@@ -369,10 +371,10 @@ SELECT count(*) FROM partitioned_events;
 Wait a few minutes, then:
 
 ```sql
-SELECT count(*) FROM `<BQ_DATASET>.partition_test_partitioned_events`;
-SELECT count(*) FROM `<BQ_DATASET>.partition_test_cutover_events`;
+SELECT count(*) FROM \`$BQ_DATASET.partition_test_partitioned_events\`;
+SELECT count(*) FROM \`$BQ_DATASET.partition_test_cutover_events\`;
 SELECT datastream_metadata.change_type, count(*)
-  FROM `<BQ_DATASET>.partition_test_partitioned_events` GROUP BY 1;
+  FROM \`$BQ_DATASET.partition_test_partitioned_events\` GROUP BY 1;
 ```
 
 - **Expected:** both BigQuery counts are unchanged from sections 1 and 2, even
