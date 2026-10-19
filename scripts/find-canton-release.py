@@ -34,11 +34,10 @@ Example, to check the fallback for a commit not yet released on release-line-3.6
 """
 
 import argparse
-import os
 import re
-import subprocess
 import sys
 
+import git
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -73,18 +72,14 @@ def parse_args():
     return parser.parse_args()
 
 
-def make_git(repo: str, option: str):
-    """Return a function running git in the checkout `repo`, after fetching its origin."""
-
-    def git(*cmd: str, check: bool = True) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            ["git", "-C", repo, *cmd], capture_output=True, text=True, check=check
-        )
-
-    if not os.path.isdir(repo) or git("rev-parse", "--git-dir", check=False).returncode != 0:
-        sys.exit(f"error: {option} {repo!r} is not a git checkout")
-    git("fetch", "--quiet", "--tags", "origin")
-    return git
+def open_repo(path: str, option: str) -> git.Repo:
+    """Open the checkout at `path`, after fetching its origin."""
+    try:
+        repo = git.Repo(path)
+    except (git.NoSuchPathError, git.InvalidGitRepositoryError):
+        sys.exit(f"error: {option} {path!r} is not a git checkout")
+    repo.remotes.origin.fetch(tags=True)
+    return repo
 
 
 def print_table(rows: list[tuple[str, ...]]):
@@ -95,29 +90,31 @@ def print_table(rows: list[tuple[str, ...]]):
 
 def main():
     args = parse_args()
-    closed = make_git(args.closed_canton, "--closed-canton")
-    oss = make_git(args.oss_canton, "--oss-canton")
+    closed = open_repo(args.closed_canton, "--closed-canton")
+    oss = open_repo(args.oss_canton, "--oss-canton")
 
     # Only final releases (v3.6.1), not -rc tags, and only for the given release line.
     pattern = re.compile(rf"v{re.escape(args.release_line)}\.\d+")
 
-    def resolve_closed(commit: str) -> str | None:
+    def resolve_closed(commit: str) -> git.Commit | None:
         if not re.fullmatch(r"[0-9a-fA-F]+", commit):
             return None
-        rev = closed("rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}", check=False)
-        return rev.stdout.strip() if rev.returncode == 0 else None
+        try:
+            return closed.commit(commit)
+        except (git.BadName, ValueError):
+            return None
 
-    def releases_containing(ref: str) -> list[tuple[str, ...]]:
-        """Table rows (distance, tag, date) of the releases containing `ref`, nearest first."""
-        containing = closed("tag", "--contains", ref).stdout.split()
+    def releases_containing(ref: git.Commit) -> list[tuple[str, ...]]:
+        """Table rows (tag, distance, date) of the releases containing `ref`, nearest first."""
         results = []
-        for tag in sorted(t for t in containing if pattern.fullmatch(t)):
-            distance = int(closed("rev-list", "--count", f"{ref}..{tag}").stdout)
-            date = closed("log", "-1", "--format=%cs", tag).stdout.strip()
-            results.append((distance, tag, date))
+        for tag in closed.tags:
+            # Tags that contain the reference commit, i.e. include everything in the snapshot.
+            if pattern.fullmatch(tag.name) and closed.is_ancestor(ref, tag.commit):
+                distance = sum(1 for _ in closed.iter_commits(f"{ref.hexsha}..{tag.commit.hexsha}"))
+                results.append((distance, tag.name, tag.commit.committed_datetime.date().isoformat()))
         return [
-            (tag, str(distance), date)
-            for distance, tag, date in sorted(results)[: args.max_results]
+            (name, str(distance), date)
+            for distance, name, date in sorted(results)[: args.max_results]
         ]
 
     header = ("TAG", "COMMITS_AFTER_REF", "TAG_DATE")
@@ -133,21 +130,21 @@ def main():
         print_table([header, *rows])
         return
 
-    print(f"No release of line {args.release_line} contains {ref[:10]} yet.", file=sys.stderr)
+    print(f"No release of line {args.release_line} contains {ref.hexsha[:10]} yet.", file=sys.stderr)
     print(
-        f"The snapshot of that commit can be found with: scripts/search-canton-snapshot.py {ref[:10]}",
+        f"The snapshot of that commit can be found with: scripts/search-canton-snapshot.py {ref.hexsha[:10]}",
         file=sys.stderr,
     )
 
     # Walk the OSS release line, newest first, for the first snapshot whose reference
     # commit is released.
-    log = oss(
-        "log", f"origin/release-line-{args.release_line}", "--format=%H%x00%s%x00%b%x01"
-    ).stdout
-    for entry in log.split("\x01"):
-        sha, _, rest = entry.strip().partition("\x00")
-        subject, _, body = rest.partition("\x00")
-        match = re.search(r"^Reference commit: ([0-9a-f]+)", body, re.MULTILINE)
+    branch = f"origin/release-line-{args.release_line}"
+    try:
+        oss.commit(branch)
+    except git.BadName:
+        sys.exit(f"error: no branch {branch} in --oss-canton {args.oss_canton!r}")
+    for snapshot in oss.iter_commits(branch):
+        match = re.search(r"^Reference commit: ([0-9a-f]+)", snapshot.message, re.MULTILINE)
         older = resolve_closed(match.group(1)) if match else None
         if older is None or older == ref:
             continue
@@ -155,8 +152,8 @@ def main():
         if rows:
             print(
                 f"\nMost recent older snapshot with a release:\n"
-                f"  OSS commit (digital-asset/canton): {sha[:10]} {subject}\n"
-                f"  Reference commit (DACH-NY/canton): {older[:10]}\n"
+                f"  OSS commit (digital-asset/canton): {snapshot.hexsha[:10]} {snapshot.summary}\n"
+                f"  Reference commit (DACH-NY/canton): {older.hexsha[:10]}\n"
             )
             print_table([header, *rows])
             return
