@@ -7,6 +7,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{CachingConfigs, CryptoProvider}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.jce.JcePureCrypto
+import com.digitalasset.canton.crypto.provider.jce.JcePureCryptoAccess.*
 import com.digitalasset.canton.crypto.v30 as cryptoProto
 import com.digitalasset.canton.metrics.{
   SigningHistograms,

@@ -80,6 +80,7 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
 import org.lfdecentralizedtrust.splice.scan.store.historystart.{
   KvHistoryStartStore,
   ParticipantHistoryStartSources,
+  ScanHistoryReadiness,
   ScanHistoryStart,
 }
 import org.lfdecentralizedtrust.splice.scan.store.db.{
@@ -228,7 +229,7 @@ class ScanApp(
         loggerFactory,
         retryProvider.metricsFactory,
       )
-      updateHistory = new UpdateHistory(
+      updateHistory <- UpdateHistory.create(
         storage,
         domainMigrationId,
         store.storeName,
@@ -238,7 +239,6 @@ class ScanApp(
         internedStringStore,
         config.analyzableTimeWindow.duration,
         loggerFactory,
-        enableissue12777Workaround = true,
         enableImportUpdateBackfill = config.updateHistoryBackfillImportUpdatesEnabled,
         scanAppMetrics.dbScanStore.history,
       )
@@ -284,6 +284,7 @@ class ScanApp(
       _ <-
         if (config.bulkStorage.debugReresolveHistoryStart) historyStart.forgetRecorded()
         else Future.unit
+      historyReadiness = new ScanHistoryReadiness(updateHistory, historyStart)
       bulkStorage <- (config.bulkStorage.staging, config.bulkStorage.committed).tupled.traverse(_ =>
         appInitStep("Initialize bulk storage") {
           BulkStorage(
@@ -294,6 +295,7 @@ class ScanApp(
             currentMigrationId = domainMigrationId,
             kvProvider,
             historyStart,
+            historyReadiness,
             retryProvider.metricsFactory,
             config.automation,
             backoffClock = new WallClock(retryProvider.timeouts, loggerFactory),
@@ -353,6 +355,7 @@ class ScanApp(
         svName,
         amuletAppParameters.upgradesConfig,
         packageVersionSupport,
+        historyReadiness,
       )
       _ = automation.registerHistoryStartTrigger(historyStart)
       scanVerdictStore = DbScanVerdictStore(

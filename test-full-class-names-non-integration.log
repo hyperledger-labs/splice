@@ -3,6 +3,7 @@ org.lfdecentralizedtrust.splice.admin.api.client.ApiClientRequestLoggerTest
 org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandlerBftCallFailedTest
 org.lfdecentralizedtrust.splice.auth.AuthTokenManagerTest
 org.lfdecentralizedtrust.splice.auth.SignatureVerifierTest
+org.lfdecentralizedtrust.splice.automation.AutomationMetricsTest
 org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTriggerTest
 org.lfdecentralizedtrust.splice.automation.SqlIndexInitializationTriggerStoreTest
 org.lfdecentralizedtrust.splice.build_tools.DarLockCheckerTest
@@ -40,6 +41,7 @@ org.lfdecentralizedtrust.splice.scan.store.bulk.ZstdTest
 org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.BftBulkObjectListingTest
 org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.KvBackfillingProgressTest
 org.lfdecentralizedtrust.splice.scan.store.db.CheckMetaVersionsTest
+org.lfdecentralizedtrust.splice.scan.store.historystart.HistoryReadinessTest
 org.lfdecentralizedtrust.splice.scan.store.historystart.ScanHistoryStartTest
 org.lfdecentralizedtrust.splice.store.DbUnavailablePartiesStoreTest
 org.lfdecentralizedtrust.splice.store.DomainTimeStoreTest

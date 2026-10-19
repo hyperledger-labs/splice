@@ -8,8 +8,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.store.KeyValueStore
-import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.{DbKeyValueStore, StoreDescriptor}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -24,8 +23,8 @@ object ScanKeyValueStore {
       lc: ErrorLoggingContext,
       cc: CloseContext,
       tc: TraceContext,
-  ): Future[KeyValueStore] = {
-    KeyValueStore(
+  ): Future[DbKeyValueStore] = {
+    DbKeyValueStore(
       StoreDescriptor(
         version = 1,
         name = "ScanKeyValueStore",

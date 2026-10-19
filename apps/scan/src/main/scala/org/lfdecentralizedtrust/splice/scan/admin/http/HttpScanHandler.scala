@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.ActiveContract
@@ -110,7 +111,11 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   TxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.scan.store.AppActivityStore.RoundIngestionStatus
-import org.lfdecentralizedtrust.splice.scan.store.bulk.{BulkObjectsAvailability, BulkStorageReader}
+import org.lfdecentralizedtrust.splice.scan.store.bulk.{
+  BulkObjectKind,
+  BulkObjectsAvailability,
+  BulkStorageReader,
+}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   IncrementalAcsSnapshotTable,
   QueryAcsSnapshotResult,
@@ -2693,7 +2698,7 @@ class HttpScanHandler(
         )
       ) { bulkStorage =>
         for {
-          checksums <- bulkStorage.getObjectChecksums(body.objectKeys)
+          checksums <- bulkStorage.getObjectChecksums(maxSizeOrFail("object_keys", body.objectKeys))
         } yield {
           ScanResource.GetBulkObjectChecksumsResponse.OK(
             definitions.GetBulkObjectChecksumsResponse(
@@ -2708,6 +2713,7 @@ class HttpScanHandler(
   override def getBulkObjectsProgress(respond: ScanResource.GetBulkObjectsProgressResponse.type)(
       atOrBeforeRecordTime: java.time.OffsetDateTime,
       bucket: definitions.BulkStorageBucket,
+      kind: Option[definitions.BulkObjectKind],
   )(
       extracted: TraceContext
   ): scala.concurrent.Future[ScanResource.GetBulkObjectsProgressResponse] = {
@@ -2721,12 +2727,13 @@ class HttpScanHandler(
         )
       ) { bulkStorage =>
         val requested = CantonTimestamp.tryFromInstant(atOrBeforeRecordTime.toInstant)
+        val objectKind = kind.map(HttpScanHandler.fromHttpObjectKind)
         for {
           progress <- bucket match {
             case definitions.BulkStorageBucket.members.Committed =>
-              bulkStorage.getCommittedProgressTimestamp()
+              bulkStorage.getCommittedProgressTimestamp(objectKind)
             case definitions.BulkStorageBucket.members.Staging =>
-              bulkStorage.getStagingProgressTimestamp()
+              bulkStorage.getStagingProgressTimestamp(objectKind)
           }
           firstOwnSegmentStart <- bulkStorage.getFirstOwnSegmentStart()
         } yield {
@@ -2984,6 +2991,12 @@ object HttpScanHandler {
       case BulkObjectsAvailability.Available => definitions.BulkObjectsAvailability.Available
       case BulkObjectsAvailability.Processing => definitions.BulkObjectsAvailability.Processing
       case BulkObjectsAvailability.Backfilling => definitions.BulkObjectsAvailability.Backfilling
+    }
+
+  private def fromHttpObjectKind(kind: definitions.BulkObjectKind): BulkObjectKind =
+    kind match {
+      case definitions.BulkObjectKind.members.Updates => BulkObjectKind.Updates
+      case definitions.BulkObjectKind.members.Snapshots => BulkObjectKind.Snapshots
     }
 
   // We expect a handful at most but want to somewhat guard against attacks

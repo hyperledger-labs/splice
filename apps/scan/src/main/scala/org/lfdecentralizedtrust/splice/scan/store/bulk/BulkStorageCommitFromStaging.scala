@@ -3,11 +3,14 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import cats.instances.future.*
+import cats.syntax.foldable.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
+import org.lfdecentralizedtrust.splice.http.HttpRequestLimits
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftCallExecutor.BftOutcome
 import org.lfdecentralizedtrust.splice.scan.config.BulkStorageConfig
 import org.lfdecentralizedtrust.splice.scan.util.PeerBftScanConnection
@@ -21,6 +24,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class BulkStorageCommitFromStaging[T](
     stagingS3Connection: S3BucketConnection,
     committedS3Connection: S3BucketConnection,
+    kind: BulkObjectKind,
     getObjects: T => Future[Seq[ObjectKeyAndChecksum]],
     getRequiredCatchupTimestamp: T => CantonTimestamp,
     appConfig: BulkStorageConfig,
@@ -35,6 +39,17 @@ class BulkStorageCommitFromStaging[T](
   private def checkBftForObjects(
       requiredCatchupTimestamp: CantonTimestamp,
       objects: Seq[ObjectKeyAndChecksum],
+  ): Future[Boolean] =
+    if (objects.isEmpty) checkBftForBatch(requiredCatchupTimestamp, objects)
+    else
+      objects
+        .grouped(HttpRequestLimits.MaxRequestArrayItems)
+        .toList
+        .forallM(batch => checkBftForBatch(requiredCatchupTimestamp, batch))
+
+  private def checkBftForBatch(
+      requiredCatchupTimestamp: CantonTimestamp,
+      objects: Seq[ObjectKeyAndChecksum],
   ): Future[Boolean] = {
     logger.debug(
       s"Checking BFT agreement for objects: ${objects.map(_.key).mkString(", ")} (requires catchup to $requiredCatchupTimestamp)"
@@ -44,6 +59,7 @@ class BulkStorageCommitFromStaging[T](
         connection <- scanConnection.connection
         outcome <- connection.getBulkObjectChecksumsOutcome(
           requiredCatchupTimestamp,
+          kind,
           objects.map(_.key),
         )
       } yield {
@@ -256,6 +272,7 @@ object BulkStorageCommitFromStaging {
   def apply[T](
       stagingS3Connection: S3BucketConnection,
       committedS3Connection: S3BucketConnection,
+      kind: BulkObjectKind,
       getStagingObjects: T => Future[Seq[ObjectKeyAndChecksum]],
       getRequiredCatchupTimestamp: T => CantonTimestamp,
       appConfig: BulkStorageConfig,
@@ -269,6 +286,7 @@ object BulkStorageCommitFromStaging {
     new BulkStorageCommitFromStaging[T](
       stagingS3Connection,
       committedS3Connection,
+      kind,
       getStagingObjects,
       getRequiredCatchupTimestamp,
       appConfig,

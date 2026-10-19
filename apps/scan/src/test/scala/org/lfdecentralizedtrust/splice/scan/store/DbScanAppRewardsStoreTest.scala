@@ -1074,6 +1074,31 @@ class DbScanAppRewardsStoreTest
         childHashes shouldBe level0Hashes
       }
     }
+
+    "internal batch with more children than maxChildBatches fails" in {
+      for {
+        // 4 parties / batchSize=2 -> 2 batches + root
+        (store, _, rootHash) <- setupAndComputeHashes(partyCount = 4, batchSize = 2)
+        failure <- store.lookupBatchByHash(roundNumber, rootHash, maxChildBatches = 1).failed
+      } yield {
+        failure.getMessage should include(
+          "Size of the result exceeded the limit in appRewards.lookupBatchByHash.children"
+        ).and(include("Result size: 2. Limit: 1"))
+      }
+    }
+
+    "leaf batch with more allowances than maxChildBatches fails" in {
+      for {
+        // 4 parties / batchSize=2 -> 2 leaves of 2 allowances each
+        (store, batchHashes, _) <- setupAndComputeHashes(partyCount = 4, batchSize = 2)
+        leafHash = batchHashes.filter(_.batchLevel == 0).head.batchHash
+        failure <- store.lookupBatchByHash(roundNumber, leafHash, maxChildBatches = 1).failed
+      } yield {
+        failure.getMessage should include(
+          "Size of the result exceeded the limit in appRewards.lookupBatchByHash.allowances"
+        ).and(include("Result size: 2. Limit: 1"))
+      }
+    }
   }
 
   "deleteRewardAccountingDataForRound" should {
@@ -1298,21 +1323,22 @@ class DbScanAppRewardsStoreTest
   ): Future[(DbScanAppRewardsStore, Long)] = {
     val n = storeCounter.getAndIncrement()
     val participantId = mkParticipantId(s"rewards-test-$n")
-    val updateHistory = new UpdateHistory(
-      storage,
-      migrationId,
-      s"app_rewards_test_$n",
-      participantId,
-      dsoParty,
-      BackfillingRequirement.BackfillingNotRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = false,
-      HistoryMetrics(NoOpMetricsFactory, migrationId),
-    )
-    updateHistory.ingestionSink.initialize().map { _ =>
+    for {
+      updateHistory <- UpdateHistory.create(
+        storage,
+        migrationId,
+        s"app_rewards_test_$n",
+        participantId,
+        dsoParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
+        loggerFactory,
+        enableImportUpdateBackfill = false,
+        HistoryMetrics(NoOpMetricsFactory, migrationId),
+      )
+      _ <- updateHistory.ingestionSink.initialize()
+    } yield {
       val appActivityRecordStore = new DbAppActivityRecordStore(
         storage.underlying,
         updateHistory,

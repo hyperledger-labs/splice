@@ -51,6 +51,7 @@ class AcsSnapshotBulkStorageCommitFromStaging(
     BulkStorageCommitFromStaging(
       stagingS3Connection,
       committedS3Connection,
+      BulkObjectKind.Snapshots,
       ts =>
         bulkStorageReader
           .getStagingObjectsForAcsSnapshotAt(ts)

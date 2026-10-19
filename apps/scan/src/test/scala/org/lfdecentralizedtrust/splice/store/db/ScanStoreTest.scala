@@ -1751,21 +1751,23 @@ class DbScanStoreTest
   override def mkUpdateHistory(
       migrationId: Long
   ): Future[UpdateHistory] = {
-    val updateHistory = new UpdateHistory(
-      storage.underlying, // not under test
-      migrationId,
-      "update_history_scan_store_test",
-      mkParticipantId("whatever"),
-      dsoParty,
-      BackfillingRequirement.BackfillingNotRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = true,
-      HistoryMetrics(NoOpMetricsFactory, migrationId),
-    )
-    updateHistory.ingestionSink.initialize().map(_ => updateHistory)
+    for {
+      updateHistory <- UpdateHistory.create(
+        storage.underlying, // not under test
+        migrationId,
+        "update_history_scan_store_test",
+        mkParticipantId("whatever"),
+        dsoParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
+        loggerFactory,
+        enableImportUpdateBackfill = true,
+        HistoryMetrics(NoOpMetricsFactory, migrationId),
+      )
+
+      _ <- updateHistory.ingestionSink.initialize()
+    } yield updateHistory
   }
 
   override protected def cleanDb(

@@ -146,6 +146,8 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
       committedSnapshotProgressO: Option[CantonTimestamp] = None,
       committedUpdateProgressO: Option[UpdatesSegment] = None,
       firstOwnSegmentStart: Option[CantonTimestamp] = None,
+      stagingS3Connection: S3BucketConnection = mock[S3BucketConnection],
+      committedS3Connection: S3BucketConnection = mock[S3BucketConnection],
   ): BulkStorageReader =
     new BulkStorageReader(
       acsSnapshotStagingProgress = snapshotsProgress(snapshotProgressO),
@@ -153,8 +155,8 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
       updateHistoryStagingProgress = updatesProgress(updateProgressO),
       updateHistoryCommittedProgress = updatesProgress(committedUpdateProgressO),
       storageConfig = mock[ScanStorageConfig],
-      stagingS3Connection = mock[S3BucketConnection],
-      committedS3Connection = mock[S3BucketConnection],
+      stagingS3Connection = stagingS3Connection,
+      committedS3Connection = committedS3Connection,
       firstOwnSegmentStart = () => Future.successful(firstOwnSegmentStart),
       loggerFactory = NamedLoggerFactory.root,
     )
@@ -163,12 +165,14 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
       bulkStorage: BulkStorageReader,
       recordTime: String,
       bucket: definitions.BulkStorageBucket = definitions.BulkStorageBucket.Staging,
+      kind: Option[definitions.BulkObjectKind] = None,
   ): definitions.GetBulkObjectsProgressResponse =
     inside(
       handler(bulkStorage = Some(bulkStorage))
         .getBulkObjectsProgress(ScanResource.GetBulkObjectsProgressResponse)(
           Instant.parse(recordTime).atOffset(ZoneOffset.UTC),
           bucket,
+          kind,
         )(TraceContext.empty)
         .futureValue
     ) { case ScanResource.GetBulkObjectsProgressResponseOK(value) => value }
@@ -186,6 +190,54 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
         Status.Code.UNIMPLEMENTED,
         "Bulk storage is not configured",
       )
+    }
+
+    "reject checksum lookups for more than 1000 object keys" in {
+      val h = handler(bulkStorage = Some(bulkStorageReader(None, None)))
+      val request = definitions.GetBulkObjectChecksumsRequest(
+        objectKeys = Vector.tabulate(1001)(i => s"object-$i")
+      )
+      assertGrpcError(
+        Future.delegate(
+          h.getBulkObjectChecksums(ScanResource.GetBulkObjectChecksumsResponse)(request)(
+            TraceContext.empty
+          )
+        ),
+        Status.Code.INVALID_ARGUMENT,
+        "Expected 'object_keys' to contain at most 1000 items, but contained 1001.",
+      )
+    }
+
+    "answer checksums in request order, asking staging only for keys missing from committed" in {
+      val keys = Vector("in-staging-only", "in-both", "in-neither")
+      val keysMissingFromCommitted = Vector("in-staging-only", "in-neither")
+      def connectionWith(requestedKeys: Seq[String], objects: (String, String)*) = {
+        val connection = mock[S3BucketConnection]
+        when(
+          connection.getChecksums(eqTo(requestedKeys))(
+            any[ExecutionContext],
+            any[ActorSystem],
+            any[TraceContext],
+          )
+        ).thenReturn(Future.successful(objects.map { case (key, checksum) =>
+          S3BucketConnection.ObjectKeyAndChecksum(key, checksum)
+        }))
+        connection
+      }
+      val reader = bulkStorageReader(
+        None,
+        None,
+        stagingS3Connection =
+          connectionWith(keysMissingFromCommitted, "in-staging-only" -> "staged"),
+        committedS3Connection = connectionWith(keys, "in-both" -> "committed-checksum"),
+      )
+      withClue(s"checksums for $keys: ") {
+        reader.getObjectChecksums(keys).futureValue shouldBe Seq(
+          Some("staged"),
+          Some("committed-checksum"),
+          None,
+        )
+      }
     }
 
     "GetBulkObjectsProgress answers available when enough progress was made" in {
@@ -206,6 +258,20 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
         "2024-01-01T00:00:00Z",
       )
       response.availability shouldBe definitions.BulkObjectsAvailability.Processing
+    }
+
+    "GetBulkObjectsProgress answers from the progress of the requested kind only" in {
+      val reader = bulkStorageReader(
+        Some(snapshotProgressAt("2024-01-01T00:00:00Z")),
+        Some(updateProgress("2024-01-02T00:00:00Z", "2024-01-03T00:00:00Z")),
+      )
+      def availability(kind: Option[definitions.BulkObjectKind]) =
+        progressResponse(reader, "2024-01-03T00:00:00Z", kind = kind).availability
+      availability(Some(definitions.BulkObjectKind.Updates)) shouldBe
+        definitions.BulkObjectsAvailability.Available
+      availability(Some(definitions.BulkObjectKind.Snapshots)) shouldBe
+        definitions.BulkObjectsAvailability.Processing
+      availability(None) shouldBe definitions.BulkObjectsAvailability.Processing
     }
 
     "GetBulkObjectsProgress answers processing when updates progress is behind the requested record time" in {

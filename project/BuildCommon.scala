@@ -576,7 +576,7 @@ object BuildCommon {
           // We don't actually care about the damlLibrariesVersion but some of the Canton code needs it to compile.
           // We just set it to the canton version which isn't right but seems less annoying than having to maintain the actual version.
           BuildInfoKey("damlLibrariesVersion" -> CantonDependencies.canton_library_version),
-          BuildInfoKey("stableProtocolVersions" -> List("34", "35", "36")),
+          BuildInfoKey("stableProtocolVersions" -> List("34", "35", "36", "37")),
           BuildInfoKey("betaProtocolVersions" -> List()),
         ),
         buildInfoPackage := "com.digitalasset.canton.buildinfo",

@@ -159,46 +159,43 @@ class BulkStorageReader(
       }
   }
 
-  def getStagingProgressTimestamp(): Future[CantonTimestamp] =
-    progressTimestamp(updateHistoryStagingProgress, acsSnapshotStagingProgress)
+  def getStagingProgressTimestamp(kind: Option[BulkObjectKind]): Future[CantonTimestamp] =
+    progressTimestamp(kind, updateHistoryStagingProgress, acsSnapshotStagingProgress)
 
-  def getCommittedProgressTimestamp(): Future[CantonTimestamp] =
-    progressTimestamp(updateHistoryCommittedProgress, acsSnapshotCommittedProgress)
+  def getCommittedProgressTimestamp(kind: Option[BulkObjectKind]): Future[CantonTimestamp] =
+    progressTimestamp(kind, updateHistoryCommittedProgress, acsSnapshotCommittedProgress)
 
   def getFirstOwnSegmentStart(): Future[Option[CantonTimestamp]] = firstOwnSegmentStart()
 
   private def progressTimestamp(
+      kind: Option[BulkObjectKind],
       updatesProgress: UpdateHistoryBulkStoragePersistentProgress,
       snapshotsProgress: AcsSnapshotBulkStoragePersistentProgress,
   ): Future[CantonTimestamp] = {
-    for {
-      updates <- updatesProgress.readLatestProcessedSegment
-      snapshots <- snapshotsProgress.readLatestProcessedSnapshotTimestamp
-    } yield {
-      (updates, snapshots) match {
-        case (Some(updatesSegment), Some(snapshotTs)) =>
-          if (updatesSegment.toTimestamp > snapshotTs) {
-            snapshotTs
-          } else {
-            updatesSegment.toTimestamp
-          }
-        case _ =>
-          CantonTimestamp.MinValue
-      }
+    def updates = updatesProgress.readLatestProcessedSegment
+      .map(_.fold(CantonTimestamp.MinValue)(_.toTimestamp))
+    def snapshots = snapshotsProgress.readLatestProcessedSnapshotTimestamp
+      .map(_.getOrElse(CantonTimestamp.MinValue))
+    kind match {
+      case Some(BulkObjectKind.Updates) => updates
+      case Some(BulkObjectKind.Snapshots) => snapshots
+      case None =>
+        updates.zip(snapshots).map { case (updatesTs, snapshotsTs) =>
+          if (updatesTs > snapshotsTs) snapshotsTs else updatesTs
+        }
     }
   }
 
   def getObjectChecksums(
       objectKeys: Seq[String]
   ): Future[Seq[Option[String]]] = {
+    def checksumMap(objects: Seq[S3BucketConnection.ObjectKeyAndChecksum]) =
+      objects.view.map(obj => obj.key -> obj.checksum).toMap
     for {
       committed <- committedS3Connection.getChecksums(objectKeys)
-      staging <- stagingS3Connection.getChecksums(objectKeys)
-    } yield {
-      objectKeys.map { key =>
-        committed.find(_.key == key).orElse(staging.find(_.key == key)).map(_.checksum)
-      }
-    }
+      committedByKey = checksumMap(committed)
+      staging <- stagingS3Connection.getChecksums(objectKeys filterNot committedByKey.keySet)
+    } yield objectKeys map (committedByKey orElse checksumMap(staging)).lift
   }
 
   private def getSegmentStartingAt(

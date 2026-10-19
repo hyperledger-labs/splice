@@ -47,7 +47,7 @@ def staticParameters(sequencer: LocalInstanceReference) =
   domainParametersConfig
     .toStaticSynchronizerParameters(
       sequencer.config.crypto,
-      ProtocolVersion.v35,
+      ProtocolVersion.v36,
       NonNegativeInt.zero,
     )
     .map(StaticSynchronizerParameters(_))
@@ -78,7 +78,7 @@ def bootstrapDomainWithUnsignedKeys(
     UniqueIdentifier.tryCreate(synchronizerName, synchronizerNamespace)
   )
   val physicalSynchronizerId =
-    PhysicalSynchronizerId(synchronizerId, NonNegativeInt.zero, ProtocolVersion.v35)
+    PhysicalSynchronizerId(synchronizerId, NonNegativeInt.zero, ProtocolVersion.v36)
 
   val tempStoreForBootstrap = synchronizerOwners
     .map(

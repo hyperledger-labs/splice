@@ -191,7 +191,7 @@ class LocalNetFrontendIntegrationTest
   }
 
   "localnet supports configurable protocol versions" in { implicit env =>
-    withLocalNet(Seq("-u", "-p", "35")) { implicit env =>
+    withLocalNet(Seq("-u", "-p", "36")) { implicit env =>
       val appProviderParticipant =
         env.participants.remote
           .find(_.name == "app-provider")
@@ -206,7 +206,7 @@ class LocalNetFrontendIntegrationTest
         .list_connected()
         .loneElement
         .physicalSynchronizerId
-        .protocolVersion shouldBe ProtocolVersion.v35
+        .protocolVersion shouldBe ProtocolVersion.v37
     }
   }
 }

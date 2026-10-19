@@ -56,8 +56,9 @@ class UpdateHistoryReadPerformanceTest(
 
   override type Store = UpdateHistory
 
-  override protected def mkStore(storage: DbStorage): UpdateHistory = {
-    new UpdateHistory(
+  override protected def mkStore(storage: DbStorage): Future[UpdateHistory] = {
+    implicit val initTc: TraceContext = TraceContext.empty
+    UpdateHistory.create(
       storage = storage,
       domainMigrationId = migrationId,
       storeName = this.getClass.getName,
@@ -73,7 +74,6 @@ class UpdateHistoryReadPerformanceTest(
       ),
       analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
       loggerFactory = loggerFactory,
-      enableissue12777Workaround = true,
       enableImportUpdateBackfill = false,
       metrics = HistoryMetrics.apply(NoOpMetricsFactory, migrationId),
     )

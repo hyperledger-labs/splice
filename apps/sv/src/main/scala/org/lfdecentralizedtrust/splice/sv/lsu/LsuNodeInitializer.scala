@@ -7,11 +7,15 @@ import cats.implicits.showInterpolator
 import cats.syntax.foldable.*
 import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
+import com.digitalasset.canton.admin.api.client.data.SequencerConnectionPoolDelaysAccess.*
 import com.digitalasset.canton.admin.api.client.data.SequencerHealthStatus.implicitPrettyString
+import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplificationAccess.*
+import com.digitalasset.canton.admin.api.client.data.SubscriptionLivenessLimitsAccess.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
+import com.digitalasset.canton.protocol.StaticSynchronizerParametersAccess.*
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.topology.transaction.GrpcConnection
 import com.digitalasset.canton.tracing.TraceContext
