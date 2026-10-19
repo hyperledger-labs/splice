@@ -7,7 +7,7 @@ description: |
   A trading app PoC built on top of the allocation APIs of the Canton Network Token Standard.
 
   Serves both as an example as well as a test suite for the token standard APIs.
-version: 1.0.3
+version: 1.0.4
 source: daml
 dependencies:
   - daml-prim
@@ -18,7 +18,7 @@ data-dependencies:
   - ../../../daml/dars/splice-api-token-allocation-request-v1-1.0.0.dar
 build-options:
   - --explicit-serializable=yes
-  - --target=2.1
+  - --target=2.3
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
 codegen:

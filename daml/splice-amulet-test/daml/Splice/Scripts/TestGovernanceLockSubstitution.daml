@@ -1,0 +1,549 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Tests for the substitution of governance locks and vesting locks.
+module Splice.Scripts.TestGovernanceLockSubstitution where
+
+import DA.Action (unless)
+import DA.Assert ((===))
+import DA.Map qualified as Map
+import DA.NonEmpty qualified as NonEmpty
+import DA.Text qualified as Text
+import DA.TextMap qualified as TextMap
+import DA.Time
+import DA.Validation
+
+import Daml.Script
+import Splice.Api.Token.HoldingV1 qualified as V1
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1 qualified as V1
+import Splice.GovernanceLock
+import Splice.Scripts.TestGovernanceLocks
+import Splice.Scripts.TokenStandard.TestAmuletTokenStandardTestEnv
+import Splice.Scripts.UnitTests.GovernanceLockParsers (substitutionTSv1Parser)
+import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
+import Splice.Testing.Utils
+import Splice.TokenStandard.Utils.Internal.Conversions (encodeRelTime, encodeTime)
+
+expectParsed : Show a => Validation Text a -> Script a
+expectParsed (Success a) = pure a
+expectParsed (Errors es) = fail $ "Expected a successful parse, got errors: " <> show es
+
+expectParseError : Show a => Text -> Validation Text a -> Script ()
+expectParseError needle (Success a) =
+  fail $ "Expected a parse error containing '" <> needle <> "', got " <> show a
+expectParseError needle (Errors es) =
+  unless (any (needle `Text.isInfixOf`) (NonEmpty.toList es)) $
+    fail $ "Expected a parse error containing '" <> needle <> "', got " <> show es
+
+lockKindMetadata : GovernanceLockTag -> Metadata
+lockKindMetadata tag = Metadata $ TextMap.singleton lockKindMetaKey (governanceLockTagToText tag)
+
+substitutionRequestMetadata : Metadata
+substitutionRequestMetadata = Metadata $ TextMap.singleton requestMetaKey (governanceLockRequestTagToText GLRT_SubstituteLock)
+
+parseSubstitutionTSv1 : Party -> GovernanceLockTag -> Metadata -> Validation Text GovernanceLockKey
+parseSubstitutionTSv1 admin tag meta =
+  runParser (substitutionTSv1Parser admin) (substitutionRequestMetadata <> lockKindMetadata tag <> meta)
+
+encodeVestingLockSubstitutionTargetMetadata : GovernanceLockKey -> VestingLockSpecification -> Metadata
+encodeVestingLockSubstitutionTargetMetadata key spec =
+  Metadata $ TextMap.fromList $
+    [ (targetLockOwnerMetaKey, partyToText key.owner)
+    , (lockStatusMetaKey, lockStateToText LS_Vesting)
+    , (lockVestingDurationMetaKey, encodeRelTime spec.vestingPeriod)
+    , (lockVestingEndTimeMetaKey, encodeTime spec.endTime)
+    ]
+
+testSubstitutionMeta_lockedTargetDefaults : Script ()
+testSubstitutionMeta_lockedTargetDefaults = do
+  admin <- allocateParty "admin"
+  alice <- allocateParty "alice"
+  let kind = GLK_SuperValidatorRightsOwner "TestSV"
+      meta = Metadata $ TextMap.fromList
+        [ (lockSubjectMetaKey, "TestSV")
+        , (targetLockOwnerMetaKey, partyToText alice)
+        ]
+  parsed <- expectParsed $ parseSubstitutionTSv1 admin GLT_SuperValidator meta
+  parsed === GovernanceLockKey with
+    dso = admin
+    owner = alice
+    specification = fullLockSpecification kind
+
+testSubstitutionMeta_lockedTargetRoundTrip : Script ()
+testSubstitutionMeta_lockedTargetRoundTrip = do
+  admin <- allocateParty "admin"
+  alice <- allocateParty "alice"
+  x <- allocateParty "x"
+  let kind = GLK_FeaturedApp x
+      targetKey = GovernanceLockKey with
+        dso = admin
+        owner = alice
+        specification = fullLockSpecification kind
+      meta = Metadata $ TextMap.fromList
+        [ (lockSubjectMetaKey, partyToText x)
+        , (targetLockOwnerMetaKey, partyToText targetKey.owner)
+        , (lockStatusMetaKey, lockStateToText LS_Locked)
+        ]
+  parsed <- expectParsed $ parseSubstitutionTSv1 admin GLT_FeaturedApp meta
+  parsed === targetKey
+
+testSubstitutionMeta_vestingTargetRoundTrip : Script ()
+testSubstitutionMeta_vestingTargetRoundTrip = do
+  now <- getTime
+  admin <- allocateParty "admin"
+  alice <- allocateParty "alice"
+  let kind = GLK_SuperValidatorRightsOwner "TestSV"
+      spec = VestingLockSpecification with
+        kind
+        vestingPeriod = days 60
+        endTime = now `addRelTime` days 45
+      targetKey = GovernanceLockKey with
+        dso = admin
+        owner = alice
+        specification = GLS_VestingLock spec
+      meta = encodeVestingLockSubstitutionTargetMetadata targetKey spec <>
+        (Metadata $ TextMap.fromList [(lockSubjectMetaKey, "TestSV")])
+  parsed <- expectParsed $ parseSubstitutionTSv1 admin GLT_SuperValidator meta
+  parsed === targetKey
+
+testSubstitutionMeta_failures : Script ()
+testSubstitutionMeta_failures = do
+  admin <- allocateParty "admin"
+  alice <- allocateParty "alice"
+  let base = TextMap.fromList
+        [ (lockSubjectMetaKey, "TestSV")
+        , (targetLockOwnerMetaKey, partyToText alice)
+        ]
+      parse values = parseSubstitutionTSv1 admin GLT_SuperValidator (Metadata values)
+
+  expectParseError lockStatusMetaKey $
+    parse $ TextMap.insert lockStatusMetaKey "unlocking" base
+  expectParseError targetLockOwnerMetaKey $
+    parse $ TextMap.insert targetLockOwnerMetaKey "bad$party" base
+  expectParseError lockSubjectMetaKey $
+    parse $ TextMap.delete lockSubjectMetaKey base
+  expectParseError lockVestingDurationMetaKey $
+    parse $ TextMap.insert lockStatusMetaKey (lockStateToText LS_Vesting) base
+  expectParseError lockVestingEndTimeMetaKey $
+    parse $ TextMap.insert lockStatusMetaKey (lockStateToText LS_Vesting) base
+
+testSubstitution_governanceLock : Script ()
+testSubstitution_governanceLock = do
+  env@TestEnv{..} <- setupTest
+  let registry = registriesEnv.amuletV2
+
+  let dso = env.instrId.admin
+  let someSvKind = GLK_SuperValidatorRightsOwner "TestSV"
+
+
+  let testLockAmount = 180000.0
+  AmuletRegistryV2.tapFaucet registriesEnv.amuletV2 alice (testLockAmount - 1000.0) -- Env creates 1000.0 for alice, so we top up to 180k
+  AmuletRegistryV2.tapFaucet registriesEnv.amuletV2 bob testLockAmount
+
+  lockForGovernance registries registry alice testLockAmount someSvKind
+
+  -- check balances
+  let checkBalances (aliceUnlocked, aliceLocked) (bobUnlocked, bobLocked) = do
+        WalletClientV2.checkUnlockedBalance alice env.instrId aliceUnlocked
+        WalletClientV2.checkBalance alice env.instrId (aliceUnlocked + aliceLocked)
+        WalletClientV2.checkUnlockedBalance bob env.instrId bobUnlocked
+        WalletClientV2.checkBalance bob env.instrId (bobUnlocked + bobLocked)
+
+  checkBalances (0.0, testLockAmount) (testLockAmount, 0.0)
+
+  -- propose two partial substs
+  let testSubstAmount = 50000.0
+
+  let target = GovernanceLockKey with
+        dso
+        owner = alice
+        specification = fullLockSpecification someSvKind
+      createSubstitution amount = do
+        proposeSubstitution registries registry bob target amount
+        pure ()
+
+  createSubstitution (testSubstAmount / 2.0)
+  createSubstitution (testSubstAmount / 2.0)
+
+  checkBalances (0.0, testLockAmount) (testLockAmount - testSubstAmount, testSubstAmount)
+
+  -- accept substitution
+  let acceptOneSubstitution = do
+        (substitutionCid, _)::_ <- query @GovernanceLockSubstitution dso
+        expectSuccess $ acceptInstructionV1 env (toInterfaceContractId substitutionCid) alice
+        pure ()
+
+  acceptOneSubstitution
+  query @GovernanceLock alice >>= (debug . show)
+  acceptOneSubstitution
+  checkBalances (testSubstAmount, testLockAmount - testSubstAmount) (testLockAmount - testSubstAmount, testSubstAmount)
+
+  -- propose full subst
+  createSubstitution (testLockAmount - testSubstAmount)
+
+  checkBalances (testSubstAmount, testLockAmount - testSubstAmount) (0.0, testLockAmount)
+
+  -- accept substitution
+  acceptOneSubstitution
+
+  checkBalances (testLockAmount, 0.0) (0.0, testLockAmount)
+
+  pure ()
+
+testSubstitution_failures : Script ()
+testSubstitution_failures = do
+  env@TestEnv{..} <- setupTest
+  let registry = registriesEnv.amuletV2
+      kind = GLK_SuperValidatorRightsOwner "TestSV"
+  AmuletRegistryV2.tapFaucet registry alice 49000.0 -- alice starts with 1000.0
+  AmuletRegistryV2.tapFaucet registry bob 60000.0
+
+  let targetSpec = fullLockSpecification kind
+  lockForGovernance registries registry alice 50000.0 kind
+
+  -- Insufficient funds to create the substitution
+  WalletClientV2.createBatchingUtility charlie
+  expectFailureContaining "Insufficient funds: you are missing" =<< proposeSubstitution' env.registries env.registriesEnv.amuletV2 charlie
+    (GovernanceLockKey with dso = instrId.admin; owner = alice; specification = targetSpec)
+    60000.0
+
+  -- Insufficient lock size on the accepter side
+  expectSuccess $ proposeSubstitution' env.registries env.registriesEnv.amuletV2 bob
+    (GovernanceLockKey with dso = instrId.admin; owner = alice; specification = targetSpec)
+    60000.0
+  [(substitutionCid, _)] <- query @GovernanceLockSubstitution bob
+
+  expectFailureContaining "substituted lock has less funds " =<<
+    acceptInstructionV1 env (toInterfaceContractId substitutionCid) alice
+
+-- | Negative: `expiresAt` is derived from `requestedAt`, so dating a proposal into
+-- the future would let the proposer choose how long the registry admin has to wait to withdraw it.
+testSubstitution_futureRequestedAt : Script ()
+testSubstitution_futureRequestedAt = do
+  TestEnv{..} <- setupTest
+  let registry = registriesEnv.amuletV2
+      kind = GLK_SuperValidatorRightsOwner "TestSV"
+  AmuletRegistryV2.tapFaucet registry alice 49000.0
+  AmuletRegistryV2.tapFaucet registry bob 20000.0
+
+  let targetSpec = fullLockSpecification kind
+  lockForGovernance registries registry alice 50000.0 kind
+
+  requestedAt <- (`addRelTime` days 1) <$> getTime
+  expectFailureContaining "requestedAt" =<< proposeSubstitutionAt' registries registry bob
+    (GovernanceLockKey with dso = instrId.admin; owner = alice; specification = targetSpec)
+    20000.0 requestedAt
+
+-- | alice holds a 50000.0 SV lock; bob has 20000.0 liquid and proposes to substitute 20000.0 of it.
+setupSubstitution : Script (TestEnv, ContractId GovernanceLock, GovernanceLockSpecification, ContractId V1.TransferInstruction)
+setupSubstitution = do
+  env@TestEnv{..} <- setupTest
+  let registry = registriesEnv.amuletV2
+      kind = GLK_SuperValidatorRightsOwner "TestSV"
+  AmuletRegistryV2.tapFaucet registry alice 49000.0
+  AmuletRegistryV2.tapFaucet registry bob 20000.0
+  targetCid <- lockForGovernance registries registry alice 50000.0 kind
+  let targetKey = GovernanceLockKey with dso = instrId.admin; owner = alice; specification = fullLockSpecification kind
+      newSpec = fullLockSpecification kind
+  proposal <- proposeSubstitution registries registry bob
+    targetKey
+    20000.0
+  pure (env, targetCid, newSpec, proposal)
+
+-- TSv1 workflows on substitutions
+---------------------------------
+
+testSubstitutionV1_view : Script ()
+testSubstitutionV1_view = do
+  (TestEnv{..}, _, _, substitutionCid) <- setupSubstitution
+  Some transferView <- queryInterfaceContractId bob substitutionCid
+  transferView.transfer.amount === 20000.0
+  transferView.status === V1.TransferPendingInternalWorkflow with
+    pendingActions = Map.fromList [(alice, "accept substitution; reject substitution"), (bob, "withdraw substitution")]
+
+testSubstitutionV1_accept : Script ()
+testSubstitutionV1_accept = do
+  (env@TestEnv{..}, _, newSpec, substitutionCid) <- setupSubstitution
+  result <- expectSuccess (acceptInstructionV1 env substitutionCid alice)
+  result.senderChangeCids === []
+  [unlockedAmulet] <- expectTransferCompleted result
+  WalletClientV2.checkHolding alice (coerceContractId unlockedAmulet) 20000.0
+
+  [(_, newLock)] <- query @GovernanceLock bob
+  newLock.owner === bob
+  newLock.amount === 20000.0
+  newLock.specification === newSpec
+  WalletClientV2.checkUnlockedBalance alice instrId 20000.0
+  WalletClientV2.checkBalance alice instrId 50000.0
+
+testSubstitutionV1_withdraw : Script ()
+testSubstitutionV1_withdraw = do
+  (env@TestEnv{..}, _, _, substitutionCid) <- setupSubstitution
+  WalletClientV2.checkUnlockedBalance bob instrId 0.0
+  changes <- expectTransferFailed =<< expectSuccess (withdrawInstructionV1 env substitutionCid bob)
+  length changes === 1
+  WalletClientV2.checkUnlockedBalance bob instrId 20000.0
+  archived <- queryInterfaceContractId bob substitutionCid
+  archived === None
+
+-- | Only the owner of the target lock can reject a proposal, and the proposer gets their funds back.
+testSubstitutionV1_reject : Script ()
+testSubstitutionV1_reject = do
+  (env@TestEnv{..}, targetCid, _, substitutionCid) <- setupSubstitution
+  WalletClientV2.checkUnlockedBalance bob instrId 0.0
+  -- the proposer cannot reject
+  expectFailureContaining "" =<< rejectInstructionV1 env substitutionCid bob
+  [change] <- expectTransferFailed =<< expectSuccess (rejectInstructionV1 env substitutionCid alice)
+  WalletClientV2.checkHolding bob (coerceContractId change) 20000.0
+  WalletClientV2.checkUnlockedBalance bob instrId 20000.0
+  archived <- queryInterfaceContractId bob substitutionCid
+  archived === None
+  Some target <- queryContractId alice targetCid
+  target.amount === 50000.0
+
+testSubstitutionV1_updateFails : Script ()
+testSubstitutionV1_updateFails = do
+  (TestEnv{..}, _, _, substitutionCid) <- setupSubstitution
+  let registry = registriesEnv.amuletV2
+  expectFailureContaining "substitutions cannot be updated" =<<
+    submitWithTransferContext registry (actAs instrId.admin) \context ->
+      exerciseCmd substitutionCid V1.TransferInstruction_Update with extraActors = []; extraArgs = emptyExtraArgs with context
+
+testSubstitutionV1_vestingTarget : Script ()
+testSubstitutionV1_vestingTarget = do
+  env@TestEnv{..} <- setupTest
+  let registry = registriesEnv.amuletV2
+      kind = GLK_SuperValidatorRightsOwner "TestSV"
+  AmuletRegistryV2.tapFaucet registry alice 49000.0
+  AmuletRegistryV2.tapFaucet registry bob 20000.0
+  lockCid <- lockForGovernance registries registry alice 50000.0 kind
+  unlockAt <- (`addRelTime` hours 1) <$> getTime
+  (Some vestingCid, None, None) <- unlockGovernanceLock registries registry lockCid 50000.0 unlockAt
+  Some vestingLock <- queryContractId alice vestingCid
+  vestingSpec <- requireVestingLock vestingLock.specification
+  let newSpec = vestingSpec with kind
+
+  proposalCid <- proposeSubstitution registries registry bob
+    (GovernanceLockKey with
+      dso = instrId.admin
+      owner = alice
+      specification = vestingLock.specification)
+    20000.0
+
+  [unlockedAmulet] <- expectTransferCompleted =<< expectSuccess (acceptInstructionV1 env proposalCid alice)
+  WalletClientV2.checkHolding alice (coerceContractId unlockedAmulet) 20000.0
+  [(_, newLock)] <- query @GovernanceLock bob
+  newLock.owner === bob
+  newLock.amount === 20000.0
+  newVestingSpec <- requireVestingLock newLock.specification
+  newVestingSpec.vestingPeriod === vestingSpec.vestingPeriod
+  newVestingSpec.endTime === vestingSpec.endTime
+  newLock.specification === GLS_VestingLock newSpec
+  WalletClientV2.checkUnlockedBalance alice instrId 20000.0
+
+-- Substitutions proposed by the owner of the target lock
+---------------------------------------------------------
+
+-- | alice locks all her 50000.0 in an SV lock with the specification that `mkTargetSpec` builds.
+setupSelfSubstitution : GovernanceLockSpecification -> Script (TestEnv, ContractId GovernanceLock, GovernanceLockSpecification)
+setupSelfSubstitution targetSpec = do
+  env@TestEnv{..} <- setupTest
+  AmuletRegistryV2.tapFaucet registriesEnv.amuletV2 alice 49000.0 -- alice starts with 1000.0
+  targetCid <- lockForGovernance registries registriesEnv.amuletV2 alice 50000.0 $ governanceLockKind targetSpec
+  WalletClientV2.checkUnlockedBalance alice instrId 0.0
+  pure (env, targetCid, targetSpec)
+
+-- | alice proposes to substitute `amount` of her lock with `targetSpec`.
+-- Returns the proposal and the change holdings of its creation.
+proposeSelfSubstitution
+  :  TestEnv -> GovernanceLockSpecification -> Decimal
+  -> Script (ContractId V1.TransferInstruction, [ContractId V1.Holding])
+proposeSelfSubstitution env targetSpec amount = do
+  result <- expectSuccess $ proposeSubstitution' env.registries env.registriesEnv.amuletV2 env.alice
+    (GovernanceLockKey with dso = env.instrId.admin; owner = env.alice; specification = targetSpec)
+    amount
+  proposalCid <- expectTransferPending result
+  pure (proposalCid, result.senderChangeCids)
+
+selfSubstitutionKind : GovernanceLockKind
+selfSubstitutionKind = GLK_SuperValidatorRightsOwner "TestSV"
+
+-- | alice proposes to substitute part of her lock without liquid funds.
+testSelfSubstitution_partial : Script ()
+testSelfSubstitution_partial = do
+  (env@TestEnv{..}, targetCid, targetSpec) <- setupSelfSubstitution $ fullLockSpecification selfSubstitutionKind
+
+  -- alice has no liquid funds, and the proposal locks none
+  (proposalCid, changeCids) <- proposeSelfSubstitution env targetSpec 20000.0
+  changeCids === []
+  Some proposal <- queryContractId alice (fromInterfaceContractId @GovernanceLockSubstitution proposalCid)
+  proposal.lockedAmulet === None
+  Some proposalView <- queryInterfaceContractId alice proposalCid
+  proposalView.transfer.inputHoldingCids === []
+  WalletClientV2.checkBalance alice instrId 50000.0
+
+  -- no funds are returned, as alice is the owner of the target lock
+  acceptResult <- expectSuccess $ acceptInstructionV1 env proposalCid alice
+  acceptResult.senderChangeCids === []
+  [] <- expectTransferCompleted acceptResult
+
+  -- the target lock is split into the new lock and the remainder
+  archivedTarget <- queryContractId alice targetCid
+  archivedTarget === None
+  locks <- query @GovernanceLock alice
+  length locks === 2
+  [(newLockCid, newLock)] <- pure $ filter (\(_, l) -> l.amount == 20000.0) locks
+  [(remainingLockCid, remainder)] <- pure $ filter (\(_, l) -> l.amount == 30000.0) locks
+  newLock.owner === alice
+  newLock.amount === 20000.0
+  newLock.specification === targetSpec
+  checkLockedHolding alice newLockCid 20000.0
+  remainder.owner === alice
+  remainder.specification === targetSpec
+  checkLockedHolding alice remainingLockCid 30000.0
+  WalletClientV2.checkUnlockedBalance alice instrId 0.0
+  WalletClientV2.checkBalance alice instrId 50000.0
+
+testSubstitution_mergesTargetLocks : Script ()
+testSubstitution_mergesTargetLocks = do
+  (env@TestEnv{..}, _, targetSpec) <- setupSelfSubstitution $ fullLockSpecification selfSubstitutionKind
+  (selfProposalCid, _) <- proposeSelfSubstitution env targetSpec 20000.0
+  expectSuccess $ acceptInstructionV1 env selfProposalCid alice
+  locks <- queryFilter @GovernanceLock alice (\l -> l.owner == alice)
+  length locks === 2
+
+  AmuletRegistryV2.tapFaucet registriesEnv.amuletV2 bob 50000.0
+  proposalCid <- proposeSubstitution registries registriesEnv.amuletV2 bob
+    (GovernanceLockKey with dso = instrId.admin; owner = alice; specification = targetSpec)
+    50000.0
+  [unlockedAmulet] <- expectTransferCompleted =<< expectSuccess (acceptInstructionV1 env proposalCid alice)
+  WalletClientV2.checkHolding alice (coerceContractId unlockedAmulet) 50000.0
+
+  remainingLocks <- queryFilter @GovernanceLock alice (\l -> l.owner == alice)
+  remainingLocks === []
+  [(newLockCid, _)] <- queryFilter @GovernanceLock bob (\l -> l.owner == bob)
+  checkLockedHolding bob newLockCid 50000.0
+
+testSelfSubstitution_fullTSv1 : Script ()
+testSelfSubstitution_fullTSv1 = do
+  (env@TestEnv{..}, _, targetSpec) <- setupSelfSubstitution $ fullLockSpecification selfSubstitutionKind
+
+  (proposalCid, _) <- proposeSelfSubstitution env targetSpec 50000.0
+  Some transferView <- queryInterfaceContractId alice proposalCid
+  transferView.transfer.sender === alice
+  transferView.transfer.receiver === alice
+  transferView.transfer.inputHoldingCids === []
+  transferView.status === V1.TransferPendingInternalWorkflow with
+    pendingActions = Map.fromList [(alice, "accept substitution; reject substitution; withdraw substitution")]
+
+  acceptResult <- expectSuccess $ acceptInstructionV1 env proposalCid alice
+  acceptResult.senderChangeCids === []
+  receiverHoldings <- expectTransferCompleted acceptResult
+  receiverHoldings === []
+
+  [(newLockCid, newLock)] <- query @GovernanceLock alice
+  newLock.amount === 50000.0
+  newLock.specification === targetSpec
+  checkLockedHolding alice newLockCid 50000.0
+  WalletClientV2.checkUnlockedBalance alice instrId 0.0
+  WalletClientV2.checkBalance alice instrId 50000.0
+
+-- | A self-substitution ignores the input holdings.
+testSelfSubstitution_ignoresInputHoldings : Script ()
+testSelfSubstitution_ignoresInputHoldings = do
+  (env@TestEnv{..}, _, targetSpec) <- setupSelfSubstitution $ fullLockSpecification selfSubstitutionKind
+  AmuletRegistryV2.tapFaucet registriesEnv.amuletV2 alice 5000.0
+
+  (_, changeCids) <- proposeSelfSubstitution env targetSpec 20000.0
+  changeCids === []
+  WalletClientV2.checkUnlockedBalance alice instrId 5000.0
+  WalletClientV2.checkBalance alice instrId 55000.0
+
+-- | Withdrawing a self-substitution returns no funds and leaves the target lock unchanged.
+testSelfSubstitution_withdraw : Script ()
+testSelfSubstitution_withdraw = do
+  (env@TestEnv{..}, targetCid, targetSpec) <- setupSelfSubstitution $ fullLockSpecification selfSubstitutionKind
+
+  -- TSv1
+  (proposalCid, _) <- proposeSelfSubstitution env targetSpec 20000.0
+  senderChanges <- expectTransferFailed =<< expectSuccess (withdrawInstructionV1 env proposalCid alice)
+  senderChanges === []
+
+  Some target <- queryContractId alice targetCid
+  target.amount === 50000.0
+  WalletClientV2.checkUnlockedBalance alice instrId 0.0
+  WalletClientV2.checkBalance alice instrId 50000.0
+
+-- | alice moves part of her vesting lock to a vesting lock that charlie can also withdraw from.
+-- The new lock keeps the vesting period and end time of the target.
+testSelfSubstitution_vesting : Script ()
+testSelfSubstitution_vesting = do
+  (env@TestEnv{..}, lockCid, _) <- setupSelfSubstitution $ fullLockSpecification selfSubstitutionKind
+  unlockAt <- (`addRelTime` hours 1) <$> getTime
+  (Some vestingCid, None, None) <- unlockGovernanceLock registries registriesEnv.amuletV2 lockCid 50000.0 unlockAt
+  Some vestingLock <- queryContractId alice vestingCid
+  vestingTimes <- requireVestingLock vestingLock.specification
+
+  result <- expectSuccess $ proposeSubstitution' registries registriesEnv.amuletV2 alice
+    (GovernanceLockKey with
+      dso = instrId.admin
+      owner = alice
+      specification = vestingLock.specification)
+    20000.0
+  result.senderChangeCids === []
+  proposalCid <- expectTransferPending result
+  Some proposal <- queryContractId alice (fromInterfaceContractId @GovernanceLockSubstitution proposalCid)
+  proposal.lockedAmulet === None
+
+  acceptResult <- expectSuccess $ acceptInstructionV1 env proposalCid alice
+  acceptResult.senderChangeCids === []
+  [] <- expectTransferCompleted acceptResult
+
+  archivedTarget <- queryContractId alice vestingCid
+  archivedTarget === None
+  locks <- query @GovernanceLock alice
+  length locks === 2
+  [(newLockCid, newLock)] <- pure $ filter (\(_, l) -> l.amount == 20000.0) locks
+  [(remainingLockCid, remainder)] <- pure $ filter (\(_, l) -> l.amount == 30000.0) locks
+  newLock.owner === alice
+  newLock.amount === 20000.0
+  newTimes <- requireVestingLock newLock.specification
+  newTimes.vestingPeriod === vestingTimes.vestingPeriod
+  newTimes.endTime === vestingTimes.endTime
+  newLock.specification === vestingLock.specification
+  checkLockedHolding alice newLockCid 20000.0
+  remainder.specification === vestingLock.specification
+  checkLockedHolding alice remainingLockCid 30000.0
+  WalletClientV2.checkUnlockedBalance alice instrId 0.0
+
+-- | A proposal by the owner of the target lock fails on acceptance if the target lock has too little funds,
+-- or if the remainder would be below the minimum lock amount.
+testSelfSubstitution_failures : Script ()
+testSelfSubstitution_failures = do
+  (env@TestEnv{..}, _, targetSpec) <- setupSelfSubstitution $ fullLockSpecification selfSubstitutionKind
+
+  -- more than the target lock holds
+  (tooLarge, _) <- proposeSelfSubstitution env targetSpec 60000.0
+  expectFailureContaining "substituted lock has less funds" =<<
+    acceptInstructionV1 env tooLarge alice
+
+  -- the remainder of 5000.0 is below the minimum lock amount of 10000.0
+  (smallRemainder, _) <- proposeSelfSubstitution env targetSpec 45000.0
+  expectFailureContaining "minimum governance lock amount" =<<
+    acceptInstructionV1 env smallRemainder alice
+
+-- | Rejecting a proposal by the owner of the target lock returns no funds and leaves the target lock unchanged.
+testSelfSubstitution_reject : Script ()
+testSelfSubstitution_reject = do
+  (env@TestEnv{..}, targetCid, targetSpec) <- setupSelfSubstitution $ fullLockSpecification selfSubstitutionKind
+
+  (proposalCid, _) <- proposeSelfSubstitution env targetSpec 20000.0
+  changes <- expectTransferFailed =<< expectSuccess (rejectInstructionV1 env proposalCid alice)
+  changes === []
+
+  Some target <- queryContractId alice targetCid
+  target.amount === 50000.0
+  WalletClientV2.checkUnlockedBalance alice instrId 0.0
+  WalletClientV2.checkBalance alice instrId 50000.0

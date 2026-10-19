@@ -1946,6 +1946,70 @@ class DbSvDsoStore(
     )
   }
 
+  override def listProvisionalGovernanceLocksWithFeaturedAppRightSample(
+      unavailablePartiesStore: Option[UnavailablePartiesStore] = None
+  ): ListExpiredContracts[
+    splice.governancelock.GovernanceLock.ContractId,
+    splice.governancelock.GovernanceLock,
+  ] = (_, limit) =>
+    implicit tc =>
+      waitUntilAcsIngested {
+        val opName = "listProvisionalGovernanceLocksWithFeaturedAppRightSample"
+        for {
+          ignoredParties <- UnavailablePartiesStore.listParties(unavailablePartiesStore)
+          filterClause =
+            if (ignoredParties.nonEmpty)
+              (sql" and " ++ notInClause(
+                "acs.create_arguments->>'owner'",
+                ignoredParties,
+              ) ++ sql" and " ++ notInClause(
+                "acs.provisional_featured_app_lock_for",
+                ignoredParties,
+              )).toActionBuilder
+            else sql""
+          synchronizerId <- getDsoRules().map(_.domain)
+          result <- storage.query(
+            (sql"""
+          select #${AcsQueries.SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated(
+                "sample."
+              )}
+          from (
+            select #${AcsQueries.SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()}
+            from #${DsoTables.acsTableName} acs
+            where acs.store_id = $acsStoreId
+              and acs.migration_id = $domainMigrationId
+              and acs.package_name = ${splice.governancelock.GovernanceLock.PACKAGE_NAME}
+              and acs.template_id_qualified_name = ${QualifiedName(
+                splice.governancelock.GovernanceLock.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
+              and acs.assigned_domain = $synchronizerId
+              and acs.provisional_featured_app_lock_for is not null
+              and exists (
+                select 1
+                from #${DsoTables.acsTableName} fa_right
+                where fa_right.store_id = acs.store_id
+                  and fa_right.migration_id = acs.migration_id
+                  and fa_right.package_name = ${FeaturedAppRight.PACKAGE_NAME}
+                  and fa_right.template_id_qualified_name = ${QualifiedName(
+                FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
+              )}
+                  and fa_right.assigned_domain is not null
+                  and fa_right.featured_app_right_provider = acs.provisional_featured_app_lock_for
+              )
+              """ ++ filterClause ++ sql"""
+            limit 1000
+          ) sample
+          order by random()
+          limit ${sqlLimit(limit)}
+          """).toActionBuilder.as[AcsQueries.SelectFromAcsTableWithStateResult],
+            opName,
+          )
+          limited = applyLimit(opName, limit, result)
+        } yield limited.map(
+          assignedContractFromRow(splice.governancelock.GovernanceLock.COMPANION)(_)
+        )
+      }
+
   override def lookupAnsEntryContext(reference: SubscriptionRequest.ContractId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[AnsEntryContext.ContractId, AnsEntryContext]]] =

@@ -368,6 +368,15 @@ object AmuletArchive {
     } else None
 }
 
+object GovernanceLockSubstitutionExercise {
+  private val substitutionTemplate = QualifiedName(
+    splice.governancelock.GovernanceLockSubstitution.COMPANION.getTemplateIdWithPackageId
+  )
+
+  def unapply(event: ExercisedEvent): Option[ExercisedEvent] =
+    if (QualifiedName(event.getTemplateId) == substitutionTemplate) Some(event) else None
+}
+
 object AmuletCreate {
   type TCid = amuletCodegen.Amulet.ContractId
   type T = amuletCodegen.Amulet

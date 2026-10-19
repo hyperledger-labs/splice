@@ -1,0 +1,64 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Iso8601 (
+  parseIso8601UtcTime
+) where
+
+import DA.Date
+import DA.Either (optionalToEither)
+import DA.Text qualified as Text
+
+-- This is an internal error because at this point the component should be completely parsed from its individual
+-- characters, which would have produced errors if they didn't form a valid Int
+parseInt : Text -> Text -> Either Text Int
+parseInt type_ input = optionalToEither ("Failed to parse " <> type_ <> " as Int" <> ": '" <> input <> "'") $ Text.parseInt input
+
+ensureInRange : Text -> Int -> Int -> Int -> Either Text Int
+ensureInRange type_ low high i =
+  if i >= low && i <= high then Right i
+  else Left $ "Invalid " <> type_ <> ": " <> show i <> ". Expected a value between " <> show low <> " and " <> show high
+
+parseIntInRange : Text -> Int -> Int -> Text -> Either Text Int
+parseIntInRange type_ low high input = parseInt type_ input >>= ensureInRange type_ low high
+
+parseYear : Text -> Either Text Int
+parseYear = parseInt "year"
+
+parseMonth : Text -> Either Text Month
+parseMonth input = (\i -> toEnum (i - 1)) <$> parseIntInRange "month" 1 12 input
+
+parseDay : Int -> Month -> Text -> Either Text Int
+parseDay year month = parseIntInRange "day" 1 (monthDayCount year month)
+
+parseHour : Text -> Either Text Int
+parseHour = parseIntInRange "hour" 0 23
+
+parseMinute : Text -> Either Text Int
+parseMinute = parseIntInRange "minute" 0 59
+
+parseSecond : Text -> Either Text Int
+parseSecond = parseIntInRange "second" 0 59
+
+-- Parse ISO 8601 formatted text into a Time.
+parseIso8601UtcTime : Text -> Either Text Time
+parseIso8601UtcTime input = do
+  let
+    invalidTime = "Invalid Time: '" <> input <> "'"
+
+    parseFromRange : Int -> Int -> Text -> (Text -> Either Text a) -> Either Text a
+    parseFromRange low high terminator parse = do
+      let numChars = high - low
+          textWithTerminator = Text.take (numChars + 1) (Text.drop low input)
+      case Text.splitAt numChars textWithTerminator of
+        (text, end) | Text.length text == numChars && end == terminator -> parse text
+        _ -> Left $ invalidTime
+
+  assertMsg invalidTime $ Text.length input <= 20
+  year <- parseFromRange 0 4 "-" parseYear
+  month <- parseFromRange 5 7 "-" parseMonth
+  day <- parseFromRange 8 10 "T" $ parseDay year month
+  hour <- parseFromRange 11 13 ":" parseHour
+  minute <- parseFromRange 14 16 ":" parseMinute
+  second <- parseFromRange 17 19 "Z" parseSecond
+  pure $ datetime year month day hour minute second

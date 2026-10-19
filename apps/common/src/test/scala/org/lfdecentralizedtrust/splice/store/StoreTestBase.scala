@@ -31,6 +31,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   expiry as expiryCodegen,
   externalpartyamuletrules as externalpartyamuletrulesCodegen,
   fees as feesCodegen,
+  governancelock as governancelockCodegen,
   round as roundCodegen,
   schedule as scheduleCodegen,
   validatorlicense as validatorLicenseCodegen,
@@ -537,6 +538,45 @@ abstract class StoreTestBase
       payload = template,
     )
   }
+
+  protected def governanceLock(
+      owner: PartyId,
+      amount: BigDecimal,
+      dso: PartyId = dsoParty,
+      kind: governancelockCodegen.GovernanceLockKind =
+        new governancelockCodegen.governancelockkind.GLK_SuperValidatorRightsOwner("sv1"),
+      vestingEndTime: Option[Instant] = None,
+      contractId: String = nextCid(),
+  ): Contract[
+    governancelockCodegen.GovernanceLock.ContractId,
+    governancelockCodegen.GovernanceLock,
+  ] =
+    contract(
+      identifier = governancelockCodegen.GovernanceLock.TEMPLATE_ID_WITH_PACKAGE_ID,
+      contractId = new governancelockCodegen.GovernanceLock.ContractId(contractId),
+      payload = new governancelockCodegen.GovernanceLock(
+        dso.toProtoPrimitive,
+        owner.toProtoPrimitive,
+        amount.bigDecimal,
+        new LockedAmulet.ContractId(nextCid()),
+        vestingEndTime match {
+          case Some(endTime) =>
+            new governancelockCodegen.governancelockspecification.GLS_VestingLock(
+              new governancelockCodegen.VestingLockSpecification(
+                kind,
+                new RelTime(1_000_000),
+                endTime,
+              )
+            )
+          case None =>
+            new governancelockCodegen.governancelockspecification.GLS_FullLock(
+              new governancelockCodegen.FullLockSpecification(kind)
+            )
+        },
+        Optional.empty(),
+        Instant.now().truncatedTo(ChronoUnit.MICROS),
+      ),
+    )
 
   protected def appRewardCoupon(
       round: Int,

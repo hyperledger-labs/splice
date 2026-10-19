@@ -753,6 +753,21 @@ trait SvDsoStore
       : ListExpiredContracts[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed] =
     multiDomainAcsStore.listExpiredFromPayloadExpiry(so.SvOnboardingConfirmed.COMPANION)
 
+  def listExpiredVestingLocks(
+      unavailablePartiesStore: Option[UnavailablePartiesStore]
+  ): ListExpiredContracts[
+    splice.governancelock.GovernanceLock.ContractId,
+    splice.governancelock.GovernanceLock,
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(
+      splice.governancelock.GovernanceLock.COMPANION,
+      unavailablePartiesStore,
+      // TODO(canton-network/splice-sv-fa-locking#76): Make sure custom
+      // controllers parties are listed here as well when they are implemented
+      // in Daml.
+      ignoredPartyFields = Seq("owner"),
+    )
+
   def listExpiredAnsEntries(
       unavailablePartiesStore: Option[UnavailablePartiesStore]
   ): ListExpiredContracts[
@@ -1037,6 +1052,13 @@ trait SvDsoStore
         AssignedContract[splice.amulet.FeaturedAppRight.ContractId, splice.amulet.FeaturedAppRight]
       ]
     ]
+  ]
+
+  def listProvisionalGovernanceLocksWithFeaturedAppRightSample(
+      unavailablePartiesStore: Option[UnavailablePartiesStore] = None
+  ): ListExpiredContracts[
+    splice.governancelock.GovernanceLock.ContractId,
+    splice.governancelock.GovernanceLock,
   ]
 
   def lookupFeaturedAppRight(
@@ -1663,6 +1685,29 @@ object SvDsoStore {
         DsoAcsStoreRowData(
           contract,
           contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+        )
+      },
+      mkFilter(splice.governancelock.GovernanceLock.COMPANION)(
+        co => co.payload.dso == dso,
+        versionGuard = { case (pkgVersionSupport, now) =>
+          (tc) => pkgVersionSupport.supportsGovernanceLock(Seq(dsoParty), now)(tc)
+        },
+      ) { contract =>
+        val expiresAt = GovernanceLockUtil
+          .getVestingLockSpecification(contract.payload)
+          .map(v => Timestamp.assertFromInstant(v.endTime))
+        val provisionalFeaturedAppLockFor = GovernanceLockUtil.foldSpecification(contract.payload)(
+          _.kind match {
+            case kind: splice.governancelock.governancelockkind.GLK_ProvisionalFeaturedApp =>
+              Some(PartyId.tryFromProtoPrimitive(kind.provider))
+            case _ => None
+          },
+          _ => None,
+        )
+        DsoAcsStoreRowData(
+          contract,
+          provisionalFeaturedAppLockFor = provisionalFeaturedAppLockFor,
+          contractExpiresAt = expiresAt,
         )
       },
     )

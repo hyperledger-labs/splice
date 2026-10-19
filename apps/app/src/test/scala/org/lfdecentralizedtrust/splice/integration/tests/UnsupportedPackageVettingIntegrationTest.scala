@@ -200,6 +200,7 @@ class UnsupportedPackageVettingIntegrationTest
           currentConfig.developmentFundManagerBlacklist,
           currentConfig.minDevelopmentFundMintingDelay,
           currentConfig.amuletSwitchOverTimes,
+          currentConfig.governanceLockConfig,
         )
         setAmuletConfig(Seq((None, newAmuletConfig, currentConfig)))
       }

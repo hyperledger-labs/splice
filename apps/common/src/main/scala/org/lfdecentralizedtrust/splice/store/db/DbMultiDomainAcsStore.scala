@@ -269,22 +269,44 @@ final class DbMultiDomainAcsStore[TXE](
     }
   }
 
+  private def selectGenericContractById(id: ContractId[?]) =
+    (sql"""
+     select #${SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()}
+     from #$acsTableName acs
+     where acs.store_id = $acsStoreId
+       and acs.migration_id = $domainMigrationId
+       and acs.contract_id = ${lengthLimited(id.contractId)}""").toActionBuilder
+      .as[AcsQueries.SelectFromAcsTableWithStateResult]
+      .headOption
+
   override def lookupContractStateById(id: ContractId[?])(implicit
       traceContext: TraceContext
   ): Future[Option[ContractState]] = waitUntilAcsIngested {
     storage
       .querySingle( // index: acs_store_template_sid_mid_cid
-        (sql"""
-         select #${SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()}
-         from #$acsTableName acs
-         where acs.store_id = $acsStoreId
-           and acs.migration_id = $domainMigrationId
-           and acs.contract_id = ${lengthLimited(id.contractId)}""").toActionBuilder
-          .as[AcsQueries.SelectFromAcsTableWithStateResult]
-          .headOption,
+        selectGenericContractById(id),
         "lookupContractStateById",
       )
       .map(result => contractStateFromRow(result.stateRow))
+      .value
+  }
+
+  override def lookupGenericContractById(id: ContractId[?])(implicit
+      traceContext: TraceContext
+  ): Future[Option[Contract[?, ?]]] = waitUntilAcsIngested {
+    storage
+      .querySingle( // index: acs_store_template_sid_mid_cid
+        selectGenericContractById(id),
+        "lookupGenericContractById",
+      )
+      .subflatMap { result =>
+        genericContractFromRow(result.acsRow) match {
+          case Right(contract) => Some(contract)
+          case Left(err) =>
+            logger.debug(s"Failed to decode generic contract ${id.contractId}: $err")
+            None
+        }
+      }
       .value
   }
 
