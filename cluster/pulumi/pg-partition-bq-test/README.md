@@ -441,7 +441,14 @@ SELECT datastream_metadata.change_type, count(*)
 
 - **Expected:** the stream is still `RUNNING`.
 
-## 4. Read-only check for real clusters
+## 4. Test status
+
+Verified all of the above in a real test as of
+`c11d31822e0938a36a7d4d6f17b56037c0c915fe`
+on 2026-10-19.
+-- `@stephencompall-DA`
+
+## 5. Read-only check for real clusters
 
 Do **not** alter publications on real clusters; the legacy Datastreams run on them.
 On clusters with the stag-prod stream enabled, check only:
