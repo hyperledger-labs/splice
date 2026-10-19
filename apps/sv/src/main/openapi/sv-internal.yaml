@@ -482,7 +482,7 @@ paths:
     post:
       tags: [sv]
       x-jvm-package: sv_public
-      x-external-audience: validators
+      x-external-audience: none
       description: "faucet for validator candidates to buy member traffic"
       operationId: "internalBuyMemberTraffic"
       requestBody:
