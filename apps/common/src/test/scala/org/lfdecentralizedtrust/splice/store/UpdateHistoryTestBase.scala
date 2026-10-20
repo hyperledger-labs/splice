@@ -3,7 +3,12 @@ package org.lfdecentralizedtrust.splice.store
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Transaction}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
-import org.lfdecentralizedtrust.splice.environment.ledger.api.{Reassignment, ReassignmentEvent, ReassignmentUpdate, TransactionTreeUpdate}
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
+  Reassignment,
+  ReassignmentEvent,
+  ReassignmentUpdate,
+  TransactionTreeUpdate,
+}
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown

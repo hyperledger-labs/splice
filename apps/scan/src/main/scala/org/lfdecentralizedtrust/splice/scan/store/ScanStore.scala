@@ -163,8 +163,8 @@ trait ScanStore
     ]
   ]]
 
-  def getTotalPurchasedMemberTraffic(memberId: StoreMemberId, synchronizerId: SynchronizerId)(implicit
-      tc: TraceContext
+  def getTotalPurchasedMemberTraffic(memberId: StoreMemberId, synchronizerId: SynchronizerId)(
+      implicit tc: TraceContext
   ): Future[Long]
 
   def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
