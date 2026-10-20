@@ -48,7 +48,7 @@ class ScanEventHistoryIntegrationTest
   "should provide new events with verdicts" in { implicit env =>
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
-    val (_, _) = onboardAliceAndBob()
+    onboardAliceAndBob()
 
     val cursorBeforeTap = eventuallySucceeds() { latestEventHistoryCursor(sv1ScanBackend) }
 

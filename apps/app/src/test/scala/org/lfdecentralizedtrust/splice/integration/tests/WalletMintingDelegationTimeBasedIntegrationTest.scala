@@ -267,7 +267,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             },
           )
 
-          val (_, _) = actAndCheck(
+          actAndCheck(
             "Validator accepts the proposal",
             aliceValidatorWalletClient.acceptMintingDelegationProposal(proposal2Cid),
           )(
@@ -306,7 +306,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             },
           )
 
-          val (_, _) = actAndCheck(
+          actAndCheck(
             "Validator accepts new proposal",
             aliceValidatorWalletClient.acceptMintingDelegationProposal(proposal3Cid),
           )(

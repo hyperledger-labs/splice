@@ -292,7 +292,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   }
 
   "adjust maxNumInput if there is a tap operation in the batch" in { implicit env =>
-    val (_, _) = onboardAliceAndBob()
+    onboardAliceAndBob()
     aliceValidatorWalletClient.tap(50)
     val aliceValidator = aliceValidatorBackend.getValidatorPartyId()
     createRewards(
@@ -339,7 +339,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
   "scan-connection caching avoids unnecessary network calls and re-sending contracts if they are already known by the client" in {
     implicit env =>
-      val (_, _) = onboardAliceAndBob()
+      onboardAliceAndBob()
 
       clue("create issuing rounds 0 and 1") {
         advanceRoundsToNextRoundOpening

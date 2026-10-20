@@ -20,7 +20,7 @@ class ScanConnectionIntegrationTest
       .withoutAutomaticRewardsCollectionAndAmuletMerging
 
   "amulet rules cache should be invalidated when the amulet rules change" in { implicit env =>
-    val (_, _) = onboardAliceAndBob()
+    onboardAliceAndBob()
     // tap once so the AmuletRules are cached...
     aliceWalletClient.tap(5)
     val baseConfig = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule.initialValue
