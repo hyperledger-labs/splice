@@ -8,6 +8,8 @@ import DA.Assert ((===))
 
 import Daml.Script
 
+import Splice.Testing.Utils (trafficPurchaseMemoPrefix)
+
 import Splice.DecentralizedSynchronizer (MemberTrafficPurchase(..), TrafficPurchaseMemo(..), parseTrafficPurchaseMemo, trafficPurchaseReason)
 
 sender : Party
@@ -35,7 +37,7 @@ memoParams =
   "&migration-id=3"
 
 completeMemo : Text
-completeMemo = "cip-128/memo:" <> memoParams
+completeMemo = trafficPurchaseMemoPrefix <> memoParams
 
 parse : Text -> Either Text TrafficPurchaseMemo
 parse = parseTrafficPurchaseMemo
@@ -63,7 +65,7 @@ test_trafficPurchaseReason_includesPurchasedTraffic = script do
 test_parseMemo_keyOrderIrrelevant : Script ()
 test_parseMemo_keyOrderIrrelevant = script do
   let reordered =
-        "cip-128/memo:migration-id=3" <>
+        trafficPurchaseMemoPrefix <> "migration-id=3" <>
         "&synchronizer-id=" <> testSynchronizerId <>
         "&member-id=" <> testMemberId
   parse reordered === Right expectedMemo
@@ -81,12 +83,12 @@ test_parseMemo_forfeitValidatorRewardCoupon = script do
 
 test_parseMemo_rejectsMissingPrefix : Script ()
 test_parseMemo_rejectsMissingPrefix = script do
-  parse memoParams === Left "Traffic purchase memo must start with cip-128/memo:"
-  parse (" " <> completeMemo) === Left "Traffic purchase memo must start with cip-128/memo:"
+  parse memoParams === Left ("Traffic purchase memo must start with " <> trafficPurchaseMemoPrefix)
+  parse (" " <> completeMemo) === Left ("Traffic purchase memo must start with " <> trafficPurchaseMemoPrefix)
 
 test_parseMemo_rejectsMissingKey : Script ()
 test_parseMemo_rejectsMissingKey = script do
-  parse ("cip-128/memo:member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId) ===
+  parse (trafficPurchaseMemoPrefix <> "member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId) ===
     Left "Missing key in traffic purchase memo: migration-id"
 
 test_parseMemo_rejectsUnknownKey : Script ()
@@ -101,13 +103,13 @@ test_parseMemo_rejectsMalformedField : Script ()
 test_parseMemo_rejectsMalformedField = script do
   assertMsg "field without a value is rejected" $ isRejected $ parse $ completeMemo <> "&migration"
   assertMsg "field with two separators is rejected" $
-    isRejected $ parse $ "cip-128/memo:member-id=a=b&synchronizer-id=s&migration-id=0"
+    isRejected $ parse $ trafficPurchaseMemoPrefix <> "member-id=a=b&synchronizer-id=s&migration-id=0"
   assertMsg "empty memo is rejected" $ isRejected $ parse ""
-  assertMsg "prefix without parameters is rejected" $ isRejected $ parse "cip-128/memo:"
+  assertMsg "prefix without parameters is rejected" $ isRejected $ parse trafficPurchaseMemoPrefix
 
 test_parseMemo_rejectsNonIntegerValues : Script ()
 test_parseMemo_rejectsNonIntegerValues = script do
   assertMsg "non-integer migrationId is rejected" $
     isRejected $ parse $
-      "cip-128/memo:member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId <>
+      trafficPurchaseMemoPrefix <> "member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId <>
       "&migration-id=latest"

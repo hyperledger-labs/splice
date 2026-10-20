@@ -46,7 +46,7 @@ testSynchronizerId = "decentralized-synchronizer-id-0"
 
 defaultMemoTag : Text
 defaultMemoTag =
-  "cip-128/memo:member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId <> "&migration-id=0"
+  trafficPurchaseMemoPrefix <> "member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId <> "&migration-id=0"
 
 defaultReason : Text
 defaultReason =
@@ -188,7 +188,7 @@ test_trafficPurchase_acceptsMemoTagInAnyOrder : Script ()
 test_trafficPurchase_acceptsMemoTagInAnyOrder = script do
   setup@TestSetup{..} <- setupTest
   let memoTag =
-        "cip-128/memo:migration-id=0&synchronizer-id=" <> testSynchronizerId <> "&member-id=" <> testMemberId
+        trafficPurchaseMemoPrefix <> "migration-id=0&synchronizer-id=" <> testSynchronizerId <> "&member-id=" <> testMemberId
   result <- buyTraffic setup defaultTransfer with meta = memoTagMeta memoTag
   TextMap.lookup reasonMetaKey result.meta.values === Some defaultReason
 
@@ -205,7 +205,7 @@ test_trafficPurchase_rejectsUnknownSynchronizer = script do
   buyTrafficMustFailWith
     (expectErrorId "splice.lfdecentralizedtrust.org/unknown-synchronizer")
     setup defaultTransfer with
-      meta = memoTagMeta ("cip-128/memo:member-id=" <> testMemberId <> "&synchronizer-id=unknown-synchronizer&migration-id=0")
+      meta = memoTagMeta (trafficPurchaseMemoPrefix <> "member-id=" <> testMemberId <> "&synchronizer-id=unknown-synchronizer&migration-id=0")
 
 test_trafficPurchase_rejectsAmountBelowMinTopup : Script ()
 test_trafficPurchase_rejectsAmountBelowMinTopup = script do

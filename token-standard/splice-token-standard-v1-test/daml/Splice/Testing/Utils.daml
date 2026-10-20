@@ -27,7 +27,10 @@ module Splice.Testing.Utils
     withExtraDisclosures,
 
     -- * Simpler party allocation
-    allocatePartyExact
+    allocatePartyExact,
+
+    -- * Traffic purchases
+    trafficPurchaseMemoPrefix
   ) where
 
 import qualified DA.Map as Map
@@ -38,6 +41,10 @@ import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 
 import Daml.Script
 import DA.Fail
+
+-- | Defined separately from the implementation's prefix so that the tests also check its value.
+trafficPurchaseMemoPrefix : Text
+trafficPurchaseMemoPrefix = "cip-128/memo:"
 
 -- | Use this to construct an empty 'ExtraArgs' record.
 emptyExtraArgs : ExtraArgs
