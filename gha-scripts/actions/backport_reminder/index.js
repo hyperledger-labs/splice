@@ -22052,7 +22052,7 @@ async function addBackportReminderComment(github, context3, prNumber2, lookupPro
   });
 }
 function alwaysIncludedBranches(context3) {
-  return isSpliceRepo(context3) ? ["release-line-0.8.x"] : [];
+  return isSpliceRepo(context3) ? ["release-line-0.9.x"] : [];
 }
 async function getRelevantReleaseBranchesFromProdClusters(github, context3) {
   const prodClusters = ["devnet", "testnet", "mainnet"];
