@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.scan.store
 
 import org.lfdecentralizedtrust.splice.store.StoreErrors
 
-import java.time.Instant
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpDef
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 
@@ -67,10 +66,6 @@ object TxLogEntry extends StoreErrors {
     } catch {
       case _: RuntimeException => throw txDecodingFailed()
     }
-  }
-
-  trait TransactionTxLogEntry extends TxLogEntry {
-    def date: Option[Instant]
   }
 
   object Http {

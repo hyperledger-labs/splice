@@ -422,7 +422,7 @@ class UpdateHistoryBulkStorageTest
       // then start a new one with the new migration and ingest updates in the new migration
 
       mockStore.mockMigration()
-      val (retryProvider1, bulkStorage1, svc1, progress1) =
+      val (retryProvider1, _, svc1, progress1) =
         newRetryProviderAndUpdatesBulkStorageService()
       Using.resources(svc1, retryProvider1) { (_, _) =>
         clue("500 more updates in the new migration, up to 15:03") {
