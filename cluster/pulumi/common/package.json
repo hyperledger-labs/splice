@@ -33,10 +33,10 @@
     "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
   },
   "devDependencies": {
-    "@jest/globals": "^30.4.1",
+    "@jest/globals": "^30.5.2",
     "@types/js-yaml": "^4.0.5",
-    "@types/lodash": "^4.17.25",
-    "@types/ws": "^8.18.1",
+    "@types/lodash": "^4.17.26",
+    "@types/ws": "^8.18.2",
     "dedent": "^1.7.2"
   }
 }
