@@ -710,7 +710,7 @@ trait AcsSnapshotStoreTest
             Seq(owner, holder),
           )
           _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
-          _result <- store.getHoldingsState(
+          _ <- store.getHoldingsState(
             DefaultMigrationId,
             timestamp1,
             None,
