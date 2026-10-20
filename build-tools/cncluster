@@ -543,9 +543,9 @@ function subcmd_gcloud_alert_logs_ui() {
 
     base_query="resource.labels.cluster_name%3D%22${GCP_CLUSTER_NAME}%22"
     cluster=$(basename "$PWD")
-    expected_file="../../expected/observability/${cluster}/log_warnings.gcp_logging_metric_Metric.json"
+    expected_file="../../expected/observability/expected-${cluster}.json"
     _info "Using filter from $expected_file"
-    query=$(cat "${expected_file}" | jq '.inputs.filter')
+    query=$(cat "${expected_file}" | jq '.[] | select(.name == "log_warnings") | .inputs.filter')
     encoded_query=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote($query))")
 
     url="https://console.cloud.google.com/logs/query?query=$encoded_query&project=$CLOUDSDK_CORE_PROJECT&duration=PT1H"
@@ -1639,19 +1639,18 @@ function subcmd_participant_console() {
     _cluster_must_exist
 
     namespace="${1-}"
-    domain=${2:-0}
-    app=${3:-"participant"}
-    participant_number=${4:-0}
+    app=${2:-"participant"}
+    participant_number=${3:-0}
 
     if [ -z "${namespace}" ]; then
-        _error "Usage: $SCRIPTNAME participant_console <namespace-name> [domain_migration_id (Default: 0)]
+        _error "Usage: $SCRIPTNAME participant_console <namespace-name>
         [app <participant|multi-participant-X> (Default: participant)] [participant_number <0-9> (Default: 0)]
 
               Example: opening sv-1 participant console
-                cncluster participant_console sv-1 7
+                cncluster participant_console sv-1
 
-              Example: opening multi-participant-24 console
-                cncluster participant_console multi-validator 7 multi-participant-24 7"
+              Example: opening participant_07 console on multi-participant-24
+                cncluster participant_console multi-validator multi-participant-24 7"
     fi
 
     app_container="$app"
