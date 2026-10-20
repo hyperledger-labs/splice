@@ -179,27 +179,6 @@ monitoring:
     loggedSecretsFilter: "(\n  (\n    jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=[^, ]+\" AND\n    -jsonPayload.message=~\"(?i)(secret|token|(private|secret)(-)?key|password)=(\\\"\\*\\*\\*\\*\\\"|hidden)\" AND\n    -jsonPayload.message=~\"(?i)page(_|-)?token=[^, ]+\"\n  ) OR\n  jsonPayload.message=~\"eyJhbGc[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\" OR\n  jsonPayload.message=~\"Bearer\\s+eyJ[A-Za-z0-9_-]{2,}\"\n)\n"
     muteTimeIntervals: []
   enableGrafanaServiceAccountToken: true
-multiValidator:
-  instanceCount: 0
-  postgresPvcSize: '100Gi'
-  resources:
-    participant:
-      limits:
-        memory: '16Gi'
-      requests:
-        cpu: '1'
-        memory: '8Gi'
-    postgres:
-      limits:
-        memory: '12Gi'
-      requests:
-        memory: '5Gi'
-    validator:
-      limits:
-        memory: '8Gi'
-      requests:
-        cpu: '0.5'
-        memory: '2400Mi'
 operatorDeployment:
   reference:
     deploymentDir: 'cluster/deployment'
