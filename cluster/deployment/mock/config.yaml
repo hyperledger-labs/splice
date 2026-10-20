@@ -246,6 +246,8 @@ svs:
           additionalEnvVars:
             - name: PS9_SEQUENCER_ENV_VAR_NAME
               value: PS9_SEQUENCER_ENV_VAR_VALUE
+          cloudSql:
+            tier: "sequencer-ps9-override-tier-sv-1"
   sv-2: !include(sv.yaml) {}
   sv-da-1: !include(sv.yaml) # non "sv-X" key => additional SV that is always deployed (key == node name == k8s namespace)
     publicName: Digital-Asset-1
@@ -283,6 +285,14 @@ svs:
       appsLogLevel: INFO
       cantonLogLevel: INFO
       apiRequestLogLevel: DEBUG
+    physicalSynchronizerOverrides:
+      10:
+        sequencer:
+          cloudSql:
+            tier: "sequencer-ps10-override-tier-sv-da-1"
+        cantonbft:
+          cloudSql:
+            tier: "cantonbft-ps10-override-tier-sv-da-1"
 infra:
   gkeGateway:
     proxyForIstioHttp: true
