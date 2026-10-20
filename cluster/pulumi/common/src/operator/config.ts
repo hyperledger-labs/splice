@@ -11,7 +11,12 @@ import { z } from 'zod';
 
 export const StackConfigSchema = z.object({
   parallelism: z.number().optional(),
+  retryMaxBackoffDurationSeconds: z.number().int().positive().optional(),
   resources: K8sResourceSchema,
+});
+
+const DefaultStackConfigSchema = StackConfigSchema.extend({
+  retryMaxBackoffDurationSeconds: z.number().int().positive(),
 });
 
 const ProjectFilterSchema = z.union([
@@ -61,7 +66,7 @@ function* iterateDefaultProjectFilters(): Generator<ProjectFilter> {
 export const DeploymentConfigSchema = z.object({
   pulumiStacks: z.record(z.string(), StackConfigSchema).and(
     z.object({
-      default: StackConfigSchema,
+      default: DefaultStackConfigSchema,
     })
   ),
   deployment: z

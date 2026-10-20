@@ -227,6 +227,7 @@ pulumiStacks:
     resources:
       requests:
         memory: '2Gi'
+    retryMaxBackoffDurationSeconds: 600
   multi-validator:
     parallelism: 10
     resources:
