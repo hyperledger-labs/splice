@@ -297,16 +297,22 @@ function _assert_lock() {
     fi
 }
 
+# Fail if the cluster lock is held by someone else, without claiming it.
+function _check_lock_available() {
+    local lockholder
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ] && [ "$lockholder" != "$(whoami)" ]; then
+        _error "Cluster already locked by: ${lockholder}. Lock age: $(_current_lock_age_formatted)."
+    fi
+}
+
 # Ensure the cluster lock is held by the current user, claiming it if free.
 # Fails if the cluster is locked by someone else.
 function _ensure_lock() {
-    local lockholder
-    lockholder=$(_current_lockholder)
-    if [ -z "$lockholder" ]; then
+    _check_lock_available
+    if [ -z "$(_current_lockholder)" ]; then
         _info "Cluster is not locked, claiming the lock."
         subcmd_lock
-    elif [ "$lockholder" != "$(whoami)" ]; then
-        _error "Cluster already locked by: ${lockholder}. Lock age: $(_current_lock_age_formatted)."
     fi
 }
 
@@ -1513,6 +1519,7 @@ function _deploy_cluster_workflow() {
     local deploy_default_repo="canton-network/splice"
 
     local repo="${deploy_default_repo}" repo_explicit="" pr="" url_repo=""
+    local pr_json sha cluster dispatch_out run_url me body
 
     while [ $# -gt 0 ]; do
         case "$1" in
@@ -1558,17 +1565,20 @@ function _deploy_cluster_workflow() {
         _error "The 'gh' CLI is required but not installed. See https://cli.github.com/"
     fi
 
-    _ensure_lock
+    # Fail early on a cluster locked by someone else, but only claim the lock
+    # after confirmation so that answering "n" does not leave it behind.
+    _check_lock_available
 
     _info "Resolving head SHA of PR ${repo}#${pr}."
-    local pr_json=$(gh api "repos/${repo}/pulls/${pr}") || _error "Failed to fetch PR ${repo}#${pr}."
+    pr_json=$(gh api "repos/${repo}/pulls/${pr}") || _error "Failed to fetch PR ${repo}#${pr}."
     sha=$(echo "$pr_json" | jq -r '.head.sha')
     if [ -z "$sha" ] || [ "$sha" = "null" ]; then
         _error "Could not determine head SHA of PR ${repo}#${pr}."
     fi
     _info "PR head SHA: ${sha}"
 
-    _prompt_to_confirm
+    _prompt_to_confirm --no-lock
+    _ensure_lock
 
     # The deploy workflow expects the full scratchnet name (scratchneta-e),
     # while this checkout only exports the short basename (scratcha-e),
@@ -1588,7 +1598,7 @@ function _deploy_cluster_workflow() {
     run_url=$(echo "$dispatch_out" | grep -oE 'https://[^[:space:]]*/actions/runs/[0-9]+' | head -n 1 || true)
 
     if [ -z "$run_url" ]; then
-        _error "Run URL not returned, might be a delay in GitHub Actions. Please look at https://www.githubstatus.com/"
+        _error "Run URL not returned. The workflow may still have been dispatched, so check https://github.com/${deploy_internal_repo}/actions/workflows/${deploy_workflow} (and https://www.githubstatus.com/ for GitHub Actions incidents)."
     fi
 
     me=$(gh api user --jq '.login')
