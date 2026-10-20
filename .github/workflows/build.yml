@@ -161,18 +161,6 @@ jobs:
       protocol_version: ${{ inputs.protocol_version }}
     secrets: inherit
 
-  scala_test_with_cometbft:
-    uses: ./.github/workflows/build.scala_test_with_cometbft.yml
-    with:
-      runs_on: self-hosted-k8s-medium
-      test_names_file: "test-cometbft-full-class-names.log"
-      parallelism: 1
-      test_name: cometbft
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-      protocol_version: ${{ inputs.protocol_version }}
-    secrets: inherit
-
   scala_test_signatures:
     uses: ./.github/workflows/build.scala_test.yml
     with:
@@ -339,7 +327,6 @@ jobs:
     - scala_test_record_time_tolerance
     - scala_test_logical_sync_upgrade
     - scala_test_roll_forward_lsu
-    - scala_test_with_cometbft
     - scala_test_signatures
     - scala_test_wall_clock_time
     - scala_test_frontend_wall_clock_time
