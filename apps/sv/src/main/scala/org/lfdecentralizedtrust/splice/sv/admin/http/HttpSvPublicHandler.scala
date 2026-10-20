@@ -344,7 +344,7 @@ class HttpSvPublicHandler(
       if (!config.enableInternalAutoOnboardingThroughSvTrafficFaucet || !isDevNet) {
         Future.failed(
           HttpErrorHandler.notImplemented(
-            "Traffic purchasing internal service is disabled."
+            "Traffic purchasing internal endpoint on the SV is disabled, purchase traffic for your node yourself"
           )
         )
       } else {

@@ -60,11 +60,6 @@ class PermissionedSynchronizerIntegrationTest
           case (_, c) => c
         }(config)
       )
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppConfigs { case (_, c) =>
-          c.copy(enableInternalAutoOnboardingThroughSvTrafficFaucet = true)
-        }(config)
-      )
       .withManualStart
 
   "Onboard network in RestrictedOpen mode" in { implicit env =>

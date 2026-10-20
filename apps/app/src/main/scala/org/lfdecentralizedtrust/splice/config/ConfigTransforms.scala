@@ -210,6 +210,7 @@ object ConfigTransforms {
       // ConfigTransforms.defaults) fall back to the FeaturedAppMarkers default
       withTrafficBasedAppRewards,
       withPerAcsSnapshotTablesEnabled,
+      withInternalAutoOnboardingTrafficFaucet,
     )
   }
 
@@ -830,6 +831,9 @@ object ConfigTransforms {
         )
       )
     )
+
+  def withInternalAutoOnboardingTrafficFaucet: ConfigTransform =
+    updateAllSvAppConfigs_(c => c.copy(enableInternalAutoOnboardingThroughSvTrafficFaucet = true))
 
   def withPerAcsSnapshotTablesEnabled: ConfigTransform =
     updateAllScanAppConfigs_(c => c.copy(perAcsSnapshotTablesEnabled = true))
