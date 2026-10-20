@@ -10,7 +10,7 @@
     "@pulumi/gcp": "^9.18.0",
     "@pulumi/github": "6.13.1",
     "@pulumi/kubernetes": "4.28.0",
-    "@pulumi/pulumi": "^3.243.0",
+    "@pulumi/pulumi": "^3.254.0",
     "@pulumi/random": "4.19.2",
     "@pulumi/std": "2.3.2",
     "@types/auth0": "^3.3.11",
