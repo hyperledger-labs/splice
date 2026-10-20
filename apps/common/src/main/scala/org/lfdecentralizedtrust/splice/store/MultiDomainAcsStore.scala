@@ -905,8 +905,7 @@ object MultiDomainAcsStore extends StoreErrors {
 
   // The state of a contract in the store. Note that, contrary to `ContractState`, this can
   // also include archived contracts.
-  sealed abstract class StoreContractState extends PrettyPrinting {
-  }
+  sealed abstract class StoreContractState extends PrettyPrinting
   object StoreContractState {
 
     /** Observed activation (assign/create).

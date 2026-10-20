@@ -40,9 +40,7 @@ import com.digitalasset.canton.topology.{
   SequencerId,
   SynchronizerId,
 }
-import com.digitalasset.canton.topology.admin.v30.{
-  SequencerLsuStateResponse,
-}
+import com.digitalasset.canton.topology.admin.v30.SequencerLsuStateResponse
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.transaction.SequencerSynchronizerState

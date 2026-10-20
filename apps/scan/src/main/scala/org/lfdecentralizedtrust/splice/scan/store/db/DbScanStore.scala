@@ -97,8 +97,6 @@ class DbScanTxLogStoreConfig(loggerFactory: NamedLoggerFactory)
   override def decodeEntry = TxLogEntry.decode
 }
 
-object DbScanStore {
-}
 class DbScanStore(
     override val key: ScanStore.Key,
     storage: DbStorage,
