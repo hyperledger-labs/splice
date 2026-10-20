@@ -69,6 +69,7 @@ pulumiProjectConfig:
 pulumiStacks:
   default:
     parallelism: 64
+    retryMaxBackoffDurationSeconds: 60
     resources:
       requests:
         memory: '2Gi'
