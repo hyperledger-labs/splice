@@ -230,3 +230,4 @@ SERVER_OVERLOADED.*Reached the limit of concurrent requests for.*DownloadTopolog
 sequenced.*but rejected.*during topology validation
 
 Not accepting submission as aggregation ID.*is already marked as delivered
+SEQUENCER_AGGREGATE_SUBMISSION_ALREADY_SENT
