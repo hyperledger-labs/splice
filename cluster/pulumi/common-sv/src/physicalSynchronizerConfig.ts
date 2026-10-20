@@ -47,6 +47,7 @@ const PhysicalSynchronizerConfigOverridesSchema = z
   .object({
     mediator: SvMediatorConfigSchema.partial().optional(),
     sequencer: SvSequencerConfigSchema.partial().optional(),
+    cantonbft: SvSequencerConfigSchema.partial().optional(),
   })
   .strict();
 export const PhysicalSynchronizersConfigOverridesSchema = z

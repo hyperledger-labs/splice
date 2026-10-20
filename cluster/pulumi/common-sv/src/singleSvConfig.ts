@@ -213,19 +213,28 @@ const SingleSvConfigSchema = z
     // Implicit config merging is confusing but for now I don't really see a better way of introducting these overrides.
     // Perhaps a proper revisit of the synchronizerMigration config structure will lead to a better solution here.
     const physicalSynchronizers = DecentralizedSynchronizerUpgradeConfig.allMigrations.map(
-      migration => [
-        migration.id,
-        {
-          mediator: mergeConfigFragments(
-            mediator,
-            physicalSynchronizerOverrides[migration.id]?.mediator || {}
-          ) as SvMediatorConfig,
-          sequencer: mergeConfigFragments(
-            sequencer,
-            physicalSynchronizerOverrides[migration.id]?.sequencer || {}
-          ) as SvSequencerConfig,
-        },
-      ]
+      migration => {
+        const mergedSequencer = mergeConfigFragments(
+          sequencer,
+          physicalSynchronizerOverrides[migration.id]?.sequencer || {}
+        ) as SvSequencerConfig;
+        const cantonbftOverride = physicalSynchronizerOverrides[migration.id]?.cantonbft;
+        return [
+          migration.id,
+          {
+            mediator: mergeConfigFragments(
+              mediator,
+              physicalSynchronizerOverrides[migration.id]?.mediator || {}
+            ) as SvMediatorConfig,
+            sequencer: mergedSequencer,
+            // If no cantonbft override is defined, inherit the (overridden) sequencer config;
+            // otherwise it is independent of the sequencer overrides.
+            cantonbft: cantonbftOverride
+              ? (mergeConfigFragments(sequencer, cantonbftOverride) as SvSequencerConfig)
+              : mergedSequencer,
+          },
+        ];
+      }
     );
     return {
       ...svConfig,
