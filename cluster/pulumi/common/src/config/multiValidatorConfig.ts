@@ -9,16 +9,7 @@ import { K8sResourceSchema } from './configSchema';
 export const MultiValidatorConfigSchema = z.object({
   multiValidator: z
     .object({
-      instanceCount: z
-        .number()
-        // TODO(#7801) remove env variable override when internal stops relying on it
-        .overwrite(instanceCount => {
-          const multivalidatorSize = config.optionalEnv('MULTIVALIDATOR_SIZE');
-          return multivalidatorSize !== undefined
-            ? Number.parseInt(multivalidatorSize)
-            : instanceCount;
-        })
-        .default(0),
+      instanceCount: z.number().default(0),
       postgresPvcSize: z.string().optional(),
       // Multi-validator needs to be migrated
       postgres: SplicePostgresSchema.default({
