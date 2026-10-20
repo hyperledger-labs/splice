@@ -27,6 +27,7 @@ import Splice.AmuletRules
 import Splice.Api.Token.HoldingV1 (Holding)
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as V1
+import Splice.Api.Token.TransferInstructionV2 qualified as V2
 import Splice.GovernanceLock
 import Splice.ExternalPartyConfigState
 import Splice.TokenStandard.Utils hiding (require, reasonMetaKey)
@@ -77,6 +78,24 @@ template GovernanceLockSubstitution with
         result <- governanceLockSubstitution_withdrawImpl (coerceContractId self) this [owner]
         pure $ substitutionTransferResult_failed result.unlockedAmulet
       transferInstruction_updateImpl _ _ = assertFail substitutionTransferUpdateUnsupported
+
+    interface instance V2.TransferInstruction for GovernanceLockSubstitution where
+      view =
+        let v1View = view @V1.TransferInstruction (toInterface this)
+        in V2.TransferInstructionView with
+          originalInstructionCid = coerceContractId <$> originalSubstitutionCid
+          transfer = upcast v1View.transfer
+          expiresAt = Some expiresAt
+          availableActions = Map.fromList [(V2.TIA_Accept, [[target.owner]]), (V2.TIA_Reject, [[target.owner]]), (V2.TIA_Withdraw, [[owner]])]
+          meta = v1View.meta
+
+      transferInstruction_acceptImpl = transferInstructionV2_receiverActor_acceptDefaultImplUsingV1 target.owner
+      transferInstruction_rejectImpl = transferInstructionV2_receiverActor_rejectDefaultImplUsingV1 target.owner
+      transferInstruction_withdrawImpl = transferInstructionV2_senderActor_withdrawDefaultImplUsingV1 owner
+
+      transferInstruction_acceptExtraObservers _ = observer this
+      transferInstruction_rejectExtraObservers _ = observer this
+      transferInstruction_withdrawExtraObservers _ = observer this
 
 data GovernanceLockSubstitution_AcceptResult
   = GovernanceLockSubstitution_AcceptResult with

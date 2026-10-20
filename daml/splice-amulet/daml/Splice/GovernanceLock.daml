@@ -97,6 +97,7 @@ import Splice.AmuletRules
 import Splice.Api.Token.HoldingV1 (Holding)
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as V1
+import Splice.Api.Token.TransferInstructionV2 qualified as V2
 import Splice.Expiry hiding (maxTime)
 import Splice.Fees (relTimeToDays, relTimeToSeconds)
 import Splice.ExternalPartyConfigState
@@ -143,6 +144,9 @@ requireFullLock spec =
 requireVestingLock : CanAssert m => GovernanceLockSpecification -> m VestingLockSpecification
 requireVestingLock spec =
   foldGovernanceLockSpecification (\_ -> assertFail $ "Expected VestingLockSpecification but got: " <> show spec) pure spec
+
+governanceLockOptExpiresAt : GovernanceLockSpecification -> Optional Time
+governanceLockOptExpiresAt = foldGovernanceLockSpecification (const None) (Some . (.endTime))
 
 governanceLockExpiresAt : GovernanceLockSpecification -> Time
 governanceLockExpiresAt = foldGovernanceLockSpecification (const maxBound) (.endTime)
@@ -257,6 +261,24 @@ template GovernanceLock
       transferInstruction_rejectImpl _ _ = assertFail "Transfers representing governance locks cannot be rejected"
       transferInstruction_withdrawImpl _ _ = assertFail "Transfers representing governance locks cannot be withdrawn"
       transferInstruction_updateImpl _ _ = assertFail "Transfers representing governance locks cannot be updated"
+
+    interface instance V2.TransferInstruction for GovernanceLock where
+      view = V2.TransferInstructionView with
+        originalInstructionCid = toInterfaceContractId . (fromAnyContractId @GovernanceLock) <$> originalLockCid
+        transfer = upcast (view @V1.TransferInstruction (toInterface this)).transfer
+        expiresAt = governanceLockOptExpiresAt specification
+        availableActions = Map.singleton
+          (V2.TIA_Custom (foldGovernanceLockSpecification (const "unlock to start vesting") (const "withdraw vested amounts") specification))
+          [[owner]]
+        meta = encodeGovernanceLockMetadata this
+
+      transferInstruction_acceptImpl _ _ = assertFail "Transfers representing governance locks cannot be accepted"
+      transferInstruction_rejectImpl _ _ = assertFail "Transfers representing governance locks cannot be rejected"
+      transferInstruction_withdrawImpl _ _ = assertFail "Transfers representing governance locks cannot be withdrawn"
+
+      transferInstruction_acceptExtraObservers _ = observer this
+      transferInstruction_rejectExtraObservers _ = observer this
+      transferInstruction_withdrawExtraObservers _ = observer this
 
 data GovernanceLock_UnlockResult
   = GovernanceLock_UnlockResult with

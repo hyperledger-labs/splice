@@ -143,7 +143,8 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
-      transferFactory_transferExtraObservers = transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl
+      transferFactory_transferExtraObservers arg =
+        filter (/= lockManagerParty) $ transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl arg
 
       transferFactory_transferImpl =
         transferFactoryV2_transferDefaultImplUsingV1 $ amulet_transferFactoryV1_transferImpl this

@@ -75,14 +75,14 @@ submitMemo env sender amount memo = do
   inputs <- if amount > 0.0
     then WalletClientV2.listUnlockedHoldingCidsFor (basicAccount sender) sender registry.instrumentId
     else pure []
-  request <- lockRequest registry sender amount memo emptyMetadata
-  expectSuccess $ submitLockRequest env.registries request with inputHoldingCids = downcast <$> inputs
+  request <- lockRequestV1 registry sender amount memo emptyMetadata
+  expectSuccess $ submitLockRequestV1 env.registries request with inputHoldingCids = downcast <$> inputs
 
 -- | Creates the 5M FA lock of `A` for `X` with the memo of the "Creating Locks" example.
 createExampleLock : TestEnv -> ExampleParties -> Script (ContractId V1.TransferInstruction)
 createExampleLock env ExampleParties{a} = do
   AmuletRegistryV2.tapFaucet env.registriesEnv.amuletV2 a 5000000.0
-  expectTransferPending =<< submitMemo env a 5000000.0
+  tsv1Operations.expectPendingTransfer =<< submitMemo env a 5000000.0
     "cip-127/memo:request=create-lock&lock-kind=fa-lock&lock-subject=X"
 
 -- | The pending transfer that displays the FA lock of `owner` for `X`.
@@ -179,7 +179,7 @@ test_example_unlockAndWithdraw = do
   unlockResult <- submitMemo env a 0.0
     "cip-127/memo:request=unlock-and-start-vesting&unlock-amount=1000000&vesting-start-time=2030-01-01T00:00:00Z&lock-kind=fa-lock&lock-subject=X"
   unlockResult.senderChangeCids === []
-  vestingLockCid <- expectTransferPending unlockResult
+  vestingLockCid <- tsv1Operations.expectPendingTransfer unlockResult
 
   -- The result is a 1M vesting lock, and the FA lock keeps the remaining 4M
   checkDisplayedAs a vestingLockCid DisplayedTransfer with
@@ -199,7 +199,7 @@ test_example_unlockAndWithdraw = do
   [payoutCid] <- pure withdrawResult.senderChangeCids
   checkHolding' a ((coerceContractId payoutCid : ContractId Amulet)) 250000.0
   checkBalances env a (250000.0, 4750000.0)
-  newVestingLockCid <- expectTransferPending withdrawResult
+  newVestingLockCid <- tsv1Operations.expectPendingTransfer withdrawResult
   checkDisplayedAs a newVestingLockCid DisplayedTransfer with
     sender = "A"
     receiver = lockManager
@@ -216,13 +216,13 @@ test_spec_unlockProvisionalLockWithoutVestingStartTime = do
   env@TestEnv{..} <- setupTest
   ExampleParties{..} <- setupExampleParties
   AmuletRegistryV2.tapFaucet registriesEnv.amuletV2 a 5000000.0
-  expectTransferPending =<< submitMemo env a 5000000.0
+  tsv1Operations.expectPendingTransfer =<< submitMemo env a 5000000.0
     "cip-127/memo:request=create-lock&lock-kind=provisional-fa-lock&lock-subject=X"
 
   -- A partial unlock pays out the unlocked funds immediately
   partialResult <- submitMemo env a 0.0
     "cip-127/memo:request=unlock-and-start-vesting&unlock-amount=1000000&lock-kind=provisional-fa-lock&lock-subject=X"
-  [] <- expectTransferCompleted partialResult
+  [] <- tsv1Operations.expectCompletedTransfer partialResult
   [payoutCid] <- pure partialResult.senderChangeCids
   checkHolding' a ((coerceContractId payoutCid : ContractId Amulet)) 1000000.0
   [(remainingLockCid, remainingLock)] <- governanceLocksOf a
@@ -232,7 +232,7 @@ test_spec_unlockProvisionalLockWithoutVestingStartTime = do
   -- A full unlock leaves no lock
   fullResult <- submitMemo env a 0.0
     "cip-127/memo:request=unlock-and-start-vesting&unlock-amount=4000000&lock-kind=provisional-fa-lock&lock-subject=X"
-  [] <- expectTransferCompleted fullResult
+  [] <- tsv1Operations.expectCompletedTransfer fullResult
   remainingLocks <- governanceLocksOf a
   remainingLocks === []
   vestingLocks <- vestingLocksOf a
@@ -247,10 +247,10 @@ test_spec_unlockFaLockNeedsVestingStartTime = do
   lockCid <- createExampleLock env parties
   Some lock <- queryContractId a (fromInterfaceContractId @GovernanceLock lockCid)
 
-  request <- lockRequest registriesEnv.amuletV2 a 0.0
+  request <- lockRequestV1 registriesEnv.amuletV2 a 0.0
     "cip-127/memo:request=unlock-and-start-vesting&unlock-amount=1000000&lock-kind=fa-lock&lock-subject=X"
     emptyMetadata
-  expectFailureContaining (missingMetadataMessage vestingStartTimeMetaKey) =<< submitLockRequest registries request
+  expectFailureContaining (missingMetadataMessage vestingStartTimeMetaKey) =<< submitLockRequestV1 registries request
   checkLockUntouched a (fromInterfaceContractId @GovernanceLock lockCid) lock
 
 -- Substituting Locks
@@ -264,7 +264,7 @@ test_example_substituteLock = do
   AmuletRegistryV2.tapFaucet registriesEnv.amuletV2 b 1000000.0
 
   -- Party `B` can propose substituting 1M of this lock
-  substitutionCid <- expectTransferPending =<< submitMemo env b 1000000.0
+  substitutionCid <- tsv1Operations.expectPendingTransfer =<< submitMemo env b 1000000.0
     "cip-127/memo:request=substitute-lock&target-lock-owner=A&lock-kind=fa-lock&lock-subject=X&lock-status=locked"
 
   -- This creates a pending transfer instruction for `A` to accept, which both `A` and `B` see
@@ -278,8 +278,8 @@ test_example_substituteLock = do
 
   -- If `A` accepts, then 1M is paid out to `A`, the existing FA lock is reduced to 4M,
   -- and a new FA lock for `B` is created with subject `X` and amount 1M
-  acceptResult <- expectSuccess $ acceptInstructionV1 env substitutionCid a
-  [payoutCid] <- expectTransferCompleted acceptResult
+  acceptResult <- expectSuccess $ tsv1Operations.acceptInstruction env substitutionCid a
+  [payoutCid] <- tsv1Operations.expectCompletedTransfer acceptResult
   checkHolding' a ((coerceContractId payoutCid : ContractId Amulet)) 1000000.0
   checkBalances env a (1000000.0, 4000000.0)
   expectSingleFaLock a 4000000.0
@@ -299,7 +299,7 @@ test_example_transferLock = do
   transferResult <- submitMemo env a 0.0
     "cip-127/memo:request=transfer-lock&new-lock-owner=B&transfer-amount=2000000&lock-kind=fa-lock&lock-subject=X&lock-status=locked"
   transferResult.senderChangeCids === []
-  transferCid <- expectTransferPending transferResult
+  transferCid <- tsv1Operations.expectPendingTransfer transferResult
 
   -- This creates a pending transfer instruction for `B` to accept, which both `A` and `B` see
   let displayedTransfer = DisplayedTransfer with
@@ -312,7 +312,7 @@ test_example_transferLock = do
 
   -- If `B` accepts, the existing FA lock remains with `A` and is reduced to 3M,
   -- and a new FA lock for `B` is created with subject `X` and amount 2M
-  [] <- expectTransferCompleted =<< expectSuccess (acceptInstructionV1 env transferCid b)
+  [] <- tsv1Operations.expectCompletedTransfer =<< expectSuccess (tsv1Operations.acceptInstruction env transferCid b)
   expectSingleFaLock a 3000000.0
   expectSingleFaLock b 2000000.0
   checkBalances env a (0.0, 3000000.0)

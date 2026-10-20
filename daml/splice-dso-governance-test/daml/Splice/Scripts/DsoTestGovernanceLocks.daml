@@ -11,6 +11,7 @@ import DA.Time
 import Daml.Script
 
 import Splice.Amulet (Amulet, FeaturedAppRight(..), LockedAmulet, LockedAmulet_OwnerExpireLockV2(..))
+import Splice.Api.Token.MetadataV1 (emptyMetadata)
 import Splice.DsoRules (DsoRules, DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLock(..), DsoRules_GovernanceLockSubstitution_DsoExpire(..), DsoRules_GovernanceLockTransfer_DsoExpire(..), DsoRules_GovernanceLock_DsoExpire(..))
 import Splice.GovernanceLock
 import Splice.GovernanceLock.Substitution
@@ -45,7 +46,8 @@ setupSharedLock kind = do
       registries = Map.singleton app.dso (MultiRegistry.mkRegistryApisV1V2 app.registry registry)
   WalletClientV2.createBatchingUtility alice.primaryParty
 
-  governanceLockCid <- lockForGovernance registries registry alice.primaryParty testVestingAmount (kind alice)
+  governanceLockCid <- expectSuccess $
+    tsv1Operations.governanceLock (TestEnvRegistries registries registry) alice.primaryParty testVestingAmount (kind alice) emptyMetadata
 
   pure SharedLockEnv with ..
 
@@ -83,7 +85,8 @@ setupVestingLock = do
   unlockAt <- (`addRelTime` hours 1) <$> getTime
 
   -- `unlockAmount = testVestingAmount` unlocks the full amount, so no `GovernanceLock` remains.
-  (Some vestingLockCid, None, None) <- unlockGovernanceLock registries registry governanceLockCid testVestingAmount unlockAt
+  vestingLockCid <- expectSuccess $
+    tsv1Operations.governanceUnlock (TestEnvRegistries registries registry) governanceLockCid alice.primaryParty (unlockMeta testVestingAmount unlockAt)
 
   [(lockedAmuletCid, lockedAmulet)] <- query @LockedAmulet alice.primaryParty
 
@@ -325,7 +328,7 @@ setupGovernanceSubstitution = do
   tap app bob testVestingAmount
   WalletClientV2.createBatchingUtility bob.primaryParty
 
-  proposeSubstitution registries registry bob.primaryParty
+  tsv1Operations.proposeSubstitution (TestEnvRegistries registries registry) bob.primaryParty
     (GovernanceLockKey with
       dso = app.dso
       owner = alice.primaryParty
@@ -342,11 +345,11 @@ setupVestingSubstitution = do
   WalletClientV2.createBatchingUtility bob.primaryParty
 
   unlockAt <- (`addRelTime` hours 1) <$> getTime
-  (Some vestingLockCid, None, None) <-
-    unlockGovernanceLock registries registry governanceLockCid testVestingAmount unlockAt
+  vestingLockCid <- expectSuccess $
+    tsv1Operations.governanceUnlock (TestEnvRegistries registries registry) governanceLockCid alice.primaryParty (unlockMeta testVestingAmount unlockAt)
   Some vestingLock <- queryContractId alice.primaryParty vestingLockCid
 
-  proposeSubstitution registries registry bob.primaryParty
+  tsv1Operations.proposeSubstitution (TestEnvRegistries registries registry) bob.primaryParty
     (GovernanceLockKey with
       dso = app.dso
       owner = alice.primaryParty
@@ -437,7 +440,7 @@ setupGovernanceLockTransfer = do
   bob <- setupUser app "bob" app.dso
 
   now <- getTime
-  transferCid <- errorIfLeft =<< proposeGovernanceLockTransfer' registries registry alice.primaryParty LockTransferArgs with
+  transferCid <- errorIfLeft =<< tsv1Operations.proposeTransfer (TestEnvRegistries registries registry) alice.primaryParty LockTransferArgs with
     source = GovernanceLockKey with
       dso = app.dso
       owner = alice.primaryParty
@@ -454,12 +457,12 @@ setupVestingLockTransfer = do
   bob <- setupUser app "bob" app.dso
 
   unlockAt <- (`addRelTime` hours 1) <$> getTime
-  (Some vestingLockCid, None, None) <-
-    unlockGovernanceLock registries registry governanceLockCid testVestingAmount unlockAt
+  vestingLockCid <- expectSuccess $
+    tsv1Operations.governanceUnlock (TestEnvRegistries registries registry) governanceLockCid alice.primaryParty (unlockMeta testVestingAmount unlockAt)
   Some vestingLock <- queryContractId alice.primaryParty vestingLockCid
 
   now <- getTime
-  transferCid <- errorIfLeft =<< proposeGovernanceLockTransfer' registries registry alice.primaryParty LockTransferArgs with
+  transferCid <- errorIfLeft =<< tsv1Operations.proposeTransfer (TestEnvRegistries registries registry) alice.primaryParty LockTransferArgs with
     source = GovernanceLockKey with
       dso = app.dso
       owner = alice.primaryParty

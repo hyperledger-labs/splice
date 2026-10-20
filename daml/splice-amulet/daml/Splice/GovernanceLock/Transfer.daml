@@ -24,6 +24,7 @@ import Splice.Amulet.TokenApiUtils
 import Splice.AmuletConfig (getTokenStandardMaxTTL)
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as V1
+import Splice.Api.Token.TransferInstructionV2 qualified as V2
 import Splice.GovernanceLock
 import Splice.TokenStandard.Utils hiding (require, reasonMetaKey)
 import Splice.Types
@@ -111,6 +112,24 @@ template GovernanceLockTransfer with
         pure $ transferTransferResult_failed
 
       transferInstruction_updateImpl _ _ = assertFail transferTransferUpdateUnsupported
+
+    interface instance V2.TransferInstruction for GovernanceLockTransfer where
+      view =
+        let v1View = view @V1.TransferInstruction (toInterface this)
+        in V2.TransferInstructionView with
+          originalInstructionCid = None
+          transfer = upcast v1View.transfer
+          expiresAt = Some expiresAt
+          availableActions = Map.fromList [(V2.TIA_Accept, [[receiver]]), (V2.TIA_Reject, [[receiver]]), (V2.TIA_Withdraw, [[source.owner]])]
+          meta = v1View.meta
+
+      transferInstruction_acceptImpl = transferInstructionV2_receiverActor_acceptDefaultImplUsingV1 receiver
+      transferInstruction_rejectImpl = transferInstructionV2_receiverActor_rejectDefaultImplUsingV1 receiver
+      transferInstruction_withdrawImpl = transferInstructionV2_senderActor_withdrawDefaultImplUsingV1 source.owner
+
+      transferInstruction_acceptExtraObservers _ = observer this
+      transferInstruction_rejectExtraObservers _ = observer this
+      transferInstruction_withdrawExtraObservers _ = observer this
 
     choice GovernanceLockTransfer_DsoExpire : GovernanceLockTransfer_DsoExpireResult
       -- ^ Garbage-collect proposal that receiver never accepted, so SV nodes
