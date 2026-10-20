@@ -115,7 +115,7 @@
       },
       "refresh": true,
       "resyncFrequencySeconds": 300,
-      "retryMaxBackoffDurationSeconds": 600,
+      "retryMaxBackoffDurationSeconds": 900,
       "retryOnUpdateConflict": true,
       "serviceAccountName": "validators.extra-validator-sa",
       "stack": "organization/validator-runbook/validators.extra-validator.mock",

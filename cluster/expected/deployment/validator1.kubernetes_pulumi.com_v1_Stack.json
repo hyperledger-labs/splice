@@ -107,7 +107,7 @@
           "name": "splice-node-active"
         }
       },
-      "retryMaxBackoffDurationSeconds": 600,
+      "retryMaxBackoffDurationSeconds": 900,
       "retryOnUpdateConflict": true,
       "serviceAccountName": "validator1-sa",
       "stack": "organization/validator1/validator1.mock",
