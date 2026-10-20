@@ -85,7 +85,7 @@ class HttpTokenStandardMetadataHandler(
     } yield result
   }
 
-  private def getAmuletInstrument()(implicit ec: ExecutionContext, tc: TraceContext) =
+  private def getAmuletInstrument()(implicit tc: TraceContext) =
     for {
       optSupply <- lookupTotalSupply()
     } yield v1.definitions.Instrument(
