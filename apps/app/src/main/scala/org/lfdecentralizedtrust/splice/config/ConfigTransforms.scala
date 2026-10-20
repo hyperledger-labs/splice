@@ -23,7 +23,6 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
   SvOffboardingSequencerTrigger,
 }
 import org.lfdecentralizedtrust.splice.sv.config.*
-import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.validator.config.{
   AnsAppExternalClientConfig,
   ValidatorAppBackendConfig,
@@ -555,43 +554,10 @@ object ConfigTransforms {
     Port.tryCreate((range * 1000) + port.unwrap % 1000)
   }
 
-  private def setPortPrefix(
-      range: Int,
-      c: ScanSynchronizerNodesConfig,
-  ): ScanSynchronizerNodesConfig =
-    c.focus(_.current)
-      .modify(setPortPrefix(range, _))
-      .focus(_.successor)
-      .modify(_.map(setPortPrefix(range, _)))
-
-  private def setPortPrefix(range: Int, c: ScanSynchronizerConfig): ScanSynchronizerConfig =
-    c.focus(_.sequencer.port)
-      .modify(setPortPrefix(range))
-      .focus(_.mediator.port)
-      .modify(setPortPrefix(range))
-
   private def setPortPrefixInUrl(range: Int): String => String = { s =>
     val uri = Uri(s)
     val port = uri.effectivePort
     uri.withPort((range * 1000) + port % 1000).toString()
-  }
-
-  def setSomeSvAppPortsPrefix(range: Int, svApps: Seq[String]): ConfigTransform = {
-    updateAllSvAppConfigs((name, config) => {
-      if (svApps.contains(name)) {
-        config
-          .focus(_.participantClient.ledgerApi.clientConfig.port)
-          .modify(setPortPrefix(range))
-          .focus(_.participantClient.adminApi.port)
-          .modify(setPortPrefix(range))
-          .focus(_.localSynchronizerNodes.current)
-          .modify(setSvSynchronizerConfigPortsPrefix(range, _))
-          .focus(_.adminApi.internalPort)
-          .modify(_.map(setPortPrefix(range)))
-      } else {
-        config
-      }
-    })
   }
 
   def setSvSynchronizerConfigPortsPrefix(
@@ -609,18 +575,6 @@ object ConfigTransforms {
       .modify(setPortPrefix(range))
   }
 
-  def bumpSomeScanAppPortsBy(bump: Int, scanApps: Seq[String]): ConfigTransform = {
-    updateAllScanAppConfigs((name, config) => {
-      if (scanApps.contains(name)) {
-        config
-          .focus(_.adminApi)
-          .modify(portTransform(bump, _))
-      } else {
-        config
-      }
-    }) compose bumpSomeScanAppCantonPortsBy(bump, scanApps)
-  }
-
   def bumpSomeScanAppCantonPortsBy(bump: Int, scanApps: Seq[String]): ConfigTransform = {
     updateAllScanAppConfigs((name, config) => {
       if (scanApps.contains(name)) {
@@ -629,24 +583,6 @@ object ConfigTransforms {
           .modify(portTransform(bump, _))
           .focus(_.synchronizerNodes)
           .modify(portTransform(bump, _))
-      } else {
-        config
-      }
-    })
-  }
-
-  def setSomeScanAppPortsPrefix(range: Int, scanApps: Seq[String]): ConfigTransform = {
-    updateAllScanAppConfigs((name, config) => {
-      if (scanApps.contains(name)) {
-        config
-          .focus(_.participantClient.ledgerApi.clientConfig.port)
-          .modify(setPortPrefix(range))
-          .focus(_.participantClient.adminApi.port)
-          .modify(setPortPrefix(range))
-          .focus(_.adminApi.internalPort)
-          .modify(_.map(setPortPrefix(range)))
-          .focus(_.synchronizerNodes)
-          .modify(setPortPrefix(range, _))
       } else {
         config
       }
@@ -683,37 +619,6 @@ object ConfigTransforms {
         config
           .focus(_.adminApi.url)
           .modify(bumpUrl(bump, _))
-      } else {
-        config
-      }
-    })
-  }
-
-  def setSomeValidatorAppPortsPrefix(
-      range: Int,
-      validatorApps: Seq[String],
-  ): ConfigTransform = {
-    updateAllValidatorAppConfigs((name, config) => {
-      if (validatorApps.contains(name)) {
-        config
-          .focus(_.participantClient.ledgerApi.clientConfig.port)
-          .modify(setPortPrefix(range))
-          .focus(_.participantClient.adminApi.port)
-          .modify(setPortPrefix(range))
-          .focus(_.adminApi.internalPort)
-          .modify(_.map(setPortPrefix(range)))
-          .focus(_.onboarding)
-          .modify(
-            _.map(oc =>
-              oc.copy(svClient =
-                SvAppClientConfig(
-                  NetworkAppClientConfig(url =
-                    setPortPrefixInUrl(range)(oc.svClient.adminApi.url.toString)
-                  )
-                )
-              )
-            )
-          )
       } else {
         config
       }
@@ -970,31 +875,6 @@ object ConfigTransforms {
           )
         )
     ) compose updateAllValidatorAppConfigs_(_.focus(_.domains.extra).replace(Seq.empty))
-
-  def modifyAllANStorageConfigs(
-      storageConfigModifier: (
-          String,
-          DbConfig,
-      ) => DbConfig
-  ): ConfigTransform = {
-    combineAllTransforms(
-      updateAllValidatorConfigs((name, config) =>
-        config
-          .focus(_.storage)
-          .modify(storage => storageConfigModifier(name, storage))
-      ),
-      updateAllScanAppConfigs((name, config) =>
-        config
-          .focus(_.storage)
-          .modify(storage => storageConfigModifier(name, storage))
-      ),
-      updateAllSvAppConfigs((name, config) =>
-        config
-          .focus(_.storage)
-          .modify(storage => storageConfigModifier(name, storage))
-      ),
-    )
-  }
 
   private def combineAllTransforms(transforms: ConfigTransform*) = { (config: SpliceConfig) =>
     transforms.foldLeft(config)((c, tf) => tf(c))

@@ -47,23 +47,22 @@ import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.ledger.client.GrpcChannel
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
-import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.{ByteString, Duration}
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.{Channel, Deadline, StatusRuntimeException, Status as GrpcStatus}
-import io.grpc.stub.{AbstractStub, StreamObserver}
+import io.grpc.stub.AbstractStub
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 sealed abstract class DedupConfig extends PrettyPrinting {}
@@ -854,30 +853,6 @@ private[environment] class LedgerClient(
 }
 
 object LedgerClient {
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  class FutureObserver[T](implicit elc: ErrorLoggingContext) extends StreamObserver[T] {
-    val promise = Promise[T]()
-    private var result: Option[T] = None
-
-    override def onError(t: Throwable) = {
-      promise.failure(t)
-    }
-
-    override def onNext(result: T) = {
-      this.result = Some(result)
-    }
-
-    override def onCompleted() = {
-      promise.success(
-        result.getOrElse(
-          ErrorUtil.internalError(
-            new IllegalStateException("onComplete was called without prior call to onNext")
-          )
-        )
-      )
-    }
-  }
-
   final case class GetUpdatesRequest(
       begin: Long,
       end: Option[Long],

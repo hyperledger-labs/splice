@@ -9,7 +9,6 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
   AcsStoreId,
-  SelectFromAcsTableResult,
   SelectFromAcsTableWithStateResult,
 }
 import slick.dbio.Effect
@@ -44,7 +43,7 @@ trait TcsQueries extends AcsQueries {
       companion: C,
       asOf: CantonTimestamp,
       additionalWhere: SQLActionBuilder,
-      limit: Option[Int] = None,
+      limit: Option[Int],
   )(implicit companionClass: ContractCompanion[C, TCid, T]): SQLActionBuilder = {
     val packageQualifiedName = companionClass.packageQualifiedName(companion)
     val limitClause = limit.fold(sql"")(n => sql" limit $n")
@@ -71,27 +70,6 @@ trait TcsQueries extends AcsQueries {
          """ ++ additionalWhere ++ sql"""
        )
        """ ++ limitClause).toActionBuilder
-  }
-
-  protected def selectFromTcsTableAsOf[C, TCid <: ContractId[?], T](
-      acsTableName: String,
-      archiveTableName: String,
-      storeId: AcsStoreId,
-      migrationId: Long,
-      companion: C,
-      asOf: CantonTimestamp,
-      additionalWhere: SQLActionBuilder = sql"",
-  )(implicit companionClass: ContractCompanion[C, TCid, T]) = {
-    tcsUnionAll(
-      SelectFromAcsTableResult.sqlColumnsCommaSeparated(),
-      acsTableName,
-      archiveTableName,
-      storeId,
-      migrationId,
-      companion,
-      asOf,
-      additionalWhere,
-    ).as[SelectFromAcsTableResult]
   }
 
   protected def selectFromTcsTableWithStateAsOf[C, TCid <: ContractId[?], T](

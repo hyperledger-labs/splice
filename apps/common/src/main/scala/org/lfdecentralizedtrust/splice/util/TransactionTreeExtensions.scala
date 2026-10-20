@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.util
 
-import org.lfdecentralizedtrust.splice.codegen.java.da.internal.template.Archive
 import com.daml.ledger.javaapi.data as j
 import j.codegen as jcg
 import scala.jdk.CollectionConverters.*
@@ -18,17 +17,6 @@ private[splice] object TransactionTreeExtensions {
       case (_, c: j.CreatedEvent) if c.getContractId == contractId.contractId =>
         Contract.fromCreatedEvent(tpl)(c)
     }.flatten
-
-    def findArchive[Marker](
-        descendantOf: j.Event,
-        contractId: jcg.ContractId[Marker],
-        archive: jcg.Choice[Marker, Archive, j.Unit],
-    ): Option[j.ExercisedEvent] =
-      self.collectFirstDescendant(descendantOf) {
-        case e: j.ExercisedEvent
-            if e.isConsuming && e.getContractId == contractId.contractId && e.getChoice == archive.name =>
-          e
-      }
 
     def firstDescendantExercise[Marker, Res](
         event: j.Event,

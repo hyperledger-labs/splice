@@ -906,14 +906,6 @@ object MultiDomainAcsStore extends StoreErrors {
   // The state of a contract in the store. Note that, contrary to `ContractState`, this can
   // also include archived contracts.
   sealed abstract class StoreContractState extends PrettyPrinting {
-    def toActiveState: Option[MultiDomainAcsStore.ContractState] =
-      this match {
-        case StoreContractState.Assigned(domain) =>
-          Some(MultiDomainAcsStore.ContractState.Assigned(domain))
-        case StoreContractState.InFlight(_) => Some(MultiDomainAcsStore.ContractState.InFlight)
-        case StoreContractState.Archived => None
-      }
-
   }
   object StoreContractState {
 

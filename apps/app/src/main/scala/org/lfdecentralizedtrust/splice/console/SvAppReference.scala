@@ -100,12 +100,6 @@ abstract class SvAppReference(
       httpCommand(HttpSvPublicAppClient.GetCometBftNodeStatus())
     }
 
-  @Help.Summary("Get the CometBFT node dump")
-  def cometBftNodeDebugDump(): definitions.CometBftNodeDumpResponse =
-    consoleEnvironment.run {
-      httpCommand(HttpSvOperatorAppClient.GetCometBftNodeDump())
-    }
-
   @Help.Summary("Make a CometBFT Json RPC request")
   def cometBftJsonRpcRequest(
       id: definitions.CometBftJsonRpcRequestId,
