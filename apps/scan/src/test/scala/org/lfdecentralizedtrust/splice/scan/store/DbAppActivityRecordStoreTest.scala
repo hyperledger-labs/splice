@@ -507,7 +507,7 @@ class DbAppActivityRecordStoreTest
       val ts1 = CantonTimestamp.now()
       val ts2 = ts1.plusSeconds(1L)
       for {
-        (appStore, verdictStore) <- newStores()
+        (_, verdictStore) <- newStores()
         accepted = mkVerdict(
           verdictStore,
           updateId,
@@ -555,7 +555,7 @@ class DbAppActivityRecordStoreTest
       val ts1 = CantonTimestamp.now()
       val ts2 = ts1.plusSeconds(1L)
       for {
-        (appStore, verdictStore) <- newStores()
+        (_, verdictStore) <- newStores()
         rejected = mkVerdict(
           verdictStore,
           updateId,

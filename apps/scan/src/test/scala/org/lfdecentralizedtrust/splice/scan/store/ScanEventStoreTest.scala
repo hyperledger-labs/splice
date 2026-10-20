@@ -426,7 +426,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
         ctx <- newEventStore()
         // First assignment
         recordTs1 = CantonTimestamp.now()
-        assignment1 <- insertAssign(ctx.updateHistory, recordTs1, "assign-cap-1")
+        _ <- insertAssign(ctx.updateHistory, recordTs1, "assign-cap-1")
 
         recordTs2 = recordTs1.plusSeconds(1)
         _ <- insertVerdict(ctx.verdictStore, "verdict-1", recordTs2)
@@ -515,7 +515,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
         ctx <- newEventStore()
         // First unassignment
         recordTs1 = CantonTimestamp.now()
-        unassignment1 <- insertUnassign(ctx.updateHistory, recordTs1, "unassign-cap-1")
+        _ <- insertUnassign(ctx.updateHistory, recordTs1, "unassign-cap-1")
 
         recordTs2 = recordTs1.plusSeconds(1)
         _ <- insertVerdict(ctx.verdictStore, "verdict-1", recordTs2)

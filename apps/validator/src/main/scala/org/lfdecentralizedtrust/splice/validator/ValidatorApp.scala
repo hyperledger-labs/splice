@@ -190,7 +190,7 @@ class ValidatorApp(
                 ValidatorScanConnection.persistScanUrlListBuilder(configProvider),
               )
             }
-            domainMigrationId <- appInitStep("Resolving domain migration id") {
+            _ <- appInitStep("Resolving domain migration id") {
               resolveDomainMigrationId(scanConnection)
             }
             domainConnector = new SynchronizerConnector(

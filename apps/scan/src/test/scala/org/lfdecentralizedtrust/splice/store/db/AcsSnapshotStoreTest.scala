@@ -243,7 +243,7 @@ trait AcsSnapshotStoreTest
             omr2,
             timestamp2,
           )
-          lastSnapshot <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp2)
+          _ <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp2)
           _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp2)
           result <- queryAll(store, timestamp2)
         } yield result.createdEventsInPage.map(_.event.getContractId) should be(

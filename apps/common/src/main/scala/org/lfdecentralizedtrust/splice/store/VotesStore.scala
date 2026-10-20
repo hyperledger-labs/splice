@@ -81,7 +81,7 @@ trait ActiveVotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
 
       for {
         dsoRules <- getDsoRules()
-        amuletRules <- getAmuletRules()
+        _ <- getAmuletRules()
         // Assumption: there are less than 1000 active vote requests
         // listing contracts in memory has a default limit of 1000
         requests <- multiDomainAcsStore.listAssignedContracts(
