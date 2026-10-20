@@ -478,19 +478,19 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /v0/devnet/onboard/validator/purchase-traffic:
+  /v0/internal/onboard/validator/purchase-traffic:
     post:
       tags: [sv]
       x-jvm-package: sv_public
-      x-external-audience: validators
+      x-external-audience: none
       description: "faucet for validator candidates to buy member traffic"
-      operationId: "devNetBuyMemberTraffic"
+      operationId: "internalBuyMemberTraffic"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/DevNetBuyMemberTrafficRequest"
+              "$ref": "#/components/schemas/InternalBuyMemberTrafficRequest"
       responses:
         "200":
           description: ok
@@ -736,7 +736,7 @@ components:
             Human-readable alias of the validator party decoded from the stored secret.
           type: string
 
-    DevNetBuyMemberTrafficRequest:
+    InternalBuyMemberTrafficRequest:
       type: object
       required:
         - participant_id

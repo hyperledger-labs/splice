@@ -334,17 +334,17 @@ class HttpSvPublicHandler(
     *
     * Protection: Rate limiting, endpoint only used for DevNet
     */
-  override def devNetBuyMemberTraffic(
-      respond: r0.DevNetBuyMemberTrafficResponse.type
+  override def internalBuyMemberTraffic(
+      respond: r0.InternalBuyMemberTrafficResponse.type
   )(
-      body: definitions.DevNetBuyMemberTrafficRequest
-  )(extracted: TraceContext): Future[r0.DevNetBuyMemberTrafficResponse] = {
+      body: definitions.InternalBuyMemberTrafficRequest
+  )(extracted: TraceContext): Future[r0.InternalBuyMemberTrafficResponse] = {
     implicit val traceContext: TraceContext = extracted
-    withSpan(s"$workflowId.devNetBuyMemberTraffic") { _ => _ =>
-      if (!isDevNet) {
+    withSpan(s"$workflowId.internalBuyMemberTraffic") { _ => _ =>
+      if (!config.enableInternalAutoOnboardingThroughSvTrafficFaucet || !isDevNet) {
         Future.failed(
           HttpErrorHandler.notImplemented(
-            "Traffic purchasing self-service is only available in DevNet."
+            "Traffic purchasing internal endpoint on the SV is disabled, purchase traffic for your node yourself"
           )
         )
       } else {
@@ -355,7 +355,7 @@ class HttpSvPublicHandler(
             if (!SwitchOverTimes.permissionedSynchronizerScheduled(dsoRules.payload)) {
               Future.failed(
                 HttpErrorHandler.notImplemented(
-                  "Traffic purchasing self-service is only available in DevNet when permissioned synchronizer is enabled."
+                  "Traffic purchasing self-service is only available when permissioned synchronizer is enabled."
                 )
               )
             } else {
@@ -364,8 +364,8 @@ class HttpSvPublicHandler(
                 "participant_id",
               ) match {
                 case Right(id) =>
-                  devNetTapAndBuyMemberTraffic(id).map(_ =>
-                    r0.DevNetBuyMemberTrafficResponseOK("Success")
+                  internalTapAndBuyMemberTraffic(id).map(_ =>
+                    r0.InternalBuyMemberTrafficResponseOK("Success")
                   )
                 case Left(err) =>
                   Future.failed(HttpErrorHandler.badRequest(s"Invalid participant ID: $err"))
@@ -880,7 +880,7 @@ class HttpSvPublicHandler(
         .yieldUnit()
     } yield ()
 
-  private def devNetTapAndBuyMemberTraffic(
+  private def internalTapAndBuyMemberTraffic(
       participantId: ParticipantId
   )(implicit tc: TraceContext): Future[Unit] = {
     for {
