@@ -546,6 +546,7 @@ abstract class StoreTestBase
       kind: governancelockCodegen.GovernanceLockKind =
         new governancelockCodegen.governancelockkind.GLK_SuperValidatorRightsOwner("sv1"),
       vestingEndTime: Option[Instant] = None,
+      vestingPeriod: RelTime = new RelTime(1_000_000),
       contractId: String = nextCid(),
   ): Contract[
     governancelockCodegen.GovernanceLock.ContractId,
@@ -564,7 +565,7 @@ abstract class StoreTestBase
             new governancelockCodegen.governancelockspecification.GLS_VestingLock(
               new governancelockCodegen.VestingLockSpecification(
                 kind,
-                new RelTime(1_000_000),
+                vestingPeriod,
                 endTime,
               )
             )
@@ -575,6 +576,39 @@ abstract class StoreTestBase
         },
         Optional.empty(),
         Instant.now().truncatedTo(ChronoUnit.MICROS),
+      ),
+    )
+
+  protected def governanceLockTransfer(
+      sender: PartyId,
+      receiver: PartyId,
+      expiresAt: Instant,
+      dso: PartyId = dsoParty,
+      contractId: String = nextCid(),
+  ): Contract[
+    governancelockCodegen.transfer.GovernanceLockTransfer.ContractId,
+    governancelockCodegen.transfer.GovernanceLockTransfer,
+  ] =
+    contract(
+      identifier =
+        governancelockCodegen.transfer.GovernanceLockTransfer.TEMPLATE_ID_WITH_PACKAGE_ID,
+      contractId = new governancelockCodegen.transfer.GovernanceLockTransfer.ContractId(contractId),
+      payload = new governancelockCodegen.transfer.GovernanceLockTransfer(
+        new governancelockCodegen.GovernanceLockKey(
+          dso.toProtoPrimitive,
+          sender.toProtoPrimitive,
+          // The kind is always an SV lock here: an FA party is not a stakeholder of the
+          // transfer itself, so there is nothing extra to test for it.
+          new governancelockCodegen.governancelockspecification.GLS_FullLock(
+            new governancelockCodegen.FullLockSpecification(
+              new governancelockCodegen.governancelockkind.GLK_SuperValidatorRightsOwner("sv1")
+            )
+          ),
+        ),
+        receiver.toProtoPrimitive,
+        BigDecimal(10).bigDecimal,
+        Instant.EPOCH,
+        expiresAt,
       ),
     )
 

@@ -7,13 +7,15 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
+import org.lfdecentralizedtrust.splice.codegen.java.splice.governancelock
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.AnyContract
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
-import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
+import org.lfdecentralizedtrust.splice.store.{ChoiceContextContractFetcher, PageLimit}
 import org.lfdecentralizedtrust.splice.util.{
   AmuletConfigSchedule,
   Contract,
@@ -266,6 +268,65 @@ object ChoiceContextBuilder {
         optLockedAmulet.foreach(contract => choiceContextBuilder.disclose(contract))
         choiceContextBuilder.build()
     }
+  }
+
+  /** The accept of a `GovernanceLockTransfer` merges at most this many
+    * locks with the source key.
+    */
+  private val maxGovernanceLockTransferSourceLocks = 20
+
+  /** Discloses the locks that the accept of a `GovernanceLockTransfer` resolves
+    * by its source key as the receiver cannot see them. Also discloses the
+    * transfer's `LockedAmulet`s,
+    */
+  def getGovernanceLockTransferAcceptContext[
+      DisclosedContract,
+      ChoiceContext,
+      Builder <: ChoiceContextBuilder[DisclosedContract, ChoiceContext, Builder],
+  ](
+      description: String,
+      source: governancelock.GovernanceLockKey,
+      store: ScanStore,
+      fetcher: ChoiceContextContractFetcher,
+      clock: Clock,
+      newBuilder: String => Builder,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ChoiceContext] = {
+    for {
+      locks <- store.listGovernanceLocksByKey(
+        source,
+        PageLimit.tryCreate(maxGovernanceLockTransferSourceLocks),
+      )
+      _ = if (locks.isEmpty)
+        throw io.grpc.Status.NOT_FOUND
+          .withDescription(s"No GovernanceLock with key $source found for $description")
+          .asRuntimeException()
+      lockedAmulets <- MonadUtil.sequentialTraverse(locks) { lock =>
+        val lockedAmuletId = lock.payload.lockedAmulet
+        fetcher
+          .lookupContractById(amulet.LockedAmulet.COMPANION)(lockedAmuletId)
+          .map(
+            _.getOrElse(
+              throw io.grpc.Status.NOT_FOUND
+                .withDescription(
+                  s"LockedAmulet '${lockedAmuletId.contractId}' of GovernanceLock " +
+                    s"'${lock.contractId.contractId}' not found for $description"
+                )
+                .asRuntimeException()
+            )
+          )
+      }
+      (choiceContextBuilder, _) <- getAmuletRulesTransferContext[
+        DisclosedContract,
+        ChoiceContext,
+        Builder,
+      ](store, clock, newBuilder)
+    } yield choiceContextBuilder
+      .discloseAll(locks.map(_.contract))
+      .discloseAll(lockedAmulets)
+      .build()
   }
 
 }

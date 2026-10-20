@@ -22,6 +22,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.governancelock.{
+  GovernanceLock,
+  GovernanceLockKey,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
   ExternalPartyAmuletRules,
   TransferCommand,
@@ -184,6 +188,11 @@ class CachingScanStore(
       cacheConfig.cachedByParty,
       store.lookupTransferPreapprovalByParty,
     ).get(partyId)
+
+  override def listGovernanceLocksByKey(key: GovernanceLockKey, limit: Limit)(implicit
+      tc: TraceContext
+  ): Future[Seq[ContractWithState[GovernanceLock.ContractId, GovernanceLock]]] =
+    store.listGovernanceLocksByKey(key, limit)
 
   override def lookupTransferCommandCounterByParty(partyId: PartyId)(implicit
       tc: TraceContext

@@ -246,6 +246,113 @@ abstract class ScanStoreTest
       }
     }
 
+    "ingest GovernanceLockTransfers of the DSO and skip those of other parties" in {
+      val wanted = governanceLockTransfer(userParty(1), userParty(2), time(2).toInstant)
+      val unwanted =
+        governanceLockTransfer(userParty(1), userParty(2), time(2).toInstant, dso = userParty(3))
+      for {
+        store <- mkStore()
+        _ <- MonadUtil.sequentialTraverse(Seq(wanted, unwanted))(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        result <- store.multiDomainAcsStore.listContracts(
+          splice.governancelock.transfer.GovernanceLockTransfer.COMPANION
+        )
+      } yield {
+        result.map(_.contractId) shouldBe Seq(wanted.contractId)
+      }
+    }
+
+    "listGovernanceLocksByKey" should {
+      val owner = userParty(1)
+      val sv1 = new splice.governancelock.governancelockkind.GLK_SuperValidatorRightsOwner("sv1")
+      val vestingEndTime = Instant.now().plusSeconds(3600).truncatedTo(ChronoUnit.MICROS)
+
+      def keyOf(
+          lock: Contract[?, splice.governancelock.GovernanceLock]
+      ): splice.governancelock.GovernanceLockKey =
+        new splice.governancelock.GovernanceLockKey(
+          lock.payload.dso,
+          lock.payload.owner,
+          lock.payload.specification,
+        )
+
+      def listByKey(store: ScanStore, key: splice.governancelock.GovernanceLockKey, limit: Int) =
+        store
+          .listGovernanceLocksByKey(key, PageLimit.tryCreate(limit))
+          .futureValue
+          .map(_.contract.contractId)
+
+      "return exactly the locks with the key, largest amount first" in {
+        val smallFull = governanceLock(owner, amount = BigDecimal(10), kind = sv1)
+        val largeFull = governanceLock(owner, amount = BigDecimal(40), kind = sv1)
+        val vesting =
+          governanceLock(owner, BigDecimal(20), kind = sv1, vestingEndTime = Some(vestingEndTime))
+        val faLock = governanceLock(
+          owner,
+          BigDecimal(20),
+          kind = new splice.governancelock.governancelockkind.GLK_FeaturedApp(
+            userParty(2).toProtoPrimitive
+          ),
+        )
+        val others = Seq(
+          governanceLock(userParty(3), BigDecimal(20), kind = sv1),
+          governanceLock(
+            owner,
+            BigDecimal(20),
+            kind = new splice.governancelock.governancelockkind.GLK_SuperValidatorRightsOwner(
+              "sv2"
+            ),
+          ),
+          governanceLock(
+            owner,
+            BigDecimal(20),
+            kind = new splice.governancelock.governancelockkind.GLK_ProvisionalFeaturedApp(
+              userParty(2).toProtoPrimitive
+            ),
+          ),
+          governanceLock(
+            owner,
+            BigDecimal(20),
+            kind = sv1,
+            vestingEndTime = Some(vestingEndTime.plusSeconds(1)),
+          ),
+          governanceLock(
+            owner,
+            BigDecimal(20),
+            kind = sv1,
+            vestingEndTime = Some(vestingEndTime),
+            vestingPeriod = new RelTime(2_000_000),
+          ),
+        )
+        for {
+          store <- mkStore()
+          _ <- MonadUtil.sequentialTraverse(
+            Seq(smallFull, largeFull, vesting, faLock) ++ others
+          )(dummyDomain.create(_)(store.multiDomainAcsStore))
+        } yield {
+          listByKey(store, keyOf(smallFull), 10) shouldBe
+            Seq(largeFull.contractId, smallFull.contractId)
+          listByKey(store, keyOf(vesting), 10) shouldBe Seq(vesting.contractId)
+          listByKey(store, keyOf(faLock), 10) shouldBe Seq(faLock.contractId)
+        }
+      }
+
+      "return at most limit locks, the largest ones" in {
+        val locks = Seq(10, 30, 20).map(amount =>
+          governanceLock(owner, amount = BigDecimal(amount), kind = sv1)
+        )
+        for {
+          store <- mkStore()
+          _ <- MonadUtil.sequentialTraverse(locks)(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+        } yield {
+          listByKey(store, keyOf(locks(0)), 2) shouldBe Seq(locks(1), locks(2)).map(_.contractId)
+        }
+      }
+    }
+
     "lookupTransferPreapprovalByParty" should {
       "return the TransferPreapproval contract signed by the specified party if available" in {
         val wanted = transferPreapproval(userParty(1), providerParty(1), time(0), time(1))

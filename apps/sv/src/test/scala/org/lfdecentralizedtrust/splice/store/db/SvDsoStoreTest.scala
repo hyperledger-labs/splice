@@ -2468,39 +2468,6 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
     )
   }
 
-  private def governanceLockTransfer(
-      sender: PartyId,
-      receiver: PartyId,
-      expiresAt: Instant,
-      dso: PartyId = dsoParty,
-      contractId: String = nextCid(),
-  ): Contract[
-    splice.governancelock.transfer.GovernanceLockTransfer.ContractId,
-    splice.governancelock.transfer.GovernanceLockTransfer,
-  ] =
-    contract(
-      identifier =
-        splice.governancelock.transfer.GovernanceLockTransfer.TEMPLATE_ID_WITH_PACKAGE_ID,
-      contractId = new splice.governancelock.transfer.GovernanceLockTransfer.ContractId(contractId),
-      payload = new splice.governancelock.transfer.GovernanceLockTransfer(
-        new splice.governancelock.GovernanceLockKey(
-          dso.toProtoPrimitive,
-          sender.toProtoPrimitive,
-          // The kind is always an SV lock here: an FA party is not a stakeholder of the
-          // transfer itself, so there is nothing extra to test for it.
-          new splice.governancelock.governancelockspecification.GLS_FullLock(
-            new splice.governancelock.FullLockSpecification(
-              new splice.governancelock.governancelockkind.GLK_SuperValidatorRightsOwner("sv1")
-            )
-          ),
-        ),
-        receiver.toProtoPrimitive,
-        BigDecimal(10).bigDecimal,
-        Instant.EPOCH,
-        expiresAt,
-      ),
-    )
-
   private def svOnboardingRequest(
       name: String,
       candidate: PartyId,
