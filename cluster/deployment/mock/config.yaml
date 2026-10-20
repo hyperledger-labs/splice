@@ -455,6 +455,9 @@ gha:
     ]
 networkWide:
   maxVettingDelay: 1m
+pulumiStacks:
+  default:
+    retryMaxBackoffDurationSeconds: 900
 validators:
   validator-runbook:
     postgresPvcSize: '200Gi'

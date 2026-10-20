@@ -113,7 +113,7 @@
           "name": "splice-node-active"
         }
       },
-      "retryMaxBackoffDurationSeconds": 600,
+      "retryMaxBackoffDurationSeconds": 900,
       "retryOnUpdateConflict": true,
       "serviceAccountName": "sv.sv-1-sa",
       "stack": "organization/sv/sv.sv-1.mock",
