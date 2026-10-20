@@ -97,8 +97,6 @@ class DbScanTxLogStoreConfig(loggerFactory: NamedLoggerFactory)
 }
 
 object DbScanStore {
-  type CacheKey = java.lang.Long // caffeine metrics function demands AnyRefs
-  type CacheValue = BigDecimal
 }
 class DbScanStore(
     override val key: ScanStore.Key,

@@ -406,11 +406,6 @@ class SvAppBackendReference(
   lazy val sequencerClient: SequencerClientReference =
     sequencerClientFor(_.current)
 
-  lazy val sequencerClientSuccessor: SequencerClientReference =
-    sequencerClientFor(
-      _.successor.getOrElse(throw new IllegalStateException("successor not configured"))
-    )
-
   def sequencerClientFor(
       node: SvSynchronizerNodesConfig => SvSynchronizerNodeConfig
   ): SequencerClientReference = {

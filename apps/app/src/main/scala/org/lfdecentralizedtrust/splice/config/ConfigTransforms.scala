@@ -216,7 +216,6 @@ object ConfigTransforms {
   type AnsExternalClientConfigReader = Endo[AnsAppExternalClientConfig]
   type ValidatorAppTransform = Endo[ValidatorAppBackendConfig]
   type WalletAppClientTransform = Endo[WalletAppClientConfig]
-  type ScanAppTransform = Endo[ScanAppBackendConfig]
   type SplitwellAppTransform = Endo[SplitwellAppBackendConfig]
   type RemoteSplitwellAppTransform = Endo[SplitwellAppClientConfig]
   type AutomationConfigTransform = Endo[AutomationConfig]

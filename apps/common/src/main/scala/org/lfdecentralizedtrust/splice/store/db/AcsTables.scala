@@ -14,9 +14,6 @@ trait AcsTables extends AcsJdbcTypes {
 
   import profile.api.*
 
-  lazy val acsBaseSchema: profile.SchemaDescription =
-    StoreDescriptors.schema
-
   case class StoreDescriptorsRow(id: Int, descriptor: Json)
 
   class StoreDescriptors(_tableTag: Tag)

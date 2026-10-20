@@ -381,19 +381,6 @@ object AmuletCreate {
   }
 }
 
-object LockedAmuletCreate {
-  type TCid = amuletCodegen.LockedAmulet.ContractId
-  type T = amuletCodegen.LockedAmulet
-  type ContractType = Contract[TCid, T]
-  val companion = amuletCodegen.LockedAmulet.COMPANION
-
-  def unapply(
-      event: CreatedEvent
-  ): Option[ContractType] = {
-    Contract.fromCreatedEvent(companion)(event)
-  }
-}
-
 object TransferInstructionCreate {
   type TCid = splice.amulettransferinstruction.AmuletTransferInstruction.ContractId
   type T = splice.amulettransferinstruction.AmuletTransferInstruction

@@ -959,11 +959,6 @@ object MultiDomainAcsStore extends StoreErrors {
       )
     }
 
-  /** Max batch size for domain reassignment automation.  Not a hard limit,
-    * chosen to be "reasonable".
-    */
-  val notOnDomainsTotalLimit: PageLimit = PageLimit tryCreate 1000
-
   type VersionGuard = (PackageVersionSupport, CantonTimestamp) => (
       TraceContext
   ) => Future[PackageVersionSupport.FeatureSupport]
