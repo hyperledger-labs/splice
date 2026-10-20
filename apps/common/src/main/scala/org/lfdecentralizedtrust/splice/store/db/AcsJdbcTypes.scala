@@ -416,7 +416,7 @@ object AcsJdbcTypes {
     ).fold(throw _, identity)
   }
 
-  /** Wrapper for ParticipantId with Splice's historical SetParameter implementation.
+  /** Wrapper for Member with Splice's historical SetParameter implementation.
     * If the wrong implicit is picked (i.e., the one from Canton fork),
     * then the wrong data is inserted into the database.
     */
