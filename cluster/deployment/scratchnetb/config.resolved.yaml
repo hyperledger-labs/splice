@@ -41,6 +41,11 @@ cloudArmor:
       - 'grafana'
 cluster:
   nodePools:
+    additionalInfra:
+      - maxNodes: 3
+        minNodes: 0
+        nodeType: 'c3d-standard-8'
+        zones: '*'
     apps:
       maxNodes: 40
       minNodes: 0
