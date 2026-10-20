@@ -15,10 +15,6 @@ export const StackConfigSchema = z.object({
   resources: K8sResourceSchema,
 });
 
-const DefaultStackConfigSchema = StackConfigSchema.extend({
-  retryMaxBackoffDurationSeconds: z.number().int().positive(),
-});
-
 const ProjectFilterSchema = z.union([
   z.literal('canton-network'),
   z.literal('gha'),
@@ -66,7 +62,7 @@ function* iterateDefaultProjectFilters(): Generator<ProjectFilter> {
 export const DeploymentConfigSchema = z.object({
   pulumiStacks: z.record(z.string(), StackConfigSchema).and(
     z.object({
-      default: DefaultStackConfigSchema,
+      default: StackConfigSchema,
     })
   ),
   deployment: z
