@@ -180,9 +180,6 @@ class DbScanStore(
 
   private[splice] def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
   private[splice] def txLogStoreId: TxLogStoreId = multiDomainAcsStore.txLogStoreId
-  // Round totals are derived from TxLog entries, and are therefore linked to that store
-  private[splice] def roundTotalsStoreId: TxLogStoreId = txLogStoreId
-
   override def lookupAmuletRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]] =
