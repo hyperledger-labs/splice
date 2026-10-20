@@ -16,6 +16,9 @@ infra:
     retentionDuration: "1y"
     retentionSize: "1500GB"
     storageSize: "2Ti"
+    # Expose pushgateway through the cluster ingress
+    # pushgatewayExternalAccess:
+    #   enabled: true
   gkeGateway:
     # swapping this comes with ~5min of downtime
     # note: if you want to use cloud armor, you need to set this to true
