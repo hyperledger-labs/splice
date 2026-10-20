@@ -394,7 +394,7 @@ class UpdateHistoryBulkStorageTest
           .toInstant(ZoneOffset.UTC)
           .toEpochMilli * 1000
 
-      val (retryProvider, bulkStorage, svc, progress) =
+      val (retryProvider, _, svc, progress) =
         newRetryProviderAndUpdatesBulkStorageService()
       Using.resources(
         svc,

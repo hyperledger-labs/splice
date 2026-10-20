@@ -292,7 +292,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   }
 
   "adjust maxNumInput if there is a tap operation in the batch" in { implicit env =>
-    val (alice, _) = onboardAliceAndBob()
+    val (_, _) = onboardAliceAndBob()
     aliceValidatorWalletClient.tap(50)
     val aliceValidator = aliceValidatorBackend.getValidatorPartyId()
     createRewards(

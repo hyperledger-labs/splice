@@ -61,7 +61,7 @@ class TimeBasedTreasuryIntegrationTest
   )
 
   "automatically merge transfer inputs when the automation is triggered" in { implicit env =>
-    val (alice, bob) = onboardAliceAndBob()
+    val (alice, _) = onboardAliceAndBob()
     waitForWalletUser(aliceValidatorWalletClient)
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 

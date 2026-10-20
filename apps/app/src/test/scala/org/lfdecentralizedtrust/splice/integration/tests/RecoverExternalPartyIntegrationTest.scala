@@ -41,7 +41,7 @@ class RecoverExternalPartyIntegrationTest
     // Canton endpoint is kinda slow for this so we only resolve it once.
     val synchronizerId = decentralizedSynchronizerId
 
-    val onboarding @ OnboardingResult(aliceParty, alicePublicKey, alicePrivateKey) =
+    val onboarding @ OnboardingResult(aliceParty, _, alicePrivateKey) =
       onboardExternalParty(aliceValidatorBackend, Some("aliceExternal"))
 
     aliceValidatorWalletClient.tap(5000.0)

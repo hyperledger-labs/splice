@@ -36,7 +36,7 @@ class HttpExternalAnsHandler(
   )(
       body: d0.CreateAnsEntryRequest
   )(tuser: WalletUserRequest): Future[r0.CreateAnsEntryResponse] = {
-    implicit val WalletUserRequest(user, endUserWallet, traceContext) = tuser
+    implicit val WalletUserRequest(_, endUserWallet, traceContext) = tuser
     val partyId = endUserWallet.store.key.endUserParty
     withSpan(s"$workflowId.createAnsEntry") { implicit traceContext => _ =>
       retryProvider.retryForClientCalls(
@@ -84,7 +84,7 @@ class HttpExternalAnsHandler(
   override def listAnsEntries(
       respond: r0.ListAnsEntriesResponse.type
   )()(tuser: WalletUserRequest): Future[r0.ListAnsEntriesResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    implicit val WalletUserRequest(_, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.listAnsEntries") { implicit traceContext => _ =>
       for {
         entriesWithPayData <- userWallet.store.listAnsEntries(walletManager.clock.now)

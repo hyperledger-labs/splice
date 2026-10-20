@@ -154,7 +154,7 @@ class TokenStandardTransferIntegrationTest
         )
       }
 
-      val (aliceTxs, bobTxs) = clue("Alice and Bob parse all tx log entries") {
+      val (_, _) = clue("Alice and Bob parse all tx log entries") {
         eventually() {
           val aliceTxs = aliceWalletClient.listTransactions(None, 1000)
           // tap + 4 transfer instructions + accept + withdraw + reject
@@ -359,7 +359,7 @@ class TokenStandardTransferIntegrationTest
       )
       aliceWalletClient.withdrawTokenStandardTransfer(offer)
 
-      val (aliceTxs, bobTxs) = clue("Alice and Bob parse all tx log entries") {
+      val (_, _) = clue("Alice and Bob parse all tx log entries") {
         eventually() {
           val aliceTxs = aliceWalletClient.listTransactions(None, 1000)
           // tap + transfer instruction + unlock + withdraw
