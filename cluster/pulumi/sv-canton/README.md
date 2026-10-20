@@ -1,6 +1,6 @@
 # sv-canton (Pulumi project)
 
-Deploys "backend" nodes comprising an SV deployment: participant, sequencer, mediator, and CometBFT node.
+Deploys "backend" nodes comprising an SV deployment: participant, sequencer, and mediator.
 
 Deploys a single set of these nodes for a single migration ID.
 

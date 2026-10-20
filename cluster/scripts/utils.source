@@ -106,20 +106,6 @@ create_component_instance() {
     echo "$component_instance"
 }
 
-function canton_bft_db_enabled() {
-  local migration_id=$1
-  local config=$2
-
-  echo "$config" | yq "
-    ([.synchronizerMigration.active, .synchronizerMigration.upgrade, .synchronizerMigration.legacy]
-      + (.synchronizerMigration.additionalLegacy // [])
-      + (.synchronizerMigration.archived // []))
-    | map(select(. != null and .id == ${migration_id}))
-    | .[0]
-    | ((.sequencer.enableBftSequencer // false) and (.sequencer.dedicatedBftSequencerDb // true))
-  "
-}
-
 function get_resolved_config() {
   "${SPLICE_ROOT}/cluster/scripts/get-resolved-config.sh"
 }

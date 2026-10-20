@@ -144,9 +144,6 @@ const MonitoringConfigSchema = z
         cloudSql: z.object({
           maintenance: z.boolean(),
         }),
-        cometbft: z.object({
-          expectedMaxBlocksPerSecond: z.number(),
-        }),
         loadTester: z.object({
           minRate: z.number(),
         }),

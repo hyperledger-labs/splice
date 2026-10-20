@@ -58,14 +58,6 @@ function subcmd_update_config() {
       id: $migration_id
 EOF
   )
-  if [ "$migration_type" = "upgrade" ]; then
-    migration_config+=$(cat <<EOF
-
-      sequencer:
-        enableBftSequencer: true
-EOF
-  )
-  fi
   if [ "$#" -gt 0 ]; then
     migration_config+=$(cat <<EOF
 

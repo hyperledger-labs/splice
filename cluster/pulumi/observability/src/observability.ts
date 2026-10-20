@@ -13,7 +13,6 @@ import {
   CLUSTER_NAME,
   clusterProdLike,
   commandScriptPath,
-  DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
   GCP_PROJECT,
   GrafanaKeys,
@@ -25,7 +24,6 @@ import {
   ObservabilityReleaseName,
   SPLICE_ROOT,
 } from '@canton-network/splice-pulumi-common';
-import { allSvsConfiguration } from '@canton-network/splice-pulumi-common-sv/src/singleSvConfig';
 import {
   extraSvConfigsBasic,
   standardSvConfigsBasic,
@@ -930,13 +928,6 @@ function createGrafanaAlerting(namespace: Input<string>) {
     .concat(standardSvConfigsBasic)
     .map(sv => sv.sweep!)
     .filter(e => e != undefined);
-  const cantonBftEnabled =
-    DecentralizedSynchronizerUpgradeConfig.active.sequencer.enableBftSequencer;
-  const cometbftPruningHighestBlockRetain = allSvsConfiguration
-    .map(sv => sv.pruning?.cometbft?.retainBlocks)
-    .filter((retainBlocks): retainBlocks is number => retainBlocks !== undefined)
-    .sort((a, b) => a - b)
-    .pop();
   new k8s.core.v1.ConfigMap(
     'grafana-alerting',
     {
@@ -1013,25 +1004,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 loadTesterConfig?.minRate ? loadTesterConfig?.minRate.toString() : '1.0'
               )
               .replaceAll('$NODATA', loadTesterConfig?.enable ? 'Alerting' : 'OK'),
-            ...(cantonBftEnabled
-              ? {
-                  'cometbft_deleted_alerts.yaml': readGrafanaAlertingFile('cometbft_deleted.yaml'),
-                }
-              : {
-                  'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml')
-                    .replaceAll(
-                      '$EXPECTED_MAX_BLOCK_RATE_PER_SECOND',
-                      monitoringConfig.alerting.alerts.cometbft.expectedMaxBlocksPerSecond.toString()
-                    )
-                    .replaceAll(
-                      '$COMETBFT_PRUNING_DISABLED',
-                      (cometbftPruningHighestBlockRetain === undefined).toString()
-                    )
-                    .replaceAll(
-                      '$COMETBFT_RETAIN_BLOCKS',
-                      String((cometbftPruningHighestBlockRetain || 0) * 1.05)
-                    ),
-                }),
+            'cometbft_deleted_alerts.yaml': readGrafanaAlertingFile('cometbft_deleted.yaml'),
             'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml')
               .replaceAll(
                 '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
@@ -1179,16 +1152,10 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 '$SEQUENCER_RATE_LIMIT_CIRCUIT_BREAKER_STATE_THRESHOLD',
                 monitoringConfig.alerting.alerts.sequencerRateLimits.circuitBreakerStateThreshold.toString()
               ),
-            ...(cantonBftEnabled
-              ? {
-                  'cantonbft_alerts.yaml': readGrafanaAlertingFile(
-                    'cantonbft_alerts.yaml'
-                  ).replaceAll(
-                    '$CANTON_BFT_MEMPOOL_SIZE_THRESHOLD',
-                    monitoringConfig.alerting.alerts.cantonBft.mempoolMaxSizeThreshold.toString()
-                  ),
-                }
-              : {}),
+            'cantonbft_alerts.yaml': readGrafanaAlertingFile('cantonbft_alerts.yaml').replaceAll(
+              '$CANTON_BFT_MEMPOOL_SIZE_THRESHOLD',
+              monitoringConfig.alerting.alerts.cantonBft.mempoolMaxSizeThreshold.toString()
+            ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(
               readGrafanaAlertingFile('templates.yaml')

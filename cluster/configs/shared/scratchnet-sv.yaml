@@ -1,7 +1,4 @@
 !include(base-sv.yaml;ci-sv.yaml)
-pruning:
-  cometbft:
-    retainBlocks: 2000 # corresponds to a retention period of ~2 hours
 svApp:
   resources:
     limits:
@@ -38,10 +35,4 @@ mediator:
       memory: 4Gi
     requests:
       cpu: "1"
-      memory: 2Gi
-cometbft:
-  resources:
-    limits:
-      memory: 4Gi
-    requests:
       memory: 2Gi

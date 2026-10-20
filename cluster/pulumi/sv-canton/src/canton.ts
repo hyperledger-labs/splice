@@ -12,13 +12,9 @@ import {
 import {
   InstalledMigrationSpecificSv,
   SingleSvConfiguration,
-  StaticCometBftConfigWithNodeName,
 } from '@canton-network/splice-pulumi-common-sv';
 import { installPostgres, Postgres } from '@canton-network/splice-pulumi-common/src/postgres';
-import {
-  InStackCantonBftDecentralizedSynchronizerNode,
-  InStackCometBftDecentralizedSynchronizerNode,
-} from '@canton-network/splice-pulumi-sv-canton/src/decentralizedSynchronizerNode';
+import { InStackCantonBftDecentralizedSynchronizerNode } from '@canton-network/splice-pulumi-sv-canton/src/decentralizedSynchronizerNode';
 
 export async function installCantonComponents(
   xns: ExactNamespace,
@@ -32,15 +28,6 @@ export async function installCantonComponents(
     isCoreSv: boolean;
   } & SingleSvConfiguration,
   migrationConfig: DecentralizedSynchronizerMigrationConfig,
-  cometbft: {
-    nodeConfigs: {
-      self: StaticCometBftConfigWithNodeName;
-      sv1: StaticCometBftConfigWithNodeName;
-      peers: StaticCometBftConfigWithNodeName[];
-    };
-    enableStateSync?: boolean;
-    enableTimeoutCommit?: boolean;
-  },
   dbs?: {
     participant: Postgres;
     mediator: Postgres;
@@ -103,54 +90,34 @@ export async function installCantonComponents(
       true,
       { isActive: migrationStillRunning, migrationId, disableProtection }
     ));
-  const bftSequencerPostgres =
-    migrationInfo.sequencer.enableBftSequencer && migrationInfo.sequencer.dedicatedBftSequencerDb
-      ? await installPostgres(
-          xns,
-          `sequencer-bft-${migrationId}-pg`,
-          `sequencer-bft-pg`,
-          version,
-          physicalSynchronizerConfig.cantonbft.cloudSql,
-          physicalSynchronizerConfig.cantonbft.splicePostgres,
-          true,
-          { isActive: migrationStillRunning, migrationId, disableProtection }
-        )
-      : undefined;
+  const bftSequencerPostgres = migrationInfo.sequencer.dedicatedBftSequencerDb
+    ? await installPostgres(
+        xns,
+        `sequencer-bft-${migrationId}-pg`,
+        `sequencer-bft-pg`,
+        version,
+        physicalSynchronizerConfig.cantonbft.cloudSql,
+        physicalSynchronizerConfig.cantonbft.splicePostgres,
+        true,
+        { isActive: migrationStillRunning, migrationId, disableProtection }
+      )
+    : undefined;
   if (migrationStillRunning) {
-    const decentralizedSynchronizerNode = migrationInfo.sequencer.enableBftSequencer
-      ? new InStackCantonBftDecentralizedSynchronizerNode(
-          svConfig,
-          migrationId,
-          svConfig.ingressName,
-          xns,
-          {
-            sequencerPostgres: sequencerPostgres,
-            mediatorPostgres: mediatorPostgres,
-            bftSequencerPostgres: bftSequencerPostgres,
-            setCoreDbNames: svConfig.isCoreSv,
-          },
-          version,
-          imagePullServiceAccountName,
-          opts
-        )
-      : new InStackCometBftDecentralizedSynchronizerNode(
-          svConfig,
-          cometbft,
-          migrationId,
-          xns,
-          {
-            sequencerPostgres: sequencerPostgres,
-            mediatorPostgres: mediatorPostgres,
-            setCoreDbNames: svConfig.isCoreSv,
-          },
-          isActiveMigration,
-          svConfig.onboardingName,
-          version,
-          imagePullServiceAccountName,
-          disableProtection,
-          migrationInfo.cometbft?.volumeSize,
-          opts
-        );
+    const decentralizedSynchronizerNode = new InStackCantonBftDecentralizedSynchronizerNode(
+      svConfig,
+      migrationId,
+      svConfig.ingressName,
+      xns,
+      {
+        sequencerPostgres: sequencerPostgres,
+        mediatorPostgres: mediatorPostgres,
+        bftSequencerPostgres: bftSequencerPostgres,
+        setCoreDbNames: svConfig.isCoreSv,
+      },
+      version,
+      imagePullServiceAccountName,
+      opts
+    );
     return {
       decentralizedSynchronizer: decentralizedSynchronizerNode,
     };

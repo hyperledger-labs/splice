@@ -54,7 +54,6 @@ if (!useGKEL7Gateway && cloudArmorSecurityPolicy) {
 const istio = configureIstio(
   network.ingressNs,
   ingressIp,
-  network.cometbftIngressIp.address,
   useGKEL7Gateway,
   gkeGatewayTeardown ? [gkeGatewayTeardown] : []
 );

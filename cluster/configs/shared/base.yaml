@@ -138,8 +138,6 @@ monitoring:
         excludedLimiters: [ ]
       cloudSql:
         maintenance: false
-      cometbft:
-        expectedMaxBlocksPerSecond: 3.5
       loadTester:
         minRate: 0.95
       mediators:

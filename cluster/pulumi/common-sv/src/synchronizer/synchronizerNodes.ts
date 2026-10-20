@@ -1,39 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
-import {
-  DecentralizedSynchronizerMigrationConfig,
-  DomainMigrationIndex,
-  MigrationInfo,
-} from '@canton-network/splice-pulumi-common';
+import { DecentralizedSynchronizerMigrationConfig } from '@canton-network/splice-pulumi-common';
 
-import { CometBftNodeConfigs } from './cometBftNodeConfigs';
-import { StaticCometBftConfigWithNodeName } from './cometbftConfig';
 import {
-  CrossStackCometBftDecentralizedSynchronizerNode,
   CrossStackDecentralizedSynchronizerNode,
   DecentralizedSynchronizerNode,
   SvParticipant,
 } from './decentralizedSynchronizerNode';
-
-function buildDecentralizedSynchronizerNode(
-  migrationInfo: MigrationInfo,
-  migrationId: DomainMigrationIndex,
-  cometbftNodeConfigs: {
-    self: StaticCometBftConfigWithNodeName;
-    sv1: StaticCometBftConfigWithNodeName;
-    peers: StaticCometBftConfigWithNodeName[];
-  },
-  ingressName: string
-): DecentralizedSynchronizerNode {
-  return migrationInfo.sequencer.enableBftSequencer
-    ? new CrossStackDecentralizedSynchronizerNode(migrationId, ingressName)
-    : new CrossStackCometBftDecentralizedSynchronizerNode(
-        migrationId,
-        new CometBftNodeConfigs(migrationId, cometbftNodeConfigs).nodeIdentifier,
-        ingressName
-      );
-}
 
 export class SynchronizerNodes {
   readonly participant: SvParticipant;
@@ -44,44 +18,31 @@ export class SynchronizerNodes {
 
   constructor(
     decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
-    cometbftNodeConfigs: {
-      self: StaticCometBftConfigWithNodeName;
-      sv1: StaticCometBftConfigWithNodeName;
-      peers: StaticCometBftConfigWithNodeName[];
-    },
     ingressName: string
   ) {
-    const activeMigrationId = decentralizedSynchronizerMigrationConfig.active.id;
-
     this.participant = {
       internalClusterAddress: pulumi.output('participant'),
     };
 
-    this.active = buildDecentralizedSynchronizerNode(
-      decentralizedSynchronizerMigrationConfig.active,
-      activeMigrationId,
-      cometbftNodeConfigs,
+    this.active = new CrossStackDecentralizedSynchronizerNode(
+      decentralizedSynchronizerMigrationConfig.active.id,
       ingressName
     );
 
     if (decentralizedSynchronizerMigrationConfig.legacy) {
-      this.legacy = buildDecentralizedSynchronizerNode(
-        decentralizedSynchronizerMigrationConfig.legacy,
+      this.legacy = new CrossStackDecentralizedSynchronizerNode(
         decentralizedSynchronizerMigrationConfig.legacy.id,
-        cometbftNodeConfigs,
         ingressName
       );
     }
 
-    this.additionalLegacy = decentralizedSynchronizerMigrationConfig.additionalLegacy.map(info =>
-      buildDecentralizedSynchronizerNode(info, info.id, cometbftNodeConfigs, ingressName)
+    this.additionalLegacy = decentralizedSynchronizerMigrationConfig.additionalLegacy.map(
+      info => new CrossStackDecentralizedSynchronizerNode(info.id, ingressName)
     );
 
     if (decentralizedSynchronizerMigrationConfig.upgrade) {
-      this.upgrade = buildDecentralizedSynchronizerNode(
-        decentralizedSynchronizerMigrationConfig.upgrade,
+      this.upgrade = new CrossStackDecentralizedSynchronizerNode(
         decentralizedSynchronizerMigrationConfig.upgrade.id,
-        cometbftNodeConfigs,
         ingressName
       );
     }

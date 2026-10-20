@@ -463,19 +463,8 @@ function main() {
     | map(select(.id == $migration_id))
     | .[0].sequencer.enableBftSequencer // false")
 
-  local bft_db_enabled
-  bft_db_enabled=$(canton_bft_db_enabled "$migration_id" "$config")
-
   local -a components=()
   for component in "${@:4}"; do
-    if [ "$component" == "cometbft" ] && [ "$bft_sequencer_enabled" == "true" ]; then
-      _info "BFT sequencer is enabled for migration $migration_id, skipping CometBFT restore"
-      continue
-    fi
-    if [ "$component" == "cantonBft" ] && [ "$bft_db_enabled" != "true" ]; then
-      _info "Dedicated CantonBFT sequencer DB is not enabled for migration $migration_id, skipping CantonBFT restore"
-      continue
-    fi
     components+=("$component")
   done
 

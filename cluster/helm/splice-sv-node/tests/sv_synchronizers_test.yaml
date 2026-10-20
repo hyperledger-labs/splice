@@ -46,7 +46,6 @@ tests:
           sequencerPublicUrl: "https://sequencer1.test.com"
           sequencerAddress: "sequencer1-address"
           mediatorAddress: "mediator1-address"
-          enableBftSequencer: false
           sequencerPruningConfig:
             enabled: false
     documentSelector:
@@ -78,42 +77,6 @@ tests:
       - isNull:
           path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN')]
 
-  - it: "sets synchronizers configuration without enableBftSequencer"
-    set:
-      synchronizers:
-        current:
-          sequencerPublicUrl: "https://sequencer1.test.com"
-          sequencerAddress: "sequencer1-address"
-          mediatorAddress: "mediator1-address"
-          sequencerPruningConfig:
-            enabled: false
-    documentSelector:
-      path: kind
-      value: Deployment
-    asserts:
-      - equal:
-          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SV_DOMAIN_CURRENT')].value
-          value: |
-            canton.sv-apps.sv.local-synchronizer-nodes.current {
-              sequencer {
-                admin-api {
-                  address = "sequencer1-address"
-                  port = 5009
-                }
-                internal-api {
-                  address = "sequencer1-address"
-                  port = 5008
-                }
-                external-public-api-url = "https://sequencer1.test.com"
-              }
-              mediator {
-                admin-api {
-                  address = "mediator1-address"
-                  port = 5007
-                }
-              }
-            }
-
   - it: "sets synchronizers configuration with both current and successor"
     set:
       synchronizers:
@@ -121,7 +84,6 @@ tests:
           sequencerPublicUrl: "https://sequencer-alpha.test.com"
           sequencerAddress: "sequencer-alpha-address"
           mediatorAddress: "mediator-alpha-address"
-          enableBftSequencer: true
           sequencerPruningConfig:
             enabled: true
             pruningInterval: "2h"
@@ -130,7 +92,6 @@ tests:
           sequencerPublicUrl: "https://sequencer-beta.test.com"
           sequencerAddress: "sequencer-beta-address"
           mediatorAddress: "mediator-beta-address"
-          enableBftSequencer: false
           sequencerPruningConfig:
             enabled: true
             pruningInterval: "1h"
@@ -203,7 +164,6 @@ tests:
           sequencerPublicUrl: "https://sequencer1.test.com"
           sequencerAddress: "sequencer1-address"
           mediatorAddress: "mediator1-address"
-          enableBftSequencer: true
           sequencerPruningConfig:
             enabled: false
     documentSelector:
@@ -246,20 +206,17 @@ tests:
           sequencerPublicUrl: "https://sequencer2.test.com"
           sequencerAddress: "sequencer2-address"
           mediatorAddress: "mediator2-address"
-          enableBftSequencer: true
           sequencerPruningConfig:
             enabled: false
         additionalLegacy:
           - sequencerPublicUrl: "https://sequencer0.test.com"
             sequencerAddress: "sequencer0-address"
             mediatorAddress: "mediator0-address"
-            enableBftSequencer: true
             sequencerPruningConfig:
               enabled: false
           - sequencerPublicUrl: "https://sequencer1.test.com"
             sequencerAddress: "sequencer1-address"
             mediatorAddress: "mediator1-address"
-            enableBftSequencer: true
             sequencerPruningConfig:
               enabled: false
     documentSelector:

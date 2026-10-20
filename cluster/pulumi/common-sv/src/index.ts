@@ -1,8 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-export * from './synchronizer/cometbft';
-export * from './synchronizer/cometbftConfig';
-export * from './synchronizer/cometBftNodeConfigs';
+export * from './chainIdSuffix';
 export * from './synchronizer/decentralizedSynchronizerNode';
 export * from './synchronizer/synchronizerNodes';
 export * from './singleSvConfig';

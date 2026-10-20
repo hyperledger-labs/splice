@@ -10,7 +10,6 @@ import {
 } from '@canton-network/splice-pulumi-common';
 import {
   configForSv,
-  coreSvsToDeploy,
   InstalledMigrationSpecificSv,
   sv1Config,
   svConfigs,
@@ -57,29 +56,6 @@ export async function installNode(
       ...config,
     },
     DecentralizedSynchronizerUpgradeConfig,
-    {
-      nodeConfigs: {
-        self: {
-          ...nodeConfig.cometBft,
-          nodeName: nodeConfig.nodeName,
-        },
-        sv1: {
-          ...sv1Config.cometBft,
-          nodeName: sv1Config.nodeName,
-        },
-        peers:
-          isCoreSv && !isFirstSv
-            ? coreSvsToDeploy
-                .filter(config => config.nodeName !== nodeConfig.nodeName)
-                .map(config => {
-                  return {
-                    ...config.cometBft,
-                    nodeName: config.nodeName,
-                  };
-                })
-            : [],
-      },
-    },
     undefined,
     { dependsOn: imagePullDeps },
     supportsReset,

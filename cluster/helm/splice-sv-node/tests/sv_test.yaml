@@ -181,7 +181,6 @@ tests:
         sequencerPublicUrl: "https://sequencer.test.com"
         sequencerAddress: "sequencer-test-address"
         mediatorAddress: "mediator-test-address"
-        enableBftSequencer: true
         sequencerPruningConfig:
           enabled: true
           pruningInterval: "1h"

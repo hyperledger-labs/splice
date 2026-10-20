@@ -8,7 +8,7 @@ import { allSvsToDeployBasic } from '@canton-network/splice-pulumi-common-sv/src
 
 /**
  * The hostnames under which the sequencer BFT P2P API is served, one per
- * (SV, BFT-enabled migration, cluster DNS name).
+ * (SV, running migration, cluster DNS name).
  *
  * These must stay in sync with the `p2pUrl`/`externalAddress` built in
  * `common-sv/src/synchronizer/decentralizedSynchronizerNode.ts`.
@@ -16,10 +16,8 @@ import { allSvsToDeployBasic } from '@canton-network/splice-pulumi-common-sv/src
 export function sequencerP2pHosts(): string[] {
   const dnsNames = [getDnsNames().cantonDnsName, getDnsNames().daDnsName];
   return allSvsToDeployBasic.flatMap(sv =>
-    DecentralizedSynchronizerUpgradeConfig.runningMigrations()
-      .filter(migration => migration.sequencer.enableBftSequencer)
-      .flatMap(migration =>
-        dnsNames.map(dns => `sequencer-p2p-${migration.id}.${sv.ingressName}.${dns}`)
-      )
+    DecentralizedSynchronizerUpgradeConfig.runningMigrations().flatMap(migration =>
+      dnsNames.map(dns => `sequencer-p2p-${migration.id}.${sv.ingressName}.${dns}`)
+    )
   );
 }

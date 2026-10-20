@@ -3,11 +3,7 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import {
-  allSvsToDeployBasic,
-  coreSvsToDeployBasic,
-} from '@canton-network/splice-pulumi-common-sv/src/svConfigsBasic';
-import { cometBFTExternalPort } from '@canton-network/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
+import { allSvsToDeployBasic } from '@canton-network/splice-pulumi-common-sv/src/svConfigsBasic';
 import { gkeL7GatewayNumTrustedProxies } from '@canton-network/splice-pulumi-common/src/ratelimit/envoyRateLimiter';
 import { rateLimitResponseHeaders } from '@canton-network/splice-pulumi-common/src/ratelimit/rateLimitHeaders';
 import { mergeWith } from 'lodash';
@@ -23,12 +19,10 @@ import {
   getDnsNames,
   HELM_MAX_HISTORY_SIZE,
   infraKubernetesScheduling,
-  isDevNet,
-  isMainNet,
 } from '../../common';
 import { clusterBasename, flowControlConfigSchema, infraConfig } from './config';
 import { configureIstioGatewayPolicies, installAppWhitelisting } from './whitelisting';
-import { loadInternalWhitelistedIps, loadIPRanges } from './whitelisting/ipRanges';
+import { loadInternalWhitelistedIps } from './whitelisting/ipRanges';
 import { configurePublicInfo } from './whitelisting/publicInfo';
 import { configurePublicTokenRegistry } from './whitelisting/publicTokenRegistry';
 
@@ -46,9 +40,6 @@ export const istioVersion = {
     wasm: 290, // https://grafana.com/grafana/dashboards/13277-istio-wasm-extension-dashboard/
   },
 };
-
-// dsoSize + number of extra SVs added via config.yaml
-const numCoreSvsToDeploy = coreSvsToDeployBasic.length;
 
 function configureIstioBase(
   ns: k8s.core.v1.Namespace,
@@ -90,9 +81,9 @@ function configureIstiod(
       istioNamespace: ingressNs.metadata.name,
       logAsJson: true,
       proxy: {
-        // disable traffic proxying for the postgres port and CometBFT RPC port
-        excludeInboundPorts: '5432,26657',
-        excludeOutboundPorts: '5432,26657',
+        // disable traffic proxying for the postgres port
+        excludeInboundPorts: '5432',
+        excludeOutboundPorts: '5432',
         resources: {
           limits: {
             memory: '4096Mi',
@@ -317,40 +308,6 @@ function configureInternalGatewayService(
   );
 }
 
-function configureCometBFTGatewayService(
-  ingressNs: k8s.core.v1.Namespace,
-  ingressIp: pulumi.Output<string>,
-  istiod: k8s.helm.v3.Release
-) {
-  const externalIPRanges = loadIPRanges(true);
-  const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
-  // For DevNet-like clusters, we always assume at least 4 SVs to reduce churn on the gateway definition,
-  // and support easily deploying without refreshing the infra stack.
-  const numSVs = numCoreSvsToDeploy < 4 && isDevNet ? 4 : numCoreSvsToDeploy;
-
-  const cometBftIngressPorts = Array.from(
-    { length: Math.min(numMigrations, 10) },
-    (_, i) => i
-  ).flatMap(migration => {
-    const res = Array.from({ length: numSVs }, (_, node) => node).map(node =>
-      ingressPort(`cometbft-${migration}-${node + 1}-gw`, cometBFTExternalPort(migration, node + 1))
-    );
-    if (!isMainNet) {
-      // For non-mainnet clusters, include "node 0" for the sv runbook
-      res.unshift(ingressPort(`cometbft-${migration}-0-gw`, cometBFTExternalPort(migration, 0)));
-    }
-    return res;
-  });
-  return configureGatewayService(
-    ingressNs,
-    pulumi.output(['0.0.0.0/0']),
-    { type: 'LoadBalancer', ingressIp, externalIPRangesInLB: externalIPRanges },
-    cometBftIngressPorts,
-    istiod,
-    '-cometbft'
-  );
-}
-
 // how gateway is configured: https://github.com/istio/istio/blob/master/manifests/charts/gateway/templates/service.yaml
 type IstioGatewayVariant =
   | {
@@ -376,9 +333,7 @@ function configureGatewayService(
   // - For most traffic, we use istio instead of through loadBalancerSourceRanges as the latter has a size limit.
   //   These IPs should be provided in externalIPRangesInIstio.
   //   See https://github.com/DACH-NY/canton-network-internal/issues/626
-  // - For cometbft traffic, which is tcp traffic, we failed to use istio policies, so we route it through a dedicated
-  //   LoadBalancer service that uses loadBalancerSourceRanges. The size limit is not an issue as we need only SV IPs.
-  //   These IPs should be provided in externalIPRangesInLB.
+  // - For LoadBalancer services, loadBalancerSourceRanges can additionally be set through externalIPRangesInLB.
   const istioPolicies = configureIstioGatewayPolicies(ingressNs, externalIPRangesInIstio, suffix);
 
   const { serviceValues, deploymentValues, port80Protocol } =
@@ -533,7 +488,6 @@ function configureGatewayService(
 function configureGateway(
   ingressNs: ExactNamespace,
   gwSvc: k8s.helm.v3.Release,
-  cometBftSvc: k8s.helm.v3.Release | undefined,
   withSeparateGcpGateway: boolean
 ): k8s.apiextensions.CustomResource[] {
   const hosts = [
@@ -586,56 +540,7 @@ function configureGateway(
     }
   );
 
-  const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
-  // For DevNet-like clusters, we always assume at least 4 SVs (not including sv-runbook) to reduce churn on the gateway definition,
-  // and support easily deploying without refreshing the infra stack.
-  const numSVs = numCoreSvsToDeploy < 4 && isDevNet ? 4 : numCoreSvsToDeploy;
-
-  const server = (migration: number, node: number) => ({
-    // We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
-    hosts: ['*'],
-    port: {
-      name: `cometbft-${migration}-${node}-gw`,
-      number: cometBFTExternalPort(migration, node),
-      protocol: 'TCP',
-    },
-  });
-
-  const servers = Array.from({ length: Math.min(numMigrations, 10) }, (_, i) => i).flatMap(
-    migration => {
-      const ret = Array.from({ length: numSVs }, (_, node) => node).map(node =>
-        server(migration, node + 1)
-      );
-      if (!isMainNet) {
-        // For non-mainnet clusters, include "node 0" for the sv runbook
-        ret.unshift(server(migration, 0));
-      }
-      return ret;
-    }
-  );
-
-  const appsGw = new k8s.apiextensions.CustomResource(
-    'cn-apps-gateway',
-    {
-      apiVersion: 'networking.istio.io/v1alpha3',
-      kind: 'Gateway',
-      metadata: {
-        name: 'cn-apps-gateway',
-        namespace: ingressNs.ns.metadata.name,
-      },
-      spec: {
-        selector: {
-          app: 'istio-ingress-cometbft',
-          istio: 'ingress-cometbft',
-        },
-        servers,
-      },
-    },
-    {
-      dependsOn: cometBftSvc ? [cometBftSvc] : [],
-    }
-  );
-  return [httpGw, appsGw];
+  return [httpGw];
 }
 
 function configureDocsAndReleases(
@@ -922,7 +827,6 @@ function stripRateLimitHeaders(
 export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
-  cometBftIngressIp: pulumi.Output<string>,
   expectGKEL7Gateway: boolean,
   extraIngressDependencies: pulumi.Resource[] = []
 ): ConfiguredIstio {
@@ -940,10 +844,7 @@ export function configureIstio(
     istiod,
     extraIngressDependencies
   );
-  const cometBftSvc = DecentralizedSynchronizerUpgradeConfig.usesCometbft()
-    ? configureCometBFTGatewayService(ingressNs.ns, cometBftIngressIp, istiod)
-    : undefined;
-  const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc, expectGKEL7Gateway);
+  const gateways = configureGateway(ingressNs, gwSvc, expectGKEL7Gateway);
   const docsAndReleases = configureDocsAndReleases(true, gateways);
   const publicInfo = configurePublicInfo(ingressNs.ns);
 

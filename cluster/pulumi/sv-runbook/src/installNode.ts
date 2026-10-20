@@ -59,8 +59,7 @@ import {
   configForSv,
   DecentralizedSynchronizerNode,
   getChainIdSuffix,
-  installSvLoopback,
-  sv1Config,
+  installLoopback,
   svsConfig,
   svRunbookConfig,
   SynchronizerNodes,
@@ -120,7 +119,7 @@ export async function installNode(
       bootstrappingConfig,
     });
 
-  const loopback = installSvLoopback(xns, decentralizedSynchronizerMigrationConfig.usesCometbft());
+  const loopback = installLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
@@ -247,11 +246,6 @@ async function installSvAndValidator(
 
   const canton = new SynchronizerNodes(
     decentralizedSynchronizerMigrationConfig,
-    {
-      self: { ...svRunbookConfig.cometBft, nodeName: onboardingName },
-      sv1: { ...sv1Config.cometBft, nodeName: sv1Config.nodeName },
-      peers: [],
-    },
     svRunbookConfig.ingressName
   );
 
@@ -281,7 +275,6 @@ async function installSvAndValidator(
     decentralizedSynchronizerMigrationConfig,
     {
       ...svConfig,
-      cometBftGovernanceKey,
       skipInitialization:
         svsConfig?.synchronizer?.skipInitialization &&
         !svsConfig?.synchronizer.forceSvRunbookInitialization,
@@ -298,7 +291,6 @@ async function installSvAndValidator(
         },
       ]
     : [];
-  const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const svValues: ChartValues = {
     ...valuesFromYamlFile,
     ...commonSvAppValues,
@@ -386,16 +378,14 @@ async function installSvAndValidator(
     synchronizers: {
       current: {
         ...defaultScanValues.synchronizers.current,
-        ...(useCantonBft ? cantonBftConfigFor(canton.active) : {}),
+        ...cantonBftConfigFor(canton.active),
       },
       ...(canton.upgrade
         ? {
             successor: {
               sequencer: canton.upgrade.namespaceInternalSequencerAddress,
               mediator: canton.upgrade.namespaceInternalMediatorAddress,
-              ...(decentralizedSynchronizerMigrationConfig.upgrade?.sequencer.enableBftSequencer
-                ? cantonBftConfigFor(canton.upgrade)
-                : {}),
+              ...cantonBftConfigFor(canton.upgrade),
             },
           }
         : {}),
@@ -404,9 +394,7 @@ async function installSvAndValidator(
             legacy: {
               sequencer: canton.legacy.namespaceInternalSequencerAddress,
               mediator: canton.legacy.namespaceInternalMediatorAddress,
-              ...(decentralizedSynchronizerMigrationConfig.legacy?.sequencer.enableBftSequencer
-                ? cantonBftConfigFor(canton.legacy)
-                : {}),
+              ...cantonBftConfigFor(canton.legacy),
             },
           }
         : {}),

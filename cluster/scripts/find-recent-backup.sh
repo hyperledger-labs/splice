@@ -189,12 +189,7 @@ function main() {
       sv|sv-[0-9]|sv-[0-9][0-9]|sv-da-*)
           is_sv=true
           full_instance="$namespace-cn-apps-pg"
-          expected_components="cn-apps sequencer participant mediator"
-          local bft_db_enabled
-          bft_db_enabled=$(canton_bft_db_enabled "$migration_id" "$config")
-          if [ "$bft_db_enabled" == "true" ]; then
-            expected_components="$expected_components cantonBft"
-          fi
+          expected_components="cn-apps sequencer participant mediator cantonBft"
           stack=$(get_stack_for_namespace_component "$namespace" "cn-apps")
           ;;
       *)

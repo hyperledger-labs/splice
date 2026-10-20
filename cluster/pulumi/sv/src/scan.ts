@@ -1,6 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as pulumi from '@pulumi/pulumi';
 import {
   CLUSTER_HOSTNAME,
   CnInput,
@@ -21,7 +20,6 @@ import {
   SynchronizerNodes,
 } from '@canton-network/splice-pulumi-common-sv';
 import { SvConfig, svsConfig } from '@canton-network/splice-pulumi-common-sv/src/config';
-import { spliceConfig } from '@canton-network/splice-pulumi-common/src/config/config';
 import { Postgres } from '@canton-network/splice-pulumi-common/src/postgres';
 import { installRateLimits } from '@canton-network/splice-pulumi-common/src/ratelimit/rateLimit';
 import { scanRateLimitEnvVars } from '@canton-network/splice-pulumi-common/src/ratelimit/spliceRateLimits';
@@ -35,10 +33,8 @@ export function installScan(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   dependsOn: CnInput<Resource>[],
   synchronizerNodes: SynchronizerNodes,
-  svApp: pulumi.Resource,
   postgres: Postgres
 ): InstalledHelmChart {
-  const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const { active, participant } = synchronizerNodes;
   const scanDbName = `scan_${sanitizedForPostgres(config.nodeName)}`;
 
@@ -55,16 +51,14 @@ export function installScan(
       current: {
         sequencer: active.namespaceInternalSequencerAddress,
         mediator: active.namespaceInternalMediatorAddress,
-        ...(useCantonBft ? cantonBftConfigFor(active) : {}),
+        ...cantonBftConfigFor(active),
       },
       ...(synchronizerNodes.upgrade
         ? {
             successor: {
               sequencer: synchronizerNodes.upgrade.namespaceInternalSequencerAddress,
               mediator: synchronizerNodes.upgrade.namespaceInternalMediatorAddress,
-              ...(decentralizedSynchronizerMigrationConfig.upgrade?.sequencer.enableBftSequencer
-                ? cantonBftConfigFor(synchronizerNodes.upgrade)
-                : {}),
+              ...cantonBftConfigFor(synchronizerNodes.upgrade),
             },
           }
         : {}),
@@ -73,9 +67,7 @@ export function installScan(
             legacy: {
               sequencer: synchronizerNodes.legacy.namespaceInternalSequencerAddress,
               mediator: synchronizerNodes.legacy.namespaceInternalMediatorAddress,
-              ...(decentralizedSynchronizerMigrationConfig.legacy?.sequencer.enableBftSequencer
-                ? cantonBftConfigFor(synchronizerNodes.legacy)
-                : {}),
+              ...cantonBftConfigFor(synchronizerNodes.legacy),
             },
           }
         : {}),
@@ -132,13 +124,7 @@ export function installScan(
 
   return installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, config.version, {
     // TODO(#893) if possible, don't require parallel start of sv app and scan when using CantonBft
-    dependsOn: dependsOn
-      .concat(active.dependencies)
-      .concat(
-        spliceConfig.pulumiProjectConfig.interAppsDependencies && !useCantonBft
-          ? [svApp]
-          : [postgres]
-      ),
+    dependsOn: dependsOn.concat(active.dependencies).concat([postgres]),
   });
 }
 
