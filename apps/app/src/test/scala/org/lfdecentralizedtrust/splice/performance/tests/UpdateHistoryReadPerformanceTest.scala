@@ -11,20 +11,11 @@ import com.typesafe.config.Config
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.{IngestionConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding
-import org.lfdecentralizedtrust.splice.scan.admin.http.{
-  ExternalHashInclusionPolicy,
-  ScanHttpEncodings,
-}
-import org.lfdecentralizedtrust.splice.scan.config.{
-  AnalyzableTimeWindowConfig,
-  ScanAppBackendConfig,
-}
+import org.lfdecentralizedtrust.splice.scan.admin.http.{ExternalHashInclusionPolicy, ScanHttpEncodings}
+import org.lfdecentralizedtrust.splice.scan.config.{AnalyzableTimeWindowConfig, ScanAppBackendConfig}
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.InternedStringStore
-import org.lfdecentralizedtrust.splice.store.{
-  HistoryMetrics,
-  TreeUpdateWithMigrationId,
-  UpdateHistory,
-}
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, TreeUpdateWithMigrationId, UpdateHistory}
 import pureconfig.ConfigReader
 import pureconfig.generic.semiauto.deriveReader
 
@@ -62,7 +53,7 @@ class UpdateHistoryReadPerformanceTest(
       storage = storage,
       domainMigrationId = migrationId,
       storeName = this.getClass.getName,
-      participantId = mkParticipantId(this.getClass.getSimpleName),
+      participantId = StoreMemberId(mkParticipantId(this.getClass.getSimpleName)),
       updateStreamParty = dsoParty,
       backfillingRequired = UpdateHistory.BackfillingRequirement.BackfillingNotRequired,
       internedStringStore = InternedStringStore.createWithoutWarmup(

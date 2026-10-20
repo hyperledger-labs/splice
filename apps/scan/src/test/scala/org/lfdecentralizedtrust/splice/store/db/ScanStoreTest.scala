@@ -65,6 +65,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.I
   ResumeAtOffset,
   UpdateHistoryInitAtLatestPrunedOffset,
 }
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 abstract class ScanStoreTest
     extends StoreTestBase
@@ -119,7 +120,7 @@ abstract class ScanStoreTest
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.getTotalPurchasedMemberTraffic(
-            goodMember,
+            StoreMemberId(goodMember),
             dummyDomain,
           )
         } yield result shouldBe (1 to 3).sum.toLong
@@ -1756,7 +1757,7 @@ class DbScanStoreTest
         storage.underlying, // not under test
         migrationId,
         "update_history_scan_store_test",
-        mkParticipantId("whatever"),
+        StoreMemberId(mkParticipantId("whatever")),
         dsoParty,
         BackfillingRequirement.BackfillingNotRequired,
         internedStringStore(storage),

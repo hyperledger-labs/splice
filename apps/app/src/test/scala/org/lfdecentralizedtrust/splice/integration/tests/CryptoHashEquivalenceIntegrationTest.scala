@@ -1,44 +1,21 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.ledger.javaapi.data.{
-  CreateCommand,
-  CreatedEvent,
-  DamlList,
-  DamlRecord,
-  ExerciseCommand,
-  ExercisedEvent,
-  Identifier,
-  Numeric,
-  Party,
-  Text,
-  Value,
-}
+import com.daml.ledger.javaapi.data.{CreateCommand, CreatedEvent, DamlList, DamlRecord, ExerciseCommand, ExercisedEvent, Identifier, Numeric, Party, Text, Value}
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.daml.lf.data.Ref
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.cryptohash.Hash as DamlHash
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.rewardaccountingv2.{
-  Batch,
-  MintingAllowance,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.rewardaccountingv2.batch.{
-  BatchOfBatches,
-  BatchOfMintingAllowances,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.rewardaccountingv2.{Batch, MintingAllowance}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.rewardaccountingv2.batch.{BatchOfBatches, BatchOfMintingAllowances}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
-import org.lfdecentralizedtrust.splice.scan.store.db.{
-  DbAppActivityRecordStore,
-  DbScanAppRewardsStore,
-}
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore.{
-  AppActivityPartyTotalT,
-  AppRewardPartyTotalT,
-}
+import org.lfdecentralizedtrust.splice.scan.store.db.{DbAppActivityRecordStore, DbScanAppRewardsStore}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore.{AppActivityPartyTotalT, AppRewardPartyTotalT}
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.InternedStringStore
 import org.lfdecentralizedtrust.splice.util.{DarUtil, WalletTestUtil}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -138,7 +115,7 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
           storage,
           0L,
           "batch_hash_equiv_test",
-          participantId,
+          StoreMemberId(participantId),
           svParty,
           BackfillingRequirement.BackfillingNotRequired,
           InternedStringStore.createWithoutWarmup(

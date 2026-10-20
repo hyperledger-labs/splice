@@ -15,61 +15,31 @@ import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{allocationv2, holdingv2}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.Metadata
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
-  AmuletRules_MiningRound_Archive,
-  AppTransferContext,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules_MiningRound_Archive, AppTransferContext}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.cometbft.CometBftConfigLimits
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
-  DsoDecentralizedSynchronizerConfig,
-  SynchronizerNodeConfigLimits,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{DsoDecentralizedSynchronizerConfig, SynchronizerNodeConfigLimits}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{
-  ARC_AmuletRules,
-  ARC_AnsEntryContext,
-  ARC_DsoRules,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{ARC_AmuletRules, ARC_AnsEntryContext, ARC_DsoRules}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.ansentrycontext_actionrequiringconfirmation.{
-  ANSRARC_CollectInitialEntryPayment,
-  ANSRARC_RejectEntryInitialPayment,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
-  SRARC_AddSv,
-  SRARC_OffboardSv,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.ansentrycontext_actionrequiringconfirmation.{ANSRARC_CollectInitialEntryPayment, ANSRARC_RejectEntryInitialPayment}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{SRARC_AddSv, SRARC_OffboardSv}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
-import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
-  SvOnboardingConfirmed,
-  SvOnboardingRequest,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.{PaymentAmount, Unit}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.*
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
-  InMemoryUnavailablePartiesStore,
-  Limit,
-  MiningRoundsStore,
-  PageLimit,
-  StoreTestBase,
-}
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
+import org.lfdecentralizedtrust.splice.store.{HardLimit, InMemoryUnavailablePartiesStore, Limit, MiningRoundsStore, PageLimit, StoreTestBase}
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore.{IdleAnsSubscription, RoundBatch}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import org.lfdecentralizedtrust.splice.util.{
-  AssignedContract,
-  Contract,
-  ResourceTemplateDecoder,
-  TemplateJsonDecoder,
-}
+import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -1954,7 +1924,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listMemberTrafficContracts(
-            goodMember,
+            StoreMemberId(goodMember),
             dummyDomain,
             PageLimit.tryCreate(100),
           )
@@ -1980,7 +1950,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.getTotalPurchasedMemberTraffic(
-            goodMember,
+            StoreMemberId(goodMember),
             dummyDomain,
           )
         } yield result shouldBe (1 to 3).sum.toLong

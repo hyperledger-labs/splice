@@ -45,7 +45,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.pretty.Pretty.{param, prettyOfClass}
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.{GetResult, JdbcProfile}
@@ -72,6 +72,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 /** Stores all original daml updates visible to `updateStreamParty`.
   *
@@ -95,7 +96,7 @@ class UpdateHistory private (
     storage: DbStorage,
     val domainMigrationId: Long,
     storeName: String,
-    participantId: ParticipantId,
+    participantId: StoreMemberId,
     val updateStreamParty: PartyId,
     val backfillingRequired: BackfillingRequirement,
     internedStringStore: InternedStringStore,
@@ -2267,7 +2268,7 @@ object UpdateHistory {
       storage: DbStorage,
       domainMigrationId: Long,
       storeName: String,
-      participantId: ParticipantId,
+      participantId: StoreMemberId,
       updateStreamParty: PartyId,
       backfillingRequired: BackfillingRequirement,
       internedStringStore: InternedStringStore,

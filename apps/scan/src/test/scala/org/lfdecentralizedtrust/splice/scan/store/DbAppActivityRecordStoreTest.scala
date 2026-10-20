@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 import scala.concurrent.Future
 
@@ -1328,7 +1329,7 @@ class DbAppActivityRecordStoreTest
         storage,
         migrationId,
         s"app_activity_test_$n",
-        participantId,
+        StoreMemberId(participantId),
         dsoParty,
         BackfillingRequirement.BackfillingNotRequired,
         internedStringStore(storage),
@@ -1363,7 +1364,7 @@ class DbAppActivityRecordStoreTest
         storage,
         migrationId,
         "app_activity_combined_test",
-        participantId,
+        StoreMemberId(participantId),
         dsoParty,
         BackfillingRequirement.BackfillingNotRequired,
         internedStringStore(storage),

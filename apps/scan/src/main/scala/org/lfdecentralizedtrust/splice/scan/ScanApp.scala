@@ -101,6 +101,7 @@ import org.lfdecentralizedtrust.splice.util.HasHealth
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import cats.implicits.*
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 /** Class representing a Scan app instance.
   *
@@ -233,7 +234,7 @@ class ScanApp(
         storage,
         domainMigrationId,
         store.storeName,
-        participantId,
+        StoreMemberId(participantId),
         store.acsContractFilter.ingestionFilter.primaryParty,
         BackfillingRequirement.NeedsBackfilling,
         internedStringStore,
