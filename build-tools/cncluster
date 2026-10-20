@@ -1561,7 +1561,7 @@ function _deploy_cluster_workflow() {
     _ensure_lock
 
     _info "Resolving head SHA of PR ${repo}#${pr}."
-    pr_json=$(gh api "repos/${repo}/pulls/${pr}") || _error "Failed to fetch PR ${repo}#${pr}."
+    local pr_json=$(gh api "repos/${repo}/pulls/${pr}") || _error "Failed to fetch PR ${repo}#${pr}."
     sha=$(echo "$pr_json" | jq -r '.head.sha')
     if [ -z "$sha" ] || [ "$sha" = "null" ]; then
         _error "Could not determine head SHA of PR ${repo}#${pr}."

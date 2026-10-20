@@ -92,7 +92,6 @@ jobs:
   cluster_test_instructions:
     runs-on: ubuntu-24.04
     needs:
-      - get_head
       - determine_test_type
     if: needs.determine_test_type.outputs.workflow == 'cluster_test'
     steps:
