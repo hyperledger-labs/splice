@@ -20,9 +20,9 @@
     }
   },
   "UpdateHistoryIngestionPerformanceTest": {
-    "_comment_avg_item_time_ns": "median*(1+ noise_margin + safety_margin) of last 30d. noise_margin=(p95-median)/median, safety_margin=10%. calculated on 2026-June-25",
+    "_comment_avg_item_time_ns": "median*(1+ noise_margin + safety_margin) of last 30d. noise_margin=(p95-median)/median, safety_margin=10%. calculated on 2026-Oct-20",
     "splice_perf_ingestion_avg_item_time_ns": {
-      "max": 27400000
+      "max": 33100000
     },
     "_comment_total_time_ns": "our hard max is 1h, but we set it to 20m based on the past data collected on 2026-June-25 to detect the trends earlier",
     "splice_perf_ingestion_total_time_ns": {
