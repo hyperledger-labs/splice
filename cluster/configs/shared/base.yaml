@@ -306,8 +306,6 @@ cloudArmor:
   wafRules:
     excludedHostPrefixes:
       - 'grafana'
-# TODO(#7801) remove when internal config is adjusted
-multiValidator: !include(./multi-validator.yaml) {}
 sv:
   scan:
     externalRateLimits:
