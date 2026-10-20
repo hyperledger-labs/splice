@@ -343,6 +343,7 @@ class UpdateHistory private (
     val tableSuffix = firstDay.format(DateTimeFormatter.BASIC_ISO_DATE)
     val start = startOf(firstDay)
     val end = startOf(firstDay.plusDays(1))
+    metrics.UpdateHistory.partitionRunwayEnd.updateValue(_.max(end))
 
     // TODO(#6313): compare CREATE TABLE ... PARTITION OF with separate CREATE and ATTACH PARTITION
     storage.queryAndUpdate(
