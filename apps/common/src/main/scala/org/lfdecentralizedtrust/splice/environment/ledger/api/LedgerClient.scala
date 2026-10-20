@@ -802,31 +802,6 @@ private[environment] class LedgerClient(
     } yield res.identityProviderConfigs
   }
 
-  def createIdentityProviderConfig(
-      id: String,
-      isDeactivated: Boolean,
-      jwksUrl: String,
-      issuer: String,
-      audience: String,
-  )(implicit tc: TraceContext): Future[Unit] = {
-    for {
-      stub <- withGrpcContext(identityProviderConfigServiceStub)
-      _ <- stub.createIdentityProviderConfig(
-        identity_provider_config_service.CreateIdentityProviderConfigRequest(
-          Some(
-            identity_provider_config_service.IdentityProviderConfig(
-              identityProviderId = id,
-              isDeactivated = isDeactivated,
-              jwksUrl = jwksUrl,
-              issuer = issuer,
-              audience = audience,
-            )
-          )
-        )
-      )
-    } yield ()
-  }
-
   def getSupportedPackageVersion(
       synchronizerId: SynchronizerId,
       packageRequirements: Seq[(String, Seq[PartyId])],

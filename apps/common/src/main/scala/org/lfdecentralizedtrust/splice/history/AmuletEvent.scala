@@ -165,13 +165,6 @@ final object AllocationFactoryV2Allocate
         splice.api.token.allocationinstructionv2.AllocationFactory.CHOICE_AllocationFactory_Allocate,
     )
 
-final object AllocationV2Settle
-    extends InterfaceExerciseNodeCompanion.Mk(
-      interface = splice.api.token.allocationv2.Allocation.INTERFACE,
-      template = splice.amuletallocationv2.AmuletAllocationV2.COMPANION,
-      choice = splice.api.token.allocationv2.Allocation.CHOICE_Allocation_Settle,
-    )
-
 final object SettlementFactorySettle
     extends InterfaceExerciseNodeCompanion.Mk(
       interface = splice.api.token.allocationv2.SettlementFactory.INTERFACE,

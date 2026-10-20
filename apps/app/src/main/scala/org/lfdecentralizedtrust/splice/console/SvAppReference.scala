@@ -94,12 +94,6 @@ abstract class SvAppReference(
       httpCommand(HttpSvOperatorAppClient.GetDsoInfo)
     }
 
-  @Help.Summary("Get the CometBFT node status")
-  def cometBftNodeStatus(): definitions.CometBftNodeStatusResponse =
-    consoleEnvironment.run {
-      httpCommand(HttpSvPublicAppClient.GetCometBftNodeStatus())
-    }
-
   @Help.Summary("Make a CometBFT Json RPC request")
   def cometBftJsonRpcRequest(
       id: definitions.CometBftJsonRpcRequestId,
@@ -369,12 +363,6 @@ class SvAppBackendReference(
       httpCommand(
         HttpSvOperatorAppClient.ArchiveDryRunRewardAccountingContracts(rounds)
       )
-    }
-
-  @Help.Summary("Get the CometBFT node debug dump")
-  def cometBftNodeDump(): definitions.CometBftNodeDumpResponse =
-    consoleEnvironment.run {
-      httpCommand(HttpSvOperatorAppClient.GetCometBftNodeDump())
     }
 
   @Help.Summary("Get the party to participant mapping for a given party")

@@ -77,11 +77,6 @@ object BackupDump {
     f
   }
 
-  def fileExists(path: Path): Boolean = {
-    import better.files.File
-    File(path).exists
-  }
-
   def getBlobs(
       config: BackupDumpConfig,
       offset: String,

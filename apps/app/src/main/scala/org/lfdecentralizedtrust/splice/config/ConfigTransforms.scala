@@ -30,7 +30,6 @@ import org.lfdecentralizedtrust.splice.validator.config.{
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -547,45 +546,6 @@ object ConfigTransforms {
   def bumpUrl(bump: Int, s: String): String = {
     val uri = Uri(s)
     bumpUrl(bump, uri).toString
-  }
-
-  private def setPortPrefix(range: Int): Port => Port = { port =>
-    Port.tryCreate((range * 1000) + port.unwrap % 1000)
-  }
-
-  private def setPortPrefixInUrl(range: Int): String => String = { s =>
-    val uri = Uri(s)
-    val port = uri.effectivePort
-    uri.withPort((range * 1000) + port % 1000).toString()
-  }
-
-  def setSvSynchronizerConfigPortsPrefix(
-      range: Int,
-      config: SvSynchronizerNodeConfig,
-  ): SvSynchronizerNodeConfig = {
-    config
-      .focus(_.sequencer.internalApi.port)
-      .modify(setPortPrefix(range))
-      .focus(_.sequencer.adminApi.port)
-      .modify(setPortPrefix(range))
-      .focus(_.sequencer.externalPublicApiUrl)
-      .modify(setPortPrefixInUrl(range))
-      .focus(_.mediator.adminApi.port)
-      .modify(setPortPrefix(range))
-  }
-
-  def bumpSomeScanAppCantonPortsBy(bump: Int, scanApps: Seq[String]): ConfigTransform = {
-    updateAllScanAppConfigs((name, config) => {
-      if (scanApps.contains(name)) {
-        config
-          .focus(_.participantClient)
-          .modify(portTransform(bump, _))
-          .focus(_.synchronizerNodes)
-          .modify(portTransform(bump, _))
-      } else {
-        config
-      }
-    })
   }
 
   def bumpSomeValidatorAppPortsBy(bump: Int, validatorApps: Seq[String]): ConfigTransform = {

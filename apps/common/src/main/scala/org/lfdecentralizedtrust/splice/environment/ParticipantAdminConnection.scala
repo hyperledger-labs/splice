@@ -53,7 +53,6 @@ import com.digitalasset.canton.topology.transaction.{
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
-import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.config.Thresholds
@@ -69,7 +68,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
 
 import java.io.{InputStream, SequenceInputStream}
 import java.time.Instant
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
 /** Connection to the subset of the Canton admin API that we rely
@@ -542,50 +541,8 @@ class ParticipantAdminConnection(
 }
 
 object ParticipantAdminConnection {
-  import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-  import com.digitalasset.canton.admin.participant.v30.{SynchronizerConnectionConfig as _, *}
-  import com.digitalasset.canton.admin.participant.v30.PackageServiceGrpc.PackageServiceStub
-  import io.grpc.ManagedChannel
 
   final val IMPORT_ACS_WORKFLOW_ID_PREFIX = "canton-network-acs-import"
-
-  // The Canton APIs insist on writing the bytestring to a file so we define
-  // our own variant.
-  final case class LookupDarByteString(
-      mainPackageId: String
-  )(implicit ec: ExecutionContext)
-      extends GrpcAdminCommand[GetDarRequest, Option[GetDarResponse], Option[ByteString]] {
-    override type Svc = PackageServiceStub
-
-    override def createService(channel: ManagedChannel): PackageServiceStub =
-      PackageServiceGrpc.stub(channel)
-
-    override def createRequest(): Either[String, GetDarRequest] =
-      Right(GetDarRequest(mainPackageId))
-
-    override def submitRequest(
-        service: PackageServiceStub,
-        request: GetDarRequest,
-    ): Future[Option[GetDarResponse]] =
-      service.getDar(request).map(Some(_)).recover {
-        case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND => None
-      }
-
-    override def handleResponse(
-        response: Option[GetDarResponse]
-    ): Either[String, Option[ByteString]] =
-      // For some reason the API does not throw a NOT_FOUND but instead returns
-      // a successful response with data set to an empty bytestring.
-      // To make things extra fun, this is inconsistent. Other APIs on the package service
-      // do return NOT_FOUND.
-      Right(response.map(_.payload))
-
-    // might be a big file to download
-    override def timeoutType
-        : com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.DefaultUnboundedTimeout.type =
-      GrpcAdminCommand.DefaultUnboundedTimeout
-
-  }
 
   /** Like [[ParticipantAdminConnection]], but document that the scope is only
     * interested in the `getParticipantId` feature.
