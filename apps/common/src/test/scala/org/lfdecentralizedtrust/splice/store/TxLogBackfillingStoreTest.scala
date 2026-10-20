@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IM
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement.NeedsBackfilling
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsInterfaceViewRowData,
@@ -560,7 +561,7 @@ class TxLogBackfillingStoreTest
         storage,
         migrationId,
         "TxLogBackfillingStoreTest",
-        participantId,
+        StoreMemberId(participantId),
         party,
         backfillingRequired,
         internedStringStore(storage),

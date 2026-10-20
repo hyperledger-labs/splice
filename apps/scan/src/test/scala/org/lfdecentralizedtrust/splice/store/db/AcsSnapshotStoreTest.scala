@@ -38,6 +38,7 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   PerTableAcsSnapshot,
 }
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 trait AcsSnapshotStoreTest
     extends StoreTestBase
@@ -1362,7 +1363,7 @@ trait AcsSnapshotStoreTest
         storage.underlying, // not under test
         migrationId,
         "update_history_acs_snapshot_test",
-        mkParticipantId(participantId),
+        StoreMemberId(mkParticipantId(participantId)),
         dsoParty,
         backfillingRequired,
         internedStringStore(storage),

@@ -28,6 +28,7 @@ import scala.jdk.CollectionConverters.*
 import UpdateHistory.UpdateHistoryResponse
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.config.NonNegativeDuration
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 abstract class UpdateHistoryTestBase
     extends StoreTestBase
@@ -247,7 +248,7 @@ abstract class UpdateHistoryTestBase
         storage,
         domainMigrationId,
         storeName,
-        participantId,
+        StoreMemberId(participantId),
         updateStreamParty,
         backfillingRequired,
         internedStringStore(storage),

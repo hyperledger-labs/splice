@@ -21,6 +21,7 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 import scala.concurrent.Future
 
@@ -1062,7 +1063,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
         storage.underlying,
         migrationId,
         "scan_event_store_test",
-        participantId,
+        StoreMemberId(participantId),
         dsoParty,
         BackfillingRequirement.BackfillingNotRequired,
         internedStringStore(storage),
