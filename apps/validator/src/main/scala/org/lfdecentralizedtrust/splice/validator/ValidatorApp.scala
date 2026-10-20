@@ -1175,7 +1175,7 @@ class ValidatorApp(
                         )(operation)
                       },
                 )
-              } ++ walletStatusHandler.toList.map { case (walletHandler, walletManager) =>
+              } ++ walletStatusHandler.toList.map { case (walletHandler, _) =>
                 StatusWalletResource.routes(
                   walletHandler,
                   operation =>

@@ -123,7 +123,7 @@ class TokenStandardV2TransferIntegrationTest
         }
       }
 
-      inside(cids.toList) { case toReject :: toWithdraw :: toAccept :: _toIgnore :: Nil =>
+      inside(cids.toList) { case toReject :: toWithdraw :: toAccept :: _ :: Nil =>
         actAndCheck(
           "Bob rejects one transfer offer",
           bobWalletClient.rejectTokenStandardTransferV2(toReject),
