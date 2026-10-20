@@ -103,25 +103,25 @@ class DbScanRewardsReferenceStoreTest
         val p3 = userParty(3)
         val ops1 = userParty(11)
         val ops2 = userParty(12)
-        // weights and kinds are combined to max weight and most general kind
+        // weights and kinds are combined to max weight and max kind
         val far1a = featuredAppRight(
           p1,
           activityWeight = Some(BigDecimal(2)),
-          appKind = Some(FeaturedAppKind.FAK_ASSET),
+          appKind = Some(FeaturedAppKind.FAK_GENERAL),
           opsParties = Some(Seq(ops1)),
         )
         val far1b = featuredAppRight(
           p1,
           activityWeight = Some(BigDecimal("0.5")),
-          appKind = Some(FeaturedAppKind.FAK_GENERAL),
+          appKind = Some(FeaturedAppKind.FAK_ASSET),
           opsParties = Some(Seq(ops2)),
         )
         val far2a = featuredAppRight(p2, appKind = Some(FeaturedAppKind.FAK_ASSET))
         val far2b = featuredAppRight(p2, appKind = Some(FeaturedAppKind.FAK_ASSETMOVING))
         val far3 = featuredAppRight(p3)
-        val p1Entry = (FeaturedAppKind.FAK_GENERAL, BigDecimal(2))
-        val p1EntryAfterArchive = (FeaturedAppKind.FAK_ASSET, BigDecimal(2))
-        val p2Entry = (FeaturedAppKind.FAK_ASSETMOVING, BigDecimal(1))
+        val p1Entry = (FeaturedAppKind.FAK_ASSET, BigDecimal(2))
+        val p1EntryAfterArchive = (FeaturedAppKind.FAK_GENERAL, BigDecimal(2))
+        val p2Entry = (FeaturedAppKind.FAK_ASSET, BigDecimal(1))
         val p3Entry = (FeaturedAppKind.FAK_GENERAL, BigDecimal(1))
         for {
           _ <- initWithAcs()(store.multiDomainAcsStore)

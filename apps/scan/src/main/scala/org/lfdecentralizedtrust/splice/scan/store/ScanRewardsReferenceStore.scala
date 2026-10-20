@@ -67,8 +67,8 @@ trait ScanRewardsReferenceStore extends AppStore {
   /** Returns the providers and opsParties of the FeaturedAppRights active as of the given time.
     *
     * If a provider has multiple FeaturedAppRights, their opsParties are combined,
-    * the highest activityWeight is used, and the most general appKind is used
-    * (FAK_General > FAK_AssetMoving > FAK_Asset).
+    * the highest activityWeight is used, and the highest appKind is used
+    * (FAK_General < FAK_AssetMoving < FAK_Asset), to be in favor of the app.
     *
     * If an ops party belongs to FeaturedAppRights of multiple providers,
     * then the lexicographically lowest provider is chosen.
