@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.environment
 
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfig
-import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
+import com.daml.ledger.api.v2.admin.ObjectMetaOuterClass
 import com.daml.ledger.api.v2.event
 import com.daml.ledger.api.v2.package_reference.PackageReference
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Created, Exercised, HasCommands, Update}
@@ -28,7 +28,6 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.{Namespace, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.daml.lf.data.Ref
@@ -379,29 +378,6 @@ class BaseLedgerConnection(
     } yield partyId
   }
 
-  // Doesn't update an existing user; only creates a new one if a config with that ID doesn't exist.
-  def ensureUserCreated(
-      user: String,
-      primaryParty: Option[PartyId],
-      rights: Seq[User.Right],
-      isDeactivated: Boolean = false,
-      annotations: Map[String, String] = Map.empty,
-      identityProviderId: Option[String] = None,
-  )(implicit
-      tc: TraceContext
-  ): Future[Unit] = {
-    val userId = Ref.UserId.assertFromString(user)
-    val userLf = primaryParty match {
-      case None =>
-        new User(userId)
-      case Some(party) =>
-        new User(userId, party.toLf)
-    }
-    client
-      .getOrCreateUser(userLf, rights, isDeactivated, annotations, identityProviderId)
-      .map(_ => ())
-  }
-
   def setUserPrimaryParty(
       user: String,
       party: PartyId,
@@ -617,67 +593,10 @@ class BaseLedgerConnection(
   ): Future[String] =
     waitForUserMetadata(userId, SV_NAME_USER_METADATA_KEY)
 
-  def listAllUserData()(implicit
-      tc: TraceContext
-  ): Future[Seq[(UserManagementServiceOuterClass.User, Seq[User.Right])]] =
-    for {
-      identityProviderConfigs <- listIdentityProviderConfigs()
-      // the `Seq(None)` is so we also get the users that have no explicit idp set
-      identityProviderIds: Seq[Option[String]] = Seq(None) ++ identityProviderConfigs.map(
-        (c: IdentityProviderConfig) => Some(c.identityProviderId)
-      )
-      allUsers <- MonadUtil
-        .sequentialTraverse(identityProviderIds)(listAllUsersProto(None, 1000, _))
-        .map(_.flatten)
-      allUserData <- MonadUtil.sequentialTraverse(allUsers) { user =>
-        for {
-          rights <- client.listUserRights(
-            user.getId,
-            Option(user.getIdentityProviderId).filter(_.nonEmpty),
-          )
-        } yield (user, rights)
-      }
-    } yield allUserData
-
-  private def listAllUsersProto(
-      pageToken: Option[String],
-      pageSize: Int,
-      identityProviderId: Option[String],
-  )(implicit tc: TraceContext): Future[Seq[UserManagementServiceOuterClass.User]] =
-    client.listUsersProto(pageToken, pageSize, identityProviderId).flatMap {
-      case (users, nextToken) =>
-        if (nextToken.isEmpty) {
-          Future.successful(users)
-        } else {
-          listAllUsersProto(nextToken, pageSize, identityProviderId).map(users ++ _)
-        }
-    }
-
   def listIdentityProviderConfigs()(implicit
       tc: TraceContext
   ): Future[Seq[IdentityProviderConfig]] =
     client.listIdentityProviderConfigs()
-
-  // Doesn't update an existing config; only creates a new one if a config with that ID doesn't exist.
-  def ensureIdentityProviderConfigCreated(
-      id: String,
-      isDeactivated: Boolean,
-      jwksUrl: String,
-      issuer: String,
-      audience: String,
-  )(implicit
-      tc: TraceContext
-  ): Future[Unit] =
-    retryProvider.retry(
-      RetryFor.WaitingOnInitDependency,
-      "ensure_identity_provider_config_created",
-      show"Create identity provider $id",
-      client.createIdentityProviderConfig(id, isDeactivated, jwksUrl, issuer, audience).recover {
-        case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.ALREADY_EXISTS =>
-          logger.info(show"Identity provider $id already exists")
-      },
-      logger,
-    )
 
   def getSupportedPackageVersion(
       synchronizerId: SynchronizerId,

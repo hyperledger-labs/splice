@@ -796,8 +796,6 @@ object MultiDomainAcsStore extends StoreErrors {
   final case class ReassignmentId(source: SynchronizerId, id: String)
 
   object ReassignmentId {
-    def fromAssign(in: ReassignmentEvent.Assign) =
-      ReassignmentId(in.source, in.unassignId)
     def fromUnassign(out: ReassignmentEvent.Unassign) =
       ReassignmentId(out.source, out.unassignId)
   }
@@ -950,11 +948,6 @@ object MultiDomainAcsStore extends StoreErrors {
       transferCounter: Long,
       state: StoreContractState,
   ) extends PrettyPrinting {
-
-    def toAssigned: Option[SynchronizerId] = state match {
-      case StoreContractState.Assigned(domain) => Some(domain)
-      case StoreContractState.InFlight(_) | StoreContractState.Archived => None
-    }
 
     override def pretty: Pretty[this.type] = prettyOfClass(
       param("contractId", _.contractId),
