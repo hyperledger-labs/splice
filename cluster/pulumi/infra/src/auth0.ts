@@ -14,8 +14,8 @@ import {
   NamespacedAuth0Configs,
   fixedTokens,
 } from '@canton-network/splice-pulumi-common';
-import { dsoSize } from '@canton-network/splice-pulumi-common-sv/src/dsoConfig';
 import { allDSyncNodeNames } from '@canton-network/splice-pulumi-common-sv/src/dSyncNode';
+import { dsoSize } from '@canton-network/splice-pulumi-common-sv/src/dsoConfig';
 import {
   standardSvConfigsBasic,
   extraSvConfigsBasic,

@@ -24,6 +24,7 @@ async function main() {
     const migration = migrations[migrationIndex];
     await writeMigration(migration.id, allSvsToDeploy);
   }
+  //TODO(splice#7780): Add support for dsync nodes
 }
 
 async function writeMigration(migrationId: DomainMigrationIndex, svs: StaticSvConfig[]) {
@@ -40,7 +41,7 @@ async function writeMigration(migrationId: DomainMigrationIndex, svs: StaticSvCo
           Promise.resolve('access_token'),
         getCfg: () => (sv.nodeName === 'sv' ? svRunbookAuth0Config : cantonNetworkAuth0Config),
         reuseNamespaceConfig: (fromNamespace: string, toNamespace: string) => {},
-      }, sv.nodeName)
+      }, sv.nodeName, 'sv')
     );
   }
 }

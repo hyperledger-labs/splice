@@ -70,7 +70,9 @@ for (const [dsyncName, dsync] of Object.entries(clusterDSyncsConfiguration)) {
 const dsyncForNode = (dSyncNodeName: string): DSyncConfiguration => {
   const dsyncName = dsyncNameByNodeName.get(dSyncNodeName);
   if (dsyncName === undefined) {
-    throw new Error(`No dsync found containing node ${dSyncNodeName}, make sure SPLICE_DSYNC_NODE is of the form <dsyncName>-<nodeName> from the config`);
+    throw new Error(
+      `No dsync found containing node ${dSyncNodeName}, make sure SPLICE_DSYNC_NODE is of the form <dsyncName>-<nodeName> from the config`
+    );
   }
   return clusterDSyncsConfiguration[dsyncName];
 };
