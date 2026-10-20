@@ -99,7 +99,7 @@ class LocalSynchronizerNode(
     SynchronizerParametersConfig(synchronizerLimits =
       config.synchronizerLimits
         .map(_.toInternal)
-        .filter(_ => config.protocolVersion >= ProtocolVersion.v36)
+        .filter(_ => config.protocolVersion >= ProtocolVersion.v37)
     )
       .toStaticSynchronizerParameters(
         CryptoConfig(provider = CryptoProvider.Jce),
@@ -228,9 +228,8 @@ class LocalSynchronizerNode(
     logger.info("Adding mediator identity transactions")
     for {
       mediatorId <- mediatorAdminConnection.getMediatorId
-      identity <- mediatorAdminConnection.getOrGenerateIdentityTransactions(
-        mediatorId,
-        config.protocolVersion,
+      identity <- mediatorAdminConnection.generateOnboardingTopologyTransactions(
+        config.protocolVersion
       )
       _ <- addIdentityTransactions(
         "mediator",
@@ -395,9 +394,8 @@ class LocalSynchronizerNode(
     )
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
-      identity <- sequencerAdminConnection.getOrGenerateIdentityTransactions(
-        sequencerId,
-        config.protocolVersion,
+      identity <- sequencerAdminConnection.generateOnboardingTopologyTransactions(
+        config.protocolVersion
       )
       _ <- addIdentityTransactions(
         "sequencer",
