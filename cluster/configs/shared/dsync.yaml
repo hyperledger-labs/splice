@@ -1,15 +1,29 @@
-dsync:
-  migration:
-    # at least for now, starting from migration 1, to be different from the 0 in the gSync, to help debugging
-    frozenMigrationId: 1
-    active:
-      id: 1
-      version: "local"
-      sequencer:
-        enableBftSequencer: true
-
-dsyncNodes:
-  dsync-node-1: !include(dsyncNode.yaml)
-  dsync-node-2: !include(dsyncNode.yaml)
-  dsync-node-3: !include(dsyncNode.yaml)
-  dsync-node-4: !include(dsyncNode.yaml)
+dsyncs:
+  dsync1:
+    migration:
+      # at least for now, starting from migration 1, to be different from the 0 in the gSync, to help debugging
+      frozenMigrationId: 1
+      active:
+        id: 1
+        version: "local"
+        sequencer:
+          enableBftSequencer: true
+    nodes:
+      node1: !include(dsyncNode.yaml)
+      node2: !include(dsyncNode.yaml)
+      node3: !include(dsyncNode.yaml)
+      node4: !include(dsyncNode.yaml)
+  dsync2:
+    migration:
+      # at least for now, starting from migration 1, to be different from the 0 in the gSync, to help debugging
+      frozenMigrationId: 1
+      active:
+        id: 1
+        version: "local"
+        sequencer:
+          enableBftSequencer: true
+    nodes:
+      node1: !include(dsyncNode.yaml)
+      node2: !include(dsyncNode.yaml)
+      node3: !include(dsyncNode.yaml)
+      node4: !include(dsyncNode.yaml)

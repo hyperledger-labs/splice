@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as automation from '@pulumi/pulumi/automation';
 
-import { clusterDSyncNodesConfiguration, dSyncMigrationConfig } from '../common-sv/src/dSyncNode';
+import { clusterDSyncsConfiguration } from '../common-sv/src/dSyncNode';
 import { allSvNamesToDeploy } from '../common-sv/src/dsoConfig';
 import { DeploySvRunbook, isDevNet } from '../common/src/config';
 // We have to be explicit with the imports here, if we import a module that creates a pulumi resource running the preview will fail
@@ -75,20 +75,17 @@ export function runSvCantonForDsyncForAllMigrations<T>(
   runForStack: (stack: automation.Stack, migration: MigrationInfo, dsyncNode: string) => Promise<T>,
   requiresExistingStack: boolean,
 ): { name: string; promise: Promise<T> }[] {
-  const dsyncMigrations = dSyncMigrationConfig?.allMigrations;
-  if (!dsyncMigrations) {
-    return [];
-  }
-  const dsyncNodesToRunFor = Object.keys(clusterDSyncNodesConfiguration);
-  return dsyncNodesToRunFor.flatMap(dsyncNode => {
-    return dsyncMigrations.map(migration => {
-      return {
-        name: `${operation}-canton-M${migration.id}-${dsyncNode}`,
-        // eslint-disable-next-line promise/prefer-await-to-then
-        promise: stackForMigration(dsyncNode, migration.id, requiresExistingStack, 'dsync').then(stack => {
-          return runForStack(stack, migration, dsyncNode);
-        }),
-      };
+  return Object.values(clusterDSyncsConfiguration).flatMap(dsync => {
+    return Object.keys(dsync.nodes).flatMap(dsyncNode => {
+      return dsync.migrationConfig.allMigrations.map(migration => {
+        return {
+          name: `${operation}-canton-M${migration.id}-${dsyncNode}`,
+          // eslint-disable-next-line promise/prefer-await-to-then
+          promise: stackForMigration(dsyncNode, migration.id, requiresExistingStack, 'dsync').then(stack => {
+            return runForStack(stack, migration, dsyncNode);
+          }),
+        };
+      });
     });
   });
 }

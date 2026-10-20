@@ -50,6 +50,217 @@ cluster:
       maxNodes: 3
       minNodes: 1
       nodeType: 'n4d-standard-8'
+dsyncs:
+  dsync1:
+    migration:
+      active:
+        id: 1
+        sequencer:
+          enableBftSequencer: true
+        version: 'local'
+      frozenMigrationId: 1
+    nodes:
+      node1:
+        mediator:
+          resources:
+            limits:
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+        participant:
+          resources:
+            limits:
+              memory: '18Gi'
+            requests:
+              cpu: '1'
+              memory: '12Gi'
+        sequencer:
+          enableAntiAffinity: false
+          resources:
+            limits:
+              cpu: '3'
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+      node2:
+        mediator:
+          resources:
+            limits:
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+        participant:
+          resources:
+            limits:
+              memory: '18Gi'
+            requests:
+              cpu: '1'
+              memory: '12Gi'
+        sequencer:
+          enableAntiAffinity: false
+          resources:
+            limits:
+              cpu: '3'
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+      node3:
+        mediator:
+          resources:
+            limits:
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+        participant:
+          resources:
+            limits:
+              memory: '18Gi'
+            requests:
+              cpu: '1'
+              memory: '12Gi'
+        sequencer:
+          enableAntiAffinity: false
+          resources:
+            limits:
+              cpu: '3'
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+      node4:
+        mediator:
+          resources:
+            limits:
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+        participant:
+          resources:
+            limits:
+              memory: '18Gi'
+            requests:
+              cpu: '1'
+              memory: '12Gi'
+        sequencer:
+          enableAntiAffinity: false
+          resources:
+            limits:
+              cpu: '3'
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+  dsync2:
+    migration:
+      active:
+        id: 1
+        sequencer:
+          enableBftSequencer: true
+        version: 'local'
+      frozenMigrationId: 1
+    nodes:
+      node1:
+        mediator:
+          resources:
+            limits:
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+        participant:
+          resources:
+            limits:
+              memory: '18Gi'
+            requests:
+              cpu: '1'
+              memory: '12Gi'
+        sequencer:
+          enableAntiAffinity: false
+          resources:
+            limits:
+              cpu: '3'
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+      node2:
+        mediator:
+          resources:
+            limits:
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+        participant:
+          resources:
+            limits:
+              memory: '18Gi'
+            requests:
+              cpu: '1'
+              memory: '12Gi'
+        sequencer:
+          enableAntiAffinity: false
+          resources:
+            limits:
+              cpu: '3'
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+      node3:
+        mediator:
+          resources:
+            limits:
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+        participant:
+          resources:
+            limits:
+              memory: '18Gi'
+            requests:
+              cpu: '1'
+              memory: '12Gi'
+        sequencer:
+          enableAntiAffinity: false
+          resources:
+            limits:
+              cpu: '3'
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+      node4:
+        mediator:
+          resources:
+            limits:
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
+        participant:
+          resources:
+            limits:
+              memory: '18Gi'
+            requests:
+              cpu: '1'
+              memory: '12Gi'
+        sequencer:
+          enableAntiAffinity: false
+          resources:
+            limits:
+              cpu: '3'
+              memory: '4Gi'
+            requests:
+              cpu: '1'
+              memory: '2Gi'
 infra:
   enableSweetSecurity: true
   gkeGateway:
@@ -75,7 +286,6 @@ infra:
     retentionDuration: '30d'
     retentionSize: '200GB'
     storageSize: '600Gi'
-  supportDsync: true
 initialRound: 0
 monitoring:
   alerting:

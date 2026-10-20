@@ -12,7 +12,7 @@ import {
   configForDSyncNode,
   configForSv,
   coreSvsToDeploy,
-  dSyncMigrationConfig,
+  dSyncMigrationConfigForNode,
   InstalledMigrationSpecificSv,
   StaticSvConfig,
   staticSvConfigFromDSyncNodeConfig,
@@ -62,7 +62,7 @@ export async function installNode(
   const serviceAccountName = `sv-canton-migration-${migrationId}`;
   const imagePullDeps = imagePullSecretWithNonDefaultServiceAccount(xns, serviceAccountName);
 
-  const migrationConfig = nodeType === 'sv' ? DecentralizedSynchronizerUpgradeConfig : dSyncMigrationConfig!;
+  const migrationConfig = nodeType === 'sv' ? DecentralizedSynchronizerUpgradeConfig : dSyncMigrationConfigForNode(nodeName);
 
   return await installCantonComponents(
     xns,
