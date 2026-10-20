@@ -21,6 +21,7 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 import scala.concurrent.Future
 
@@ -1057,21 +1058,22 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       migrationId: Long
   ): Future[UpdateHistory] = {
     val participantId = mkParticipantId("ScanEventStoreTest")
-    val uh = new UpdateHistory(
-      storage.underlying,
-      migrationId,
-      "scan_event_store_test",
-      participantId,
-      dsoParty,
-      BackfillingRequirement.BackfillingNotRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = true,
-      HistoryMetrics(NoOpMetricsFactory, migrationId),
-    )
-    uh.ingestionSink.initialize().map(_ => uh)
+    for {
+      updateHistory <- UpdateHistory.create(
+        storage.underlying,
+        migrationId,
+        "scan_event_store_test",
+        StoreMemberId(participantId),
+        dsoParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
+        loggerFactory,
+        enableImportUpdateBackfill = true,
+        HistoryMetrics(NoOpMetricsFactory, migrationId),
+      )
+      _ <- updateHistory.ingestionSink.initialize()
+    } yield updateHistory
   }
 
   private def newVerdictStore(updateHistory: UpdateHistory) =

@@ -57,10 +57,10 @@ abstract class StoreReadPerformanceTest(
 
   @SuppressWarnings(Array("org.lfdecentralizedtrust.splice.wart.Println"))
   def run(): Future[Unit] = withStorage { storage =>
-    val store = mkStore(storage)
     TraceContext
       .withNewTraceContext(this.getClass.getName) { implicit tc =>
         for {
+          store <- mkStore(storage)
           _ <- store.ingestionSink.initialize()
           txs = loadTxsFromDump()
           _ <- ingestAll(store, txs)

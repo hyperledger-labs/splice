@@ -225,6 +225,8 @@ case class ValidatorAppBackendConfig(
     // from running concurrently against the same database.  Only disable for migration scenarios
     // where intentional overlap is required.
     instanceLockEnabled: Boolean = true,
+    // Start automation for external parties that only have a p2p with embedded keys instead of a separate p2k mapping.
+    supportEmbeddedPartySigningKeys: Boolean = true,
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

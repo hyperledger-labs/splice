@@ -110,8 +110,8 @@ export async function installCantonComponents(
           `sequencer-bft-${migrationId}-pg`,
           `sequencer-bft-pg`,
           version,
-          physicalSynchronizerConfig.sequencer.cloudSql,
-          physicalSynchronizerConfig.sequencer.splicePostgres,
+          physicalSynchronizerConfig.cantonbft.cloudSql,
+          physicalSynchronizerConfig.cantonbft.splicePostgres,
           true,
           { isActive: migrationStillRunning, migrationId, disableProtection }
         )

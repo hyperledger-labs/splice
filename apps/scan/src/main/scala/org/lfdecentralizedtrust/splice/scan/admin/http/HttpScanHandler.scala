@@ -139,6 +139,7 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import java.lang.IllegalStateException
 import scala.collection.immutable.SortedMap
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -2359,7 +2360,7 @@ class HttpScanHandler(
           .flatMap(_.getSequencerTrafficControlState(member))
         actualConsumed = actual.extraTrafficConsumed.value
         actualLimit = actual.extraTrafficLimit.value
-        targetTotalPurchased <- store.getTotalPurchasedMemberTraffic(member, domain)
+        targetTotalPurchased <- store.getTotalPurchasedMemberTraffic(StoreMemberId(member), domain)
       } yield {
         definitions.GetMemberTrafficStatusResponse(
           definitions.MemberTrafficStatus(

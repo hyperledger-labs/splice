@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -23,7 +23,10 @@ import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
 import org.lfdecentralizedtrust.splice.http.v0.definitions as d0
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
+}
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
@@ -45,6 +48,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.AutoAcceptTransfersConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 
 import java.time.Duration
+import scala.concurrent.duration.DurationInt
 import java.util.UUID
 
 class WalletNoDevNetIntegrationTest
@@ -139,25 +143,30 @@ class WalletNoDevNetIntegrationTest
           // Reset traffic state for alice and bob such that extraTrafficRemainder = 0 to make sure we hit the cases where command priority matters.
           sv1Backend.sequencerClient.health.status match {
             case _: NodeStatus.Success[?] =>
-              Seq(
-                aliceValidatorBackend.participantClient.id,
-                bobValidatorBackend.participantClient.id,
-              ).foreach { participantId =>
-                val trafficStateO = sv1Backend.sequencerClient.traffic_control
-                  .traffic_state_of_members(Seq(participantId.member))
-                  .trafficStates
-                  .get(participantId.member)
-                trafficStateO.foreach(ts =>
-                  sv1Backend.sequencerClient.traffic_control.set_traffic_balance(
-                    participantId.member,
-                    serial = ts.serial.fold(PositiveInt.one)(_ + PositiveInt.one),
-                    newBalance = ts.extraTrafficConsumed,
-                  )
-                )
-              }
+              Seq(aliceValidatorBackend, bobValidatorBackend).foreach(
+                setExtraTrafficRemainder(_, 0L)
+              )
             case _ =>
           }
         }
+      )
+  }
+
+  private def setExtraTrafficRemainder(
+      validator: ValidatorAppBackendReference,
+      remainder: Long,
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    val member = validator.participantClient.id.member
+    sv1Backend.sequencerClient.traffic_control
+      .traffic_state_of_members(Seq(member))
+      .trafficStates
+      .get(member)
+      .foreach(ts =>
+        sv1Backend.sequencerClient.traffic_control.set_traffic_balance(
+          member,
+          serial = ts.serial.fold(PositiveInt.one)(_ + PositiveInt.one),
+          newBalance = NonNegativeLong.tryCreate(ts.extraTrafficConsumed.value + remainder),
+        )
       )
   }
 
@@ -186,12 +195,23 @@ class WalletNoDevNetIntegrationTest
       // Keep each transfer small: every accepted transfer raises the receiver's balance,
       // and it must stay below the cost of one top-up for the next accept to count.
       val amount = BigDecimal(10)
+      val baseTrafficForHighPrioritySubmission = 15_000L
 
       // Fails the test if it does not hold, so that an accept can never pass with Low priority.
       def checkCannotAffordTopupAndTrafficBelowReserve(
           validator: ValidatorAppBackendReference,
           walletClient: WalletAppClientReference,
-      ): Unit =
+      ): Unit = {
+        clue(
+          s"${validator.name} has enough base traffic for a high priority submission"
+        ) {
+          eventually(timeUntilSuccess = 2.minutes, maxPollInterval = 1.second) {
+            getTrafficState(
+              validator,
+              activeSynchronizerId,
+            ).baseTrafficRemainder.value should be >= baseTrafficForHighPrioritySubmission
+          }
+        }
         clue(
           s"Precondition: ${validator.name} cannot afford one top-up and its traffic is at or below the reserve"
         ) {
@@ -203,6 +223,7 @@ class WalletNoDevNetIntegrationTest
             getTrafficState(validator, activeSynchronizerId).extraTrafficRemainder
           remainder should be <= reserved
         }
+      }
 
       // 1. acceptTransferOffer
       val offerTrackingId = UUID.randomUUID.toString
@@ -395,6 +416,12 @@ class WalletNoDevNetIntegrationTest
       }
       clue("Nothing changed: the transfer is still pending") {
         aliceWalletClient.listTokenStandardTransfers() should have size 1
+      }
+
+      clue("Give alice and bob one top-up of extra traffic back for the suites that follow") {
+        Seq(aliceValidatorBackend, bobValidatorBackend).foreach { validator =>
+          setExtraTrafficRemainder(validator, getTopupParameters(validator, now).topupAmount)
+        }
       }
     }
   }

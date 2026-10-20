@@ -64,7 +64,7 @@ jobs:
               workflow = process.env.INPUTS_WORKFLOW;
             } else {
               const body = context.payload.comment.body || '';
-              
+
               if (body.includes('/cluster_test')) {
                 workflow = 'cluster_test';
               } else if (body.includes('/hdm_test')) {
@@ -82,36 +82,28 @@ jobs:
     needs:
       - get_head
       - determine_test_type
-    if: needs.determine_test_type.outputs.workflow != ''
+    if: needs.determine_test_type.outputs.workflow != '' && needs.determine_test_type.outputs.workflow != 'cluster_test'
     uses: ./.github/workflows/cluster_tests.yml
     secrets: inherit
     with:
       workflow: ${{ needs.determine_test_type.outputs.workflow }}
       sha: ${{ needs.get_head.outputs.sha }}
 
-  result:
+  cluster_test_instructions:
     runs-on: ubuntu-24.04
     needs:
-      - get_head
       - determine_test_type
-      - trigger_test
     if: needs.determine_test_type.outputs.workflow == 'cluster_test'
     steps:
-      - name: parse the result
-        id: parse
-        run: |
-          number=$(echo '${{ needs.trigger_test.outputs.result }}' | jq -r '.number')
-          echo "Deploy scratchnet pipeline triggered for [Commit ${{ needs.get_head.outputs.sha }} in ${{ needs.get_head.outputs.repo }}](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/${{ needs.get_head.outputs.sha }}), please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"
-          echo "number=$number" >> "$GITHUB_OUTPUT"
-      - name: Comment on the PR
+      - name: Comment instructions on the PR
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          script : |
+          script: |
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: "Deploy cluster test triggered for [Commit ${{ needs.get_head.outputs.sha }} in ${{ needs.get_head.outputs.repo }}](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/${{ needs.get_head.outputs.sha }}), please contact a Contributor to approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${{ steps.parse.outputs.number }}"
+              body: "To run a cluster test on this PR, a maintainer can run the following from a scratchnet checkout (`cluster/deployment/<scratchnet>`):\n\n`cncluster deploy_basic ${{ github.event.issue.number }}`\n\nThis grabs the cluster lock if free (use `cncluster lock` to lock explicitly), triggers the deploy workflow, and posts the run link back on this PR. Nothing was triggered by this comment."
             });
 
   result_hdm:

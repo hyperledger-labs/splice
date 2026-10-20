@@ -22,6 +22,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SynchronizerNodeService,
 }
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologySnapshot
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.util.AssignedContract
@@ -137,7 +138,8 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
       case Some(trafficState) =>
         for {
           // Compute new extra traffic limit
-          totalPurchasedTraffic <- store.getTotalPurchasedMemberTraffic(memberId, synchronizerId)
+          totalPurchasedTraffic <- store
+            .getTotalPurchasedMemberTraffic(StoreMemberId(memberId), synchronizerId)
           newExtraTrafficLimit = NonNegativeLong
             .tryCreate(trafficLimitOffset + totalPurchasedTraffic)
 

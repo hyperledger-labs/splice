@@ -3,6 +3,7 @@ org.lfdecentralizedtrust.splice.admin.api.client.ApiClientRequestLoggerTest
 org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandlerBftCallFailedTest
 org.lfdecentralizedtrust.splice.auth.AuthTokenManagerTest
 org.lfdecentralizedtrust.splice.auth.SignatureVerifierTest
+org.lfdecentralizedtrust.splice.automation.AutomationMetricsTest
 org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTriggerTest
 org.lfdecentralizedtrust.splice.automation.SqlIndexInitializationTriggerStoreTest
 org.lfdecentralizedtrust.splice.build_tools.DarLockCheckerTest
@@ -64,8 +65,6 @@ org.lfdecentralizedtrust.splice.store.db.LegacyAcsSnapshotStoreTest
 org.lfdecentralizedtrust.splice.store.db.SpliceStorageMultiLockTest
 org.lfdecentralizedtrust.splice.store.db.TablePerAcsSnapshotStoreTest
 org.lfdecentralizedtrust.splice.sv.automation.VoteRequestMetricsTriggerTest
-org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNodeTest
-org.lfdecentralizedtrust.splice.sv.cometbft.CometBftRequestSignerTest
 org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconcilerSpec
 org.lfdecentralizedtrust.splice.sv.util.SvOnboardingTokenTest
 org.lfdecentralizedtrust.splice.sv.util.WeightDistributionForSvTest
