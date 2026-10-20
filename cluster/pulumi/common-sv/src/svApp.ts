@@ -119,7 +119,7 @@ export function valuesForSvApp(
     });
   }
 
-  if (config.svApp?.enableInternalAutoOnboardingThroughSvTrafficFaucet) {
+  if (config.svApp?.enableInternalTrafficFaucet) {
     additionalEnvVars.push({
       name: 'ADDITIONAL_CONFIG_ENABLE_INTERNAL_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
       value: `canton.sv-apps.sv.enable-internal-auto-onboarding-through-sv-traffic-faucet = true`,

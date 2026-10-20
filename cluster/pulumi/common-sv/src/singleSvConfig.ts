@@ -88,7 +88,7 @@ const SvAppConfigSchema = z
     // Map of package name -> list of versions to explicitly unvet
     additionalPackagesToUnvet: z.record(z.string(), z.array(z.string())).optional(),
     trafficBasedOnboarding: z.boolean().optional(),
-    enableInternalAutoOnboardingThroughSvTrafficFaucet: z.boolean().optional(),
+    enableInternalTrafficFaucet: z.boolean().optional(),
     resources: K8sResourceSchema,
   })
   .strict();
