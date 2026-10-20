@@ -28,8 +28,6 @@ trait AcsTables extends AcsJdbcTypes {
     val descriptor: Rep[Json] = column[Json]("descriptor")
   }
 
-  lazy val StoreDescriptors = new TableQuery(tag => new StoreDescriptors(tag))
-
 }
 
 object AcsTables extends AcsTables {
