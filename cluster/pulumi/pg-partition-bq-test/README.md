@@ -604,7 +604,9 @@ SELECT datastream_metadata.change_type, count(*)
 
 ## 4. Test status
 
-Not yet run against GCP. The earlier procedure, whose migration altered the
+The above was run and confirmed on a real scratchnet cluster at `a0d914e224434db747f006522747fc6f5737d2da` on 2026-10-21.
+
+The earlier procedure, whose migration altered the
 publication itself, was verified in a real test as of
 [`ef62712d6d`](https://github.com/canton-network/splice/blob/ef62712d6d58bc9063b8bd32137181f12176cc8b/cluster/pulumi/pg-partition-bq-test/README.md)
 on 2026-10-19.
