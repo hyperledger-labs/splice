@@ -1098,40 +1098,19 @@ function createGrafanaAlerting(namespace: Input<string>) {
               '$SEQUENCER_CLIENT_DELAY_THRESHOLD_SECONDS',
               monitoringConfig.alerting.alerts.sequencerClientDelay.seconds.toString()
             ),
-            ...(monitoringConfig.alerting.alerts.acsCommitments.usePv36Metrics
-              ? {
-                  'acs_commitment_deleted_alerts.yaml': readGrafanaAlertingFile(
-                    'acs_commitment_deleted.yaml'
-                  ),
-                  'acs_commitment_pv36_alerts.yaml': readGrafanaAlertingFile(
-                    'acs_commitment_pv36_alerts.yaml'
-                  )
-                    .replaceAll(
-                      '$ACS_COMMITMENT_CHECKPOINT_DELAY_THRESHOLD_SECONDS',
-                      monitoringConfig.alerting.alerts.acsCommitments.checkpointDelay.seconds.toString()
-                    )
-                    .replaceAll(
-                      '$ACS_COMMITMENT_DELAY_THRESHOLD_SECONDS',
-                      monitoringConfig.alerting.alerts.acsCommitments.completedDelay.seconds.toString()
-                    ),
-                }
-              : {
-                  'acs_commitment_alerts.yaml': readGrafanaAlertingFile(
-                    'acs_commitment_alerts.yaml'
-                  )
-                    .replaceAll(
-                      '$ACS_COMMITMENT_CHECKPOINT_DELAY_THRESHOLD_SECONDS',
-                      monitoringConfig.alerting.alerts.acsCommitments.checkpointDelay.seconds.toString()
-                    )
-                    .replaceAll(
-                      '$ACS_COMMITMENT_DELAY_THRESHOLD_SECONDS',
-                      monitoringConfig.alerting.alerts.acsCommitments.completedDelay.seconds.toString()
-                    )
-                    .replaceAll(
-                      '$ACS_COMMITMENT_COMPUTE_DURATION_THRESHOLD_SECONDS',
-                      monitoringConfig.alerting.alerts.acsCommitments.computeDuration.seconds.toString()
-                    ),
-                }),
+            'acs_commitment_deleted_alerts.yaml': readGrafanaAlertingFile(
+              'acs_commitment_deleted.yaml'
+            ),
+            'acs_commitment_pv36_alerts.yaml': readGrafanaAlertingFile(
+              'acs_commitment_pv36_alerts.yaml'
+            ).replaceAll(
+                '$ACS_COMMITMENT_CHECKPOINT_DELAY_THRESHOLD_SECONDS',
+                monitoringConfig.alerting.alerts.acsCommitments.checkpointDelay.seconds.toString()
+              )
+              .replaceAll(
+                '$ACS_COMMITMENT_DELAY_THRESHOLD_SECONDS',
+                monitoringConfig.alerting.alerts.acsCommitments.completedDelay.seconds.toString()
+              ),
             'sequencer_connection_pool_alerts.yaml': readGrafanaAlertingFile(
               'sequencer_connection_pool_alerts.yaml'
             ),
