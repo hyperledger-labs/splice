@@ -62,7 +62,7 @@ object AdvisoryLocks {
   }
 
   /** Like [[withTransactionalLock]], but waits for the lock instead of failing while another
-    * session holds it.
+    * session holds it. For this reason, use only when the update will be quick.
     */
   def withBlockingTransactionalLock[T, E <: Effect](
       profile: JdbcProfile,
