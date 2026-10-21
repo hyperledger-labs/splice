@@ -243,7 +243,7 @@ final case class SynchronizerConnectionConfig(
       ),
     )
 
-  def toInternal: SynchronizerConnectionConfigInternal =
+  private[canton] def toInternal: SynchronizerConnectionConfigInternal =
     this
       .into[SynchronizerConnectionConfigInternal]
       .withFieldRenamed(_.synchronizerId, _.psid)

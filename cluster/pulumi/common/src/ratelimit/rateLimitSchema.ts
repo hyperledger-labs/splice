@@ -43,6 +43,7 @@ export const defaultGlobalPerIpLimits = {
 export const RateLimitSchema = z.object({
   globalLimits: BucketRateLimitSchema.default(defaultGlobalLimits),
   globalPerIpLimits: PerIpLimitsSchema.default(defaultGlobalPerIpLimits),
+  // TODO(canton-network/splice/pull#7797) consider removing, depending on what we decide to do with per-endpoint rate limits
   rateLimits: z
     .object({})
     .catchall(

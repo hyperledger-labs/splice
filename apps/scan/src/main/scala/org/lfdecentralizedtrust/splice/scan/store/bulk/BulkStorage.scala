@@ -13,9 +13,10 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.actor.{ActorSystem, Cancellable}
+import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, S3Config, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceLedgerClient}
 import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStorageConfig}
@@ -29,13 +30,13 @@ import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, S3BucketConnection
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import cats.implicits.*
-import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.PekkoRetryableService
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage.{
   acsCommittedKvStoreKey,
   acsStagingKvStoreKey,
   firstAcsSnapshotTimestampKvStoreKey,
+  legacyKvStoreKeys,
   updatesCommittedKvStoreKey,
   updatesStagingKvStoreKey,
 }
@@ -47,10 +48,8 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.{
   ScanPeerObjectSource,
   VerifiedObjectCopier,
 }
-import org.lfdecentralizedtrust.splice.scan.store.historystart.ScanHistoryStart
+import org.lfdecentralizedtrust.splice.scan.store.historystart.{HistoryReadiness, ScanHistoryStart}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-
-import scala.concurrent.duration.*
 
 class BulkStorage(
     storageConfig: ScanStorageConfig,
@@ -62,6 +61,7 @@ class BulkStorage(
     currentMigrationId: Long,
     kvProvider: ScanKeyValueProvider,
     historyStart: ScanHistoryStart,
+    historyReadiness: HistoryReadiness,
     metricsFactory: LabeledMetricsFactory,
     automationConfig: AutomationConfig,
     backoffClock: Clock,
@@ -96,22 +96,6 @@ class BulkStorage(
     loggerFactory,
   )
 
-  val backfillingCompleteGate: Source[Boolean, Cancellable] =
-    Source
-      .tick(0.seconds, appConfig.updatesPollingInterval.underlying, ())
-      .mapAsync(1)(_ =>
-        if (updateHistory.isReady)
-          for {
-            historyBackfilled <- updateHistory.isHistoryBackfilled(currentMigrationId)
-            peerCopyComplete <-
-              if (appConfig.backfilling.enabled) backfillingProgress.isComplete
-              else Future.successful(true)
-          } yield historyBackfilled && peerCopyComplete
-        else Future.successful(false)
-      )
-      .filter(identity)
-      .take(1)
-
   val acsStagingProgress = new AcsSnapshotBulkStoragePersistentProgress(
     acsStagingKvStoreKey,
     firstAcsSnapshotTimestampKvStoreKey,
@@ -145,13 +129,21 @@ class BulkStorage(
     kvProvider,
     loggerFactory,
   )
+
+  private val writersGate = new BulkStorageWritersGate(
+    readiness = historyReadiness,
+    currentMigrationId = currentMigrationId,
+    peerBackfillingEnabled = appConfig.backfilling.enabled,
+    peerBackfillingProgress = backfillingProgress,
+    pollingInterval = appConfig.updatesPollingInterval.underlying,
+    loggerFactory = loggerFactory,
+  )
   val backfilling: Option[BulkStorageBackfilling] =
     Option.when(appConfig.backfilling.enabled) {
       new BulkStorageBackfilling(
         appConfig.backfilling,
         storageConfig,
-        currentMigrationId,
-        new BftBulkObjectListing(scanConnection),
+        new BftBulkObjectListing(scanConnection, loggerFactory),
         new VerifiedObjectCopier(
           new ScanPeerObjectSource(scanConnection),
           VerifiedObjectCopier.randomPeer,
@@ -182,6 +174,7 @@ class BulkStorage(
     storageConfig,
     appConfig,
     acsSnapshotStore,
+    updateHistory,
     stagingConnection,
     historyMetrics,
     loggerFactory,
@@ -191,7 +184,7 @@ class BulkStorage(
     acsStagingWriter,
     acsStagingProgress,
     appConfig,
-    backfillingCompleteGate,
+    writersGate.whenSnapshotsMayStart("AcsSnapshotBulkStorageStaging"),
     loggerFactory,
   )
   val acsCommittedWriter = new AcsSnapshotBulkStorageCommitFromStaging(
@@ -217,7 +210,7 @@ class BulkStorage(
     acsCommittedWriter,
     acsCommittedProgress,
     appConfig,
-    backfillingCompleteGate,
+    writersGate.whenUpdatesMayStart("AcsSnapshotBulkStorageCommitted"),
     loggerFactory,
   )
   val updatesStagingWriter = new UpdateHistoryBulkStorageWriterFromDb(
@@ -226,7 +219,6 @@ class BulkStorage(
     updateHistory,
     stagingConnection,
     historyMetrics,
-    currentMigrationId,
     loggerFactory,
   )
   val updatesStaging = new UpdateHistoryBulkStorage(
@@ -234,7 +226,7 @@ class BulkStorage(
     updatesStagingWriter,
     updatesStagingProgress,
     appConfig,
-    backfillingCompleteGate,
+    writersGate.whenUpdatesMayStart("UpdateHistoryBulkStorageStaging"),
     loggerFactory,
   )
   val updatesCommittedWriter = new UpdateHistoryBulkStorageCommitFromStaging(
@@ -260,7 +252,7 @@ class BulkStorage(
     updatesCommittedWriter,
     updatesCommittedProgress,
     appConfig,
-    backfillingCompleteGate,
+    writersGate.whenUpdatesMayStart("UpdateHistoryBulkStorageCommitted"),
     loggerFactory,
   )
 
@@ -285,6 +277,7 @@ class BulkStorage(
           _ <- updatesStagingProgress.reset
           _ <- updatesCommittedProgress.reset
           _ <- backfillingProgress.resetCompletion()
+          _ <- deleteLegacyKeys()
         } yield ()
       } else Future.unit
     resetAll.map { _ =>
@@ -293,6 +286,10 @@ class BulkStorage(
     }
   }
 
+  // TODO(#7745): remove deleteLegacyKeys and legacyKvStoreKeys once this is deployed on DevNet
+  private def deleteLegacyKeys(): Future[Unit] =
+    MonadUtil.sequentialTraverse_(legacyKvStoreKeys)(kvProvider.store.deleteKey(_))
+
   final override def closeAsync(): Seq[AsyncOrSyncCloseable] =
     services.flatMap(_.closeAsync()) :+
       SyncCloseable("peer scan connection", LifeCycle.close(scanConnection)(logger))
@@ -300,11 +297,20 @@ class BulkStorage(
 
 object BulkStorage {
 
-  val acsStagingKvStoreKey = "latest_acs_snapshot_in_bulk_storage_staging"
-  val acsCommittedKvStoreKey = "latest_acs_snapshot_in_bulk_storage_committed"
-  val updatesStagingKvStoreKey = "latest_updates_segment_in_bulk_storage_staging"
-  val updatesCommittedKvStoreKey = "latest_updates_segment_in_bulk_storage_committed"
-  val firstAcsSnapshotTimestampKvStoreKey = "first_acs_snapshot_timestamp_in_bulk_storage"
+  val acsStagingKvStoreKey = "latest_acs_snapshot_in_bulk_storage_staging_v2"
+  val acsCommittedKvStoreKey = "latest_acs_snapshot_in_bulk_storage_committed_v2"
+  val updatesStagingKvStoreKey = "latest_updates_segment_in_bulk_storage_staging_v2"
+  val updatesCommittedKvStoreKey = "latest_updates_segment_in_bulk_storage_committed_v2"
+  val firstAcsSnapshotTimestampKvStoreKey = "first_acs_snapshot_timestamp_in_bulk_storage_v2"
+
+  val legacyKvStoreKeys: Seq[String] = Seq(
+    "latest_acs_snapshot_in_bulk_storage_staging",
+    "latest_acs_snapshot_in_bulk_storage_committed",
+    "latest_updates_segment_in_bulk_storage_staging",
+    "latest_updates_segment_in_bulk_storage_committed",
+    "first_acs_snapshot_timestamp_in_bulk_storage",
+    "bulk_storage_backfill_complete",
+  )
 
   def apply(
       storageConfig: ScanStorageConfig,
@@ -314,6 +320,7 @@ object BulkStorage {
       currentMigrationId: Long,
       kvProvider: ScanKeyValueProvider,
       historyStart: ScanHistoryStart,
+      historyReadiness: HistoryReadiness,
       metricsFactory: LabeledMetricsFactory,
       automationConfig: AutomationConfig,
       backoffClock: Clock,
@@ -349,6 +356,7 @@ object BulkStorage {
         currentMigrationId,
         kvProvider,
         historyStart,
+        historyReadiness,
         metricsFactory,
         automationConfig,
         backoffClock,

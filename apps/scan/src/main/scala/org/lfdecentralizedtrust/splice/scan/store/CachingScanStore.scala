@@ -8,7 +8,7 @@ import com.digitalasset.canton.caching.ScaffeineCache
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.github.blemale.scaffeine.Scaffeine
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
@@ -31,6 +31,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.Vali
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{CacheConfig, ScanCacheConfig}
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanStoreMetrics
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.{
   Limit,
   MiningRoundsStore,
@@ -129,8 +130,11 @@ class CachingScanStore(
       store.getValidatorLicenseByValidator,
     ).get(validator)
 
-  override def getTotalPurchasedMemberTraffic(memberId: Member, synchronizerId: SynchronizerId)(
-      implicit tc: TraceContext
+  override def getTotalPurchasedMemberTraffic(
+      memberId: StoreMemberId,
+      synchronizerId: SynchronizerId,
+  )(implicit
+      tc: TraceContext
   ): Future[Long] =
     getCache(
       "totalPurchasedMemberTraffic",

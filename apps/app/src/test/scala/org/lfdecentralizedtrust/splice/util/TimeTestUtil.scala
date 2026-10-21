@@ -15,7 +15,9 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 import org.lfdecentralizedtrust.splice.wallet.util.ExtraTrafficTopupParameters
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 
@@ -65,9 +67,9 @@ trait TimeTestUtil extends TestCommon {
 
         // it doesn't seem to matter which participant we run these from - all get synced
         val now = sv1Backend.participantClient.ledger_api.time.get()
+        val timeToAdvanceTo = now.plus(duration)
         try {
           // actually advance the time
-          val timeToAdvanceTo = now.plus(duration)
           logger.info(s"advancing time by $duration to $timeToAdvanceTo")
           sv1Backend.participantClient.ledger_api.time.set(now, timeToAdvanceTo)
         } catch {
@@ -84,8 +86,21 @@ trait TimeTestUtil extends TestCommon {
               "Are participants configured with `testing-time.type = monotonic-time`?"
           )
         }
+        nudgeGlobalSynchronizerTime(timeToAdvanceTo)
       }
     }
+  }
+
+  private def nudgeGlobalSynchronizerTime(
+      advancedTo: CantonTimestamp
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    val target = advancedTo.minusSeconds(1)
+    sv1Backend.participantClientWithAdminToken.testing.await_synchronizer_time(
+      decentralizedSynchronizerId,
+      target,
+      timeout = NonNegativeDuration.ofSeconds(60),
+    )
+    logger.info(s"Global synchronizer time reached $target after advancing time")
   }
 
   /** This function advances time past the opening time of the next round and waits for the DSO round management automation for open, summarizing

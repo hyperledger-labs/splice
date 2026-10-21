@@ -28,6 +28,7 @@ import scala.jdk.CollectionConverters.*
 import UpdateHistory.UpdateHistoryResponse
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.config.NonNegativeDuration
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 abstract class UpdateHistoryTestBase
     extends StoreTestBase
@@ -242,20 +243,21 @@ abstract class UpdateHistoryTestBase
       analyzableTimeWindowDuration: NonNegativeDuration =
         NonNegativeDuration.tryFromDuration(scala.concurrent.duration.Duration.Inf),
   ): UpdateHistory = {
-    new UpdateHistory(
-      storage,
-      domainMigrationId,
-      storeName,
-      participantId,
-      updateStreamParty,
-      backfillingRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = true,
-      HistoryMetrics.apply(NoOpMetricsFactory, domainMigrationId),
-    )
+    UpdateHistory
+      .create(
+        storage,
+        domainMigrationId,
+        storeName,
+        StoreMemberId(participantId),
+        updateStreamParty,
+        backfillingRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration,
+        loggerFactory,
+        enableImportUpdateBackfill = true,
+        HistoryMetrics.apply(NoOpMetricsFactory, domainMigrationId),
+      )
+      .futureValue
   }
 
   override def cleanDb(

@@ -15,6 +15,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
   VaultAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
+import com.digitalasset.canton.admin.api.client.data.SequencingParametersAccess.*
 import com.digitalasset.canton.admin.api.client.data.topology
 import com.digitalasset.canton.admin.api.client.data.topology.{
   BaseResult,
@@ -576,6 +577,13 @@ abstract class TopologyAdminConnection(
       ),
       filterNamespace = Some(id.namespace),
     ).map(_.map(_.transaction))
+
+  def generateOnboardingTopologyTransactions(protocolVersion: ProtocolVersion)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[GenericSignedTopologyTransaction]] =
+    runCmd(
+      TopologyAdminCommands.Read.GenerateOnboardingTopologyTransactions(protocolVersion, None)
+    ).map(_.transactions)
 
   def listAllTransactions(
       store: TopologyStoreId,

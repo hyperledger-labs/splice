@@ -16,6 +16,8 @@ trait HistoryStartStore {
   def read(implicit tc: TraceContext): Future[Option[HistoryStart]]
 
   def recordOnce(start: HistoryStart)(implicit tc: TraceContext): Future[HistoryStart]
+
+  def reset()(implicit tc: TraceContext): Future[Unit]
 }
 
 class KvHistoryStartStore(kvProvider: ScanKeyValueProvider)(implicit ec: ExecutionContext)
@@ -32,6 +34,9 @@ class KvHistoryStartStore(kvProvider: ScanKeyValueProvider)(implicit ec: Executi
     } yield stored.getOrElse(
       throw new IllegalStateException(s"$kvStoreKey is missing right after it was recorded")
     )
+
+  override def reset()(implicit tc: TraceContext): Future[Unit] =
+    kvProvider.store.deleteKey(kvStoreKey)
 }
 
 object KvHistoryStartStore {
@@ -68,6 +73,13 @@ class ScanHistoryStart(
               Some(stored)
             }
         }
+    }
+
+  def forgetRecorded()(implicit tc: TraceContext): Future[Unit] =
+    store.reset().map { _ =>
+      logger.warn(
+        "Forgot the recorded history start of this Scan, it is determined again from the current data"
+      )
     }
 
   private def resolve(implicit tc: TraceContext): Future[Option[HistoryStart]] =

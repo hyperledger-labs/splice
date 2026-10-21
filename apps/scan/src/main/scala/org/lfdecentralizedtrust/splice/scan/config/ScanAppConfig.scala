@@ -39,6 +39,8 @@ final case class MediatorVerdictIngestionConfig(
 final case class BulkStorageBackfillingConfig(
     enabled: Boolean = false,
     pollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
+    noPeerWillHoldRetryInterval: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofMinutes(10),
     downloadParallelism: Int = 1,
     pageSize: Int = Limit.DefaultMaxPageSize,
 )
@@ -68,6 +70,13 @@ final case class BulkStorageConfig(
       *   this before starting to prune data.
       */
     debugForceStartFromGenesis: Boolean = false,
+    /** When enabled, the app forgets its recorded history start on startup, so it is determined again from the
+      * current data (founding SV, history backfilled from genesis, or the DSO party hosting time). The history start
+      * decides where bulk storage backfilling stops and which times this Scan answers as backfilling. If bulk
+      * storage progress was already built on a wrong history start, also set debugForceStartFromGenesis.
+      * As with that flag, restart once with it enabled and then disable it again.
+      */
+    debugReresolveHistoryStart: Boolean = false,
     /** A list of S3 object keys that this instance should not save to the committed bucket, and instead only
       * delete from staging. To be used only in extreme cases where we decide to accept a BFT disagreement,
       * and have the (minority of) disagreeing instances simply skip the broken objects.

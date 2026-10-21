@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
@@ -23,11 +24,10 @@ import org.apache.pekko.actor.ActorSystem
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
-import scala.math.Ordering.Implicits.*
 
 case class UpdatesSegment(
-    fromTimestamp: TimestampWithMigrationId,
-    toTimestamp: TimestampWithMigrationId,
+    fromTimestamp: CantonTimestamp,
+    toTimestamp: CantonTimestamp,
 )
 
 /** Pekko source for dumping all updates from a segment to S3 objects.
@@ -56,34 +56,44 @@ class UpdateHistorySegmentBulkStorage(
 
   private case class GetUpdatesResult(
       updates: Seq[TreeUpdateWithMigrationId],
-      lastTimestamp: TimestampWithMigrationId,
+      lastTimestamp: Option[TimestampWithMigrationId],
       doneWithSegment: Boolean,
   )
 
+  private def segmentStart(): Future[Option[TimestampWithMigrationId]] =
+    updateHistory
+      .getLowestMigrationForRecordTime(segment.fromTimestamp)
+      .map(_.map(TimestampWithMigrationId(segment.fromTimestamp, _)))
+
   private def getUpdates(
+      afterO: Option[TimestampWithMigrationId],
+      limit: PageLimit,
+  ): Future[GetUpdatesResult] =
+    afterO.fold(segmentStart())(after => Future.successful(Some(after))).flatMap {
+      case None =>
+        logger.debug(
+          s"No updates found after record time ${segment.fromTimestamp} yet, but we don't know if we're done with the segment"
+        )
+        Future.successful(GetUpdatesResult(Seq.empty, None, doneWithSegment = false))
+      case Some(after) => getUpdatesAfter(after, limit)
+    }
+
+  private def getUpdatesAfter(
       afterTs: TimestampWithMigrationId,
       limit: PageLimit,
   ): Future[GetUpdatesResult] = {
     for {
-      updates <- updateHistory.getUpdatesWithoutImportUpdates(
-        Some(TimestampWithMigrationId(afterTs.timestamp, afterTs.migrationId)),
-        limit,
-      )
+      updates <- updateHistory.getUpdatesWithoutImportUpdates(Some(afterTs), limit)
       _ = logger.debug(
         s"Fetched ${updates.length} updates from record time ${afterTs.timestamp} (limit was $limit)"
       )
-      updatesInSegment = updates.filter(update =>
-        TimestampWithMigrationId(
-          update.update.update.recordTime,
-          update.migrationId,
-        ) <= segment.toTimestamp
-      )
+      updatesInSegment = updates.filter(_.update.update.recordTime <= segment.toTimestamp)
       result <-
         if (updates.isEmpty) {
           logger.debug(
             s"No updates found after record time ${afterTs.timestamp} yet, but we don't know if we're done with the segment"
           )
-          Future.successful(GetUpdatesResult(Seq.empty, afterTs, doneWithSegment = false))
+          Future.successful(GetUpdatesResult(Seq.empty, Some(afterTs), doneWithSegment = false))
         } else {
           if (updatesInSegment.nonEmpty) {
             logger.debug(
@@ -96,7 +106,7 @@ class UpdateHistorySegmentBulkStorage(
             Future.successful(
               GetUpdatesResult(
                 updatesInSegment,
-                TimestampWithMigrationId(last.update.update.recordTime, last.migrationId),
+                Some(TimestampWithMigrationId(last.update.update.recordTime, last.migrationId)),
                 // If the query result contains updates outside the segment, then we know we're done with the segment
                 doneWithSegment = updates.length > updatesInSegment.length,
               )
@@ -106,7 +116,7 @@ class UpdateHistorySegmentBulkStorage(
             logger.debug(
               "No more updates inside the segment, done dumping updates from this segment"
             )
-            Future.successful(GetUpdatesResult(Seq.empty, afterTs, doneWithSegment = true))
+            Future.successful(GetUpdatesResult(Seq.empty, Some(afterTs), doneWithSegment = true))
           }
         }
     } yield {
@@ -141,12 +151,12 @@ class UpdateHistorySegmentBulkStorage(
   ): Source[Seq[TreeUpdateWithMigrationId], NotUsed] = {
 
     final case class State(
-        afterTs: TimestampWithMigrationId,
+        afterTs: Option[TimestampWithMigrationId],
         sleepBeforeNextFetch: Boolean,
         done: Boolean,
     )
 
-    Source.unfoldAsync(State(segment.fromTimestamp, sleepBeforeNextFetch = false, done = false)) {
+    Source.unfoldAsync(State(afterTs = Option.empty, sleepBeforeNextFetch = false, done = false)) {
       state =>
         if (state.done) {
           logger.debug(
@@ -200,7 +210,7 @@ class UpdateHistorySegmentBulkStorage(
                 appConfig,
                 s3Connection,
                 objIdx =>
-                  s"${storageConfig.getSegmentFolder(segment.fromTimestamp.timestamp, Some(segment.toTimestamp.timestamp))}/${encoding
+                  s"${storageConfig.getSegmentFolder(segment.fromTimestamp, Some(segment.toTimestamp))}/${encoding
                       .storageKey("updates", objIdx)}",
                 loggerFactory,
               )

@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.environment.{BuildInfo, SpliceLedgerConne
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer

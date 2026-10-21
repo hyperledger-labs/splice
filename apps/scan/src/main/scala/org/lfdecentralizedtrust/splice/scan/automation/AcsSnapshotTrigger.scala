@@ -19,6 +19,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerBase.RetrieveTaskForMigrationResult
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
+import org.lfdecentralizedtrust.splice.scan.store.historystart.HistoryReadiness
 import org.lfdecentralizedtrust.splice.store.HistoryMetrics.AcsSnapshotsMetrics
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -28,6 +29,7 @@ class AcsSnapshotTrigger(
     updateHistory: UpdateHistory,
     storageConfig: ScanStorageConfig,
     perAcsSnapshotTablesEnabled: Boolean,
+    historyReadiness: HistoryReadiness,
     override protected val context: TriggerContext,
 )(implicit
     ec: ExecutionContext,
@@ -56,7 +58,7 @@ class AcsSnapshotTrigger(
       AcsSnapshotTrigger
         .retrieveTaskForCurrentMigration(
           migrationId = store.currentMigrationId,
-          isHistoryBackfilled = updateHistory.isHistoryBackfilled,
+          mayStart = historyReadiness.acsSnapshotsMayStart(_),
           getLastIngestedRecordTime = getLastIngestedRecordTime,
           getIncrementalSnapshot = () => getIncrementalSnapshot(),
           getLatestSnapshot = getLatestSnapshot,
@@ -74,7 +76,7 @@ object AcsSnapshotTrigger {
 
   def retrieveTaskForCurrentMigration(
       migrationId: Long,
-      isHistoryBackfilled: (Long) => Future[Boolean],
+      mayStart: (Long) => Future[Boolean],
       getLastIngestedRecordTime: (Long) => Option[CantonTimestamp],
       getIncrementalSnapshot: () => Future[Option[IncrementalAcsSnapshot]],
       getLatestSnapshot: (Long) => Future[Option[AcsSnapshot]],
@@ -89,7 +91,7 @@ object AcsSnapshotTrigger {
     AcsSnapshotTriggerBase
       .retrieveTaskForMigration(
         migrationId = migrationId,
-        isHistoryBackfilled = isHistoryBackfilled,
+        mayStart = mayStart,
         getIncrementalSnapshot = getIncrementalSnapshot,
         getLatestSnapshot = getLatestSnapshot,
         getMinRecordTime = getMinRecordTime,
