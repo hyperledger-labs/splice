@@ -55,7 +55,7 @@
         "day": 2,
         "hour": 8
       },
-      "tier": "cantonBft-ps10-override-tier-sv-da-1",
+      "tier": "cantonbft-ps10-override-tier-sv-da-1",
       "userLabels": {
         "cluster": "mock",
         "migration_id": "10"

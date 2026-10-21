@@ -221,7 +221,6 @@ const SingleSvConfigSchema = z
           sequencer,
           physicalSynchronizerOverrides[migration.id]?.sequencer || {}
         ) as SvSequencerConfig;
-        const cantonbftOverride = physicalSynchronizerOverrides[migration.id]?.cantonBft;
         return [
           migration.id,
           {
