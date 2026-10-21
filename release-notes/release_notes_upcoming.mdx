@@ -37,11 +37,10 @@
        `/v0/scan-proxy/dso` is deprecated: it fails when the validator is connected to more than one Scan
        instance, as the `sv_user` and `sv_party_id` fields differ between Scan instances.
 
-     - Fix a bug where automation for external parties was not started
-       when they had keys embedded in a `PartyToParticipant` mapping
-       but no dedicated `PartyToKeyMapping`.  The prior behavior can
+     - The validator now starts automation external parties with keys embedded in a
+       `PartyToParticipant` mapping by default. The prior behavior can
        be restored with the
-       `canton.validator-apps.validator_backend.supports-embedded-party-siging = false` but it is recommended to instead make sure that the
+       `canton.validator-apps.validator_backend.support-embedded-party-signing-keys = false` but it is recommended to instead make sure that the
        `ValidatorRight` contracts are [configured such that they won't start automation](https://docs.canton.network/global-synchronizer/production-operations/scalability#bypassing-the-limit).
 
 ## Upcoming for next minor release (template):
