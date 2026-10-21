@@ -139,3 +139,40 @@ tests:
       - equal:
           path: spec.template.spec.containers[?(@.name=='wallet-web-ui')].securityContext.allowPrivilegeEscalation
           value: true
+
+  - it: "sets default resources"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=="wallet-web-ui")].resources
+          value:
+            requests:
+              cpu: 0.1
+              memory: 240Mi
+            limits:
+              memory: 1536Mi
+
+  - it: "allows overriding resources via validatorWebUi.resources"
+    set:
+      validatorWebUi.resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: 1
+          memory: 2Gi
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=="wallet-web-ui")].resources
+          value:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 1
+              memory: 2Gi

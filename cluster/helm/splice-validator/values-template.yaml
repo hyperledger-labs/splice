@@ -91,6 +91,12 @@ extraInitContainers: []
 ansWebUi:
   enabled: true
   imageName: "ans-web-ui"
+  resources:
+    requests:
+      cpu: 0.1
+      memory: 240Mi
+    limits:
+      memory: 1536Mi
   # Optional: override the K8s secret name this component reads OIDC credentials from.
   # Default: "splice-app-cns-ui-auth".
   secretName: ""
@@ -103,6 +109,12 @@ ansWebUi:
 # set if validator-web-ui should be deployed
 validatorWebUi:
   enabled: true
+  resources:
+    requests:
+      cpu: 0.1
+      memory: 240Mi
+    limits:
+      memory: 1536Mi
   # Optional: override the K8s secret name this component reads OIDC credentials from.
   # Default: "splice-app-wallet-ui-auth".
   secretName: ""

@@ -45,6 +45,33 @@
               "type": "string"
             }
           }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": ["number", "string"]
+                },
+                "memory": {
+                  "type": ["number", "string"]
+                }
+              }
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": ["number", "string"]
+                },
+                "memory": {
+                  "type": ["number", "string"]
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -163,6 +190,33 @@
             },
             "url": {
               "type": "string"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": ["number", "string"]
+                },
+                "memory": {
+                  "type": ["number", "string"]
+                }
+              }
+            },
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": ["number", "string"]
+                },
+                "memory": {
+                  "type": ["number", "string"]
+                }
+              }
             }
           }
         }
