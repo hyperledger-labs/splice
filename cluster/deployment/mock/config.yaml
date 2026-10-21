@@ -242,7 +242,7 @@ svs:
         fromEnv: SV1
     cantonBft:
       cloudSql:
-        tier: "cantonbft-override-tier-sv-1"
+        tier: "cantonbft-tier-sv-1"
     physicalSynchronizerOverrides:
       9:
         sequencer:

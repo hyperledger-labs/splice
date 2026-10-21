@@ -55,7 +55,7 @@
         "day": 2,
         "hour": 8
       },
-      "tier": "sequencer-override-tier",
+      "tier": "cantonbft-tier-sv-1",
       "userLabels": {
         "cluster": "mock",
         "migration_id": "8"
