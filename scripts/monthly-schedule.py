@@ -21,6 +21,7 @@ NETWORK_COLUMN_NAME = "Network"
 ACTIVITY_COLUMN_NAME = "Type of Activity"
 VERSION_COLUMN_NAME = "Minor Versions"
 DEPENDENCY_COLUMN_NAME = "Dependent On"
+DEV_COLUMN_NAME = "Dev"
 
 INITIAL_STATUS = "To Be Confirmed"
 
@@ -32,6 +33,7 @@ ACTIVITY_WEEKLY = "Weekly Upgrades"
 ACTIVITY_DAML = "Splice Daml Model Effectivity"
 ACTIVITY_LSU = "Protocol Upgrades (LSU)"
 ACTIVITY_CONFIG = "Configuration Change"
+ACTIVITY_RELEASE = "Release Cadence"
 
 _BOARD_CACHE: dict[int, dict] = {}
 _ITEMS_CACHE: dict[int, dict[str, list[str]]] = {}
@@ -46,6 +48,7 @@ class ScheduledEvent:
     minor_version: str
     time_utc: Optional[str] = None
     depends_on: Optional[str] = None
+    dev: bool = False
 
 
 def parse_args() -> argparse.Namespace:
@@ -110,9 +113,6 @@ def schedule_date(month: str, weekday: str, week_number: int) -> datetime.date:
     if key not in weekdays:
         raise ValueError(f"Unknown weekday: {weekday}")
 
-    if week_number < 0:
-        raise ValueError("week_number must be >= 0")
-
     return first_monday_in_month(month) + datetime.timedelta(weeks=week_number, days=weekdays[key])
 
 
@@ -168,6 +168,24 @@ def monday_request(token: str, query: str, variables: dict) -> dict:
         )
 
     return parsed
+
+
+def trigger_website_update() -> None:
+    request = urllib.request.Request(required_env("MONDAY_REFRESH_STAGING_CALENDAR"), method="GET")
+
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            response.read()
+
+    except urllib.error.HTTPError as exc:
+        response_body = exc.read().decode("utf-8", errors="replace")
+
+        raise RuntimeError(
+            f"Website update trigger failed ({exc.code}): {response_body}"
+        ) from exc
+
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Could not reach website update endpoint: {exc}") from exc
 
 
 def get_board(token: str, board_id: int) -> dict:
@@ -331,6 +349,8 @@ def preflight(token: str, board_id: int, group_name: str) -> tuple[dict, str]:
 
     dependency_col = get_column(board, DEPENDENCY_COLUMN_NAME)
 
+    dev_col = get_column(board, DEV_COLUMN_NAME)
+
     ensure_column_type(date_col, {"date"})
 
     ensure_column_type(status_col, {"status", "color"})
@@ -343,6 +363,8 @@ def preflight(token: str, board_id: int, group_name: str) -> tuple[dict, str]:
 
     ensure_column_type(dependency_col, {"dependency"})
 
+    ensure_column_type(dev_col, {"checkbox"})
+
     require_label(status_col, INITIAL_STATUS)
 
     for label in (NETWORK_DEVNET, NETWORK_TESTNET, NETWORK_MAINNET):
@@ -354,7 +376,7 @@ def preflight(token: str, board_id: int, group_name: str) -> tuple[dict, str]:
     return (board, get_group_id(board, group_name))
 
 
-def choice_value(column: dict, label: str):
+def choice_value(column: dict, label: str | bool):
     column_type = str(column.get("type", "")).lower()
 
     if column_type in {"status", "color"}:
@@ -365,6 +387,9 @@ def choice_value(column: dict, label: str):
 
     if column_type in {"text", "long_text"}:
         return label
+
+    if column_type == "checkbox":
+        return {"checked": "true"} if label else None
 
     raise RuntimeError(f"Unsupported choice column type {column_type!r} for {column['title']!r}")
 
@@ -392,11 +417,14 @@ def build_column_values(
 
     version_col = get_column(board, VERSION_COLUMN_NAME)
 
+    dev_col = get_column(board, DEV_COLUMN_NAME)
+
     values = {
         str(date_col["id"]): date_value(event.date, event.time_utc),
         str(network_col["id"]): choice_value(network_col, event.network),
         str(activity_col["id"]): choice_value(activity_col, event.activity),
         str(version_col["id"]): choice_value(version_col, event.minor_version),
+        str(dev_col["id"]): choice_value(dev_col, event.dev),
     }
 
     if include_submission_status:
@@ -545,7 +573,7 @@ def describe_event(event: ScheduledEvent) -> str:
     if event.time_utc:
         when += f" {event.time_utc} UTC"
 
-    return f"{when} | {event.network} | {event.activity} | {event.minor_version}"
+    return f"{when} | {event.network} | {event.activity} | {event.minor_version}" + (" (Dev)" if event.dev else "")
 
 
 def upsert_event(
@@ -732,6 +760,63 @@ def make_schedule(version: str, month: str) -> list[ScheduledEvent]:
             ]
         )
 
+    # Dev events
+    for patch in range(patch_count):
+        events.append(
+            ScheduledEvent(
+                title=(f"Cut Splice {version}.{patch}"),
+                date=schedule_date(month, "thursday", patch-1),
+                network="",
+                activity=(ACTIVITY_RELEASE),
+                minor_version=(version),
+                dev=True,
+            )
+        )
+
+    events.append(
+        ScheduledEvent(
+            title=(f"Cut Canton & WG releases for Splice {version}.0"),
+            date=schedule_date(month, "tuesday", -1),
+            network="",
+            activity=(ACTIVITY_RELEASE),
+            minor_version=(version),
+            dev=True,
+        )
+    )
+
+    events.append(
+        ScheduledEvent(
+            title=(f"Canton version for Splice {version}.0 deployed to CILR"),
+            date=schedule_date(month, "monday", -2),
+            network="",
+            activity=(ACTIVITY_RELEASE),
+            minor_version=(version),
+            dev=True,
+        )
+    )
+
+    events.append(
+        ScheduledEvent(
+            title=(f"Splice Upgrades to new Canton minor release Line (if applicable)"),
+            date=schedule_date(month, "wednesday", -3),
+            network="",
+            activity=(ACTIVITY_RELEASE),
+            minor_version=(version),
+            dev=True,
+        )
+    )
+
+    events.append(
+        ScheduledEvent(
+            title=(f"Cut Canton & WG release line for Splice {version}.0 (if applicable)"),
+            date=schedule_date(month, "monday", -3),
+            network="",
+            activity=(ACTIVITY_RELEASE),
+            minor_version=(version),
+            dev=True,
+        )
+    )
+
     return events
 
 
@@ -814,6 +899,12 @@ def main() -> None:
         print(f"LINKED: {event.title} depends on {event.depends_on}")
 
     print()
+
+    if args.dry_run:
+        print("SKIPPED: Website update trigger (dry run)")
+    else:
+        trigger_website_update()
+        print("TRIGGERED: Website update")
 
     print("Done.")
 

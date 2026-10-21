@@ -39,6 +39,7 @@ jobs:
         env:
           MONDAY_API_TOKEN: ${{ secrets.MONDAY_API_TOKEN }}
           MONDAY_BOARD_ID: ${{ secrets.MONDAY_BOARD_ID }}
+          MONDAY_REFRESH_STAGING_CALENDAR: ${{ secrets.MONDAY_REFRESH_STAGING_CALENDAR }}
         shell: bash
         run: |
           ARGS=(
