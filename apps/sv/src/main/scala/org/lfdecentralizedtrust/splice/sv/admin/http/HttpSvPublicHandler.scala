@@ -46,8 +46,11 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.onboarding.sponsor.DsoPartyMigration
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{Secrets, SvOnboardingToken}
-import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
-import org.lfdecentralizedtrust.splice.util.{Codec, Contract}
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil.{
+  DefaultDevNetPublicSetupTrafficAmount,
+  generateRandomOnboardingSecret,
+}
+import org.lfdecentralizedtrust.splice.util.{Codec, Contract, SwitchOverTimes}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -96,68 +99,80 @@ class HttpSvPublicHandler(
     withSpan(s"$workflowId.onboardValidator") { _ => _ =>
       Codec.decode(Codec.Party)(body.partyId) match {
         case Right(partyId) =>
-          val providedSecret = Secrets.decodeValidatorOnboardingSecret(body.secret, svParty)
-          if (providedSecret.sponsoringSv == svParty) {
-            svStore.lookupValidatorOnboardingBySecret(providedSecret.secret).flatMap {
-              case None =>
-                svStore.lookupUsedSecret(providedSecret.secret).flatMap {
-                  case Some(used) if used.payload.validator == body.partyId =>
-                    // This validator is already onboarded with the same secret - nothing to do
-                    Future.successful(r0.OnboardValidatorResponseOK)
-                  case Some(_) =>
-                    Future.failed(
-                      HttpErrorHandler
-                        .unauthorized("Secret has already been used for a different validator.")
-                    )
-                  case None => Future.failed(HttpErrorHandler.unauthorized("Unknown secret."))
-                }
-
-              case Some(vo) =>
-                val storedSecret =
-                  Secrets.decodeValidatorOnboardingSecret(vo.payload.candidateSecret, svParty)
-
-                if (storedSecret.partyHint.exists(_ != partyId.uid.identifier.str)) {
-                  Future.failed(
-                    HttpErrorHandler.badRequest(
-                      s"The onboarding secret entered does not match the secret issued for validatorPartyHint: ${storedSecret.partyHint
-                          .getOrElse("<missing>")}"
-                    )
-                  )
-                } else {
-                  // Check whether a validator license already exists for this party,
-                  // because when recovering from an ACS snapshot "used secret" information will get lost.
-                  dsoStore
-                    .lookupValidatorLicenseWithOffset(PartyId.tryFromProtoPrimitive(body.partyId))
-                    .flatMap {
-                      case QueryResult(_, Some(_)) =>
-                        // This validator is already onboarded - nothing to do
+          dsoStore.getDsoRules().flatMap { dsoRules =>
+            if (SwitchOverTimes.permissionedSynchronizerEnabled(clock, dsoRules.payload)) {
+              Future.failed(
+                HttpErrorHandler.badRequest(
+                  s"Endpoint is disabled: the network has migrated to traffic-based onboarding."
+                )
+              )
+            } else {
+              val providedSecret = Secrets.decodeValidatorOnboardingSecret(body.secret, svParty)
+              if (providedSecret.sponsoringSv == svParty) {
+                svStore.lookupValidatorOnboardingBySecret(providedSecret.secret).flatMap {
+                  case None =>
+                    svStore.lookupUsedSecret(providedSecret.secret).flatMap {
+                      case Some(used) if used.payload.validator == body.partyId =>
+                        // This validator is already onboarded with the same secret - nothing to do
                         Future.successful(r0.OnboardValidatorResponseOK)
-                      case QueryResult(_, None) =>
-                        for {
-                          // We retry here because this mutates the AmuletRules and rounds contracts,
-                          // which can lead to races.
-                          _ <- retryProvider.retryForClientCalls(
-                            "onboard_validator",
-                            "onboard validator via DsoRules",
-                            onboardValidator(
-                              partyId,
-                              Secrets.encodeValidatorOnboardingSecret(storedSecret),
-                              vo,
-                              body.version,
-                              body.contactPoint,
-                            ),
-                            logger,
-                          )
-                        } yield r0.OnboardValidatorResponseOK
+                      case Some(_) =>
+                        Future.failed(
+                          HttpErrorHandler
+                            .unauthorized("Secret has already been used for a different validator.")
+                        )
+                      case None => Future.failed(HttpErrorHandler.unauthorized("Unknown secret."))
+                    }
+
+                  case Some(vo) =>
+                    val storedSecret =
+                      Secrets.decodeValidatorOnboardingSecret(vo.payload.candidateSecret, svParty)
+
+                    if (storedSecret.partyHint.exists(_ != partyId.uid.identifier.str)) {
+                      Future.failed(
+                        HttpErrorHandler.badRequest(
+                          s"The onboarding secret entered does not match the secret issued for validatorPartyHint: ${storedSecret.partyHint
+                              .getOrElse("<missing>")}"
+                        )
+                      )
+                    } else {
+                      // Check whether a validator license already exists for this party,
+                      // because when recovering from an ACS snapshot "used secret" information will get lost.
+                      dsoStore
+                        .lookupValidatorLicenseWithOffset(
+                          PartyId.tryFromProtoPrimitive(body.partyId)
+                        )
+                        .flatMap {
+                          case QueryResult(_, Some(_)) =>
+                            // This validator is already onboarded - nothing to do
+                            Future.successful(r0.OnboardValidatorResponseOK)
+                          case QueryResult(_, None) =>
+                            for {
+                              // We retry here because this mutates the AmuletRules and rounds contracts,
+                              // which can lead to races.
+                              _ <- retryProvider.retryForClientCalls(
+                                "onboard_validator",
+                                "onboard validator via DsoRules",
+                                onboardValidator(
+                                  partyId,
+                                  Secrets.encodeValidatorOnboardingSecret(storedSecret),
+                                  vo,
+                                  body.version,
+                                  body.contactPoint,
+                                ),
+                                logger,
+                              )
+                            } yield r0.OnboardValidatorResponseOK
+                        }
                     }
                 }
+              } else {
+                Future.failed(
+                  HttpErrorHandler.badRequest(
+                    s"Secret is for SV ${providedSecret.sponsoringSv} but this SV is $svParty, validate your SV sponsor URL"
+                  )
+                )
+              }
             }
-          } else {
-            Future.failed(
-              HttpErrorHandler.badRequest(
-                s"Secret is for SV ${providedSecret.sponsoringSv} but this SV is $svParty, validate your SV sponsor URL"
-              )
-            )
           }
         case Left(error) =>
           Future.failed(HttpErrorHandler.badRequest(error))
@@ -198,7 +213,10 @@ class HttpSvPublicHandler(
                     s"Party ${token.candidateParty} does not have the same namespace than its participant ${token.candidateParticipantId}."
                   )
                 )
-              } else if (!isCandidatePartyHostedOnParticipant)
+              } else if (
+                !isCandidatePartyHostedOnParticipant && !SwitchOverTimes
+                  .permissionedSynchronizerScheduled(dsoRules.payload)
+              )
                 // Conflict instead of not authorized because this can happen if our participant just has not yet caught up
                 // and the client can just retry on that.
                 Future.failed(
@@ -308,6 +326,52 @@ class HttpSvPublicHandler(
                 definitions.SvOnboardingStateUnknown(state = "unknown")
               )
           }
+      }
+    }
+  }
+
+  /** Intended use: Used by validator candidates to buy member traffic using SV's DevNet faucet
+    *
+    * Protection: Rate limiting, endpoint only used for DevNet
+    */
+  override def internalBuyMemberTraffic(
+      respond: r0.InternalBuyMemberTrafficResponse.type
+  )(
+      body: definitions.InternalBuyMemberTrafficRequest
+  )(extracted: TraceContext): Future[r0.InternalBuyMemberTrafficResponse] = {
+    implicit val traceContext: TraceContext = extracted
+    withSpan(s"$workflowId.internalBuyMemberTraffic") { _ => _ =>
+      if (!config.enableInternalAutoOnboardingThroughSvTrafficFaucet || !isDevNet) {
+        Future.failed(
+          HttpErrorHandler.notImplemented(
+            "Traffic purchasing internal endpoint on the SV is disabled, purchase traffic for your node yourself"
+          )
+        )
+      } else {
+        for {
+          dsoRules <- dsoStore.getDsoRules()
+
+          res <-
+            if (!SwitchOverTimes.permissionedSynchronizerScheduled(dsoRules.payload)) {
+              Future.failed(
+                HttpErrorHandler.notImplemented(
+                  "Traffic purchasing self-service is only available when permissioned synchronizer is enabled."
+                )
+              )
+            } else {
+              ParticipantId.fromProtoPrimitive(
+                body.participantId,
+                "participant_id",
+              ) match {
+                case Right(id) =>
+                  internalTapAndBuyMemberTraffic(id).map(_ =>
+                    r0.InternalBuyMemberTrafficResponseOK("Success")
+                  )
+                case Left(err) =>
+                  Future.failed(HttpErrorHandler.badRequest(s"Invalid participant ID: $err"))
+              }
+            }
+        } yield res
       }
     }
   }
@@ -736,6 +800,7 @@ class HttpSvPublicHandler(
       confirmations <- OptionT.liftF(
         dsoStore.listSvOnboardingConfirmations(svOnboardingRequest, weight)
       )
+
       confirmedBy = confirmations
         .map(c =>
           dsoRules.payload.svs.asScala.get(c.payload.confirmer) match {
@@ -814,6 +879,65 @@ class HttpSvPublicHandler(
         .noDedup // No command-dedup required, as the ValidatorOnboarding contract is archived
         .yieldUnit()
     } yield ()
+
+  private def internalTapAndBuyMemberTraffic(
+      participantId: ParticipantId
+  )(implicit tc: TraceContext): Future[Unit] = {
+    for {
+      dsoRules <- dsoStore.getDsoRules()
+
+      svWalletInstall <- retryProvider.retryForClientCalls(
+        "wait_for_wallet_install",
+        "Wait for SV WalletAppInstall contract to be ingested",
+        for {
+          svWalletInstallOpt <- svStoreWithIngestion.store.lookupWalletAppInstallByEndUser(svParty)
+          install <- svWalletInstallOpt match {
+            case Some(install) => Future.successful(install)
+            case None =>
+              Future.failed(
+                HttpErrorHandler.internalServerError(
+                  "SV WalletAppInstall contract not found."
+                )
+              )
+          }
+        } yield install,
+        logger,
+      )
+
+      synchronizerConfig = Option(
+        dsoRules.payload.config.decentralizedSynchronizer.synchronizers
+          .get(dsoRules.payload.config.decentralizedSynchronizer.activeSynchronizerId)
+      )
+
+      devNetPublicSetupTrafficAmount = synchronizerConfig
+        .flatMap(_.devNetPublicSetupTrafficAmount.toScala)
+        .map(_.longValue())
+        .getOrElse(DefaultDevNetPublicSetupTrafficAmount)
+
+      cmd = svWalletInstall.contractId.exerciseWalletAppInstall_CreateBuyTrafficRequest(
+        participantId.toProtoPrimitive,
+        dsoRules.payload.config.decentralizedSynchronizer.activeSynchronizerId,
+        dsoStore.domainMigrationId.toInt,
+        devNetPublicSetupTrafficAmount,
+        clock.now.plus(java.time.Duration.ofMinutes(5)).toInstant,
+        s"devnet-onboard-${participantId.toProtoPrimitive}-${clock.now.toInstant.toEpochMilli}",
+      )
+
+      _ = logger.info(s"Creating BuyTrafficRequest for $participantId")
+
+      _ <- dsoStoreWithIngestion
+        .connection(SpliceLedgerConnectionPriority.Medium)
+        .submit(
+          actAs = Seq(svParty),
+          readAs = Seq(dsoParty),
+          update = cmd,
+        )
+        .withSynchronizerId(dsoRules.domain)
+        .noDedup
+        .yieldUnit()
+
+    } yield ()
+  }
 
   private def startSvOnboarding(
       candidateName: String,

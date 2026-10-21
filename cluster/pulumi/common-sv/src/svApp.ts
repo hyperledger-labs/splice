@@ -55,7 +55,6 @@ export function valuesForSvApp(
   additionalEnvVars: EnvVarConfig[];
   cometBFT?: object;
   pvc: object;
-  permissionedSynchronizer?: boolean;
 } {
   const bftSequencerConnectionEnvVars =
     !config.participant || config.participant.bftSequencerConnection
@@ -112,6 +111,20 @@ export function valuesForSvApp(
     .concat(cantonBftPruningConfig)
     .concat(additionalPackagesToUnvetConfig)
     .concat([envoyClientIpHeaderEnvVar('canton.sv-apps.sv')]);
+
+  if (config.svApp?.trafficBasedOnboarding) {
+    additionalEnvVars.push({
+      name: 'ADDITIONAL_CONFIG_TRAFFIC_BASED_ONBOARDING',
+      value: `canton.sv-apps.sv.onboarding.initial-sv-operations-switch-over-times {\n  "no-featured-app-choice-context" = "0001-01-01T00:00:00Z"\n  "permissioned-synchronizer" = "0001-01-01T00:00:00Z"\n}`,
+    });
+  }
+
+  if (config.svApp?.enableInternalTrafficFaucet) {
+    additionalEnvVars.push({
+      name: 'ADDITIONAL_CONFIG_ENABLE_INTERNAL_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
+      value: `canton.sv-apps.sv.enable-internal-auto-onboarding-through-sv-traffic-faucet = true`,
+    });
+  }
 
   const synchronizerValues: { synchronizers: object } = {
     synchronizers: {
@@ -177,7 +190,6 @@ export function valuesForSvApp(
       volumeStorageClass: standardStorageClassName,
       volumeName: `sv-app-global-domain-migration-${pvcSuffix}`,
     },
-    permissionedSynchronizer: config.svApp?.permissionedSynchronizer,
     additionalEnvVars,
   };
 }

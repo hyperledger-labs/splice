@@ -117,7 +117,6 @@
       "nodeIdentifier": "DA-Helm-Test-Node",
       "onboardingName": "DA-Helm-Test-Node",
       "participantAddress": "participant",
-      "permissionedSynchronizer": false,
       "persistence": {
         "postgresName": "apps-pg",
         "secretName": "apps-pg-secret"

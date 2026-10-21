@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
@@ -101,6 +101,33 @@ class DbSvSvStore(
     } yield QueryResult(
       resultWithOffset.offset,
       resultWithOffset.row.map(contractFromRow(ValidatorOnboarding.COMPANION)(_)),
+    )).getOrRaise(offsetExpectedError())
+  }
+
+  import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.WalletAppInstall
+
+  override def lookupWalletAppInstallByEndUserWithOffset(
+      endUserParty: PartyId
+  )(implicit tc: TraceContext): Future[MultiDomainAcsStore.QueryResult[
+    Option[Contract[WalletAppInstall.ContractId, WalletAppInstall]]
+  ]] = waitUntilAcsIngested {
+    (for {
+      resultWithOffset <- storage
+        .querySingle(
+          selectFromAcsTableWithOffset(
+            DbSvSvStore.tableName,
+            acsStoreId,
+            domainMigrationId,
+            WalletAppInstall.COMPANION,
+            where = sql"""
+              create_arguments->>'endUserParty' = ${lengthLimited(endUserParty.toProtoPrimitive)}
+            """,
+          ).headOption,
+          "lookupWalletAppInstallByEndUserWithOffset",
+        )
+    } yield QueryResult(
+      resultWithOffset.offset,
+      resultWithOffset.row.map(contractFromRow(WalletAppInstall.COMPANION)(_)),
     )).getOrRaise(offsetExpectedError())
   }
 

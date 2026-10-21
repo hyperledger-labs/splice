@@ -37,6 +37,7 @@ export function buildDsoRulesConfigFromChanges(dsoConfigChanges: ConfigChange[])
 
   for (let i = 1; i <= synchronizerCount; i++) {
     const key = getValue(`decentralizedSynchronizer${i}`, false);
+    const isActive = key === getValue('decentralizedSynchronizerActiveSynchronizerId', false);
     const value = {
       state: getValue(`decentralizedSynchronizerState${i}`, false) as SynchronizerState,
       cometBftGenesisJson: getValue(`decentralizedSynchronizerCometBftGenesisJson${i}`, false),
@@ -44,6 +45,12 @@ export function buildDsoRulesConfigFromChanges(dsoConfigChanges: ConfigChange[])
         `decentralizedSynchronizerAcsCommitmentReconciliationInterval${i}`,
         true
       ),
+      minMemberTrafficToOnboardValidator: isActive
+        ? getValue('minMemberTrafficToOnboardValidator', true)
+        : null,
+      devNetPublicSetupTrafficAmount: isActive
+        ? getValue('devNetPublicSetupTrafficAmount', true)
+        : null,
     };
     synchronizers = synchronizers.set(key, value);
   }

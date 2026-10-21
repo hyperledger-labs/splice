@@ -11,6 +11,8 @@ import { SetAmuletConfigRulesForm } from '../components/forms/SetAmuletConfigRul
 import { SetDsoConfigRulesForm } from '../components/forms/SetDsoConfigRulesForm';
 import { UpdateFeaturedAppForm } from '../components/forms/UpdateFeaturedAppForm';
 import { UpdateSvRewardWeightForm } from '../components/forms/UpdateSvRewardWeightForm';
+import { UnpermissionValidatorForm } from '../components/forms/UnpermissionValidatorForm';
+import { RepermissionValidatorForm } from '../components/forms/RepermissionValidatorForm';
 import { InitiateProposalLayout } from '../components/governance/InitiateProposalLayout';
 import { useDsoInfos } from '../contexts/SvContext';
 import { createProposalActions } from '../utils/governance';
@@ -38,6 +40,10 @@ const ProposalForm: React.FC<{ action: SupportedActionTag }> = ({ action }) => {
       return <SetAmuletConfigRulesForm />;
     case 'SRARC_UpdateFeaturedAppRight':
       return <UpdateFeaturedAppForm />;
+    case 'SRARC_UnpermissionValidator':
+      return <UnpermissionValidatorForm />;
+    case 'SRARC_RepermissionValidator':
+      return <RepermissionValidatorForm />;
   }
 };
 

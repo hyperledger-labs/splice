@@ -60,6 +60,9 @@ object SvUtil {
   // Assumption: the sv1 node is run by the foundation
   val DefaultSV1Weight: Long = 10_000L
 
+  val DefaultMinMemberTrafficToOnboardValidator: Long = 100000L
+  val DefaultDevNetPublicSetupTrafficAmount: Long = 10000000L
+
   // We set the reconciliation interval for ACS commitments to 30 mins by default to ensure that
   // frequent ACS commitments do not eat up the base rate traffic and prevent validators from topping up
   // (See #12107).
@@ -144,6 +147,8 @@ object SvUtil {
           "TODO(DACH-NY/canton-network-node#4900): share CometBFT genesis.json of sv1 via DsoRules config.",
           // TODO(M3-47): also share the Canton SynchronizerId of the decentralized domain here
           Optional.of(acsCommitmentReconciliationInterval.duration.toSeconds),
+          Optional.empty(),
+          Optional.empty(),
         )
       ).asJava,
       synchronizerId.toProtoPrimitive, // lastSynchronizerId

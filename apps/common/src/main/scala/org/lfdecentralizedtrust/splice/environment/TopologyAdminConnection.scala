@@ -174,6 +174,93 @@ abstract class TopologyAdminConnection(
     ).map(_.map(result => TopologyResult(result.context, result.item)))
   }
 
+  def listParticipantSynchronizerPermission(
+      synchronizerId: SynchronizerId,
+      filterUid: String,
+      topologyTransactionType: TopologyTransactionType = AuthorizedState,
+      timeQuery: TimeQuery = TimeQuery.HeadState,
+      operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Seq[TopologyResult[ParticipantSynchronizerPermission]]] = {
+    runCommand(
+      TopologyStoreId.Synchronizer(synchronizerId),
+      topologyTransactionType,
+      timeQuery,
+      operation = operation,
+    )(baseQuery =>
+      TopologyAdminCommands.Read.ListParticipantSynchronizerPermission(
+        baseQuery,
+        filterUid,
+      )
+    )
+  }
+
+  def ensureParticipantSynchronizerPermission(
+      synchronizerId: SynchronizerId,
+      participantId: ParticipantId,
+      permission: ParticipantPermission,
+      retryFor: RetryFor,
+      limits: Option[ParticipantSynchronizerLimits] = None,
+      loginAfter: Option[CantonTimestamp] = None,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[TopologyResult[ParticipantSynchronizerPermission]] = {
+    val expectedMapping = ParticipantSynchronizerPermission(
+      synchronizerId = synchronizerId,
+      participantId = participantId,
+      permission = permission,
+      limits = limits,
+      loginAfter = loginAfter,
+    )
+    ensureTopologyMappingO(
+      TopologyStoreId.Synchronizer(synchronizerId),
+      s"ParticipantSynchronizerPermission with $permission for $participantId",
+      topologyType =>
+        EitherT
+          .liftF(
+            listParticipantSynchronizerPermission(
+              synchronizerId,
+              participantId.filterString,
+              topologyType,
+              operation = None,
+            )
+          )
+          .subflatMap { results =>
+            results.headOption match {
+              case Some(result) if result.mapping == expectedMapping =>
+                Right(result)
+              case other =>
+                Left(other)
+            }
+          },
+      update = { _ =>
+        Right(
+          expectedMapping
+        )
+      },
+      isProposal = true,
+      retryFor = retryFor,
+    )
+  }
+
+  def ensureParticipantSynchronizerPermissionRemoved(
+      synchronizerId: SynchronizerId,
+      participantId: ParticipantId,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
+    ensureTopologyMappingRemoved(
+      s"Remove ParticipantSynchronizerPermission for $participantId on $synchronizerId",
+      synchronizerId,
+      listParticipantSynchronizerPermission(
+        synchronizerId,
+        participantId.filterString,
+      ).map(_.headOption),
+      proposal = true,
+    )
+  }
+
   def listPartyToParticipant(
       store: Option[TopologyStoreId] = None,
       // list only active (non-removed) mappings by default; this matches the Canton console defaults
@@ -1630,8 +1717,8 @@ abstract class TopologyAdminConnection(
     runCmd(VaultAdminCommands.ImportKeyPair(ByteString.copyFrom(keyPair), name, password = None))
   }
 
-  def listSynchronizerTrustCertificate(synchronizerId: SynchronizerId, member: Member)(implicit
-      tc: TraceContext
+  def listSynchronizerTrustCertificate(synchronizerId: SynchronizerId, member: Option[Member])(
+      implicit tc: TraceContext
   ): Future[Seq[TopologyResult[SynchronizerTrustCertificate]]] =
     runCmd(
       TopologyAdminCommands.Read.ListSynchronizerTrustCertificate(
@@ -1643,12 +1730,12 @@ abstract class TopologyAdminConnection(
           filterSigningKey = "",
           protocolVersion = None,
         ),
-        member.filterString,
+        member.fold("")(_.filterString),
       )
     ).map(
       // TODO(#720) Canton currently compares member IDs by string prefix instead of strict equality of
       // member IDs in ListSynchronizerTrustCertificate, so we apply another filter for equality of the member ID
-      _.filter(r => r.item.participantId.member.filterString == member.filterString)
+      _.filter(r => member.forall(m => r.item.participantId.member.filterString == m.filterString))
         .map(r =>
           TopologyResult(
             r.context,
@@ -1664,7 +1751,7 @@ abstract class TopologyAdminConnection(
     ensureTopologyMappingRemoved(
       s"Remove domain trust certificate for $member on $synchronizerId",
       synchronizerId,
-      listSynchronizerTrustCertificate(synchronizerId, member).map {
+      listSynchronizerTrustCertificate(synchronizerId, Some(member)).map {
         case Seq() => None
         case Seq(cert) => Some(cert)
         case certs =>

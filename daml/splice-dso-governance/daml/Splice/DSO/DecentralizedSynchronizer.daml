@@ -39,6 +39,8 @@ data SynchronizerConfig = SynchronizerConfig with
     acsCommitmentReconciliationInterval : Optional Int
       -- ^ Participants connected to the decentralized synchronizer exchange ACS commitment messages
       -- every reconciliation interval seconds.
+    minMemberTrafficToOnboardValidator: Optional Int -- ^ Minimum amount of traffic a validator must purchase to be granted a ParticipantSynchronizerPermission.
+    devNetPublicSetupTrafficAmount: Optional Int -- ^ Traffic amount purchased for validators onboarded via the DevNet faucet.
   deriving (Eq, Show, Serializable)
 
 -- | The state of a synchronizer.
@@ -197,6 +199,8 @@ instance Patchable SynchronizerConfig where
     state = patch new.state base.state current.state
     cometBftGenesisJson = patch new.cometBftGenesisJson base.cometBftGenesisJson current.cometBftGenesisJson
     acsCommitmentReconciliationInterval = patch new.acsCommitmentReconciliationInterval base.acsCommitmentReconciliationInterval current.acsCommitmentReconciliationInterval
+    minMemberTrafficToOnboardValidator = patch new.minMemberTrafficToOnboardValidator base.minMemberTrafficToOnboardValidator current.minMemberTrafficToOnboardValidator
+    devNetPublicSetupTrafficAmount = patch new.devNetPublicSetupTrafficAmount base.devNetPublicSetupTrafficAmount current.devNetPublicSetupTrafficAmount
 
 instance Patchable SequencerIdentityConfig where
   patch new base current = SequencerIdentityConfig with

@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboarding
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
 
 import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
@@ -34,6 +35,27 @@ object HttpSvOperatorAppClient {
   import http.SvOperatorClient as Client
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result, Client] {
     val createGenClientFn = (fn, host, ec, mat) => Client.httpClient(fn, host)(ec, mat)
+  }
+
+  case class ListValidatorUnpermissions(participantId: String)
+      extends BaseCommand[
+        http.ListValidatorUnpermissionsResponse,
+        Seq[Contract[ValidatorUnpermission.ContractId, ValidatorUnpermission]],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListValidatorUnpermissionsResponse] =
+      client.listValidatorUnpermissions(participantId, headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListValidatorUnpermissionsResponse.OK(response) =>
+      response.unpermissions
+        .traverse(req => Contract.fromHttp(ValidatorUnpermission.COMPANION)(req))
+        .leftMap(_.toString)
+    }
   }
 
   case object GetDsoInfo extends BaseCommand[http.GetDsoInfoV1Response, DsoInfo] {

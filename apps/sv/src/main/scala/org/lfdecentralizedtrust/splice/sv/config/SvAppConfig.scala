@@ -407,7 +407,6 @@ case class SvAppBackendConfig(
     // validator user. Additionally, sv1 app is expected to create that user,
     // so it needs to know the expected user name.
     validatorLedgerApiUser: String,
-    permissionedSynchronizer: Boolean = false,
     auth: AuthConfig,
     participantClient: SvParticipantClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
@@ -529,6 +528,7 @@ case class SvAppBackendConfig(
     // from running concurrently against the same database.  Only disable for migration scenarios
     // where intentional overlap is required.
     instanceLockEnabled: Boolean = true,
+    enableInternalAutoOnboardingThroughSvTrafficFaucet: Boolean = false,
 ) extends SpliceBackendConfig {
 
   def allIgnoredAmuletVersions: Set[String] =

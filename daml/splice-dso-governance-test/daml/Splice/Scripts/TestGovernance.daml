@@ -616,11 +616,12 @@ testDsoRulesConfigChange = do
                                                     migrationId = 1)
         svOperationsSwitchOverTimes = Some (TextMap.fromList [("a", now), ("b", addRelTime now (days 1))])
 
-
   let initialSynchronizerConfig2 = SynchronizerConfig with
         state = DS_Operational
         cometBftGenesisJson = "<genesis-json2>"
         acsCommitmentReconciliationInterval = Some 1802
+        minMemberTrafficToOnboardValidator = Some (100000 + 1)
+        devNetPublicSetupTrafficAmount = Some (10000000 + 1)
   let initialDsoDecentralizedSynchronizerConfig2 =  DsoDecentralizedSynchronizerConfig with
         synchronizers = Map.fromList [("synchronizer-id2", initialSynchronizerConfig2)]
         lastSynchronizerId = "synchronizer-id2"

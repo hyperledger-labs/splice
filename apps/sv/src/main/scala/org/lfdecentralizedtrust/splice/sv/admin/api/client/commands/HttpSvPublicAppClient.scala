@@ -143,6 +143,28 @@ object HttpSvPublicAppClient {
     }
   }
 
+  case class InternalBuyMemberTraffic(participantId: String)
+      extends BaseCommandPublic[http.InternalBuyMemberTrafficResponse, Unit] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.InternalBuyMemberTrafficResponse] =
+      client.internalBuyMemberTraffic(
+        body = definitions.InternalBuyMemberTrafficRequest(participantId),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.InternalBuyMemberTrafficResponse.OK(_) =>
+      Right(())
+    }
+  }
+
   case class DevNetOnboardValidatorPrepare()
       extends BaseCommandPublic[http.DevNetOnboardValidatorPrepareResponse, String] {
 

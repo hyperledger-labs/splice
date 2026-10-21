@@ -38,6 +38,8 @@ export function getDsoRulesConfig(
             cometBftGenesisJson:
               'TODO(DACH-NY/canton-network-node#4900): share CometBFT genesis.json of sv1 via DsoRules config.',
             acsCommitmentReconciliationInterval: acsCommitmentReconciliationInterval,
+            minMemberTrafficToOnboardValidator: '100000',
+            devNetPublicSetupTrafficAmount: '10000000',
           },
         ],
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -207,7 +209,13 @@ export function getExpectedDsoRulesConfigDiffsHTML(
                       data-key="acsCommitmentReconciliationInterval"><div
                         class="jsondiffpatch-property-name">acsCommitmentReconciliationInterval</div><div
                         class="jsondiffpatch-value jsondiffpatch-left-value"><pre>"${originalAcsCommitmentReconciliationInterval}"</pre></div><div
-                        class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementAcsCommitmentReconciliationInterval}"</pre></div></li></ul></li></ul></li></ul></li><li
+                        class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementAcsCommitmentReconciliationInterval}"</pre></div></li><li
+                      class="jsondiffpatch-unchanged" data-key="minMemberTrafficToOnboardValidator"><div
+                        class="jsondiffpatch-property-name">minMemberTrafficToOnboardValidator</div><div
+                        class="jsondiffpatch-value"><pre>"100000"</pre></div></li><li
+                      class="jsondiffpatch-unchanged" data-key="devNetPublicSetupTrafficAmount"><div
+                        class="jsondiffpatch-property-name">devNetPublicSetupTrafficAmount</div><div
+                        class="jsondiffpatch-value"><pre>"10000000"</pre></div></li></ul></li></ul></li></ul></li><li
           class="jsondiffpatch-unchanged" data-key="lastSynchronizerId"><div
             class="jsondiffpatch-property-name">lastSynchronizerId</div><div
             class="jsondiffpatch-value"><pre>"global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37"</pre></div></li><li
@@ -311,7 +319,13 @@ export function getExpectedDsoRulesConfigDiffsHTML(
                       data-key="acsCommitmentReconciliationInterval"><div
                         class="jsondiffpatch-property-name">acsCommitmentReconciliationInterval</div><div
                         class="jsondiffpatch-value jsondiffpatch-left-value"><pre>"${originalAcsCommitmentReconciliationInterval}"</pre></div><div
-                        class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementAcsCommitmentReconciliationInterval}"</pre></div></li></ul></li></ul></li></ul></li><li
+                        class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementAcsCommitmentReconciliationInterval}"</pre></div></li><li
+                      class="jsondiffpatch-unchanged" data-key="minMemberTrafficToOnboardValidator"><div
+                        class="jsondiffpatch-property-name">minMemberTrafficToOnboardValidator</div><div
+                        class="jsondiffpatch-value"><pre>"100000"</pre></div></li><li
+                      class="jsondiffpatch-unchanged" data-key="devNetPublicSetupTrafficAmount"><div
+                        class="jsondiffpatch-property-name">devNetPublicSetupTrafficAmount</div><div
+                        class="jsondiffpatch-value"><pre>"10000000"</pre></div></li></ul></li></ul></li></ul></li><li
           class="jsondiffpatch-unchanged" data-key="lastSynchronizerId"><div
             class="jsondiffpatch-property-name">lastSynchronizerId</div><div
             class="jsondiffpatch-value"><pre>"global-domain::1220d57d4ce92ad14bb5647b453f2ba69c721e69810ca7d376d2c1455323a6763c37"</pre></div></li><li

@@ -140,8 +140,13 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
           // Compute new extra traffic limit
           totalPurchasedTraffic <- store
             .getTotalPurchasedMemberTraffic(StoreMemberId(memberId), synchronizerId)
+
+          safeLimit =
+            if (Long.MaxValue - totalPurchasedTraffic < trafficLimitOffset) Long.MaxValue
+            else trafficLimitOffset + totalPurchasedTraffic
+
           newExtraTrafficLimit = NonNegativeLong
-            .tryCreate(trafficLimitOffset + totalPurchasedTraffic)
+            .tryCreate(safeLimit)
 
           // Get current effective sequencer domain state
           sequencerSynchronizerState <- sequencerAdminConnection

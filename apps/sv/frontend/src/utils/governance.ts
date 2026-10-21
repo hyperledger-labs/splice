@@ -33,6 +33,8 @@ import type {
   UpdateFeatureAppProposal,
   UpdateSvRewardWeightProposal,
   YourVoteStatus,
+  UnpermissionValidatorProposal,
+  RepermissionValidatorProposal,
 } from '../utils/types';
 import { buildAmuletConfigChanges } from './buildAmuletConfigChanges';
 import { buildDsoConfigChanges } from './buildDsoConfigChanges';
@@ -54,6 +56,8 @@ export const actionTagToTitle = (amuletName: string): Record<SupportedActionTag,
   SRARC_SetConfig: 'Set Decentralized Synchronizer Operations (DSO) Rules Configuration',
   SRARC_UpdateSvRewardWeight: 'Update Super Validator Reward Weight',
   SRARC_UpdateFeaturedAppRight: 'Update Featured Application',
+  SRARC_UnpermissionValidator: 'Unpermission Validator',
+  SRARC_RepermissionValidator: 'Repermission Validator',
 });
 
 export const createProposalActions: {
@@ -74,6 +78,8 @@ export const createProposalActions: {
   },
   { name: 'Set Amulet Rules Configuration', value: 'CRARC_SetConfig' },
   { name: 'Update Super Validator Reward Weight', value: 'SRARC_UpdateSvRewardWeight' },
+  { name: 'Unpermission Validator', value: 'SRARC_UnpermissionValidator' },
+  { name: 'Repermission Validator', value: 'SRARC_RepermissionValidator' },
 ];
 
 export const getVoteResultStatus = (
@@ -185,6 +191,14 @@ export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: Dso
   if (action.tag === 'ARC_DsoRules') {
     const dsoAction = action.value.dsoAction;
     switch (dsoAction.tag) {
+      case 'SRARC_RepermissionValidator':
+        return createRepermissionValidatorProposal(dsoAction.value.validatorUnpermissionCid);
+      case 'SRARC_UnpermissionValidator':
+        return createUnpermissionValidatorProposal(
+          dsoAction.value.participantId,
+          dsoAction.value.revoked,
+          dsoAction.value.loginAfter
+        );
       case 'SRARC_OffboardSv':
         return createOffboardMemberProposal(dsoAction.value.sv);
       case 'SRARC_UpdateSvRewardWeight': {
@@ -229,6 +243,26 @@ export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: Dso
         );
     }
   }
+}
+
+function createRepermissionValidatorProposal(
+  unpermissionCid: string
+): RepermissionValidatorProposal {
+  return {
+    unpermissionCid,
+  };
+}
+
+function createUnpermissionValidatorProposal(
+  participantId: string,
+  revoked: boolean,
+  loginAfter: string | null
+): UnpermissionValidatorProposal {
+  return {
+    participantId,
+    revoked,
+    loginAfter: loginAfter ?? undefined,
+  };
 }
 
 function createOffboardMemberProposal(memberToOffboard: string): OffBoardMemberProposal {

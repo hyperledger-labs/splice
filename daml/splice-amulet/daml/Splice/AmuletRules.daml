@@ -356,7 +356,9 @@ template AmuletRules
                 memberId = acc.memberId
                 synchronizerId = acc.synchronizerId
                 migrationId = acc.migrationId
-                totalPurchased = acc.totalPurchased + traffic.totalPurchased
+                totalPurchased =
+                  if (maxBound : Int) - acc.totalPurchased < traffic.totalPurchased then maxBound : Int
+                  else acc.totalPurchased + traffic.totalPurchased
                 numPurchases = acc.numPurchases + traffic.numPurchases
                 usdSpent = acc.usdSpent + traffic.usdSpent
                 amuletSpent = acc.amuletSpent + traffic.amuletSpent

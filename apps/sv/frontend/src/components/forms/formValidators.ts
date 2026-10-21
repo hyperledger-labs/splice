@@ -46,6 +46,13 @@ export const expiryEffectiveDateSchema = z
 
 export const revokeFeaturedAppRightSchema = z.string().min(1, { message: 'Required' });
 
+export const participantIdSchema = z
+  .string()
+  .min(9, { message: 'Required' })
+  .regex(/^PAR::[a-zA-Z0-9_-]+::[a-zA-Z0-9_-]+$/, {
+    message: 'Invalid ParticipantId format. Expected format: PAR::identifier::fingerprint',
+  });
+
 export const partyIdSchema = z
   .string()
   .min(1, { message: 'Required' })
@@ -206,6 +213,11 @@ export const validateRevokeFeaturedAppRight = (value: string): string | false =>
 
 export const validatePartyId = (value: string): string | false => {
   const result = partyIdSchema.safeParse(value);
+  return result.success ? false : result.error.issues[0].message;
+};
+
+export const validateParticipantId = (value: string): string | false => {
+  const result = participantIdSchema.safeParse(value);
   return result.success ? false : result.error.issues[0].message;
 };
 

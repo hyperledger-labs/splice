@@ -169,7 +169,6 @@
             "prefix": "mock/sv-1"
           }
         },
-        "permissionedSynchronizer": false,
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,

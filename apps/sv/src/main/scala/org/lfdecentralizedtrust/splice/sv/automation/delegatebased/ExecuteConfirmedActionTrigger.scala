@@ -45,6 +45,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.StampedLockWithHandle
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicenseRequest
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorrepermission.ValidatorRepermission
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
@@ -258,6 +260,24 @@ class ExecuteConfirmedActionTrigger(
               instructionO <- store.lookupBootstrapExternalPartyConfigStateInstruction()
               configStateExists <- store.existsExternalPartyConfigStateWithOffset()
             } yield instructionO.isDefined || configStateExists.value
+          case grantAction: SRARC_GrantValidatorLicense =>
+            store.multiDomainAcsStore
+              .lookupContractById(ValidatorLicenseRequest.COMPANION)(
+                grantAction.dsoRules_GrantValidatorLicenseValue.validatorLicenseRequestCid
+              )
+              .map(_.isEmpty)
+          case rejectAction: SRARC_RejectValidatorLicense =>
+            store.multiDomainAcsStore
+              .lookupContractById(ValidatorLicenseRequest.COMPANION)(
+                rejectAction.dsoRules_RejectValidatorLicenseValue.validatorLicenseRequestCid
+              )
+              .map(_.isEmpty)
+          case archiveAction: SRARC_ArchiveValidatorRepermission =>
+            store.multiDomainAcsStore
+              .lookupContractById(ValidatorRepermission.COMPANION)(
+                archiveAction.dsoRules_ArchiveValidatorRepermissionValue.validatorRepermissionCid
+              )
+              .map(_.isEmpty)
           case action =>
             throw new UnsupportedOperationException(
               show"DsoRules $action is not yet supported"

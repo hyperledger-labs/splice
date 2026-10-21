@@ -38,9 +38,9 @@ import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
   StoredTopologyTransactions,
 }
+import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
 import com.digitalasset.canton.topology.transaction.{
   DecentralizedNamespaceDefinition,
-  ParticipantPermission,
   SignedTopologyTransaction,
   TopologyChangeOp,
   TopologyMapping,
@@ -83,7 +83,12 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvPackageVettingTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
-import org.lfdecentralizedtrust.splice.util.{ContractWithState, PackageVetting, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  ContractWithState,
+  PackageVetting,
+  SwitchOverTimes,
+  TemplateJsonDecoder,
+}
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.{defaultAmuletConfig, defaultAnsConfig}
 
 import java.util.concurrent.TimeUnit
@@ -467,12 +472,16 @@ class SV1Initializer(
             NonNegativeFiniteDuration.fromConfig(config.preparationTimeRecordTimeTolerance),
           mediatorDeduplicationTimeout =
             NonNegativeFiniteDuration.fromConfig(config.mediatorDeduplicationTimeout),
-          onboardingRestriction = if (config.permissionedSynchronizer) {
-            logger.debug("Using RestrictedOpen onboarding restriction for the synchronizer")
-            RestrictedOpen
-          } else {
-            UnrestrictedOpen
-          },
+          onboardingRestriction =
+            if (
+              sv1Config.initialSvOperationsSwitchOverTimes
+                .exists(_.contains(SwitchOverTimes.PermissionedSynchronizer))
+            ) {
+              logger.info("Using RestrictedOpen onboarding restriction for the synchronizer")
+              RestrictedOpen
+            } else {
+              UnrestrictedOpen
+            },
         )
         for {
           physicalSynchronizerId <- retryProvider.ensureThatO(
@@ -490,9 +499,12 @@ class SV1Initializer(
                   threshold = PositiveInt.one,
                 )
               sv1PermissionTx <-
-                if (config.permissionedSynchronizer) {
+                if (
+                  sv1Config.initialSvOperationsSwitchOverTimes
+                    .exists(_.contains(SwitchOverTimes.PermissionedSynchronizer))
+                ) {
                   logger.debug(
-                    "Proposing ParticipantSynchronizerPermission topology transaction for the SV1"
+                    "Proposing ParticipantSynchronizerPermission topology transaction for self"
                   )
                   participantAdminConnection
                     .proposeMapping(
@@ -500,7 +512,7 @@ class SV1Initializer(
                       transaction.ParticipantSynchronizerPermission(
                         synchronizerId,
                         participantId,
-                        ParticipantPermission.Submission,
+                        Submission,
                         None,
                         None,
                       ),
@@ -775,7 +787,7 @@ class SV1Initializer(
 
 object SV1Initializer {
 
-  /** Same ordering as https://github.com/DACH-NY/canton/blob/2fc1a37d815623cb68dcb4b75bc33a498065990e/enterprise/app-base/src/main/scala/com/digitalasset/canton/console/EnterpriseConsoleMacros.scala#L160
+  /** Participant must broadcast in a certain order for the bootstrap to be functional: refer https://github.com/digital-asset/canton/blob/eaa9e7a4bf48793acb35aba270b85a970afe6006/community/base/src/main/scala/com/digitalasset/canton/topology/store/TopologyStore.scala#L773
     */
   implicit val bootstrapTransactionOrdering
       : Ordering[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] =

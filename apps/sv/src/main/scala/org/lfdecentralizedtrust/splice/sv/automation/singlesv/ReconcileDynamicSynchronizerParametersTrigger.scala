@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
+import org.lfdecentralizedtrust.splice.util.SwitchOverTimes
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerConfig
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
@@ -22,7 +23,7 @@ import com.digitalasset.canton.admin.api.client.data.DynamicSynchronizerParamete
 import com.digitalasset.canton.time.{PositiveFiniteDuration, PositiveSeconds}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
+import com.digitalasset.canton.protocol.{DynamicSynchronizerParameters, OnboardingRestriction}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration as InternalNonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{ForceFlag, ForceFlags}
 import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
@@ -82,12 +83,20 @@ class ReconcileDynamicSynchronizerParametersTrigger(
         state,
         stateHistory,
       )
+      targetOnboardingRestriction =
+        if (SwitchOverTimes.permissionedSynchronizerEnabled(context.clock, dsoRules.payload)) {
+          OnboardingRestriction.RestrictedOpen
+        } else {
+          OnboardingRestriction.UnrestrictedOpen
+        }
+
       updatedConfig = updateDomainParameters(
         state.mapping.parameters,
         amuletConfig,
         decentralizedSynchronizerConfig,
         preparationTimeRecordTimeToleranceTarget,
         config.enableFreeConfirmationResponses,
+        targetOnboardingRestriction,
       )
     } yield
       if (state.mapping.parameters != updatedConfig)
@@ -96,6 +105,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
             amuletConfig,
             decentralizedSynchronizerConfig,
             preparationTimeRecordTimeToleranceTarget,
+            targetOnboardingRestriction,
           )
         )
       else Seq.empty
@@ -154,6 +164,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
           task.synchronizerConfig,
           task.preparationTimeRecordTimeToleranceTarget,
           config.enableFreeConfirmationResponses,
+          task.targetOnboardingRestriction,
         ),
         forceChanges =
           if (task.preparationTimeRecordTimeToleranceTarget.isDefined)
@@ -183,6 +194,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
       synchronizerConfig: Option[SynchronizerConfig],
       preparationTimeRecordTimeToleranceTarget: Option[InternalNonNegativeFiniteDuration],
       enableFreeConfirmationResponses: Boolean,
+      targetOnboardingRestriction: OnboardingRestriction,
   ): DynamicSynchronizerParameters = {
     val domainFeesConfig = amuletConfig.decentralizedSynchronizer.fees
     // Make sure that the bootstrap script for the upgrade domain is aligned with any changes made to the
@@ -213,6 +225,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
       ),
       mediatorDeduplicationTimeout =
         InternalNonNegativeFiniteDuration.fromConfig(config.mediatorDeduplicationTimeout),
+      onboardingRestriction = targetOnboardingRestriction,
     )
   }
 }
@@ -222,6 +235,7 @@ object ReconcileSynchronizerFeesConfigTrigger {
       amuletConfig: AmuletConfig[USD],
       synchronizerConfig: Option[SynchronizerConfig],
       preparationTimeRecordTimeToleranceTarget: Option[InternalNonNegativeFiniteDuration],
+      targetOnboardingRestriction: OnboardingRestriction,
   ) extends PrettyPrinting {
     import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
     override def pretty: Pretty[this.type] = {
@@ -235,6 +249,7 @@ object ReconcileSynchronizerFeesConfigTrigger {
           "preparationTimeRecordTimeToleranceTarget",
           _.preparationTimeRecordTimeToleranceTarget,
         ),
+        param("targetOnboardingRestriction", _.targetOnboardingRestriction),
       )
     }
   }

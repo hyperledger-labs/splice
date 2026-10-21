@@ -52,6 +52,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorrepermission.ValidatorRepermission
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
@@ -69,7 +71,6 @@ trait SvDsoStore
     with ActiveVotesStore {
   protected val outerLoggerFactory: NamedLoggerFactory
   protected def templateJsonDecoder: TemplateJsonDecoder
-
   override protected lazy val loggerFactory: NamedLoggerFactory =
     outerLoggerFactory.append("store", "dsoParty")
 
@@ -78,7 +79,10 @@ trait SvDsoStore
         org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoAcsStoreRowData,
         AcsInterfaceViewRowData.NoInterfacesIngested,
       ] =
-    SvDsoStore.contractFilter(key.dsoParty, domainMigrationId)
+    SvDsoStore.contractFilter(
+      key.dsoParty,
+      domainMigrationId,
+    )
 
   def key: SvStore.Key
 
@@ -1200,6 +1204,19 @@ trait SvDsoStore
     splice.ans.amuletconversionratefeed.AmuletConversionRateFeed,
   ]]]
 
+  def listValidatorUnpermissions(
+      participantId: String,
+      limit: Limit = defaultLimit,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[ValidatorUnpermission.ContractId, ValidatorUnpermission]]]
+
+  def listValidatorRepermissions(
+      limit: Limit = defaultLimit
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[ValidatorRepermission.ContractId, ValidatorRepermission]]]
+
 }
 
 object SvDsoStore {
@@ -1668,6 +1685,40 @@ object SvDsoStore {
         DsoAcsStoreRowData(
           contract,
           contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+        )
+      },
+      mkFilter(vl.ValidatorLicenseRequest.COMPANION)(
+        req => req.payload.dso == dso,
+        versionGuard = { case (pkgVersionSupport, now) =>
+          (tc) => pkgVersionSupport.supportsPermissionedSynchronizer(Seq(dsoParty), now)(tc)
+        },
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+        )
+      },
+      mkFilter(ValidatorUnpermission.COMPANION)(
+        co => co.payload.dso == dso,
+        versionGuard = { case (pkgVersionSupport, now) =>
+          (tc) => pkgVersionSupport.supportsPermissionedSynchronizer(Seq(dsoParty), now)(tc)
+        },
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          participantId = Some(contract.payload.participantId),
+        )
+      },
+      mkFilter(ValidatorRepermission.COMPANION)(
+        co => co.payload.dso == dso,
+        versionGuard = { case (pkgVersionSupport, now) =>
+          (tc) => pkgVersionSupport.supportsPermissionedSynchronizer(Seq(dsoParty), now)(tc)
+        },
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          participantId = Some(contract.payload.participantId),
         )
       },
     )

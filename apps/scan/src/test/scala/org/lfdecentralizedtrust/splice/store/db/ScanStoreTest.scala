@@ -125,6 +125,30 @@ abstract class ScanStoreTest
           )
         } yield result shouldBe (1 to 3).sum.toLong
       }
+      "return 0 if there are no traffic contracts for the member" in {
+        val namespace = Namespace(Fingerprint.tryFromString(s"dummy"))
+        val emptyMember = ParticipantId(UniqueIdentifier.tryCreate("empty", namespace))
+        for {
+          store <- mkStore()
+          result <- store.getTotalPurchasedMemberTraffic(
+            StoreMemberId(emptyMember),
+            dummyDomain,
+          )
+        } yield result shouldBe 0L
+      }
+
+      "cap the sum at Long.MaxValue if the total exceeds 64-bit limits" in {
+        val namespace = Namespace(Fingerprint.tryFromString(s"dummy"))
+        val overflowMember = ParticipantId(UniqueIdentifier.tryCreate("overflow", namespace))
+        val contract1 = memberTraffic(overflowMember, domainMigrationId, Long.MaxValue)
+        val contract2 = memberTraffic(overflowMember, domainMigrationId, 1000L)
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(contract1)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(contract2)(store.multiDomainAcsStore)
+          result <- store.getTotalPurchasedMemberTraffic(StoreMemberId(overflowMember), dummyDomain)
+        } yield result shouldBe Long.MaxValue
+      }
 
     }
 

@@ -22,7 +22,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupOffset
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.SvApp
-import org.lfdecentralizedtrust.splice.sv.store.{SvSvStore, SvDsoStore}
+import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -118,14 +118,17 @@ class SvOnboardingRequestTrigger(
             case Left(err) =>
               Future.failed(err.asRuntimeException())
             case Right(_) =>
-              confirm(
-                party,
-                name,
-                weightBps,
-                svOnboarding.payload.candidateParticipantId,
-                svOnboarding.payload.token,
-                dsoRules,
-              )
+              for {
+
+                res <- confirm(
+                  party,
+                  name,
+                  weightBps,
+                  svOnboarding.payload.candidateParticipantId,
+                  svOnboarding.payload.token,
+                  dsoRules,
+                )
+              } yield res
           }
         }
     } yield outcome
@@ -172,7 +175,14 @@ class SvOnboardingRequestTrigger(
       reason: String,
       dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val action = dsoRulesConfirmSvOnboardingAction(party, name, weightBps, participantId, reason)
+    val action =
+      dsoRulesConfirmSvOnboardingAction(
+        party,
+        name,
+        weightBps,
+        participantId,
+        reason,
+      )
     for {
       queryResult <- dsoStore.lookupConfirmationByActionWithOffset(svParty, action)
       cmd = dsoRules.exercise(

@@ -56,6 +56,20 @@ export class MultiValidator extends MultiNodeDeployment {
             },
           ]
         : [];
+
+    const extraValidatorEnvVars = [
+      ...(args.config?.extraValidatorEnvVars || []),
+      ...(args.config?.requiresOnboardingSecret
+        ? [
+            {
+              name: 'ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
+              value:
+                'canton.validator-apps.validator_backend.enable-internal-auto-onboarding-through-sv-traffic-faucet = true',
+            },
+          ]
+        : []),
+    ];
+
     super(
       name,
       {
@@ -177,7 +191,7 @@ export class MultiValidator extends MultiNodeDeployment {
       },
       opts,
       undefined,
-      args.config.extraValidatorEnvVars
+      extraValidatorEnvVars
     );
   }
 }

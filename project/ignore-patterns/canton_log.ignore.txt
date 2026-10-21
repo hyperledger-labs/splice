@@ -214,6 +214,22 @@ INTERNAL/Missing package-id.*in package metadata view
 # We can get temporarily blacklisted during onboarding triggering a retry for this.
 Now retrying operation 'request current time'
 
+# Ignore synchronizer permission log errors in PermissionedSynchronizerIntegrationTest. Happens when nodes are offboarded.
+.*ParticipantSynchronizerPermission for participant PAR::bobValidator.*
+.*code=PERMISSION_DENIED, description=Member PAR::bobValidator.*
+.*Member PAR::bobValidator.*access is disabled.*
+.*SYNC_SERVICE_SYNCHRONIZER_DISABLED_US.*Synchronizer 'global' rejected our subscription attempt with permission denied.*
+.*to find ParticipantSynchronizerPermission for participant PAR::bobValidator.*
+.*code=PERMISSION_DENIED, description=Member PAR::bobValidator.*
+.*PERMISSION_DENIED/Authentication token refresh error: Member PAR::bobValidator.*
+.*Failed to establish subscription.*PAR::bobValidator.*
+.*ParticipantSynchronizerPermission.*PAR::sv2::.*
+.*GrpcPermissionDeniedError.*PAR::sv2::.*
+.*PERMISSION_DENIED.*PAR::sv2::.*
+PERMISSION_DENIED.*Member access was revoked.*participant=sv2Participant
+.*PAR::sv2::.*access is disabled.*
+.*Failed to establish subscription.*PAR::sv2::.*
+
 # TODO(DACH-NY/cn-test-failures#9445) remove once Canton stops failing the whole
 # GetConnectedSynchronizers call for one synchronizer that is mid-reconnect.
 StateService/GetConnectedSynchronizers.*INTERNAL/Failed retrieving SynchronizerTopologyClient

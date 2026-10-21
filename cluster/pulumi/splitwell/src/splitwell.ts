@@ -139,6 +139,15 @@ export async function installSplitwell(
 
   const participantPruningConfig = splitwellConfig?.participantPruningSchedule;
 
+  const additionalEnvVars = [
+    ...(splitwellConfig.validatorApp?.additionalEnvVars || []),
+    {
+      name: 'ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
+      value:
+        'canton.validator-apps.validator_backend.enable-internal-auto-onboarding-through-sv-traffic-faucet = true',
+    },
+  ];
+
   return await installValidatorApp({
     xns,
     extraDependsOn,
@@ -181,6 +190,7 @@ export async function installSplitwell(
     logLevel: splitwellConfig.logging?.level,
     logAsync: splitwellConfig.logging?.async,
     version: activeVersion,
+    additionalEnvVars: additionalEnvVars,
   });
 }
 

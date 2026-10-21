@@ -47,6 +47,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
   SvOnboardingRequest,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorrepermission.ValidatorRepermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.{PaymentAmount, Unit}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.*
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
@@ -799,6 +801,51 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           resultFullyFiltered.map(_.contract) should contain theSameElementsAs Seq(visibleCid)
         }
       }
+    }
+
+    "listValidatorRepermissions" should {
+
+      "list all active contracts" in {
+        val p1 = validatorRepermission("participant1")
+        val p2 = validatorRepermission("participant1")
+        val p3 = validatorRepermission("participant3")
+        val p4 = validatorRepermission("participant4")
+
+        for {
+          store <- mkStore()
+          _ <- MonadUtil.sequentialTraverse(
+            Seq(p1, p2, p3, p4)
+          )(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          result <- store.listValidatorRepermissions()(traceContext)
+        } yield result should contain theSameElementsAs Seq(p1, p2, p3, p4)
+      }
+
+    }
+
+    "listValidatorUnpermissions" should {
+
+      "list all contracts matching the participantId" in {
+        val good1 = validatorUnpermission("participant1")
+        val good2 = validatorUnpermission("participant1", revoked = true)
+
+        val badParticipant1 = validatorUnpermission("wrong-participant")
+        val badParticipant2 = validatorUnpermission("another-wrong-participant")
+
+        for {
+          store <- mkStore()
+          _ <- MonadUtil.sequentialTraverse(
+            Seq(good1, good2, badParticipant1, badParticipant2)
+          )(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          result <- store.listValidatorUnpermissions(
+            "participant1"
+          )(traceContext)
+        } yield result should contain theSameElementsAs Seq(good1, good2)
+      }
+
     }
 
     "listExpiredAmuletTransferInstructions" should {
@@ -2214,6 +2261,38 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
     )
   }
 
+  protected def validatorRepermission(
+      participantId: String
+  ) = {
+    val template = new ValidatorRepermission(
+      dsoParty.toProtoPrimitive,
+      participantId,
+    )
+    contract(
+      ValidatorRepermission.TEMPLATE_ID_WITH_PACKAGE_ID,
+      new ValidatorRepermission.ContractId(nextCid()),
+      template,
+    )
+  }
+
+  protected def validatorUnpermission(
+      participantId: String,
+      revoked: Boolean = false,
+      loginAfter: Option[Instant] = None,
+  ) = {
+    val template = new ValidatorUnpermission(
+      dsoParty.toProtoPrimitive,
+      participantId,
+      loginAfter.map(Optional.of(_)).getOrElse(Optional.empty()),
+      java.lang.Boolean.valueOf(revoked),
+    )
+    contract(
+      ValidatorUnpermission.TEMPLATE_ID_WITH_PACKAGE_ID,
+      new ValidatorUnpermission.ContractId(nextCid()),
+      template,
+    )
+  }
+
   private def ansEntry(
       user: PartyId,
       name: String,
@@ -2297,6 +2376,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
       storeSvParty.toProtoPrimitive,
       dsoParty.toProtoPrimitive,
       expiry,
+      Optional.of(java.lang.Boolean.FALSE),
     )
 
     contract(
@@ -2320,6 +2400,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
       "reason",
       dsoParty.toProtoPrimitive,
       expiry,
+      Optional.of(java.lang.Boolean.FALSE),
     )
 
     contract(

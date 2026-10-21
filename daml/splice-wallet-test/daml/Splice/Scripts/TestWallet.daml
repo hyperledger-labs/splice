@@ -896,6 +896,34 @@ testBuyMemberTraffic = script do
   submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_MergeMemberTrafficContracts with
     trafficCids = []
 
+  -- test that merging member traffic contracts caps totalPurchased at maxIntBound
+  overflowTrafficCid1 <- submit app.dso $ createCmd MemberTraffic with
+    dso = app.dso
+    memberId = "overflow_participant"
+    synchronizerId = synchronizerId
+    migrationId = 0
+    totalPurchased = maxBound : Int
+    numPurchases = 1
+    amuletSpent = 0.0
+    usdSpent = 0.0
+
+  overflowTrafficCid2 <- submit app.dso $ createCmd MemberTraffic with
+    dso = app.dso
+    memberId = "overflow_participant"
+    synchronizerId = synchronizerId
+    migrationId = 0
+    totalPurchased = 100
+    numPurchases = 1
+    amuletSpent = 0.0
+    usdSpent = 0.0
+
+  submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_MergeMemberTrafficContracts with
+    trafficCids = [overflowTrafficCid1, overflowTrafficCid2]
+
+  [(_, mergedOverflow)] <- queryFilter @MemberTraffic app.dso (\t -> t.memberId == "overflow_participant")
+  mergedOverflow.totalPurchased === (maxBound : Int)
+  mergedOverflow.numPurchases === 2
+
   pure ()
 
 

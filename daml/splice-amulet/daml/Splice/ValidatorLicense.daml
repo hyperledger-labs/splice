@@ -6,11 +6,19 @@ module Splice.ValidatorLicense where
 import DA.Action (void)
 import DA.Text as Text
 import DA.Time
+import DA.Assert (assertDeadlineExceeded)
 import qualified DA.Foldable as Foldable
 
 import Splice.Round
 import Splice.Types
 import Splice.Util
+
+data ValidatorLicenseRequest_ExpireResult = ValidatorLicenseRequest_ExpireResult
+  deriving (Serializable)
+data ValidatorLicenseRequest_AcceptResult = ValidatorLicenseRequest_AcceptResult
+  deriving (Serializable)
+data ValidatorLicenseRequest_RejectResult = ValidatorLicenseRequest_RejectResult
+  deriving (Serializable)
 
 data FaucetState = FaucetState with
     firstReceivedFor : Round -- ^ The first round for which a coupon was received.
@@ -228,6 +236,35 @@ template ValidatorLivenessActivityRecord with
          void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
          return ValidatorLivenessActivityRecord_DsoExpireResult
 
+-- | A request by a new validator to be granted a ValidatorLicense.
+template ValidatorLicenseRequest with
+    validator : Party
+    dso : Party
+    version : Optional Text
+    contactPoint : Optional Text
+    expiresAt : Time
+  where
+    signatory validator
+    observer dso
+
+    ensure optional True (\v -> Text.length v <= maxIdentifierLength) version &&
+           optional True (\c -> Text.length c <= maxIdentifierLength) contactPoint
+
+    choice ValidatorLicenseRequest_Accept : ValidatorLicenseRequest_AcceptResult
+      controller dso
+      do
+        return ValidatorLicenseRequest_AcceptResult {}
+
+    choice ValidatorLicenseRequest_Reject : ValidatorLicenseRequest_RejectResult
+      controller dso
+      do
+        return ValidatorLicenseRequest_RejectResult {}
+
+    choice ValidatorLicenseRequest_Expire : ValidatorLicenseRequest_ExpireResult
+      controller dso
+      do
+        assertDeadlineExceeded "expiresAt" expiresAt
+        return ValidatorLicenseRequest_ExpireResult {}
 
 -- instances
 ------------
@@ -240,3 +277,6 @@ instance HasCheckedFetch ValidatorLivenessActivityRecord ForOwner where
 
 instance HasCheckedFetch ValidatorLicense ForDso where
   contractGroupId ValidatorLicense{..} = ForDso with dso
+
+instance HasCheckedFetch ValidatorLicenseRequest ForDso where
+  contractGroupId ValidatorLicenseRequest{..} = ForDso with dso

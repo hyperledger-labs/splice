@@ -95,7 +95,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationi
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv2
 import org.lfdecentralizedtrust.splice.http.v0.definitions.HoldingsSummaryRequest.RecordTimeMatch
 import org.lfdecentralizedtrust.splice.metrics.ScanConnectionMetrics
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BftSequencer
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
+  BftSequencer,
+  SynchronizerPermissionState,
+}
 
 import scala.util.{Failure, Success}
 
@@ -438,6 +441,22 @@ class SingleScanConnection private[client] (
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.GetLsu(),
+    )
+  }
+
+  override def getParticipantSynchronizerPermission(
+      synchronizerId: SynchronizerId,
+      participantId: ParticipantId,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Option[SynchronizerPermissionState]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetParticipantSynchronizerPermission(
+        synchronizerId.toProtoPrimitive,
+        participantId.toProtoPrimitive,
+      ),
     )
   }
 

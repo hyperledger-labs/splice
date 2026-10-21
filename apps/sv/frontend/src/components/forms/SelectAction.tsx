@@ -41,7 +41,6 @@ const dropdownOptions = createProposalActions.map(action => ({
 
 export const SelectAction: React.FC = () => {
   const navigate = useNavigate();
-
   const form = useForm({
     defaultValues: {
       action: '',

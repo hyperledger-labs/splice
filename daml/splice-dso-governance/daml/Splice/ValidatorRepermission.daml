@@ -1,0 +1,31 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.ValidatorRepermission where
+
+import Splice.Util
+import Splice.Types (ForDso(..))
+
+data ValidatorRepermission_ArchiveResult = ValidatorRepermission_ArchiveResult
+  deriving (Serializable)
+
+
+-- | ValidatorRepermission contract is created to
+-- restore validator's permissions on the synchronizer.
+-- It is created when SVs successfully vote to repermission a validator.
+template ValidatorRepermission
+  with
+    dso : Party
+    participantId : Text
+  where
+    signatory dso
+
+    choice ValidatorRepermission_Archive : ValidatorRepermission_ArchiveResult
+      controller dso
+      do return ValidatorRepermission_ArchiveResult
+
+-- instances
+------------
+
+instance HasCheckedFetch ValidatorRepermission ForDso where
+  contractGroupId ValidatorRepermission{..} = ForDso with dso

@@ -76,8 +76,8 @@ function start_frontend() {
 
   local log_file="${LOG_DIR}/npm-${app}-${user}.out"
 
-  # MIMALLOC_PURGE_DELAY=0: rolldown >= 1.2.7 (vite 8.3.1) links mimalloc 3.5, which no longer returns 
-  # freed memory to the OS once its worker threads go idle, so every dev server keeps ~600MiB of 
+  # MIMALLOC_PURGE_DELAY=0: rolldown >= 1.2.7 (vite 8.3.1) links mimalloc 3.5, which no longer returns
+  # freed memory to the OS once its worker threads go idle, so every dev server keeps ~600MiB of
   # dead memory resident. Purging immediately restores the old footprint at a negligible performance cost.
   tmux_cmd "${app}-${user}" "${frontend_dir}" \
     "trap \"rm -f ${config_file}\" EXIT && \
@@ -112,7 +112,7 @@ shared_validator_for_users=0
 two_svs=0
 run_tests=0
 
-while getopts "hdapvsmtl" arg; do
+while getopts "hdavst" arg; do
   case ${arg} in
     h)
       usage

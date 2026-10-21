@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   VoteRequest,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
 import org.lfdecentralizedtrust.splice.environment.{
   BuildInfo,
@@ -81,6 +82,23 @@ abstract class SvAppReference(
   def getSvOnboardingStatus(candidate: String): HttpSvPublicAppClient.SvOnboardingStatus =
     consoleEnvironment.run {
       httpCommand(HttpSvPublicAppClient.getSvOnboardingStatus(candidate))
+    }
+
+  @Help.Summary("List ValidatorUnpermission contracts for a participant")
+  def listValidatorUnpermissions(
+      participantId: String
+  ): Seq[Contract[ValidatorUnpermission.ContractId, ValidatorUnpermission]] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvOperatorAppClient.ListValidatorUnpermissions(participantId)
+      )
+    }
+  }
+
+  @Help.Summary("Buy member traffic for a new validator (Internal only) (via client API)")
+  def internalBuyMemberTraffic(participantId: ParticipantId): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpSvPublicAppClient.InternalBuyMemberTraffic(participantId.toProtoPrimitive))
     }
 
   @Help.Summary("Prepare a validator onboarding and return an onboarding secret (via client API)")

@@ -50,6 +50,29 @@ paths:
                 "$ref": "#/components/schemas/PrepareValidatorOnboardingResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/admin/validator/unpermissions/{participant_id}:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_operator
+      operationId: "listValidatorUnpermissions"
+      parameters:
+        - name: "participant_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListValidatorUnpermissionsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/admin/validator/licenses:
     get:
       tags: [sv]
@@ -455,6 +478,34 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/internal/onboard/validator/purchase-traffic:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_public
+      x-external-audience: none
+      description: "faucet for validator candidates to buy member traffic"
+      operationId: "internalBuyMemberTraffic"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/InternalBuyMemberTrafficRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            text/plain:
+              schema:
+                type: string
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+        "501":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
+        "429":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/429"
   /v0/devnet/onboard/validator/prepare:
     post:
       tags: [sv]
@@ -683,6 +734,14 @@ components:
         party_hint:
           description: |
             Human-readable alias of the validator party decoded from the stored secret.
+          type: string
+
+    InternalBuyMemberTrafficRequest:
+      type: object
+      required:
+        - participant_id
+      properties:
+        participant_id:
           type: string
 
     PrepareValidatorOnboardingRequest:
@@ -1104,6 +1163,16 @@ components:
       properties:
         featured_app_right:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListValidatorUnpermissionsResponse:
+      type: object
+      required:
+        - unpermissions
+      properties:
+        unpermissions:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     ListFeaturedAppRightsByProviderResponse:
       description: |

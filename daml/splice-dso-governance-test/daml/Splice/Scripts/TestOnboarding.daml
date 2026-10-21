@@ -17,6 +17,8 @@ import Splice.CometBft
 import Splice.DsoRules
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.SvOnboarding
+import Splice.ValidatorUnpermission
+import Splice.ValidatorRepermission
 
 import Splice.Scripts.DsoTestUtils
 import Splice.Testing.Registries.AmuletRegistry (getActiveOpenRoundsSorted)
@@ -87,7 +89,7 @@ testOnboardValidator = do
   now <- getTime
 
   -- after advancing time we can report active again, report active also ensures sponsor = validator
-  validatorLicenseCid <- submit dso $ 
+  validatorLicenseCid <- submit dso $
     archiveCmd validatorLicenseCid *>
     createCmd validatorLicense
       with
@@ -132,6 +134,7 @@ testSvOnboarding = do
     sponsor = sv2
     dso
     expiresAt = svOnboardingRequest.expiresAt
+    candidatePartyIsObserver  = Some False
 
   -- svX collects three confirmations which is enough to onboard him
   [(dsoRulesCid, _)] <- query @DsoRules dso
@@ -157,6 +160,24 @@ testSvOnboarding = do
     svRewardWeight = 19
     dso
     expiresAt = svOnboardingConfirmed.expiresAt
+    svPartyIsObserver = Some False
+
+  -- svX should NOT be able to see the contract yet
+  svXVisibleContracts <- query @SvOnboardingConfirmed svX
+  assert (null svXVisibleContracts)
+
+  -- an existing_SV flips the observer flag
+  submit (actAs sv2 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_MakeSvOnboardingConfirmedObserver with
+    svOnboardingConfirmedCid
+    sv = sv2
+
+  -- check that the flag is flipped in the new contract
+  [(svOnboardingConfirmedCid, svOnboardingConfirmed)] <- query @SvOnboardingConfirmed dso
+  svOnboardingConfirmed.svPartyIsObserver === Some True
+
+  -- svX should NOW be able to see it
+  svXVisibleContracts <- query @SvOnboardingConfirmed svX
+  length svXVisibleContracts === 1
 
   -- once svX becomes able to read as DSO party (e.g., after party migration to svX's participant)...
   [(dsoRulesCid, _)] <- query @DsoRules dso
@@ -562,4 +583,245 @@ testBootstrapMainNetWithNonZeroRound = do
   earliestRound.round === Round 34
   middleRound.round === Round 35
   latestRound.round === Round 36
+  pure ()
+
+testValidatorLicenseRequest : Script ()
+testValidatorLicenseRequest = do
+  (app, dso, (sv1, sv2, sv3, _)) <- initMainNet
+
+  v1 <- allocateParty "v1"
+  now <- getTime
+
+  let requestExpiresAt = now `addRelTime` days 1
+
+  -- new validator creates a ValidatorLicenseRequest
+  reqCid <- submit v1 $ createCmd ValidatorLicenseRequest with
+    validator = v1
+    dso = dso
+    version = Some "1.0.0"
+    contactPoint = Some "v1@example.com"
+    expiresAt = requestExpiresAt
+
+  -- a majority of SVs submit a Confirmation
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  forA_ [sv1, sv2, sv3] $ \sv ->
+    submit (actAs sv <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_DsoRules with
+        dsoAction = SRARC_GrantValidatorLicense $ DsoRules_GrantValidatorLicense reqCid
+
+  executeAllConfirmedActions app
+
+  reqs <- queryFilter @ValidatorLicenseRequest dso (\r -> r.validator == v1)
+  assert (null reqs)
+
+  [(_, license)] <- queryFilter @ValidatorLicense dso (\l -> l.validator == v1)
+  license.validator === v1
+  license.sponsor === v1
+  license.dso === dso
+  let metadata = fromSome license.metadata
+  metadata.version === "1.0.0"
+  metadata.contactPoint === "v1@example.com"
+
+  -- duplicate request creation
+
+  req5Cid <- submit v1 $ createCmd ValidatorLicenseRequest with
+    validator = v1
+    dso = dso
+    version = Some "1.0.0"
+    contactPoint = Some "v1@example.com"
+    expiresAt = requestExpiresAt
+
+  forA_ [sv1, sv2, sv3] $ \sv ->
+    submit (actAs sv <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_DsoRules with
+        dsoAction = SRARC_RejectValidatorLicense $ DsoRules_RejectValidatorLicense req5Cid
+
+  executeAllConfirmedActions app
+
+  -- The duplicate request should have been rejected and archived
+  reqs5 <- queryFilter @ValidatorLicenseRequest dso (\r -> r.validator == v1)
+  assert (null reqs5)
+
+  -- The validator should still only have 1 license
+  licensesAfterDuplicate <- queryFilter @ValidatorLicense dso (\l -> l.validator == v1)
+  length licensesAfterDuplicate === 1
+
+  -- duplicate request creation
+  req2Cid <- submit v1 $ createCmd ValidatorLicenseRequest with
+    validator = v1
+    dso = dso
+    version = Some "1.0.0"
+    contactPoint = Some "v1@example.com"
+    expiresAt = requestExpiresAt
+
+  forA_ [sv1, sv2, sv3] $ \sv ->
+    submit (actAs sv <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_DsoRules with
+        dsoAction = SRARC_GrantValidatorLicense $ DsoRules_GrantValidatorLicense req2Cid
+
+  executeAllConfirmedActions app
+
+  licensesAfterDuplicate <- queryFilter @ValidatorLicense dso (\l -> l.validator == v1)
+  length licensesAfterDuplicate === 2
+
+  _ <- submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid (DsoRules_MergeValidatorLicense (map fst licensesAfterDuplicate) (Some sv1))
+
+  licensesAfterMerge <- queryFilter @ValidatorLicense dso (\l -> l.validator == v1)
+  length licensesAfterMerge === 1
+
+  -- check expiration
+  req3Cid <- submit v1 $ createCmd ValidatorLicenseRequest with
+    validator = v1
+    dso = dso
+    version = Some "2.0.0"
+    contactPoint = Some "v1@expired.com"
+    expiresAt = requestExpiresAt
+
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ExpireValidatorLicenseRequest with
+    validatorLicenseRequestCid = req3Cid
+    sv = Some sv1
+
+  passTime (days 2)
+
+  _ <- submit (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ExpireValidatorLicenseRequest with
+    validatorLicenseRequestCid = req3Cid
+    sv = Some sv1
+
+  reqs3 <- queryFilter @ValidatorLicenseRequest dso (\r -> r.validator == v1)
+  assert (null reqs3)
+
+  pure ()
+
+-- Test ValidatorUnpermission lifecycle and merge logic
+testValidatorUnpermissionWorkflow : Script ()
+testValidatorUnpermissionWorkflow = do
+  (app, dso, (sv1, sv2, sv3, _)) <- initMainNet
+
+  v1 <- allocateParty "v1"
+  let participantId = "v1-participant-id"
+  now <- getTime
+  let requestExpiresAt = now `addRelTime` days 1
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  -- Onboard validator and grant license
+  reqCid <- submit v1 $ createCmd ValidatorLicenseRequest with
+    validator = v1
+    dso = dso
+    version = Some "1.0.0"
+    contactPoint = Some "v1@example.com"
+    expiresAt = requestExpiresAt
+
+  forA_ [sv1, sv2, sv3] $ \sv ->
+    submit (actAs sv <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_DsoRules with
+        dsoAction = SRARC_GrantValidatorLicense $ DsoRules_GrantValidatorLicense reqCid
+
+  executeAllConfirmedActions app
+
+  -- vote confirmation with temporary unpermissioning creates a new ValidatorUnpermission contract
+  let suspendTime1 = now `addRelTime` hours 1
+
+  forA_ [sv1, sv2, sv3] $ \sv ->
+    submit (actAs sv <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_DsoRules with
+        dsoAction = SRARC_UnpermissionValidator $ DsoRules_UnpermissionValidator with
+          participantId = participantId
+          loginAfter = Some suspendTime1
+          revoked = False
+
+  executeAllConfirmedActions app
+
+  unpermissions1 <- queryFilter @ValidatorUnpermission dso (\u -> u.participantId == participantId)
+
+  length unpermissions1 === 1
+  let (_, unp1) = head unpermissions1
+  unp1.loginAfter === Some suspendTime1
+  unp1.revoked === False
+
+  -- Second vote with permanent unpermissioning creates a new ValidatorUnpermission contract
+  let suspendTime2 = now `addRelTime` hours 2
+
+  forA_ [sv1, sv2, sv3] $ \sv ->
+    submit (actAs sv <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_DsoRules with
+        dsoAction = SRARC_UnpermissionValidator $ DsoRules_UnpermissionValidator with
+          participantId = participantId
+          loginAfter = Some suspendTime2
+          revoked = True
+
+  executeAllConfirmedActions app
+
+  unpermissions2 <- queryFilter @ValidatorUnpermission dso (\u -> u.participantId == participantId)
+  length unpermissions2 === 2
+
+  -- Check whether 1 of the contracts has revoked == True
+  let hasRevoked = any (\(_, u) -> u.revoked == True) unpermissions2
+  hasRevoked === True
+
+  let unpCidsToMerge = map fst unpermissions2
+
+  -- When more than 1 unpermission contract exists, merging works
+  DsoRules_MergeValidatorUnpermissionResult mergedCid <-
+    submit (actAs sv1 <> readAs dso) $
+      exerciseCmd dsoRulesCid (DsoRules_MergeValidatorUnpermission unpCidsToMerge (Some sv1))
+
+  unpermissionsAfterMerge <- queryFilter @ValidatorUnpermission dso (\u -> u.participantId == participantId)
+  length unpermissionsAfterMerge === 1
+  let (_, finalUnpermission) = head unpermissionsAfterMerge
+
+  -- The revoked flag should be True
+  finalUnpermission.revoked === True
+
+  -- The loginAfter should be the maximum of the two times (suspendTime2)
+  finalUnpermission.loginAfter === Some suspendTime2
+
+  -- Cannot merge contracts belonging to different participant IDs
+  unpermissionDiffParticipantCid <- submit dso $ createCmd ValidatorUnpermission with
+    dso
+    participantId = "different-participant-id"
+    loginAfter = None
+    revoked = False
+
+  submitMustFail (actAs sv1 <> readAs dso) $ exerciseCmd dsoRulesCid (DsoRules_MergeValidatorUnpermission [mergedCid, unpermissionDiffParticipantCid] (Some sv1))
+
+  -- Repermission the validator
+  forA_ [sv1, sv2, sv3] $ \sv ->
+    submit (actAs sv <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_DsoRules with
+        dsoAction = SRARC_RepermissionValidator $ DsoRules_RepermissionValidator with
+          validatorUnpermissionCid = mergedCid
+
+  executeAllConfirmedActions app
+
+  -- Verify the Unpermission contract is successfully archived
+  unpermissionsAfterRepermission <- queryFilter @ValidatorUnpermission dso (\u -> u.participantId == participantId)
+  length unpermissionsAfterRepermission === 0
+
+  -- Verify the Repermission contract is actively created
+  repermissions <- queryFilter @ValidatorRepermission dso (\u -> u.participantId == participantId)
+  length repermissions === 1
+  let (rep1Cid, rep1) = head repermissions
+  rep1.participantId === participantId
+
+  -- Automation triggers the archiving of the Repermission contract
+  forA_ [sv1, sv2, sv3] $ \sv ->
+    submit (actAs sv <> readAs dso) $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_DsoRules with
+        dsoAction = SRARC_ArchiveValidatorRepermission $ DsoRules_ArchiveValidatorRepermission with
+          validatorRepermissionCid = rep1Cid
+
+  executeAllConfirmedActions app
+
+  repermissionsAfterArchive <- queryFilter @ValidatorRepermission dso (\u -> u.participantId == participantId)
+  length repermissionsAfterArchive === 0
+
   pure ()

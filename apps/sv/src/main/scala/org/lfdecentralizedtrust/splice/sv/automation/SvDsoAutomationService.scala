@@ -301,6 +301,57 @@ class SvDsoAutomationService(
   // Triggers that require namespace permissions and the existence of the DsoRules and AmuletRules contracts
   def registerPostOnboardingTriggers(): Unit = {
     registerTrigger(
+      new RevokeSvPermissionTrigger(
+        triggerContext,
+        dsoStore,
+        participantAdminConnection,
+      )
+    )
+    registerTrigger(
+      new GrantExistingValidatorPermissionTrigger(
+        triggerContext,
+        dsoStore,
+        participantAdminConnection,
+      )
+    )
+    registerTrigger(
+      new GrantSvPermissionTrigger(
+        triggerContext,
+        dsoStore,
+        participantAdminConnection,
+      )
+    )
+    registerTrigger(
+      new GrantValidatorPermissionTrigger(
+        triggerContext,
+        dsoStore,
+        participantAdminConnection,
+      )
+    )
+    registerTrigger(
+      new ValidatorLicenseRequestTrigger(
+        triggerContext,
+        dsoStore,
+        connection(SpliceLedgerConnectionPriority.High),
+      )
+    )
+    registerTrigger(
+      new ValidatorUnpermissionTrigger(
+        triggerContext,
+        dsoStore,
+        participantAdminConnection,
+      )
+    )
+    registerTrigger(
+      new ValidatorRepermissionTrigger(
+        triggerContext,
+        dsoStore,
+        participantAdminConnection,
+        connection(SpliceLedgerConnectionPriority.High),
+      )
+    )
+
+    registerTrigger(
       new SvOnboardingRequestTrigger(
         triggerContext,
         dsoStore,
@@ -796,5 +847,12 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[LsuTransferTrafficTrigger],
       aTrigger[LsuSequencingTestTrigger],
       aTrigger[ReconcileSequencingParametersTrigger],
+      aTrigger[GrantValidatorPermissionTrigger],
+      aTrigger[ValidatorLicenseRequestTrigger],
+      aTrigger[ValidatorUnpermissionTrigger],
+      aTrigger[ValidatorRepermissionTrigger],
+      aTrigger[GrantSvPermissionTrigger],
+      aTrigger[GrantExistingValidatorPermissionTrigger],
+      aTrigger[RevokeSvPermissionTrigger],
     )
 }

@@ -134,7 +134,6 @@
         "onboardingName": "Digital-Asset-1",
         "onboardingType": "join-with-key",
         "participantAddress": "participant",
-        "permissionedSynchronizer": false,
         "persistence": {
           "databaseName": "sv_sv_da_1",
           "port": 5432,

@@ -12,8 +12,10 @@ import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJs
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.WalletAppInstall
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 import java.time.Instant
@@ -104,6 +106,51 @@ abstract class SvSvStoreTest extends StoreTestBase with HasExecutionContext {
         }
       }
 
+      "lookupWalletAppInstallByEndUserWithOffset" should {
+
+        "find a WalletAppInstall for the SV party and ignore others" in {
+          val endUser1 = storeSvParty
+          val endUser2 = PartyId.tryFromProtoPrimitive("endUser2::domain")
+
+          val wanted = walletAppInstall(endUser1, "sv-user")
+          val unwanted = walletAppInstall(endUser2, "other-user")
+
+          val firstOffset = 101L
+          val secondOffset = 202L
+
+          for {
+            store <- mkStore()
+            _ <- dummyDomain.create(
+              wanted,
+              firstOffset,
+              createdEventSignatories = Seq(storeSvParty),
+            )(store.multiDomainAcsStore)
+
+            _ <- dummyDomain.create(
+              unwanted,
+              secondOffset,
+              createdEventSignatories = Seq(storeSvParty),
+            )(store.multiDomainAcsStore)
+          } yield {
+            store.lookupWalletAppInstallByEndUserWithOffset(endUser1).futureValue should be(
+              QueryResult(secondOffset, Some(wanted))
+            )
+            store.lookupWalletAppInstallByEndUserWithOffset(endUser2).futureValue should be(
+              QueryResult(secondOffset, None) // we ingest only when co.payload.endUserParty == sv
+            )
+          }
+        }
+
+        "return just the offset if there's no entries" in {
+          val nobody = PartyId.tryFromProtoPrimitive("nobody::domain")
+          for {
+            store <- mkStore()
+            result <- store.lookupWalletAppInstallByEndUserWithOffset(nobody)
+          } yield result should be(QueryResult(acsOffset, None))
+        }
+
+      }
+
       "find a UsedSecret by secret in JSON format" in {
         val wanted = usedSecret(
           """{"sv": "splice-client-1::dummy", "validator_party_hint": "splice-client-2", "secret": "good_secret"}"""
@@ -122,6 +169,23 @@ abstract class SvSvStoreTest extends StoreTestBase with HasExecutionContext {
       }
 
     }
+  }
+
+  private def walletAppInstall(endUserParty: PartyId, endUserName: String) = {
+    val template = new WalletAppInstall(
+      dsoParty.toProtoPrimitive,
+      storeSvParty.toProtoPrimitive,
+      endUserName,
+      endUserParty.toProtoPrimitive,
+    )
+
+    val templateId = WalletAppInstall.TEMPLATE_ID_WITH_PACKAGE_ID
+
+    contract(
+      templateId,
+      new WalletAppInstall.ContractId(nextCid()),
+      template,
+    )
   }
 
   private def validatorOnboarding(secret: String) = {
@@ -173,7 +237,8 @@ class DbSvSvStoreTest
         DarResources.amulet.all ++
           DarResources.validatorLifecycle.all ++
           DarResources.dsoGovernance.all ++
-          DarResources.dsoGovernance.all
+          DarResources.dsoGovernance.all ++
+          DarResources.wallet.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
@@ -187,7 +252,10 @@ class DbSvSvStoreTest
       participantId = mkParticipantId("SvSvStoreTest"),
       IngestionConfig(),
       defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-    )(parallelExecutionContext, implicitly, implicitly)
+    )(parallelExecutionContext, implicitly, implicitly) {
+      override lazy val acsContractFilter =
+        SvSvStore.contractFilter(key)
+    }
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- store.multiDomainAcsStore.testIngestionSink

@@ -339,6 +339,8 @@ object SpliceUtil {
           dso.decentralizedsynchronizer.SynchronizerState.DS_OPERATIONAL,
           "TODO(DACH-NY/canton-network-node#4900): share CometBFT genesis.json of sv1 via DsoRules config.",
           Optional.empty(),
+          Optional.empty(),
+          Optional.empty(),
         )
       ).asJava,
       dummyDomain.toProtoPrimitive, // lastDomainId

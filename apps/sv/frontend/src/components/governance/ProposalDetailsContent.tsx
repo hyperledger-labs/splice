@@ -232,6 +232,20 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             <OffboardMemberSection memberPartyId={proposalDetails.proposal.memberToOffboard} />
           )}
 
+          {proposalDetails.action === 'SRARC_RepermissionValidator' && (
+            <RepermissionValidatorSection
+              unpermissionCid={proposalDetails.proposal.unpermissionCid}
+            />
+          )}
+
+          {proposalDetails.action === 'SRARC_UnpermissionValidator' && (
+            <UnpermissionValidatorSection
+              participantId={proposalDetails.proposal.participantId}
+              revoked={proposalDetails.proposal.revoked}
+              loginAfter={proposalDetails.proposal.loginAfter}
+            />
+          )}
+
           {proposalDetails.action === 'SRARC_GrantFeaturedAppRight' && (
             <FeatureAppSection
               provider={proposalDetails.proposal.provider}
@@ -769,6 +783,75 @@ const VoteItem: React.FC<VoteItemProps> = ({
       </Box>
       <Divider sx={{ borderBottomWidth: 2 }} />
     </>
+  );
+};
+
+interface UnpermissionValidatorSectionProps {
+  participantId: string;
+  revoked: boolean;
+  loginAfter?: string;
+}
+
+const UnpermissionValidatorSection = ({
+  participantId,
+  revoked,
+  loginAfter,
+}: UnpermissionValidatorSectionProps) => {
+  return (
+    <Box
+      id="proposal-details-unpermission-validator-section"
+      data-testid="proposal-details-unpermission-validator-section"
+      sx={{ display: 'contents' }}
+    >
+      <DetailItem
+        label="Participant ID"
+        value={
+          <Typography data-testid="proposal-details-participant-id" sx={{ wordBreak: 'break-all' }}>
+            {participantId}
+          </Typography>
+        }
+      />
+      <DetailItem
+        label="Permanent Revocation"
+        value={revoked ? 'Yes' : 'No'}
+        labelId="proposal-details-revoked-label"
+        valueId="proposal-details-revoked-value"
+      />
+      {!revoked && loginAfter && (
+        <DetailItem
+          label="Login After"
+          value={loginAfter}
+          labelId="proposal-details-login-after-label"
+          valueId="proposal-details-login-after-value"
+        />
+      )}
+    </Box>
+  );
+};
+
+interface RepermissionValidatorSectionProps {
+  unpermissionCid: string;
+}
+
+const RepermissionValidatorSection = ({ unpermissionCid }: RepermissionValidatorSectionProps) => {
+  return (
+    <Box
+      id="proposal-details-repermission-validator-section"
+      data-testid="proposal-details-repermission-validator-section"
+      sx={{ display: 'contents' }}
+    >
+      <DetailItem
+        label="Validator Unpermission Contract ID"
+        value={
+          <CopyableIdentifier
+            value={unpermissionCid}
+            size="large"
+            data-testid="proposal-details-repermission-unpermission-cid"
+          />
+        }
+        labelId="proposal-details-repermission-unpermission-cid-label"
+      />
+    </Box>
   );
 };
 
