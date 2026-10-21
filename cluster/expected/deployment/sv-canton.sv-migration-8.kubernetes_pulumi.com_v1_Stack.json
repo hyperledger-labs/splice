@@ -121,7 +121,7 @@
       },
       "refresh": true,
       "resyncFrequencySeconds": 300,
-      "retryMaxBackoffDurationSeconds": 600,
+      "retryMaxBackoffDurationSeconds": 900,
       "retryOnUpdateConflict": true,
       "serviceAccountName": "sv-canton.sv-migration-8-sa",
       "stack": "organization/sv-canton/sv-canton.sv-migration-8.mock",

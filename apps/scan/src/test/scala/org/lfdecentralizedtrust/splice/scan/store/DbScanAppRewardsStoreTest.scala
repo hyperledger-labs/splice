@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnles
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore.RewardHash
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.Future
@@ -1323,21 +1324,22 @@ class DbScanAppRewardsStoreTest
   ): Future[(DbScanAppRewardsStore, Long)] = {
     val n = storeCounter.getAndIncrement()
     val participantId = mkParticipantId(s"rewards-test-$n")
-    val updateHistory = new UpdateHistory(
-      storage,
-      migrationId,
-      s"app_rewards_test_$n",
-      participantId,
-      dsoParty,
-      BackfillingRequirement.BackfillingNotRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = false,
-      HistoryMetrics(NoOpMetricsFactory, migrationId),
-    )
-    updateHistory.ingestionSink.initialize().map { _ =>
+    for {
+      updateHistory <- UpdateHistory.create(
+        storage,
+        migrationId,
+        s"app_rewards_test_$n",
+        StoreMemberId(participantId),
+        dsoParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
+        loggerFactory,
+        enableImportUpdateBackfill = false,
+        HistoryMetrics(NoOpMetricsFactory, migrationId),
+      )
+      _ <- updateHistory.ingestionSink.initialize()
+    } yield {
       val appActivityRecordStore = new DbAppActivityRecordStore(
         storage.underlying,
         updateHistory,

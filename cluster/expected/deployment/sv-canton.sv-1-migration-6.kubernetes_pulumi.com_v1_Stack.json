@@ -107,7 +107,7 @@
           "name": "splice-node-migration-6"
         }
       },
-      "retryMaxBackoffDurationSeconds": 600,
+      "retryMaxBackoffDurationSeconds": 900,
       "retryOnUpdateConflict": true,
       "serviceAccountName": "sv-canton.sv-1-migration-6-sa",
       "stack": "organization/sv-canton/sv-canton.sv-1-migration-6.mock",

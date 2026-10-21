@@ -206,10 +206,7 @@
         "synchronizers": {
           "additionalLegacy": [
             {
-              "cometBFT": {
-                "connectionUri": "http://global-domain-7-cometbft-cometbft-rpc:26657",
-                "enabled": true
-              },
+              "enableBftSequencer": true,
               "mediatorAddress": "global-domain-7-mediator",
               "sequencerAddress": "global-domain-7-sequencer",
               "sequencerPruningConfig": {
@@ -232,10 +229,7 @@
             "sequencerPublicUrl": "https://sequencer-9.sv-2.mock.global.canton.network.digitalasset.com"
           },
           "legacy": {
-            "cometBFT": {
-              "connectionUri": "http://global-domain-8-cometbft-cometbft-rpc:26657",
-              "enabled": true
-            },
+            "enableBftSequencer": true,
             "mediatorAddress": "global-domain-8-mediator",
             "sequencerAddress": "global-domain-8-sequencer",
             "sequencerPruningConfig": {

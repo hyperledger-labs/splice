@@ -107,7 +107,7 @@
           "name": "splice-node-active"
         }
       },
-      "retryMaxBackoffDurationSeconds": 600,
+      "retryMaxBackoffDurationSeconds": 900,
       "retryOnUpdateConflict": true,
       "serviceAccountName": "canton-network-sa",
       "stack": "organization/canton-network/canton-network.mock",

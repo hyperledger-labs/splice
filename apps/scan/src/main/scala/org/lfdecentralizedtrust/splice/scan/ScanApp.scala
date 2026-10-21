@@ -101,6 +101,7 @@ import org.lfdecentralizedtrust.splice.util.HasHealth
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import cats.implicits.*
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 /** Class representing a Scan app instance.
   *
@@ -229,17 +230,16 @@ class ScanApp(
         loggerFactory,
         retryProvider.metricsFactory,
       )
-      updateHistory = new UpdateHistory(
+      updateHistory <- UpdateHistory.create(
         storage,
         domainMigrationId,
         store.storeName,
-        participantId,
+        StoreMemberId(participantId),
         store.acsContractFilter.ingestionFilter.primaryParty,
         BackfillingRequirement.NeedsBackfilling,
         internedStringStore,
         config.analyzableTimeWindow.duration,
         loggerFactory,
-        enableissue12777Workaround = true,
         enableImportUpdateBackfill = config.updateHistoryBackfillImportUpdatesEnabled,
         scanAppMetrics.dbScanStore.history,
       )

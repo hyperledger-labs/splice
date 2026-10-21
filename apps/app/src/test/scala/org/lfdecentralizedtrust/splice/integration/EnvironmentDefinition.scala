@@ -94,7 +94,7 @@ case class EnvironmentDefinition(
       .withMultiSyncFeatureFlag()
       .withTrafficTopupsEnabled
       .withInitialPackageVersions
-      .withProtocolVersion(ProtocolVersion.v36)
+      .withProtocolVersion(ProtocolVersion.v37)
       .withProtocolVersionFromEnv
       .withEagerAppActivityMarkerConversion
 

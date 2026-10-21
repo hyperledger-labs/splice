@@ -58,13 +58,13 @@ groups:
                 refId: D
                 type: threshold
           dashboardUid: QP_wDqDnz
-          panelId: 11
+          panelId: 29
           noDataState: OK
           execErrState: OK
           for: $PENDING_PERIOD_IN_MINUTESm
           annotations:
             __dashboardUid__: QP_wDqDnz
-            __panelId__: "11"
+            __panelId__: "29"
             description: The pulumi operator failed to update the {{ $labels.stack }} stack. Check the logs for the deployment.
             runbook_url: ""
             severity: critical
