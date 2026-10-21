@@ -58,8 +58,8 @@ export class MultiValidator extends MultiNodeDeployment {
         : [];
 
     const extraValidatorEnvVars = [
-      ...(multiValidatorConfig?.extraValidatorEnvVars || []),
-      ...(multiValidatorConfig?.requiresOnboardingSecret
+      ...(args.config?.extraValidatorEnvVars || []),
+      ...(args.config?.requiresOnboardingSecret
         ? [
             {
               name: 'ADDITIONAL_CONFIG_AUTO_ONBOARDING_TRAFFIC_PURCHASE',
@@ -191,7 +191,7 @@ export class MultiValidator extends MultiNodeDeployment {
       },
       opts,
       undefined,
-      args.config.extraValidatorEnvVars
+      extraValidatorEnvVars
     );
   }
 }
