@@ -168,7 +168,7 @@ object SvSvStore {
       mkFilter(WalletAppInstall.COMPANION)(
         co => co.payload.endUserParty == sv,
         versionGuard = { case (pkgVersionSupport, now) =>
-          (tc) => pkgVersionSupport.supportsPermissionedSynchronizer(Seq(key.dsoParty), now)(tc)
+          (tc) => pkgVersionSupport.supportsTrafficBasedOnboarding(Seq(key.dsoParty), now)(tc)
         },
       ) { contract =>
         SvAcsStoreRowData(

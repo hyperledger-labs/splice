@@ -47,8 +47,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
   SvOnboardingRequest,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorrepermission.ValidatorRepermission
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunblocked.ValidatorUnblocked
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorblocked.ValidatorBlocked
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.{PaymentAmount, Unit}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.*
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
@@ -803,13 +803,13 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
       }
     }
 
-    "listValidatorRepermissions" should {
+    "listValidatorUnblockeds" should {
 
       "list all active contracts" in {
-        val p1 = validatorRepermission("participant1")
-        val p2 = validatorRepermission("participant1")
-        val p3 = validatorRepermission("participant3")
-        val p4 = validatorRepermission("participant4")
+        val p1 = validatorUnblocked("participant1")
+        val p2 = validatorUnblocked("participant1")
+        val p3 = validatorUnblocked("participant3")
+        val p4 = validatorUnblocked("participant4")
 
         for {
           store <- mkStore()
@@ -818,20 +818,20 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listValidatorRepermissions()(traceContext)
+          result <- store.listValidatorUnblockeds()(traceContext)
         } yield result should contain theSameElementsAs Seq(p1, p2, p3, p4)
       }
 
     }
 
-    "listValidatorUnpermissions" should {
+    "listValidatorBlockeds" should {
 
       "list all contracts matching the participantId" in {
-        val good1 = validatorUnpermission("participant1")
-        val good2 = validatorUnpermission("participant1", revoked = true)
+        val good1 = validatorBlocked("participant1")
+        val good2 = validatorBlocked("participant1", revoked = true)
 
-        val badParticipant1 = validatorUnpermission("wrong-participant")
-        val badParticipant2 = validatorUnpermission("another-wrong-participant")
+        val badParticipant1 = validatorBlocked("wrong-participant")
+        val badParticipant2 = validatorBlocked("another-wrong-participant")
 
         for {
           store <- mkStore()
@@ -840,7 +840,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listValidatorUnpermissions(
+          result <- store.listValidatorBlockeds(
             "participant1"
           )(traceContext)
         } yield result should contain theSameElementsAs Seq(good1, good2)
@@ -2261,34 +2261,34 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
     )
   }
 
-  protected def validatorRepermission(
+  protected def validatorUnblocked(
       participantId: String
   ) = {
-    val template = new ValidatorRepermission(
+    val template = new ValidatorUnblocked(
       dsoParty.toProtoPrimitive,
       participantId,
     )
     contract(
-      ValidatorRepermission.TEMPLATE_ID_WITH_PACKAGE_ID,
-      new ValidatorRepermission.ContractId(nextCid()),
+      ValidatorUnblocked.TEMPLATE_ID_WITH_PACKAGE_ID,
+      new ValidatorUnblocked.ContractId(nextCid()),
       template,
     )
   }
 
-  protected def validatorUnpermission(
+  protected def validatorBlocked(
       participantId: String,
       revoked: Boolean = false,
       loginAfter: Option[Instant] = None,
   ) = {
-    val template = new ValidatorUnpermission(
+    val template = new ValidatorBlocked(
       dsoParty.toProtoPrimitive,
       participantId,
       loginAfter.map(Optional.of(_)).getOrElse(Optional.empty()),
       java.lang.Boolean.valueOf(revoked),
     )
     contract(
-      ValidatorUnpermission.TEMPLATE_ID_WITH_PACKAGE_ID,
-      new ValidatorUnpermission.ContractId(nextCid()),
+      ValidatorBlocked.TEMPLATE_ID_WITH_PACKAGE_ID,
+      new ValidatorBlocked.ContractId(nextCid()),
       template,
     )
   }

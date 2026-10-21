@@ -16,14 +16,14 @@ import type { SetAmuletConfigCompleteFormData } from '../components/forms/SetAmu
 import type { SetDsoConfigCompleteFormData } from '../components/forms/SetDsoConfigRulesForm';
 import type { UpdateSvRewardWeightFormData } from '../components/forms/UpdateSvRewardWeightForm';
 
-export interface UnpermissionValidatorProposal {
+export interface BlockValidatorProposal {
   participantId: string;
   revoked: boolean;
   loginAfter?: string;
 }
 
-export interface RepermissionValidatorProposal {
-  unpermissionCid: string;
+export interface UnblockValidatorProposal {
+  blockedCid: string;
 }
 
 export interface OffBoardMemberProposal {
@@ -110,8 +110,8 @@ export type Proposal =
   | AmuletRulesConfigProposal
   | DsoRulesConfigProposal
   | UpdateFeatureAppProposal
-  | UnpermissionValidatorProposal
-  | RepermissionValidatorProposal
+  | BlockValidatorProposal
+  | UnblockValidatorProposal
   | undefined;
 
 export type ProposalActionMap = {
@@ -123,8 +123,8 @@ export type ProposalActionMap = {
   CRARC_SetConfig: AmuletRulesConfigProposal;
   SRARC_SetConfig: DsoRulesConfigProposal;
   SRARC_UpdateFeaturedAppRight: UpdateFeatureAppProposal;
-  SRARC_UnpermissionValidator: UnpermissionValidatorProposal;
-  SRARC_RepermissionValidator: RepermissionValidatorProposal;
+  SRARC_BlockValidator: BlockValidatorProposal;
+  SRARC_UnblockValidator: UnblockValidatorProposal;
   // If no proposal type is defined, can use unknown or a specific type:
   CRARC_AddFutureAmuletConfigSchedule: unknown;
 };
@@ -165,8 +165,8 @@ export type SupportedActionTag =
   | 'SRARC_UpdateSvRewardWeight'
   | 'SRARC_CreateUnallocatedUnclaimedActivityRecord'
   | 'SRARC_UpdateFeaturedAppRight'
-  | 'SRARC_UnpermissionValidator'
-  | 'SRARC_RepermissionValidator';
+  | 'SRARC_BlockValidator'
+  | 'SRARC_UnblockValidator';
 
 export type ProposalListingStatus =
   | 'Accepted'
@@ -232,13 +232,13 @@ export interface ProposalMutationArgs {
   action: ActionRequiringConfirmation;
 }
 
-export interface UnpermissionValidatorFormData extends CommonProposalFormData {
+export interface BlockValidatorFormData extends CommonProposalFormData {
   participantId: string;
   revoked: boolean;
   loginAfter: string;
 }
 
-export interface RepermissionValidatorFormData extends CommonProposalFormData {
+export interface UnblockValidatorFormData extends CommonProposalFormData {
   participantId: string;
 }
 
@@ -254,8 +254,8 @@ export type NonConfigProposalFormData =
   | GrantRevokeFeaturedAppFormData
   | CreateUnallocatedUnclaimedActivityRecordFormData
   | UpdateFeatureAppFormData
-  | UnpermissionValidatorFormData
-  | RepermissionValidatorFormData;
+  | BlockValidatorFormData
+  | UnblockValidatorFormData;
 
 export type ConfigProposalFormData = SetDsoConfigCompleteFormData | SetAmuletConfigCompleteFormData;
 

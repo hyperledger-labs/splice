@@ -44,13 +44,13 @@ interface BaseProposalSummaryProps {
 type ProposalSummaryProps = BaseProposalSummaryProps &
   (
     | {
-        formType: 'unpermission-validator';
+        formType: 'block-validator';
         participantId: string;
         revoked: boolean;
         loginAfter?: string;
       }
     | {
-        formType: 'repermission-validator';
+        formType: 'unblock-validator';
         participantId: string;
       }
     | {
@@ -248,29 +248,29 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
           />
         )}
 
-        {formType === 'repermission-validator' && (
+        {formType === 'unblock-validator' && (
           <ProposalReviewField
-            id="repermissionParticipantId"
+            id="unblockedParticipantId"
             label="Participant ID"
             value={props.participantId}
           />
         )}
 
-        {formType === 'unpermission-validator' && (
+        {formType === 'block-validator' && (
           <>
             <ProposalReviewField
-              id="unpermissionParticipantId"
+              id="blockedParticipantId"
               label="Participant ID"
               value={props.participantId}
             />
             <ProposalReviewField
-              id="unpermissionRevoked"
+              id="blockedRevoked"
               label="Permanent Revocation"
               value={props.revoked ? 'Yes' : 'No'}
             />
             {!props.revoked && props.loginAfter && (
               <ProposalReviewField
-                id="unpermissionLoginAfter"
+                id="blockedLoginAfter"
                 label="Login After"
                 value={props.loginAfter}
               />

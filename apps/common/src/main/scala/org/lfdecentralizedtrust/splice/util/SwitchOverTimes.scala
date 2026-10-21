@@ -29,19 +29,19 @@ object SwitchOverTimes {
 
   val NoFeaturedAppChoiceContext = "no-featured-app-choice-context"
 
-  val PermissionedSynchronizer = "permissioned-synchronizer"
+  val TrafficBasedOnboarding = "traffic-based-onboarding"
 
-  def permissionedSynchronizerScheduled(dsoRules: DsoRules): Boolean = {
+  def trafficBasedOnboardingScheduled(dsoRules: DsoRules): Boolean = {
     dsoRules.config.svOperationsSwitchOverTimes.toScala
-      .fold(false)(_.containsKey(PermissionedSynchronizer))
+      .fold(false)(_.containsKey(TrafficBasedOnboarding))
   }
 
-  def permissionedSynchronizerEnabled(clock: Clock, dsoRules: DsoRules) =
-    shouldSwitchOver(clock, dsoRules, PermissionedSynchronizer)
+  def trafficBasedOnboardingEnabled(clock: Clock, dsoRules: DsoRules) =
+    shouldSwitchOver(clock, dsoRules, TrafficBasedOnboarding)
 
-  def getPermissionedSynchronizerSwitchOverTime(dsoRules: DsoRules): Option[Instant] = {
+  def getTrafficBasedOnboardingSwitchOverTime(dsoRules: DsoRules): Option[Instant] = {
     dsoRules.config.svOperationsSwitchOverTimes.toScala
-      .flatMap(_.asScala.get(PermissionedSynchronizer))
+      .flatMap(_.asScala.get(TrafficBasedOnboarding))
   }
 
 }

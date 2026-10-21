@@ -201,19 +201,19 @@ class HttpSvOperatorHandler(
     }
   }
 
-  override def listValidatorUnpermissions(
-      respond: r0.ListValidatorUnpermissionsResponse.type
+  override def listValidatorBlockeds(
+      respond: r0.ListValidatorBlockedsResponse.type
   )(
       participantId: String
-  )(extracted: ActAsKnownUserRequest): Future[r0.ListValidatorUnpermissionsResponse] = {
+  )(extracted: ActAsKnownUserRequest): Future[r0.ListValidatorBlockedsResponse] = {
     implicit val ActAsKnownUserRequest(traceContext) = extracted
-    withSpan(s"$workflowId.listValidatorUnpermissions") { _ => _ =>
+    withSpan(s"$workflowId.listValidatorBlockeds") { _ => _ =>
       for {
-        unpermissions <- dsoStore.listValidatorUnpermissions(participantId)
+        blockeds <- dsoStore.listValidatorBlockeds(participantId)
       } yield {
-        r0.ListValidatorUnpermissionsResponse.OK(
-          definitions.ListValidatorUnpermissionsResponse(
-            unpermissions.map(_.toHttp).toVector
+        r0.ListValidatorBlockedsResponse.OK(
+          definitions.ListValidatorBlockedsResponse(
+            blockeds.map(_.toHttp).toVector
           )
         )
       }

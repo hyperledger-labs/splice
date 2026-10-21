@@ -2528,10 +2528,10 @@ updateTestConfigForParallelRuns := {
   def isNonDevNetTest(name: String): Boolean = name.contains("NonDevNet")
   def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
   def isEnterpriseIntegrationTest(name: String): Boolean = name.contains("Enterprise")
-  def isPermissionedSynchronizerTest(name: String): Boolean =
-    name.contains("PermissionedSynchronizer") && !name.contains("Migration")
-  def isPermissionedSynchronizerMigrationTest(name: String): Boolean =
-    name.contains("PermissionedSynchronizer") && name.contains("Migration")
+  def isTrafficBasedOnboardingTest(name: String): Boolean =
+    name.contains("TrafficBasedOnboarding") && !name.contains("Migration")
+  def isTrafficBasedOnboardingMigrationTest(name: String): Boolean =
+    name.contains("TrafficBasedOnboarding") && name.contains("Migration")
   def isIntegrationTest(name: String): Boolean =
     name.contains("org.lfdecentralizedtrust.splice.integration.tests") || name.contains(
       "IntegrationTest"
@@ -2608,14 +2608,14 @@ updateTestConfigForParallelRuns := {
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
     (
-      "permissioned synchronizer migration tests",
-      "test-full-class-names-permissioned-migration.log",
-      (t: String) => isPermissionedSynchronizerMigrationTest(t),
+      "traffic based onboarding migration tests",
+      "test-full-class-names-traffic-based-onboarding-2.log",
+      (t: String) => isTrafficBasedOnboardingMigrationTest(t),
     ),
     (
-      "permissioned synchronizer tests",
-      "test-full-class-names-permissioned.log",
-      (t: String) => isPermissionedSynchronizerTest(t),
+      "traffic based onboarding tests",
+      "test-full-class-names-traffic-based-onboarding-1.log",
+      (t: String) => isTrafficBasedOnboardingTest(t),
     ),
     (
       "manual tests with custom canton instance",

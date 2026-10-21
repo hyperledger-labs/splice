@@ -3,14 +3,14 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.HasExecutionContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_OffboardSv,
-  DsoRules_RepermissionValidator,
-  DsoRules_UnpermissionValidator,
+  DsoRules_UnblockValidator,
+  DsoRules_BlockValidator,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_OffboardSv,
-  SRARC_RepermissionValidator,
-  SRARC_UnpermissionValidator,
+  SRARC_UnblockValidator,
+  SRARC_BlockValidator,
 }
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -21,11 +21,11 @@ import org.lfdecentralizedtrust.splice.util.*
 import java.time.Instant
 import java.util.Optional
 import com.digitalasset.canton.data.CantonTimestamp
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorrepermission.ValidatorRepermission
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunblocked.ValidatorUnblocked
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorblocked.ValidatorBlocked
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 
-class PermissionedSynchronizerIntegrationTest
+class TrafficBasedOnboardingIntegrationTest
     extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
@@ -47,7 +47,7 @@ class PermissionedSynchronizerIntegrationTest
           foundDso.copy(
             initialSvOperationsSwitchOverTimes = Some(
               currentTimes + (
-                SwitchOverTimes.PermissionedSynchronizer -> com.digitalasset.canton.data.CantonTimestamp.MinValue
+                SwitchOverTimes.TrafficBasedOnboarding -> com.digitalasset.canton.data.CantonTimestamp.MinValue
               )
             )
           )
@@ -156,7 +156,7 @@ class PermissionedSynchronizerIntegrationTest
     aliceValidatorBackend.stop()
 
     clue("SVs vote to temporarily suspend Bob") {
-      manuallyUnpermissionValidator(bobParticipantId, Some(suspendTime), revoked = false)
+      manuallyBlockValidator(bobParticipantId, Some(suspendTime), revoked = false)
     }
 
     clue("Verify Bob's ParticipantSynchronizerPermission is updated with loginAfter") {
@@ -170,7 +170,7 @@ class PermissionedSynchronizerIntegrationTest
       }
     }
     clue("SVs vote to permanently revoke Bob") {
-      manuallyUnpermissionValidator(bobParticipantId, None, revoked = true)
+      manuallyBlockValidator(bobParticipantId, None, revoked = true)
     }
 
     clue("Verify Bob's ParticipantSynchronizerPermission is completely removed") {
@@ -182,15 +182,15 @@ class PermissionedSynchronizerIntegrationTest
       }
     }
 
-    clue("Wait for SV automation to merge Bob's ValidatorUnpermission contracts") {
+    clue("Wait for SV automation to merge Bob's ValidatorBlocked contracts") {
       eventually() {
-        sv1Backend.listValidatorUnpermissions(bobParticipantId) should have size 1
+        sv1Backend.listValidatorBlockeds(bobParticipantId) should have size 1
       }
     }
 
-    clue("SVs vote to repermission Bob") {
-      manuallyRepermissionValidator(
-        sv1Backend.listValidatorUnpermissions(bobParticipantId).head.contractId
+    clue("SVs vote to unblocked Bob") {
+      manuallyUnblockValidator(
+        sv1Backend.listValidatorBlockeds(bobParticipantId).head.contractId
       )
     }
 
@@ -203,10 +203,10 @@ class PermissionedSynchronizerIntegrationTest
       }
     }
 
-    clue("Verify ValidatorRepermission contract is archived by automation") {
+    clue("Verify ValidatorUnblocked contract is archived by automation") {
       eventually() {
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(ValidatorRepermission.COMPANION)(
+          .filterJava(ValidatorUnblocked.COMPANION)(
             sv1Backend.getDsoInfo().dsoParty,
             co => co.data.participantId == bobParticipantId,
           ) shouldBe empty
@@ -218,14 +218,14 @@ class PermissionedSynchronizerIntegrationTest
       bobValidatorBackend.onboardUser("TestUserBob2")
     }
 
-    def manuallyUnpermissionValidator(
+    def manuallyBlockValidator(
         participantId: String,
         loginAfter: Option[Instant],
         revoked: Boolean,
     ): Unit = {
       val action = new ARC_DsoRules(
-        new SRARC_UnpermissionValidator(
-          new DsoRules_UnpermissionValidator(
+        new SRARC_BlockValidator(
+          new DsoRules_BlockValidator(
             participantId,
             loginAfter.map(Optional.of(_)).getOrElse(Optional.empty()),
             java.lang.Boolean.valueOf(revoked),
@@ -234,7 +234,7 @@ class PermissionedSynchronizerIntegrationTest
       )
 
       val (_, voteRequest) = actAndCheck(
-        s"SV1 creates vote request to unpermission $participantId (revoked=$revoked)",
+        s"SV1 creates vote request to blocked $participantId (revoked=$revoked)",
         eventuallySucceeds() {
           sv1Backend.createVoteRequest(
             sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
@@ -264,17 +264,17 @@ class PermissionedSynchronizerIntegrationTest
       }
     }
 
-    def manuallyRepermissionValidator(
-        unpermissionCid: ValidatorUnpermission.ContractId
+    def manuallyUnblockValidator(
+        blockedCid: ValidatorBlocked.ContractId
     ): Unit = {
       val action = new ARC_DsoRules(
-        new SRARC_RepermissionValidator(
-          new DsoRules_RepermissionValidator(unpermissionCid)
+        new SRARC_UnblockValidator(
+          new DsoRules_UnblockValidator(blockedCid)
         )
       )
 
       val (_, voteRequest) = actAndCheck(
-        s"SV1 creates vote request to repermission validator",
+        s"SV1 creates vote request to unblock validator",
         eventuallySucceeds() {
           sv1Backend.createVoteRequest(
             sv1Backend.getDsoInfo().svParty.toProtoPrimitive,

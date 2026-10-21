@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorblocked.ValidatorBlocked
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, SwitchOverTimes}
@@ -23,7 +23,7 @@ import org.lfdecentralizedtrust.splice.util.{AssignedContract, SwitchOverTimes}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 
-class ValidatorUnpermissionTrigger(
+class ValidatorBlockedTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
@@ -32,33 +32,33 @@ class ValidatorUnpermissionTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[
-      ValidatorUnpermission.ContractId,
-      ValidatorUnpermission,
+      ValidatorBlocked.ContractId,
+      ValidatorBlocked,
     ](
       store,
-      ValidatorUnpermission.COMPANION,
+      ValidatorBlocked.COMPANION,
     ) {
 
   override protected def completeTask(
-      unpermission: AssignedContract[ValidatorUnpermission.ContractId, ValidatorUnpermission]
+      blocked: AssignedContract[ValidatorBlocked.ContractId, ValidatorBlocked]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val payload = unpermission.payload
+    val payload = blocked.payload
 
     ParticipantId
       .fromProtoPrimitive(payload.participantId, "participantId")
       .fold(
         err =>
           Future.successful(
-            TaskSuccess(s"Skipping ValidatorUnpermission with invalid participantId: $err")
+            TaskSuccess(s"Skipping ValidatorBlocked with invalid participantId: $err")
           ),
         participantId => {
           for {
             dsoRules <- store.getDsoRules()
             outcome <-
-              if (!SwitchOverTimes.permissionedSynchronizerScheduled(dsoRules.payload)) {
+              if (!SwitchOverTimes.trafficBasedOnboardingScheduled(dsoRules.payload)) {
                 Future.successful(
                   TaskSuccess(
-                    "Skipped because permissionedSynchronizer switchover has not occurred"
+                    "Skipped because trafficBasedOnboarding switchover has not occurred"
                   )
                 )
               } else {

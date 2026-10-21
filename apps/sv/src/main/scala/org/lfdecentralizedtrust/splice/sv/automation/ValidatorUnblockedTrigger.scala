@@ -15,10 +15,10 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_ArchiveValidatorRepermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_ArchiveValidatorUnblocked
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ArchiveValidatorRepermission
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorrepermission.ValidatorRepermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ArchiveValidatorUnblocked
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunblocked.ValidatorUnblocked
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   RetryFor,
@@ -30,7 +30,7 @@ import org.lfdecentralizedtrust.splice.util.{Contract, SwitchOverTimes}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class ValidatorRepermissionTrigger(
+class ValidatorUnblockedTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
@@ -39,35 +39,35 @@ class ValidatorRepermissionTrigger(
     override val ec: ExecutionContext,
     mat: Materializer,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[ValidatorRepermissionTrigger.Task] {
+) extends PollingParallelTaskExecutionTrigger[ValidatorUnblockedTrigger.Task] {
 
   private val svParty = store.key.svParty
   private val dsoParty = store.key.dsoParty
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
-  ): Future[Seq[ValidatorRepermissionTrigger.Task]] = {
+  ): Future[Seq[ValidatorUnblockedTrigger.Task]] = {
     for {
       dsoRules <- store.getDsoRules()
-      repermissions <-
-        if (SwitchOverTimes.permissionedSynchronizerScheduled(dsoRules.payload))
-          store.listValidatorRepermissions()
+      unblockeds <-
+        if (SwitchOverTimes.trafficBasedOnboardingScheduled(dsoRules.payload))
+          store.listValidatorUnblockeds()
         else Future.successful(Seq.empty)
-    } yield repermissions.map(ValidatorRepermissionTrigger.Task(_))
+    } yield unblockeds.map(ValidatorUnblockedTrigger.Task(_))
   }
 
   override protected def completeTask(
-      task: ValidatorRepermissionTrigger.Task
+      task: ValidatorUnblockedTrigger.Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val payload = task.repermission.payload
+    val payload = task.unblocked.payload
 
     ParticipantId
       .fromProtoPrimitive(payload.participantId, "participantId")
       .fold(
         err => {
-          logger.warn(s"Skipping ValidatorRepermission with invalid participantId: $err")
+          logger.warn(s"Skipping ValidatorUnblocked with invalid participantId: $err")
           Future.successful(
-            TaskSuccess(s"Skipping ValidatorRepermission with invalid participantId: $err")
+            TaskSuccess(s"Skipping ValidatorUnblocked with invalid participantId: $err")
           )
         },
         participantId => {
@@ -85,8 +85,8 @@ class ValidatorRepermissionTrigger(
             )
 
             action = new ARC_DsoRules(
-              new SRARC_ArchiveValidatorRepermission(
-                new DsoRules_ArchiveValidatorRepermission(task.repermission.contractId)
+              new SRARC_ArchiveValidatorUnblocked(
+                new DsoRules_ArchiveValidatorUnblocked(task.unblocked.contractId)
               )
             )
 
@@ -116,16 +116,16 @@ class ValidatorRepermissionTrigger(
                   )
                   .withDedup(
                     commandId = SpliceLedgerConnection.CommandId(
-                      "org.lfdecentralizedtrust.splice.sv.confirmArchiveValidatorRepermission",
+                      "org.lfdecentralizedtrust.splice.sv.confirmArchiveValidatorUnblocked",
                       Seq(svParty, dsoParty),
-                      task.repermission.contractId.contractId,
+                      task.unblocked.contractId.contractId,
                     ),
                     deduplicationConfig = DedupOffset(minOffset),
                   )
                   .yieldResult()
                   .map { _ =>
                     TaskSuccess(
-                      s"Restored permission for $participantId and created confirmation to archive ValidatorRepermission"
+                      s"Restored permission for $participantId and created confirmation to archive ValidatorUnblocked"
                     )
                   }
             }
@@ -135,21 +135,21 @@ class ValidatorRepermissionTrigger(
   }
 
   override protected def isStaleTask(
-      task: ValidatorRepermissionTrigger.Task
+      task: ValidatorUnblockedTrigger.Task
   )(implicit tc: TraceContext): Future[Boolean] = {
     store.multiDomainAcsStore
-      .lookupContractById(ValidatorRepermission.COMPANION)(task.repermission.contractId)
+      .lookupContractById(ValidatorUnblocked.COMPANION)(task.unblocked.contractId)
       .map(_.isEmpty)
   }
 }
 
-object ValidatorRepermissionTrigger {
+object ValidatorUnblockedTrigger {
   final case class Task(
-      repermission: Contract[ValidatorRepermission.ContractId, ValidatorRepermission]
+      unblocked: Contract[ValidatorUnblocked.ContractId, ValidatorUnblocked]
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] = prettyOfClass(
-      param("contractId", _.repermission.contractId.contractId.unquoted),
-      param("participantId", _.repermission.payload.participantId.unquoted),
+      param("contractId", _.unblocked.contractId.contractId.unquoted),
+      param("participantId", _.unblocked.payload.participantId.unquoted),
     )
   }
 }

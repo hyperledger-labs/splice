@@ -232,14 +232,12 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             <OffboardMemberSection memberPartyId={proposalDetails.proposal.memberToOffboard} />
           )}
 
-          {proposalDetails.action === 'SRARC_RepermissionValidator' && (
-            <RepermissionValidatorSection
-              unpermissionCid={proposalDetails.proposal.unpermissionCid}
-            />
+          {proposalDetails.action === 'SRARC_UnblockValidator' && (
+            <UnblockValidatorSection blockedCid={proposalDetails.proposal.blockedCid} />
           )}
 
-          {proposalDetails.action === 'SRARC_UnpermissionValidator' && (
-            <UnpermissionValidatorSection
+          {proposalDetails.action === 'SRARC_BlockValidator' && (
+            <BlockValidatorSection
               participantId={proposalDetails.proposal.participantId}
               revoked={proposalDetails.proposal.revoked}
               loginAfter={proposalDetails.proposal.loginAfter}
@@ -786,21 +784,21 @@ const VoteItem: React.FC<VoteItemProps> = ({
   );
 };
 
-interface UnpermissionValidatorSectionProps {
+interface BlockValidatorSectionProps {
   participantId: string;
   revoked: boolean;
   loginAfter?: string;
 }
 
-const UnpermissionValidatorSection = ({
+const BlockValidatorSection = ({
   participantId,
   revoked,
   loginAfter,
-}: UnpermissionValidatorSectionProps) => {
+}: BlockValidatorSectionProps) => {
   return (
     <Box
-      id="proposal-details-unpermission-validator-section"
-      data-testid="proposal-details-unpermission-validator-section"
+      id="proposal-details-block-validator-section"
+      data-testid="proposal-details-block-validator-section"
       sx={{ display: 'contents' }}
     >
       <DetailItem
@@ -829,27 +827,27 @@ const UnpermissionValidatorSection = ({
   );
 };
 
-interface RepermissionValidatorSectionProps {
-  unpermissionCid: string;
+interface UnblockValidatorSectionProps {
+  blockedCid: string;
 }
 
-const RepermissionValidatorSection = ({ unpermissionCid }: RepermissionValidatorSectionProps) => {
+const UnblockValidatorSection = ({ blockedCid }: UnblockValidatorSectionProps) => {
   return (
     <Box
-      id="proposal-details-repermission-validator-section"
-      data-testid="proposal-details-repermission-validator-section"
+      id="proposal-details-unblock-validator-section"
+      data-testid="proposal-details-unblock-validator-section"
       sx={{ display: 'contents' }}
     >
       <DetailItem
-        label="Validator Unpermission Contract ID"
+        label="Validator Blocked Contract ID"
         value={
           <CopyableIdentifier
-            value={unpermissionCid}
+            value={blockedCid}
             size="large"
-            data-testid="proposal-details-repermission-unpermission-cid"
+            data-testid="proposal-details-unblocked-blocked-cid"
           />
         }
-        labelId="proposal-details-repermission-unpermission-cid-label"
+        labelId="proposal-details-unblocked-blocked-cid-label"
       />
     </Box>
   );

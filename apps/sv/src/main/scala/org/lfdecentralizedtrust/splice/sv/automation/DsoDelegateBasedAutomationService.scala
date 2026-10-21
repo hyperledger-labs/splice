@@ -161,7 +161,7 @@ class DsoDelegateBasedAutomationService(
       )
     )
     registerTrigger(
-      new MergeValidatorUnpermissionContractsTrigger(
+      new MergeValidatorBlockedContractsTrigger(
         triggerContext,
         svTaskContext,
       )
@@ -271,7 +271,7 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[TerminatedSubscriptionTrigger],
     aTrigger[MergeSvRewardStateContractsTrigger],
     aTrigger[MergeValidatorLicenseContractsTrigger],
-    aTrigger[MergeValidatorUnpermissionContractsTrigger],
+    aTrigger[MergeValidatorBlockedContractsTrigger],
     aTrigger[FeaturedAppActivityMarkerTrigger],
     aTrigger[AllocateUnallocatedUnclaimedActivityRecordTrigger],
     aTrigger[ExpiredUnallocatedUnclaimedActivityRecordTrigger],

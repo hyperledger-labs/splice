@@ -25,7 +25,7 @@ import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboarding
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorblocked.ValidatorBlocked
 
 import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
@@ -37,23 +37,23 @@ object HttpSvOperatorAppClient {
     val createGenClientFn = (fn, host, ec, mat) => Client.httpClient(fn, host)(ec, mat)
   }
 
-  case class ListValidatorUnpermissions(participantId: String)
+  case class ListValidatorBlockeds(participantId: String)
       extends BaseCommand[
-        http.ListValidatorUnpermissionsResponse,
-        Seq[Contract[ValidatorUnpermission.ContractId, ValidatorUnpermission]],
+        http.ListValidatorBlockedsResponse,
+        Seq[Contract[ValidatorBlocked.ContractId, ValidatorBlocked]],
       ] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListValidatorUnpermissionsResponse] =
-      client.listValidatorUnpermissions(participantId, headers = headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListValidatorBlockedsResponse] =
+      client.listValidatorBlockeds(participantId, headers = headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.ListValidatorUnpermissionsResponse.OK(response) =>
-      response.unpermissions
-        .traverse(req => Contract.fromHttp(ValidatorUnpermission.COMPANION)(req))
+    ) = { case http.ListValidatorBlockedsResponse.OK(response) =>
+      response.blockeds
+        .traverse(req => Contract.fromHttp(ValidatorBlocked.COMPANION)(req))
         .leftMap(_.toString)
     }
   }

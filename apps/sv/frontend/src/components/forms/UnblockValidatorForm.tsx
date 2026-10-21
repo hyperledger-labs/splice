@@ -7,7 +7,7 @@ import dayjs from 'dayjs';
 import { createProposalActions, getInitialExpiration } from '../../utils/governance';
 import { dateTimeFormatISO } from '@canton-network/splice-common-frontend-utils';
 import { ContractId } from '@daml/types';
-import { ValidatorUnpermission } from '@daml.js/splice-dso-governance/lib/Splice/ValidatorUnpermission';
+import { ValidatorBlocked } from '@daml.js/splice-dso-governance/lib/Splice/ValidatorBlocked';
 import {
   validateEffectiveDate,
   validateExpiration,
@@ -18,7 +18,7 @@ import {
 } from './formValidators';
 import { FormLayout } from './FormLayout';
 import { useState } from 'react';
-import { RepermissionValidatorFormData } from '../../utils/types';
+import { UnblockValidatorFormData } from '../../utils/types';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { ProposalSummary } from '../governance/ProposalSummary';
 import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
@@ -34,7 +34,7 @@ import {
   THRESHOLD_DEADLINE_SUBTITLE,
 } from '../../utils/constants';
 
-export const RepermissionValidatorForm: React.FC = () => {
+export const UnblockValidatorForm: React.FC = () => {
   const dsoInfosQuery = useDsoInfos();
   const svAdminClient = useSvAdminClient();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
@@ -43,10 +43,10 @@ export const RepermissionValidatorForm: React.FC = () => {
   const mutation = useProposalMutation();
 
   const createProposalAction = createProposalActions.find(
-    a => a.value === 'SRARC_RepermissionValidator'
+    a => a.value === 'SRARC_UnblockValidator'
   );
 
-  const defaultValues: RepermissionValidatorFormData = {
+  const defaultValues: UnblockValidatorFormData = {
     action: createProposalAction?.name || '',
     expiryDate: initialExpiration.format(dateTimeFormatISO),
     effectiveDate: {
@@ -63,12 +63,12 @@ export const RepermissionValidatorForm: React.FC = () => {
     if (formatErr) return formatErr;
 
     try {
-      const response = await svAdminClient.listValidatorUnpermissions(value);
-      if (response.unpermissions.length === 0) {
-        return 'No unpermission contracts found for this participant.';
+      const response = await svAdminClient.listValidatorBlockeds(value);
+      if (response.blockeds.length === 0) {
+        return 'No blocked contracts found for this participant.';
       }
-      if (response.unpermissions.length > 1) {
-        return 'Multiple unpermission contracts found. Please wait for SV automation to merge them.';
+      if (response.blockeds.length > 1) {
+        return 'Multiple blocked contracts found. Please wait for SV automation to merge them.';
       }
       return undefined;
     } catch (error: unknown) {
@@ -85,14 +85,10 @@ export const RepermissionValidatorForm: React.FC = () => {
       if (!showConfirmation) {
         setShowConfirmation(true);
       } else {
-        const unpermissionsRes = await svAdminClient.listValidatorUnpermissions(
-          value.participantId
-        );
+        const blockedsRes = await svAdminClient.listValidatorBlockeds(value.participantId);
 
-        if (unpermissionsRes.unpermissions.length !== 1) {
-          console.error(
-            'Submission blocked: Participant must have exactly 1 unpermission contract.'
-          );
+        if (blockedsRes.blockeds.length !== 1) {
+          console.error('Submission blocked: Participant must have exactly 1 blocked contract.');
           return;
         }
 
@@ -100,10 +96,10 @@ export const RepermissionValidatorForm: React.FC = () => {
           tag: 'ARC_DsoRules',
           value: {
             dsoAction: {
-              tag: 'SRARC_RepermissionValidator',
+              tag: 'SRARC_UnblockValidator',
               value: {
-                validatorUnpermissionCid: unpermissionsRes.unpermissions[0]
-                  .contract_id as unknown as ContractId<ValidatorUnpermission>,
+                validatorBlockedCid: blockedsRes.blockeds[0]
+                  .contract_id as unknown as ContractId<ValidatorBlocked>,
               },
             },
           },
@@ -128,7 +124,7 @@ export const RepermissionValidatorForm: React.FC = () => {
     <>
       <FormLayout
         form={form}
-        id="repermission-validator-form"
+        id="unblock-validator-form"
         actionName={form.state.values.action}
         isReviewStep={showConfirmation}
       >
@@ -139,7 +135,7 @@ export const RepermissionValidatorForm: React.FC = () => {
             summary={form.state.values.summary}
             expiryDate={form.state.values.expiryDate}
             effectiveDate={form.state.values.effectiveDate.effectiveDate}
-            formType="repermission-validator"
+            formType="unblock-validator"
             participantId={form.state.values.participantId}
             onEdit={() => setShowConfirmation(false)}
             onSubmit={() => {}}
@@ -149,7 +145,7 @@ export const RepermissionValidatorForm: React.FC = () => {
             <form.AppField name="action">
               {field => (
                 <field.ProposalTypeField
-                  id="repermission-validator-action"
+                  id="unblock-validator-action"
                   title={CREATE_PROPOSAL_LABEL_PROPOSAL_TYPE}
                 />
               )}
@@ -166,7 +162,7 @@ export const RepermissionValidatorForm: React.FC = () => {
               {field => (
                 <field.TextField
                   title="Participant ID"
-                  id="repermission-validator-participant-id"
+                  id="unblock-validator-participant-id"
                   muiTextFieldProps={{ placeholder: 'Enter Participant ID' }}
                   subtitle={
                     field.state.meta.isValidating ? 'Validating participant ID...' : undefined
@@ -186,7 +182,7 @@ export const RepermissionValidatorForm: React.FC = () => {
                 <field.DateField
                   title={CREATE_PROPOSAL_LABEL_THRESHOLD_DEADLINE}
                   description={THRESHOLD_DEADLINE_SUBTITLE}
-                  id="repermission-validator-expiry-date"
+                  id="unblock-validator-expiry-date"
                 />
               )}
             </form.AppField>
@@ -202,7 +198,7 @@ export const RepermissionValidatorForm: React.FC = () => {
                   title={CREATE_PROPOSAL_LABEL_EFFECTIVE_AT}
                   description="Select the date and time the proposal will take effect"
                   initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
-                  id="repermission-validator-effective-date"
+                  id="unblock-validator-effective-date"
                 />
               )}
             />
@@ -216,7 +212,7 @@ export const RepermissionValidatorForm: React.FC = () => {
             >
               {field => (
                 <field.ProposalSummaryField
-                  id="repermission-validator-summary"
+                  id="unblock-validator-summary"
                   title={CREATE_PROPOSAL_LABEL_PROPOSAL_SUMMARY}
                 />
               )}
@@ -232,7 +228,7 @@ export const RepermissionValidatorForm: React.FC = () => {
               {field => (
                 <field.TextField
                   title={CREATE_PROPOSAL_LABEL_SUPPORTING_URL}
-                  id="repermission-validator-url"
+                  id="unblock-validator-url"
                   muiTextFieldProps={{ placeholder: SUPPORTING_URL_PLACEHOLDER }}
                 />
               )}

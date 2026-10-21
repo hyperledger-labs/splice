@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   VoteRequest,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorblocked.ValidatorBlocked
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
 import org.lfdecentralizedtrust.splice.environment.{
   BuildInfo,
@@ -84,13 +84,13 @@ abstract class SvAppReference(
       httpCommand(HttpSvPublicAppClient.getSvOnboardingStatus(candidate))
     }
 
-  @Help.Summary("List ValidatorUnpermission contracts for a participant")
-  def listValidatorUnpermissions(
+  @Help.Summary("List ValidatorBlocked contracts for a participant")
+  def listValidatorBlockeds(
       participantId: String
-  ): Seq[Contract[ValidatorUnpermission.ContractId, ValidatorUnpermission]] = {
+  ): Seq[Contract[ValidatorBlocked.ContractId, ValidatorBlocked]] = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvOperatorAppClient.ListValidatorUnpermissions(participantId)
+        HttpSvOperatorAppClient.ListValidatorBlockeds(participantId)
       )
     }
   }

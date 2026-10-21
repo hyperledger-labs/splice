@@ -50,11 +50,11 @@ paths:
                 "$ref": "#/components/schemas/PrepareValidatorOnboardingResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /v0/admin/validator/unpermissions/{participant_id}:
+  /v0/admin/validator/blockeds/{participant_id}:
     get:
       tags: [sv]
       x-jvm-package: sv_operator
-      operationId: "listValidatorUnpermissions"
+      operationId: "listValidatorBlockeds"
       parameters:
         - name: "participant_id"
           in: "path"
@@ -67,7 +67,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListValidatorUnpermissionsResponse"
+                $ref: "#/components/schemas/ListValidatorBlockedsResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "500":
@@ -1164,12 +1164,12 @@ components:
         featured_app_right:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
-    ListValidatorUnpermissionsResponse:
+    ListValidatorBlockedsResponse:
       type: object
       required:
-        - unpermissions
+        - blockeds
       properties:
-        unpermissions:
+        blockeds:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"

@@ -64,10 +64,10 @@ class GrantValidatorPermissionTrigger(
           for {
             dsoRules <- store.getDsoRules()
             outcome <-
-              if (!SwitchOverTimes.permissionedSynchronizerScheduled(dsoRules.payload)) {
+              if (!SwitchOverTimes.trafficBasedOnboardingScheduled(dsoRules.payload)) {
                 Future.successful(
                   TaskSuccess(
-                    "Skipped because permissionedSynchronizer switchover has not occurred"
+                    "Skipped because trafficBasedOnboarding switchover has not occurred"
                   )
                 )
               } else {
@@ -85,11 +85,11 @@ class GrantValidatorPermissionTrigger(
                     StoreMemberId(memberId),
                     synchronizerId,
                   )
-                  unpermissions <- store.listValidatorUnpermissions(payload.memberId)
+                  blockeds <- store.listValidatorBlockeds(payload.memberId)
 
                   _ <-
                     if (
-                      totalPurchasedTraffic >= minMemberTrafficToOnboardValidator && unpermissions.isEmpty
+                      totalPurchasedTraffic >= minMemberTrafficToOnboardValidator && blockeds.isEmpty
                     ) {
                       participantAdminConnection.ensureParticipantSynchronizerPermission(
                         synchronizerId = synchronizerId,
@@ -101,9 +101,9 @@ class GrantValidatorPermissionTrigger(
                       Future.unit
                     }
                 } yield {
-                  if (unpermissions.nonEmpty) {
+                  if (blockeds.nonEmpty) {
                     TaskSuccess(
-                      s"Skipped Submission permission for participant $participantId because a ValidatorUnpermission contract exists."
+                      s"Skipped Submission permission for participant $participantId because a ValidatorBlocked contract exists."
                     )
                   } else if (totalPurchasedTraffic >= minMemberTrafficToOnboardValidator) {
                     TaskSuccess(
