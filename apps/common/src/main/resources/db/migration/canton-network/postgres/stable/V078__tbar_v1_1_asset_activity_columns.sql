@@ -13,9 +13,14 @@ alter table app_activity_record_store
     add column asset_activity_weights           bigint[] not null default '{}'::bigint[];
 
 alter table app_activity_party_totals
+    rename column num_activity_records to num_app_activity_records;
+
+alter table app_activity_party_totals
     -- Per-party asset activity bytes for the round. Mirrors
     -- total_app_activity_weight.
-    add column total_asset_activity_weight bigint not null default 0;
+    add column total_asset_activity_weight bigint not null default 0,
+    -- Per-party asset activity record count. Mirrors num_app_activity_records.
+    add column num_asset_activity_records bigint not null default 0;
 
 alter table app_activity_round_totals
     -- Round-wide asset activity bytes. Mirrors total_round_app_activity_weight.
