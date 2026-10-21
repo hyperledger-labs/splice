@@ -394,9 +394,9 @@ SELECT count(*), max(row_id) FROM \`$BQ_DATASET.partition_test_sim_update_histor
 -- expect 5, 5, unchanged: none of the gap rows arrive
 ```
 
-- **Expected:** the stream stays `RUNNING`.
-- **Record** whether `gcloud datastream objects list` or the console flags the
-  `sim_update_history_c_x` object at all.
+- **Expected:** the stream stays `RUNNING`, and nothing flags the gap: the
+  console's stream details Objects tab lists `partition_test.sim_update_history_c_x`
+  as normal (seen in a real run). Only the row counts above reveal it.
 
 ### 2e. The config change: the operator re-runs `bigquery-cloudsql.sh`
 
@@ -444,7 +444,7 @@ SELECT table_name FROM \`$BQ_DATASET\`.INFORMATION_SCHEMA.TABLES ORDER BY 1;
 -- expect only partition_test_sim_scan_verdict_store and partition_test_sim_update_history_c_x;
 -- no …_sim_update_history_c_x_legacy and no per-partition table
 
-SELECT split_part(payload, ' ', 1) AS phase, count(*), min(row_id), max(row_id)
+SELECT SPLIT(payload, ' ')[OFFSET(0)] AS phase, count(*), min(row_id), max(row_id)
   FROM \`$BQ_DATASET.partition_test_sim_update_history_c_x\` GROUP BY 1 ORDER BY 1;
 -- expect post-fix, 4, 18, 21 and pre-cutover, 5, 1, 5; no gap rows
 
