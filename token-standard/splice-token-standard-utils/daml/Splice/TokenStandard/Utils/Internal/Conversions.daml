@@ -98,13 +98,13 @@ encodeRelTime t  = show (convertRelTimeToMicroseconds t)
 encodeTime : Time -> Text
 encodeTime t = show (convertRelTimeToMicroseconds(t `subTime` epoch))
 
-decodeRelTime : Text -> RelTime
-decodeRelTime t = case T.parseInt t of
+decodeRelTimeMicros : Text -> RelTime
+decodeRelTimeMicros t = case T.parseInt t of
   Some i -> convertMicrosecondsToRelTime i
-  None -> error ("Cannot parse time " <> t)
+  None -> error ("Cannot parse reltime " <> t)
 
 decodeTime : Text -> Time
-decodeTime t = epoch `addRelTime` (decodeRelTime t)
+decodeTime t = epoch `addRelTime` (decodeRelTimeMicros t)
 
 -- AnyContractId conversion
 ------------------------------
@@ -136,7 +136,7 @@ timeFromMeta : Text -> Metadata -> Optional Time
 timeFromMeta field meta = decodeTime <$> TextMap.lookup field meta.values
 
 relTimeFromMeta : Text -> Metadata -> Optional RelTime
-relTimeFromMeta field meta = decodeRelTime <$> TextMap.lookup field meta.values
+relTimeFromMeta field meta = decodeRelTimeMicros <$> TextMap.lookup field meta.values
 
 -- Account utils
 ----------------

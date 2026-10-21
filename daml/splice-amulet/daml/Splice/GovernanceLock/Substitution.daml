@@ -32,6 +32,7 @@ import Splice.GovernanceLock
 import Splice.ExternalPartyConfigState
 import Splice.TokenStandard.Utils hiding (require, reasonMetaKey)
 import Splice.Types
+import Splice.Util (HasCheckedFetch(..))
 
 -- | A proposal for a substitution of a governance lock.
 template GovernanceLockSubstitution with
@@ -125,20 +126,14 @@ governanceLockSubstitution_acceptImpl self GovernanceLockSubstitution{..} actors
   -- The legs report the memo of the accepted proposal
   let reason = reasonFromMeta $ substitutionGovernanceLockMetadata target.specification
   FetchAndMergeLocksResult{lockCid} <- fetchAndMergeGovernanceLocks target context state reason
+  let forOwner = ForOwner with dso = target.dso; owner = target.owner
   (newLockedAmulet, remainingLockCid, unlockedAmulet) <- case lockedAmulet of
     Some proposalLockedAmulet -> do
-      substituteResult <- exercise lockCid GovernanceLock_DsoSubstitute with
-        substitutedAmount = amount
-        reason
-        extraArgs
+      substituteResult <- governanceLock_dsoSubstituteImpl forOwner lockCid amount reason extraArgs
       pure (proposalLockedAmulet, substituteResult.remainingLockCid, Some substituteResult.unlockedAmulet)
     None -> do
       -- The proposer is the owner of the target lock, so the target lock funds the new lock
-      splitResult <- exercise lockCid GovernanceLock_DsoSplitForSubstitution with
-        splitAmount = amount
-        newSpecification = target.specification
-        reason
-        extraArgs
+      splitResult <- governanceLock_dsoSplitForSubstitutionImpl forOwner lockCid amount target.specification reason extraArgs
       pure (splitResult.splitAmulet, splitResult.remainingLockCid, None)
   newLockCid <- create GovernanceLock with
     dso = target.dso
@@ -254,7 +249,12 @@ createSubstitution CreateSubstitutionArgs {..} = do
         context
         reason
       pure (Some lockedAmulet, changeHolding)
-  let expiresAt = requestedAt `addRelTime` getTokenStandardMaxTTL state.transferConfig
+  let maxExpiresAt = requestedAt `addRelTime` getTokenStandardMaxTTL state.transferConfig
+  expiresAt <- case target.specification of
+    GLS_FullLock _ -> pure maxExpiresAt
+    GLS_VestingLock VestingLockSpecification{endTime} -> do
+      assertWithinDeadline "target lock endTime" endTime
+      pure $ min maxExpiresAt endTime
   let substitution = GovernanceLockSubstitution with
         target
         owner
@@ -265,3 +265,9 @@ createSubstitution CreateSubstitutionArgs {..} = do
         originalSubstitutionCid = None
   substitutionCid <- create substitution
   pure (toInterfaceContractId substitutionCid, toInterface substitution, changeHolding)
+
+-- Instances
+------------
+
+instance HasCheckedFetch GovernanceLockSubstitution ForDso where
+  contractGroupId GovernanceLockSubstitution{..} = ForDso with dso = target.dso
