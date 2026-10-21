@@ -47,8 +47,8 @@ class DbScanAppRewardsStoreTest
           totalAppActivityWeight = 123456L,
           appProviderParty = "alice::provider",
           numAppActivityRecords = 3L,
-          numAssetActivityRecords = 0L,
-          totalAssetActivityWeight = 0L,
+          numAssetActivityRecords = 7L,
+          totalAssetActivityWeight = 65432L,
         )
         _ <- store.insertAppActivityPartyTotals(Seq(row))
         loaded <- store.getAppActivityPartyTotalsByRound(roundNumber)
@@ -67,7 +67,7 @@ class DbScanAppRewardsStoreTest
           totalRoundAppActivityWeight = 999999L,
           activeAppProviderPartiesCount = 5L,
           activityRecordsCount = 42L,
-          totalRoundAssetActivityWeight = 0L,
+          totalRoundAssetActivityWeight = 111111L,
         )
         _ <- store.insertAppActivityRoundTotals(Seq(row))
         loaded <- store.getAppActivityRoundTotalByRound(roundNumber)
