@@ -19,7 +19,10 @@ import {
   standardSvConfigsBasic,
   extraSvConfigsBasic,
 } from '@canton-network/splice-pulumi-common-sv/src/svConfigsBasic';
-import { allValidatorsConfig } from '@canton-network/splice-pulumi-common-validator/src/config';
+import {
+  allValidatorsConfig,
+  validatorIngressName,
+} from '@canton-network/splice-pulumi-common-validator/src/config';
 
 function tokenLifetime(): number {
   return fixedTokens() ? 2592000 : 86400; // TODO(DACH-NY/canton-network-internal#2114): Move this to the cluster config? We want it to be long for fixed token clusters
@@ -253,20 +256,19 @@ function newUiApp(
   name: string,
   description: string,
   urlPrefixes: string[],
-  ingressName: string | string[],
+  ingressName: string,
   clusterBasename: string,
   clusterDnsNames: string[],
   auth0DomainProvider: auth0.Provider,
   extraUrls: string[] = []
 ): auth0.Client {
   const urls = urlPrefixes
-    .flatMap(prefix =>
-      [ingressName]
-        .flat()
-        .flatMap(ingress =>
-          clusterDnsNames.map(dnsName => `https://${prefix}.${ingress}.${dnsName}`)
-        )
-    )
+    .map(prefix => {
+      return clusterDnsNames.map(dnsName => {
+        return `https://${prefix}.${ingressName}.${dnsName}`;
+      });
+    })
+    .flat()
     .concat(extraUrls);
 
   return newSpaClient(
@@ -561,16 +563,12 @@ function newWalletGatewayApp(
   resourceName: string,
   name: string,
   description: string,
-  ingressName: string | string[],
+  ingressName: string,
   clusterBasename: string,
   clusterDnsNames: string[],
   auth0DomainProvider: auth0.Provider
 ): auth0.Client {
-  const origins = [ingressName]
-    .flat()
-    .flatMap(ingress =>
-      clusterDnsNames.map(dnsName => `https://walletgateway.${ingress}.${dnsName}`)
-    );
+  const origins = clusterDnsNames.map(dnsName => `https://walletgateway.${ingressName}.${dnsName}`);
 
   return newSpaClient(
     resourceName,
@@ -671,50 +669,41 @@ function svRunbookAuth0(
     });
 }
 
-function validatorRunbookAuth0(
+function auth0ForValidatorNamespace(
   clusterBasename: string,
+  namespace: string,
+  provider: auth0.Provider,
+  ingressName: string,
   dnsNames: string[]
-): pulumi.Output<Auth0Config> {
-  const auth0Domain = 'canton-network-validator-test.us.auth0.com';
-  const auth0MgtClientId = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID');
-  const auth0MgtClientSecret = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET');
-  const validatorIngressNames = [
-    ...new Set(Object.values(allValidatorsConfig).map(v => v.namespace)),
-  ];
-
-  const provider = new auth0.Provider('validator', {
-    domain: auth0Domain,
-    clientId: auth0MgtClientId,
-    clientSecret: auth0MgtClientSecret,
-  });
-
+): pulumi.Output<Auth0NamespaceConfig> {
+  const resourcePrefix = namespace.replace(/-/g, '');
   const walletUiApp = newUiApp(
-    'validatorWalletUi',
-    'Wallet UI',
-    'Used for the Wallet UI for the validator runbook',
+    `${resourcePrefix}WalletUi`,
+    `Wallet UI (${namespace})`,
+    `Used for the Wallet UI for validator ${namespace}`,
     ['wallet'],
-    validatorIngressNames,
+    ingressName,
     clusterBasename,
     dnsNames,
     provider,
     ['http://localhost:3000', 'http://wallet.localhost']
   );
   const ansUiApp = newUiApp(
-    'validatorCnsUi',
-    'ANS UI',
-    'Used for the ANS UI for the validator runbook',
+    `${resourcePrefix}CnsUi`,
+    `ANS UI (${namespace})`,
+    `Used for the ANS UI for validator ${namespace}`,
     [ansDomainPrefix],
-    validatorIngressNames,
+    ingressName,
     clusterBasename,
     dnsNames,
     provider,
     ['http://localhost:3001', 'http://ans.localhost']
   );
   const walletGatewayApp = newWalletGatewayApp(
-    'validatorWalletGatewayApp',
-    'Wallet Gateway',
-    'Used for the Wallet Gateway UI login for the validator runbook',
-    validatorIngressNames,
+    `${resourcePrefix}WalletGatewayApp`,
+    `Wallet Gateway (${namespace})`,
+    `Used for the Wallet Gateway UI login for validator ${namespace}`,
+    ingressName,
     clusterBasename,
     dnsNames,
     provider
@@ -723,31 +712,73 @@ function validatorRunbookAuth0(
   return pulumi
     .all([walletUiApp.id, ansUiApp.id, walletGatewayApp.id])
     .apply(([walletUiAppId, ansUiAppId, walletGatewayAppId]) => {
-      const namespacedConfig: NamespacedAuth0Configs = {
-        validator: {
-          audiences: {
-            ledgerApi: 'https://ledger_api.example.com', // The Ledger API in the validator-test tenant
-            validatorApi: 'https://validator.example.com/api', // The Validator App API in the validator-test tenant
-          },
-          backendClientIds: {
-            validator: 'cznBUeB70fnpfjaq9TzblwiwjkVyvh5z',
-          },
-          uiClientIds: {
-            wallet: walletUiAppId,
-            cns: ansUiAppId,
-            walletGateway: walletGatewayAppId,
-          },
+      return {
+        audiences: {
+          // The Ledger API in the validator-test tenant
+          ledgerApi: 'https://ledger_api.example.com',
+          // The Validator App API in the validator-test tenant
+          validatorApi: 'https://validator.example.com/api',
+        },
+        backendClientIds: {
+          validator: 'cznBUeB70fnpfjaq9TzblwiwjkVyvh5z',
+        },
+        uiClientIds: {
+          wallet: walletUiAppId,
+          cns: ansUiAppId,
+          walletGateway: walletGatewayAppId,
         },
       };
-
-      return {
-        namespacedConfigs: namespacedConfig,
-        fixedTokenCacheName: 'auth0-fixed-token-cache-validator-test',
-        auth0Domain: auth0Domain,
-        auth0MgtClientId: auth0MgtClientId,
-        auth0MgtClientSecret: '',
-      };
     });
+}
+
+function validatorRunbookAuth0(
+  clusterBasename: string,
+  dnsNames: string[]
+): pulumi.Output<Auth0Config> {
+  const auth0Domain = 'canton-network-validator-test.us.auth0.com';
+  const auth0MgtClientId = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID');
+  const auth0MgtClientSecret = config.requireEnv('AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET');
+
+  const provider = new auth0.Provider('validator', {
+    domain: auth0Domain,
+    clientId: auth0MgtClientId,
+    clientSecret: auth0MgtClientSecret,
+  });
+
+  const validatorAuth0CfgPromises = Object.values(allValidatorsConfig).map(validator => {
+    const namespace = validator.namespace;
+    const auth0NamespaceConfig = auth0ForValidatorNamespace(
+      clusterBasename,
+      namespace,
+      provider,
+      validatorIngressName(validator),
+      dnsNames
+    );
+    return auth0NamespaceConfig.apply(cfg => ({
+      namespace: namespace,
+      cfg: cfg,
+    }));
+  });
+
+  const namespacedConfig = pulumi.all(validatorAuth0CfgPromises).apply(cfgs => {
+    return cfgs.reduce(
+      (acc: Record<string, Auth0NamespaceConfig>, validatorCfg) => {
+        acc[validatorCfg.namespace] = validatorCfg.cfg;
+        return acc;
+      },
+      {} as Record<string, Auth0NamespaceConfig>
+    );
+  });
+
+  return namespacedConfig.apply(namespacedConfig => {
+    return {
+      namespacedConfigs: namespacedConfig,
+      fixedTokenCacheName: 'auth0-fixed-token-cache-validator-test',
+      auth0Domain: auth0Domain,
+      auth0MgtClientId: auth0MgtClientId,
+      auth0MgtClientSecret: '',
+    };
+  });
 }
 
 export function configureAuth0(

@@ -4,31 +4,25 @@
   "inputs": {
     "allowedLogoutUrls": [
       "https://walletgateway.validator.mock.network.canton.global",
-      "https://walletgateway.validator.mock.global.canton.network.digitalasset.com",
-      "https://walletgateway.extra-validator.mock.network.canton.global",
-      "https://walletgateway.extra-validator.mock.global.canton.network.digitalasset.com"
+      "https://walletgateway.validator.mock.global.canton.network.digitalasset.com"
     ],
     "allowedOrigins": [
       "https://walletgateway.validator.mock.network.canton.global",
-      "https://walletgateway.validator.mock.global.canton.network.digitalasset.com",
-      "https://walletgateway.extra-validator.mock.network.canton.global",
-      "https://walletgateway.extra-validator.mock.global.canton.network.digitalasset.com"
+      "https://walletgateway.validator.mock.global.canton.network.digitalasset.com"
     ],
     "appType": "spa",
     "callbacks": [
       "https://walletgateway.validator.mock.network.canton.global/callback/",
-      "https://walletgateway.validator.mock.global.canton.network.digitalasset.com/callback/",
-      "https://walletgateway.extra-validator.mock.network.canton.global/callback/",
-      "https://walletgateway.extra-validator.mock.global.canton.network.digitalasset.com/callback/"
+      "https://walletgateway.validator.mock.global.canton.network.digitalasset.com/callback/"
     ],
     "crossOriginAuth": false,
-    "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet Gateway UI login for the validator runbook",
+    "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet Gateway UI login for validator validator",
     "grantTypes": [
       "authorization_code",
       "implicit",
       "refresh_token"
     ],
-    "name": "Wallet Gateway (Pulumi managed, test-stack)",
+    "name": "Wallet Gateway (validator) (Pulumi managed, test-stack)",
     "oidcConformant": true,
     "refreshToken": {
       "expirationType": "expiring",
@@ -41,9 +35,7 @@
     },
     "webOrigins": [
       "https://walletgateway.validator.mock.network.canton.global",
-      "https://walletgateway.validator.mock.global.canton.network.digitalasset.com",
-      "https://walletgateway.extra-validator.mock.network.canton.global",
-      "https://walletgateway.extra-validator.mock.global.canton.network.digitalasset.com"
+      "https://walletgateway.validator.mock.global.canton.network.digitalasset.com"
     ]
   },
   "name": "validatorWalletGatewayApp",
