@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.OptionT
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
+import com.digitalasset.canton.admin.api.client.data.SynchronizerConnectionConfigAccess.*
 import com.digitalasset.canton.admin.api.client.data.{
   ListConnectedSynchronizersResult,
   RegisteredSynchronizer,

@@ -101,7 +101,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
   private[console] def predefCode(interactive: Boolean, noTty: Boolean = false): String =
     ConsoleEnvironmentBinding.predefCode(interactive, noTty)
 
-  val tracer: Tracer = environment.tracerProvider.tracer
+  private[console] val tracer: Tracer = environment.tracerProvider.tracer
 
   /** Definition of the startup order of local instances. Nodes support starting up in any order
     * however to avoid delays/warnings we opt to start in the most desirable order for simple

@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, SwitchOverTimes}
 import com.digitalasset.canton.topology.Member
@@ -81,7 +82,7 @@ class GrantValidatorPermissionTrigger(
 
                 for {
                   totalPurchasedTraffic <- store.getTotalPurchasedMemberTraffic(
-                    memberId,
+                    StoreMemberId(memberId),
                     synchronizerId,
                   )
                   unpermissions <- store.listValidatorUnpermissions(payload.memberId)

@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.environment.CommandPriority
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -71,5 +72,18 @@ object TopupUtil {
         } yield walletBalance >= minBalanceForTopup
     }
   }
+
+  def highPriorityIncreaseBalanceForTopup(
+      scanConnection: ScanConnection,
+      validatorWalletStore: UserWalletStore,
+      validatorTopupConfig: ValidatorTopupConfig,
+      clock: Clock,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[CommandPriority] =
+    hasSufficientFundsForTopup(scanConnection, validatorWalletStore, validatorTopupConfig, clock)
+      .map(if (_) CommandPriority.Low else CommandPriority.High)
 
 }

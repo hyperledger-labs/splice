@@ -21,7 +21,9 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
 trait ObjectCopier {
-  def copy(objects: Seq[ObjectKeyAndChecksum])(implicit tc: TraceContext): Future[Unit]
+  def copy(objects: Seq[ObjectKeyAndChecksum], peers: Seq[Uri])(implicit
+      tc: TraceContext
+  ): Future[Unit]
 }
 
 class VerifiedObjectCopier(
@@ -37,13 +39,17 @@ class VerifiedObjectCopier(
 
   import VerifiedObjectCopier.*
 
-  override def copy(objects: Seq[ObjectKeyAndChecksum])(implicit tc: TraceContext): Future[Unit] =
+  override def copy(objects: Seq[ObjectKeyAndChecksum], peers: Seq[Uri])(implicit
+      tc: TraceContext
+  ): Future[Unit] =
     Source(objects.toList)
-      .mapAsync(math.max(1, parallelism))(obj => copyOne(obj))
+      .mapAsync(math.max(1, parallelism))(obj => copyOne(obj, peers))
       .runWith(Sink.ignore)
       .map(_ => ())
 
-  private def copyOne(obj: ObjectKeyAndChecksum)(implicit tc: TraceContext): Future[Unit] =
+  private def copyOne(obj: ObjectKeyAndChecksum, peers: Seq[Uri])(implicit
+      tc: TraceContext
+  ): Future[Unit] =
     (storedChecksum(staging, obj.key), storedChecksum(committed, obj.key)).tupled.flatMap {
       case (_, Some(actual)) if actual != obj.checksum =>
         val error = new CommittedObjectDiffers(obj.key, expected = obj.checksum, actual = actual)
@@ -59,7 +65,7 @@ class VerifiedObjectCopier(
               s"Staging holds object ${obj.key} with checksum $actual instead of the agreed ${obj.checksum}, overwriting it"
             )
           )
-          copyFromAnyPeer(obj)
+          copyFromAnyPeer(obj, peers)
         }
     }
 
@@ -70,7 +76,7 @@ class VerifiedObjectCopier(
       .getChecksums(Seq(key))(ec, mat.system, tc)
       .map(_.find(_.key == key).map(_.checksum))
 
-  private def copyFromAnyPeer(obj: ObjectKeyAndChecksum)(implicit
+  private def copyFromAnyPeer(obj: ObjectKeyAndChecksum, peers: Seq[Uri])(implicit
       tc: TraceContext
   ): Future[Unit] = {
     def tryRemaining(remaining: Seq[Uri], failures: List[String]): Future[Unit] =
@@ -92,7 +98,7 @@ class VerifiedObjectCopier(
             tryOthers(e)
         }
       }
-    source.peers.flatMap(peers => tryRemaining(peers, Nil))
+    tryRemaining(peers, Nil)
   }
 
   private def copyFromPeer(obj: ObjectKeyAndChecksum, peer: Uri)(implicit

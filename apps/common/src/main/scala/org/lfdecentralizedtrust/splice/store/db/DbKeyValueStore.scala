@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.store.db
 
 import cats.data.OptionT
-import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -13,6 +12,7 @@ import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Encoder, Json}
 import org.lfdecentralizedtrust.splice.store.KeyValueStore
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
+import slick.dbio.{DBIOAction, Effect, NoStream}
 import slick.jdbc.JdbcProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -32,22 +32,41 @@ class DbKeyValueStore private (
 
   val profile: JdbcProfile = storage.profile.jdbc
 
+  // The `*Action` variants don't run anything on their own. They can be composed with other
+  // database actions, so that the key value store is updated in the same SQL transaction.
+
+  def setValueAction[T](key: String, value: T)(implicit
+      encoder: Encoder[T]
+  ): DBIOAction[Unit, NoStream, Effect.Write] = {
+    val jsonValue: Json = value.asJson
+
+    sql"""INSERT INTO key_value_store (key, value, store_id)
+        VALUES ($key, $jsonValue, $storeId)
+        ON CONFLICT (store_id, key) DO UPDATE
+        SET value = excluded.value""".asUpdate.map(_ => ())
+  }
+
+  def setValueIfNotExistsAction[T](key: String, value: T)(implicit
+      encoder: Encoder[T]
+  ): DBIOAction[Boolean, NoStream, Effect.Write] = {
+    val jsonValue: Json = value.asJson
+
+    sql"""INSERT INTO key_value_store (key, value, store_id)
+        VALUES ($key, $jsonValue, $storeId)
+        ON CONFLICT (store_id, key) DO NOTHING""".asUpdate.map(_ > 0)
+  }
+
+  def deleteKeyAction(key: String): DBIOAction[Unit, NoStream, Effect.Write] =
+    sqlu"delete from key_value_store WHERE key = $key AND store_id = $storeId".map(_ => ())
+
   override def setValue[T](key: String, value: T)(implicit
       tc: TraceContext,
       encoder: Encoder[T],
   ): Future[Unit] = {
-    val jsonValue: Json = value.asJson
-
-    val action = sql"""INSERT INTO key_value_store (key, value, store_id)
-        VALUES ($key, $jsonValue, $storeId)
-        ON CONFLICT (store_id, key) DO UPDATE
-        SET value = excluded.value""".asUpdate
-    val updateAction = storage.update(action, "set-key-value")
-
     logger.debug(
-      s"saving key '$key' and value '$jsonValue'"
+      s"saving key '$key' and value '${value.asJson}'"
     )
-    updateAction.map(_ => ())
+    storage.update(setValueAction(key, value), "set-key-value")
   }
 
   override def setValueIfNotExists[T](key: String, value: T)(implicit
@@ -56,21 +75,16 @@ class DbKeyValueStore private (
   ): Future[Boolean] = {
     val jsonValue: Json = value.asJson
 
-    val action = sql"""INSERT INTO key_value_store (key, value, store_id)
-        VALUES ($key, $jsonValue, $storeId)
-        ON CONFLICT (store_id, key) DO NOTHING""".asUpdate
-    val updateAction = storage.update(action, "set-key-value-if-not-exists")
-
     logger.debug(
       s"saving key '$key' and value '$jsonValue' if not exists"
     )
-    updateAction.map {
-      case rowsAffected if rowsAffected > 0 =>
+    storage.update(setValueIfNotExistsAction(key, value), "set-key-value-if-not-exists").map {
+      case true =>
         logger.debug(
           s"key '$key' and value '$jsonValue' saved successfully"
         )
         true
-      case _ =>
+      case false =>
         logger.debug(
           s"key '$key' already exists, value not saved"
         )
@@ -118,12 +132,7 @@ class DbKeyValueStore private (
     logger.debug(
       s"Deleting config key $key"
     )
-    storage
-      .update(
-        sqlu"delete from key_value_store WHERE key = $key AND store_id = $storeId",
-        "delete key-value",
-      )
-      .map(_.discard)
+    storage.update(deleteKeyAction(key), "delete key-value")
   }
 }
 

@@ -7,18 +7,16 @@ import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import * as ip from 'ip';
 import * as path from 'path';
-import {
-  InstalledHelmChart,
-  installPostgresPasswordSecret,
-} from '@canton-network/splice-pulumi-common';
 import { clusterProdLike, config } from '@canton-network/splice-pulumi-common/src/config';
 import { spliceConfig } from '@canton-network/splice-pulumi-common/src/config/config';
+import type { InstalledHelmChart } from '@canton-network/splice-pulumi-common/src/helm';
 import {
   defaultUserName,
   generatePassword,
   getCloudSdkZone,
   privateNetworkId,
 } from '@canton-network/splice-pulumi-common/src/postgres';
+import { installPostgresPasswordSecret } from '@canton-network/splice-pulumi-common/src/secrets';
 import {
   ExactNamespace,
   CLUSTER_BASENAME,
@@ -896,12 +894,10 @@ export async function configureScanBigQuery({
     passwordSecret
   );
 
-  let legacyDataset: gcp.bigquery.Dataset | undefined;
-  let stagingDataset: gcp.bigquery.Dataset | undefined;
-  let prodDataset: gcp.bigquery.Dataset | undefined;
+  // legacy dataset is kept even when the legacy Datastream is disabled
+  const legacyDataset = installBigqueryDataset(bigQueryConfig);
 
   if (enableLegacyDatastream && slots.slot1) {
-    legacyDataset = installBigqueryDataset(bigQueryConfig);
     const legacyDestinationProfile = installBigqueryConnectionProfile(
       namespace,
       legacyDataset,
@@ -920,8 +916,8 @@ export async function configureScanBigQuery({
   }
 
   if (enableStagProdDatastream && slots.slot2) {
-    stagingDataset = installBigqueryStagingDataset(bigQueryConfig);
-    prodDataset = installBigqueryProdDataset(bigQueryConfig);
+    const stagingDataset = installBigqueryStagingDataset(bigQueryConfig);
+    const prodDataset = installBigqueryProdDataset(bigQueryConfig);
     const stagingDestinationProfile = installBigqueryStagingConnectionProfile(
       namespace,
       stagingDataset,
@@ -948,13 +944,11 @@ export async function configureScanBigQuery({
   }
   // TODO (DACH-NY/canton-network-internal#6451) not sure if this function needs to return anything,
   // but we need to return something to satisfy the ScanBigQuery type.
-  // For now, we return the primary dataset's ID, which is either legacy, staging, or prod, whichever is defined first.
+  // For now, we return the legacy dataset's ID, as it is always defined.
   // we should consider removing the return datasetId if it's not needed
 
-  const primaryDataset = legacyDataset ?? stagingDataset ?? prodDataset;
-
   return {
-    datasetId: primaryDataset!.id,
+    datasetId: legacyDataset.id,
   };
 }
 

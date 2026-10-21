@@ -18,7 +18,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import org.lfdecentralizedtrust.splice.wallet.ExternalPartyWalletManager
 import com.digitalasset.canton.lifecycle.UnlessShutdown
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -32,6 +32,7 @@ class ValidatorRightTrigger(
     walletManager: ExternalPartyWalletManager,
     connection: SpliceLedgerConnection,
     participantAdminConnection: ParticipantAdminConnection,
+    supportEmbeddedPartySigningKeys: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -52,15 +53,12 @@ class ValidatorRightTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val party = PartyId.tryFromProtoPrimitive(validatorRight.payload.user)
     for {
-      partyToKeyMappings <- participantAdminConnection.listPartyToKey(
-        filterStore = TopologyStoreId.Synchronizer(validatorRight.domain),
-        filterParty = Some(party),
-      )
+      isExternal <- isExternalParty(party, validatorRight.domain)
       r <-
-        if (partyToKeyMappings.isEmpty) {
+        if (!isExternal) {
           Future.successful(
             TaskSuccess(
-              s"No PartyToKeyMapping for party $party, handled through WalletAppInstallTrigger"
+              s"No PartyToKeyMapping or PartyToParticipant with signing keys for party $party, handled through WalletAppInstallTrigger"
             )
           )
         } else {
@@ -82,6 +80,30 @@ class ValidatorRightTrigger(
         }
     } yield r
   }
+
+  private def isExternalParty(party: PartyId, synchronizerId: SynchronizerId)(implicit
+      tc: TraceContext
+  ): Future[Boolean] =
+    participantAdminConnection
+      .listPartyToKey(
+        filterStore = TopologyStoreId.Synchronizer(synchronizerId),
+        filterParty = Some(party),
+      )
+      .flatMap { partyToKeyMappings =>
+        if (partyToKeyMappings.nonEmpty) Future.successful(true)
+        else if (!supportEmbeddedPartySigningKeys) Future.successful(false)
+        else
+          participantAdminConnection
+            .listPartyToParticipant(
+              store = Some(TopologyStoreId.Synchronizer(synchronizerId)),
+              filterParty = party.filterString,
+            )
+            .map(
+              _.exists(result =>
+                result.mapping.partyId == party && result.mapping.partySigningKeysWithThreshold.nonEmpty
+              )
+            )
+      }
 
   private def ensureActAsRight(party: PartyId)(implicit tc: TraceContext): Future[Unit] = {
     val validatorUser = walletManager.validatorUser

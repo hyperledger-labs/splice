@@ -5,6 +5,11 @@ cluster:
       zones: '*'
       maxNodes: 40
       nodeType: c3d-standard-8
+    additionalInfra:
+    - nodeType: c3d-standard-8
+      minNodes: 0
+      maxNodes: 3
+      zones: '*'
 infra:
   prometheus:
     retentionDuration: "30d"

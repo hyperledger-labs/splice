@@ -41,9 +41,13 @@ runs:
         FAILURE_NOTIFICATIONS_URL: ${{ inputs.notifications_url }}
         NOTIFICATION_SLACK_CHANNEL: ${{ inputs.slack_channel }}
       shell: bash
-      # on self-hosted runners all python packages are preinstalled but on github-hosted they will be missing
       run: |
-        if [[ "${RUNNER_ENVIRONMENT}" != "self-hosted" ]]; then
+        if [[ "${{ github.repository }}" == "DACH-NY/canton-network-internal" ]]; then
+          # on the internal repository, source the Nix environment and envrc
+          source "$NIX_ENV_SOURCE"
+          source "$ENVRC_SOURCE"
+        elif [[ "${RUNNER_ENVIRONMENT}" != "self-hosted" ]]; then
+          # on self-hosted runners all python packages are preinstalled but on github-hosted they will be missing
           echo "Not a self-hosted runner. Installing required Python packages..."
           python3 -m pip install GitPython requests
         fi

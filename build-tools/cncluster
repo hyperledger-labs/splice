@@ -297,6 +297,25 @@ function _assert_lock() {
     fi
 }
 
+# Fail if the cluster lock is held by someone else, without claiming it.
+function _check_lock_available() {
+    local lockholder
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ] && [ "$lockholder" != "$(whoami)" ]; then
+        _error "Cluster already locked by: ${lockholder}. Lock age: $(_current_lock_age_formatted)."
+    fi
+}
+
+# Ensure the cluster lock is held by the current user, claiming it if free.
+# Fails if the cluster is locked by someone else.
+function _ensure_lock() {
+    _check_lock_available
+    if [ -z "$(_current_lockholder)" ]; then
+        _info "Cluster is not locked, claiming the lock."
+        subcmd_lock
+    fi
+}
+
 ################################
 ### Commands
 ################################
@@ -543,9 +562,9 @@ function subcmd_gcloud_alert_logs_ui() {
 
     base_query="resource.labels.cluster_name%3D%22${GCP_CLUSTER_NAME}%22"
     cluster=$(basename "$PWD")
-    expected_file="../../expected/observability/expected-${cluster}.json"
+    expected_file="../../expected/observability/${cluster}/log_warnings.gcp_logging_metric_Metric.json"
     _info "Using filter from $expected_file"
-    query=$(cat "${expected_file}" | jq '.[] | select(.name == "log_warnings") | .inputs.filter')
+    query=$(cat "${expected_file}" | jq '.inputs.filter')
     encoded_query=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote($query))")
 
     url="https://console.cloud.google.com/logs/query?query=$encoded_query&project=$CLOUDSDK_CORE_PROJECT&duration=PT1H"
@@ -1474,6 +1493,118 @@ subcommand_whitelist[lockholder]="Print the current lockholder, if any, for the 
 
 function subcmd_lockholder() {
     _current_lockholder
+}
+
+###
+
+subcommand_whitelist[validate_lock]="Validate that the cluster lock is held by you (or, on CI, by the workflow approver)."
+
+function subcmd_validate_lock() {
+    _assert_lock
+    _info "Cluster lock validated."
+}
+
+subcommand_whitelist[deploy_basic]='Trigger a basic cluster test deploy for a PR and post the run link back on the PR.'
+
+function subcmd_deploy_basic() {
+    _deploy_cluster_workflow "deploy_scratchnet_basic.yml" "Cluster test" "$@"
+}
+
+function _deploy_cluster_workflow() {
+    local deploy_workflow="$1" label="$2"; shift 2
+
+    # DA-internal repo hosting the deploy workflows triggered from here, and the
+    # default repo PRs are looked up in (overridable per call via --repo).
+    local deploy_internal_repo="DACH-NY/canton-network-internal"
+    local deploy_default_repo="canton-network/splice"
+
+    local repo="${deploy_default_repo}" repo_explicit="" pr="" url_repo=""
+    local pr_json sha cluster dispatch_out run_url me body
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --repo)
+                repo="${2-}"; repo_explicit=1; shift 2;;
+            --repo=*)
+                repo="${1#--repo=}"; repo_explicit=1; shift;;
+            -h|--help)
+                echo "Usage: $0 ${SUBCOMMAND_NAME} <pr-number|pr-url> [--repo org/name]"
+                echo ""
+                echo "${label} deploy for the given PR on the current cluster,"
+                echo "with the workflow run link posted back on the PR."
+                echo "The PR can be given as a number (e.g. 7742) or as a full URL"
+                echo "(e.g. https://github.com/canton-network/splice/pull/7742,"
+                echo "in which case the repo is deduced from the URL)."
+                echo "Use --repo for PRs in forks when passing a bare number,"
+                echo "e.g. --repo canton-network/splice-multi-sync."
+                return 0;;
+            -*)
+                _error "Unknown option: $1";;
+            *)
+                if [ -n "$pr" ]; then
+                    _error "Unexpected argument: $1"
+                fi
+                pr="$1"; shift;;
+        esac
+    done
+
+    if [ -z "$pr" ]; then
+        _error "Usage: $0 ${SUBCOMMAND_NAME} <pr-number|pr-url> [--repo org/name]"
+    fi
+    if [[ "$pr" =~ ^https?://(www\.)?github\.com/([^/]+)/([^/]+)/pull/([0-9]+)(/.*)?$ ]]; then
+        url_repo="${BASH_REMATCH[2]}/${BASH_REMATCH[3]}"
+        if [ -n "$repo_explicit" ] && [ "$repo" != "$url_repo" ]; then
+            _error "--repo $repo conflicts with the repo deduced from the PR URL: $url_repo"
+        fi
+        repo="$url_repo"
+        pr="${BASH_REMATCH[4]}"
+    elif [[ ! "$pr" =~ ^[0-9]+$ ]]; then
+        _error "Argument must be a PR number or a PR URL, got: '$pr'"
+    fi
+    if ! command -v gh > /dev/null 2>&1; then
+        _error "The 'gh' CLI is required but not installed. See https://cli.github.com/"
+    fi
+
+    # Fail early on a cluster locked by someone else, but only claim the lock
+    # after confirmation so that answering "n" does not leave it behind.
+    _check_lock_available
+
+    _info "Resolving head SHA of PR ${repo}#${pr}."
+    pr_json=$(gh api "repos/${repo}/pulls/${pr}") || _error "Failed to fetch PR ${repo}#${pr}."
+    sha=$(echo "$pr_json" | jq -r '.head.sha')
+    if [ -z "$sha" ] || [ "$sha" = "null" ]; then
+        _error "Could not determine head SHA of PR ${repo}#${pr}."
+    fi
+    _info "PR head SHA: ${sha}"
+
+    _prompt_to_confirm --no-lock
+    _ensure_lock
+
+    # The deploy workflow expects the full scratchnet name (scratchneta-e),
+    # while this checkout only exports the short basename (scratcha-e),
+    # so derive it here.
+    if [[ "$GCP_CLUSTER_BASENAME" == scratch* ]]; then
+        cluster="${GCP_CLUSTER_BASENAME/scratch/scratchnet}"
+    else
+        cluster="$GCP_CLUSTER_BASENAME"
+    fi
+
+    _info "Triggering ${deploy_workflow} in ${deploy_internal_repo} for ${sha} on ${cluster}."
+    dispatch_out=$(gh workflow run "${deploy_workflow}" -R "${deploy_internal_repo}" \
+        -f splice-repo="$repo" \
+        -f splice-git-ref="$sha" \
+        -f cluster="$cluster" 2>&1) || _error "Failed to trigger ${deploy_workflow}: ${dispatch_out}"
+    echo "$dispatch_out"
+    run_url=$(echo "$dispatch_out" | grep -oE 'https://[^[:space:]]*/actions/runs/[0-9]+' | head -n 1 || true)
+
+    if [ -z "$run_url" ]; then
+        _error "Run URL not returned. The workflow may still have been dispatched, so check https://github.com/${deploy_internal_repo}/actions/workflows/${deploy_workflow} (and https://www.githubstatus.com/ for GitHub Actions incidents)."
+    fi
+
+    me=$(gh api user --jq '.login')
+    body="${label} triggered for PR #${pr} (${sha}) on ${cluster} by @${me}. Track progress here: ${run_url}"
+    gh api "repos/${repo}/issues/${pr}/comments" --method POST -f body="$body" > /dev/null
+    _info "Posted run link back on PR ${repo}#${pr}."
 }
 
 ###

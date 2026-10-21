@@ -49,6 +49,8 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAp
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BulkStorageObjects
+import org.lfdecentralizedtrust.splice.http.v0.definitions
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkObjectKind
 import org.lfdecentralizedtrust.splice.store.VoteResultsFilters
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{
@@ -1045,6 +1047,7 @@ class SingleScanConnection private[client] (
 
   override def getBulkObjectChecksums(
       requiredCatchupTimestamp: CantonTimestamp,
+      kind: BulkObjectKind,
       objectKeys: Seq[String],
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[GetBulkObjectChecksumsResponse] = {
     runHttpCmd(
@@ -1095,15 +1098,26 @@ class SingleScanConnection private[client] (
   def getBulkObjectsProgress(
       recordTime: CantonTimestamp,
       bucket: BulkStorageBucket,
+      kind: BulkObjectKind,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[GetBulkObjectsProgressResponse] = {
     runHttpCmd(
       config.adminApi.url,
-      HttpScanAppClient.GetBulkObjectsProgress(recordTime, bucket),
+      HttpScanAppClient.GetBulkObjectsProgress(
+        recordTime,
+        bucket,
+        Some(SingleScanConnection.toHttpObjectKind(kind)),
+      ),
     )
   }
 }
 
 object SingleScanConnection {
+
+  private def toHttpObjectKind(kind: BulkObjectKind): definitions.BulkObjectKind =
+    kind match {
+      case BulkObjectKind.Updates => definitions.BulkObjectKind.Updates
+      case BulkObjectKind.Snapshots => definitions.BulkObjectKind.Snapshots
+    }
 
   private def decoded[T](result: Either[String, T]): Future[T] =
     result.fold(err => Future.failed(new IllegalStateException(err)), Future.successful)

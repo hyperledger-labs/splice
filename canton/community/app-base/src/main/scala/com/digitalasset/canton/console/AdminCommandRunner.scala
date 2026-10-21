@@ -57,7 +57,7 @@ object AdminCommandRunner {
   */
 trait LedgerApiCommandRunner {
 
-  def ledgerApiCommand[Result](
+  protected[console] def ledgerApiCommand[Result](
       command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result]
 

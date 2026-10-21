@@ -77,6 +77,7 @@ org.lfdecentralizedtrust.splice.integration.tests.WalletExpirationsIntegrationTe
 org.lfdecentralizedtrust.splice.integration.tests.WalletIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletManualRoundsIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletMetricsTest
+org.lfdecentralizedtrust.splice.integration.tests.WalletNoDevNetIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletPaymentIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletSubscriptionsIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.WalletSurviveCantonRestartIntegrationTest

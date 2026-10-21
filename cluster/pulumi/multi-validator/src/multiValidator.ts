@@ -6,12 +6,11 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   daContactPoint,
   generatePortSequence,
-  numNodesPerInstance,
   DecentralizedSynchronizerUpgradeConfig,
 } from '@canton-network/splice-pulumi-common';
+import { numNodesPerInstance } from '@canton-network/splice-pulumi-common/src/config/multiValidatorConfig';
 
 import { pvcSuffix, standardStorageClassName } from '../../common/src/storage/storageClass';
-import { multiValidatorConfig } from './config';
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
 
 interface MultiValidatorArgs extends BaseMultiNodeArgs {
@@ -138,15 +137,15 @@ export class MultiValidator extends MultiNodeDeployment {
             },
             {
               name: 'LOG_LEVEL_CANTON',
-              value: multiValidatorConfig?.logLevel,
+              value: args.config.logLevel,
             },
             {
               name: 'LOG_LEVEL_API_REQUEST',
-              value: multiValidatorConfig?.apiRequestLogLevel,
+              value: args.config.apiRequestLogLevel,
             },
             {
               name: 'LOG_LEVEL_STDOUT',
-              value: multiValidatorConfig?.logLevel,
+              value: args.config.logLevel,
             },
           ].concat(migrationEnvVars),
           ports: ports.map(port => ({
@@ -172,7 +171,7 @@ export class MultiValidator extends MultiNodeDeployment {
             failureThreshold: 5,
             timeoutSeconds: 10,
           },
-          resources: multiValidatorConfig?.resources?.validator,
+          resources: args.config.resources?.validator,
           volumeMounts: [
             {
               name: 'domain-upgrade-dump-volume',
@@ -192,7 +191,7 @@ export class MultiValidator extends MultiNodeDeployment {
       },
       opts,
       undefined,
-      extraValidatorEnvVars
+      args.config.extraValidatorEnvVars
     );
   }
 }

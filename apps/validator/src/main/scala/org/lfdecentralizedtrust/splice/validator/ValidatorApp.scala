@@ -7,6 +7,8 @@ import cats.implicits.{catsSyntaxApplicativeByValue as _, *}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data.SequencerConnectionPoolDelaysAccess.*
+import com.digitalasset.canton.admin.api.client.data.SubscriptionLivenessLimitsAccess.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -951,6 +953,7 @@ class ValidatorApp(
         config.parameters.enabledFeatures,
         config.additionalPackagesToUnvet,
         config.domains.global.alias,
+        config.supportEmbeddedPartySigningKeys,
         loggerFactory,
         packageVersionSupport,
       )

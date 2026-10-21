@@ -6,6 +6,9 @@ package org.lfdecentralizedtrust.splice.sv.automation
 import cats.implicits.catsSyntaxOptionId
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data.SequencerConnectionPoolDelaysAccess.*
+import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplificationAccess.*
+import com.digitalasset.canton.admin.api.client.data.SubscriptionLivenessLimitsAccess.*
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,

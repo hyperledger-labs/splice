@@ -65,6 +65,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.I
   ResumeAtOffset,
   UpdateHistoryInitAtLatestPrunedOffset,
 }
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 abstract class ScanStoreTest
     extends StoreTestBase
@@ -119,7 +120,7 @@ abstract class ScanStoreTest
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.getTotalPurchasedMemberTraffic(
-            goodMember,
+            StoreMemberId(goodMember),
             dummyDomain,
           )
         } yield result shouldBe (1 to 3).sum.toLong
@@ -130,7 +131,7 @@ abstract class ScanStoreTest
         for {
           store <- mkStore()
           result <- store.getTotalPurchasedMemberTraffic(
-            emptyMember,
+            StoreMemberId(emptyMember),
             dummyDomain,
           )
         } yield result shouldBe 0L
@@ -145,7 +146,7 @@ abstract class ScanStoreTest
           store <- mkStore()
           _ <- dummyDomain.create(contract1)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(contract2)(store.multiDomainAcsStore)
-          result <- store.getTotalPurchasedMemberTraffic(overflowMember, dummyDomain)
+          result <- store.getTotalPurchasedMemberTraffic(StoreMemberId(overflowMember), dummyDomain)
         } yield result shouldBe Long.MaxValue
       }
 
@@ -1775,21 +1776,23 @@ class DbScanStoreTest
   override def mkUpdateHistory(
       migrationId: Long
   ): Future[UpdateHistory] = {
-    val updateHistory = new UpdateHistory(
-      storage.underlying, // not under test
-      migrationId,
-      "update_history_scan_store_test",
-      mkParticipantId("whatever"),
-      dsoParty,
-      BackfillingRequirement.BackfillingNotRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = true,
-      HistoryMetrics(NoOpMetricsFactory, migrationId),
-    )
-    updateHistory.ingestionSink.initialize().map(_ => updateHistory)
+    for {
+      updateHistory <- UpdateHistory.create(
+        storage.underlying, // not under test
+        migrationId,
+        "update_history_scan_store_test",
+        StoreMemberId(mkParticipantId("whatever")),
+        dsoParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
+        loggerFactory,
+        enableImportUpdateBackfill = true,
+        HistoryMetrics(NoOpMetricsFactory, migrationId),
+      )
+
+      _ <- updateHistory.ingestionSink.initialize()
+    } yield updateHistory
   }
 
   override protected def cleanDb(
@@ -1866,10 +1869,14 @@ class DbScanStoreTest
         result <- store.getValidatorLicenseByValidator(
           Vector(alice, bob)
         )
+        withDuplicates <- store.getValidatorLicenseByValidator(
+          Vector(alice, bob, alice, alice)
+        )
       } yield {
         result should contain(aliceValidatorLicense)
         result should contain(bobValidatorLicense)
         result should not contain charlesValidatorLicense
+        withDuplicates should contain theSameElementsAs result
       }
     }
   }
