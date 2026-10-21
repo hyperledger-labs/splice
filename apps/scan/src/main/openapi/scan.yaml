@@ -35,9 +35,13 @@ paths:
 
   /v0/dso:
     get:
-      tags: [external, scan]
+      deprecated: true
+      tags: [deprecated]
       x-jvm-package: scan
       operationId: "getDsoInfo"
+      description: |
+        Deprecated. Please use /v1/dso instead. The `sv_user` and `sv_party_id` fields
+        differ between Scan instances, so responses cannot be compared across SVs.
       responses:
         "200":
           description: ok
@@ -45,6 +49,21 @@ paths:
             application/json:
               schema:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponse"
+
+  /v1/dso:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getDsoInfoV1"
+      description: |
+        Returns information about the DSO. Can be used in BFT reads.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponseV1"
 
   /v0/validators/validator-faucets:
     get:

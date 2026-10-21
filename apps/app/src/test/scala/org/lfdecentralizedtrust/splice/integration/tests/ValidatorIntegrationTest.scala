@@ -97,7 +97,7 @@ class ValidatorIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
   }
 
   "initialize DSO and validator apps" in { implicit env =>
-    initDsoWithSv1Only()
+    initDso()
     // Check that there is exactly one AmuletRule and OpenMiningRound
     val amuletRules = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(splice.amuletrules.AmuletRules.COMPANION)(dsoParty)
@@ -122,7 +122,9 @@ class ValidatorIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
     aliceValidatorBackend.scanProxy.getDsoParty() shouldBe dsoParty
 
     // dso info is available on the scan proxy
-    aliceValidatorBackend.scanProxy.getDsoInfo() shouldBe sv1ScanBackend.getDsoInfo()
+    val dsoInfo = aliceValidatorBackend.scanProxy.getDsoInfoV1()
+    dsoInfo.dsoParty shouldBe dsoParty
+    dsoInfo shouldBe sv1ScanBackend.getDsoInfoV1()
 
     val now = env.environment.clock.now
     aliceValidatorBackend.scanProxy.getHoldingsSummaryAt(

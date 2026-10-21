@@ -64,6 +64,7 @@ import org.lfdecentralizedtrust.splice.util.{
   ContractWithState,
   DomainRecordTimeRange,
   DsoInfo,
+  DsoInfoV1,
   FactoryChoiceWithDisclosures,
   PackageQualifiedName,
   TemplateJsonDecoder,
@@ -218,6 +219,22 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.GetDsoInfoResponse.OK(response) =>
       DsoInfo.fromHttp(response)
+    }
+  }
+
+  case class GetDsoInfoV1(headers: List[HttpHeader])
+      extends InternalBaseCommand[http.GetDsoInfoV1Response, DsoInfoV1] {
+
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetDsoInfoV1Response] =
+      client.getDsoInfoV1(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetDsoInfoV1Response.OK(response) =>
+      DsoInfoV1.fromHttp(response)
     }
   }
 

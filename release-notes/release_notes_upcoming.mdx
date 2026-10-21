@@ -13,6 +13,10 @@
       - `/v0/voterequest`: `vote_request_contract_ids`
       - `/v0/validators/validator-faucets`: `validator_ids`
 
+    - Add `/v1/dso`, which returns the same DSO information as `/v0/dso` without the
+      `sv_user` and `sv_party_id` fields of the SV operating the Scan instance, so that
+      responses match across Scan instances. `/v0/dso` is now deprecated.
+
   - SV App
 
     - The following request fields now have a `maxItems` bound of 1000; requests exceeding it are rejected with 400:
@@ -26,6 +30,10 @@
       Dashboard UIDs are unchanged, so existing dashboard links will keep working.
 
   - Validator app
+
+     - Add `/v1/scan-proxy/dso`, which serves the DSO information from Scan's `/v1/dso`.
+       `/v0/scan-proxy/dso` is deprecated: it fails when the validator is connected to more than one Scan
+       instance, as the `sv_user` and `sv_party_id` fields differ between Scan instances.
 
      - Fix a bug where automation for external parties was not started
        when they had keys embedded in a `PartyToParticipant` mapping
