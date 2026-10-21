@@ -207,6 +207,13 @@ export function buildAmuletRulesConfigFromChanges(
               microseconds: getValue('rewardConfigRewardCouponTimeToLive', false),
             },
             appRewardCouponThreshold: getValue('rewardConfigAppRewardCouponThreshold', false),
+            // TODO(TBAR v1.1 RewardConfig UI editing): temporary stopgap — these CIP-104
+            // fields are not yet editable in the UI; emit null (None) so the RewardConfig type
+            // is complete and the SV frontend typechecks/bundles. Mirror of the Scala
+            // Optional.empty() stopgaps; replace with real editable wiring in the feature work.
+            extraFeaturedAssetActivityWeight: null,
+            maxExtraFeaturedAssetActivityWeightPerAsset: null,
+            dsoAppActivityWeight: null,
           },
   };
 
