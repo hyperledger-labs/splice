@@ -35,7 +35,13 @@ const schemaName = databaseName;
 const publicationName = 'pgpart_stag_prod_pub';
 const replicationSlotName = 'pgpart_stag_prod_r_slot';
 const fakeFlywayMigration = 'V001__pgpart_init.sql';
-const tablesToReplicate = ['partitioned_events', 'cutover_events'];
+// The migration bigquery-cloudsql.sh waits for before (re)applying the
+// publication. Changing it reruns the script, as bumping the wait in
+// common-sv's BigQuery config would; see README.md section 2.
+const waitForMigration = new pulumi.Config().get('waitForMigration') ?? fakeFlywayMigration;
+// stand-ins for scan_verdict_store, which stays as it is, and for
+// update_history_creates and _exercises, which #6312 renames to *_legacy
+const tablesToReplicate = ['sim_scan_verdict_store', 'sim_update_history_c_x'];
 // marks everything this test creates, for finding leftovers; see README.md
 const testingTag = 'pgpart-pr7737';
 const labels = { cluster: CLUSTER_BASENAME, testing: testingTag };
@@ -129,21 +135,24 @@ CREATE TABLE IF NOT EXISTS flyway_schema_history (
 INSERT INTO flyway_schema_history VALUES ('${fakeFlywayMigration}', true)
   ON CONFLICT DO NOTHING;
 
--- Shaped like the #6312 partitioned parents.
-CREATE TABLE IF NOT EXISTS partitioned_events (
+-- A replicated table the cutover leaves alone, so the stream keeps flowing.
+-- Partitioned from the start, shaped like the #6312 partitioned parents.
+CREATE TABLE IF NOT EXISTS sim_scan_verdict_store (
   row_id bigserial,
+  ingested_at timestamptz NOT NULL DEFAULT now(),
   record_time bigint NOT NULL,
   payload text,
   PRIMARY KEY (record_time, row_id)
 ) PARTITION BY RANGE (record_time);
 -- static import-update partition, up to CantonTimestamp.MinValue + 1us
-CREATE TABLE IF NOT EXISTS partitioned_events_import
-  PARTITION OF partitioned_events FOR VALUES FROM (MINVALUE) TO (-62135596799999999);
+CREATE TABLE IF NOT EXISTS sim_scan_verdict_store_import
+  PARTITION OF sim_scan_verdict_store FOR VALUES FROM (MINVALUE) TO (-62135596799999999);
 
 -- Shaped like today's unpartitioned update_history_* tables; the README
--- renames it to cutover_events_legacy and swaps in a partitioned parent.
-CREATE TABLE IF NOT EXISTS cutover_events (
+-- renames it to sim_update_history_c_x_legacy and swaps in a partitioned parent.
+CREATE TABLE IF NOT EXISTS sim_update_history_c_x (
   row_id bigserial PRIMARY KEY,
+  ingested_at timestamptz NOT NULL DEFAULT now(),
   record_time bigint NOT NULL,
   payload text
 );
@@ -181,7 +190,7 @@ function pubRepSlotCommand(action: string): pulumi.Output<string> {
     pulumi.interpolate`--replicator-user-name="${replicatorUserName}"`,
     pulumi.interpolate`--postgres-instance-name="${pgsqlInstance.name}"`,
     pulumi.interpolate`--scan-app-database-name="${databaseName}"`,
-    pulumi.interpolate`--flyway-migration-to-wait-for="${fakeFlywayMigration}"`,
+    pulumi.interpolate`--flyway-migration-to-wait-for="${waitForMigration}"`,
   ];
   const scriptPath = commandScriptPath('cluster/pulumi/canton-network/bigquery-cloudsql.sh');
   return pulumi
