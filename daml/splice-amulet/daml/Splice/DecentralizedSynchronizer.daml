@@ -145,7 +145,7 @@ parseTrafficPurchaseMemo memo = do
 
 trafficPurchaseReason : MemberTrafficPurchase -> Text
 trafficPurchaseReason purchase =
-  "purchased traffic: " <> show purchase.trafficAmount <> " bytes for member-id=" <> purchase.memberId <>
+  "cip-128/memo:purchased-traffic-bytes=" <> show purchase.trafficAmount <> "&member-id=" <> purchase.memberId <>
   "&synchronizer-id=" <> purchase.synchronizerId <>
   "&migration-id=" <> show purchase.migrationId
 
