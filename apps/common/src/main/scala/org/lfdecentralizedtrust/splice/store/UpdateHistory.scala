@@ -351,10 +351,21 @@ class UpdateHistory private (
         profile,
         AdvisoryLockIds.createUpdateHistoryPartitionStatement,
         DBIO.seq(PartitionedTables.map { table =>
-          DBIO.seq(
-            sqlu"create table if not exists #${table}_#$tableSuffix (like #$table including defaults including constraints);",
-            sqlu"alter table #$table attach partition #${table}_#$tableSuffix for values from (#${start.toMicros}) to (#${end.toMicros});",
-          )
+          val partition = s"${table}_$tableSuffix"
+          for {
+            _ <-
+              sqlu"create table if not exists #$partition (like #$table including defaults including constraints)"
+            // Unfortunately there's not an 'attach if not already', so we have to do it ourselves.
+            // This is safe because withBlockingTransactionalLock ensures all 3 statements happen together.
+            alreadyAttached <-
+              sql"select exists (select 1 from pg_inherits where inhrelid = '#$partition'::regclass)"
+                .as[Boolean]
+                .head
+            _ <-
+              if (alreadyAttached) DBIO.successful(0)
+              else
+                sqlu"alter table #$table attach partition #$partition for values from (#${start.toMicros}) to (#${end.toMicros})"
+          } yield ()
         }*),
       ),
       "createPartitions",

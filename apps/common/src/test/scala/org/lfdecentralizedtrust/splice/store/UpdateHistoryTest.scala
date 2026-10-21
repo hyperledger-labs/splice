@@ -52,6 +52,20 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
 
   "UpdateHistory" should {
 
+    "createPartitions" should {
+
+      "be idempotent" in {
+        val store = mkStore()
+
+        for {
+          _ <- initStore(store)
+          _ <- createUpdateHistoryPartitions(store, time(0), partitionRunwayDays = 7)
+          _ <- create(domain1, cid1, offset1, party1, store, time(10))
+          result <- updates(store)
+        } yield result should have size 1
+      }
+    }
+
     "ingestion" should {
 
       "return no analyzable time window before ingesting an update" in {
