@@ -144,13 +144,12 @@ test_governanceLockMetadataParser = do
       dropMetaPrefix = Text.dropPrefix cipMetaPrefix
       lockSubjectMetaKeyNoPrefix = dropMetaPrefix lockSubjectMetaKey
 
-  -- Without a reason field, the metadata is returned unchanged
+  -- Without a reason field, empty metadata is returned
   expectSuccess (mkMeta []) $ run []
-  expectSuccess (mkMeta [otherEntry, (lockSubjectMetaKey, "provider")]) $ run [otherEntry, (lockSubjectMetaKey, "provider")]
+  expectSuccess (mkMeta []) $ run [otherEntry, (lockSubjectMetaKey, "provider")]
 
-  -- A reason without the `cipMemoPrefix` prefix is not parsed, and the metadata is returned unchanged
-  expectSuccess (mkMeta [(reasonMetaKey, lockSubjectMetaKeyNoPrefix <> "=provider")]) $
-    run [(reasonMetaKey, lockSubjectMetaKeyNoPrefix <> "=provider")]
+  -- A reason without the `cipMemoPrefix` prefix is not parsed, and empty metadata is returned
+  expectSuccess (mkMeta []) $ run [(reasonMetaKey, lockSubjectMetaKeyNoPrefix <> "=provider")]
 
   -- A single pair is prefixed with `cipMetaPrefix` and added to the metadata, and the reason field is removed
   expectSuccess (mkMeta [(lockSubjectMetaKey, "provider")]) $
@@ -160,18 +159,14 @@ test_governanceLockMetadataParser = do
   expectSuccess (mkMeta [(cipMetaPrefix <> lockSubjectMetaKey, "provider")]) $
     run [reason $ lockSubjectMetaKey <> "=provider"]
 
-  -- `&` separates the pairs, and the other metadata fields are kept
+  -- `&` separates the pairs, and the other metadata fields are ignored
   expectSuccess
-    (mkMeta [otherEntry, (lockSubjectMetaKey, "provider")])
+    (mkMeta [(lockSubjectMetaKey, "provider")])
     $ run [otherEntry, reason $ lockSubjectMetaKeyNoPrefix <> "=provider"]
 
   -- An empty value is allowed
   expectSuccess (mkMeta [(lockSubjectMetaKey, "")]) $
     run [reason $ lockSubjectMetaKeyNoPrefix <> "="]
-
-  -- The fields of the original metadata take precedence over the fields in the reason
-  expectSuccess (mkMeta [(lockSubjectMetaKey, "provider")]) $
-    run [(lockSubjectMetaKey, "provider"), reason $ lockSubjectMetaKeyNoPrefix <> "=someSv"]
 
   -- A pair without `=`
   expectErrors [pairError [lockSubjectMetaKeyNoPrefix]] $ run [reason lockSubjectMetaKeyNoPrefix]
