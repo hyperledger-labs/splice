@@ -9,6 +9,7 @@ import * as os from 'os';
 import { collectResources } from '@canton-network/splice-pulumi-common/src/test';
 import { beforeAll, describe, expect, test } from '@jest/globals';
 
+import type { FlywayMigrationToWaitFor } from './bigQueryFlywayMigration';
 import type { ScanBigQueryConfig } from './singleSvConfig';
 
 /*eslint no-process-env: "off"*/
@@ -23,7 +24,7 @@ const legacyDatasetId = 'mock_scan';
 async function installBigQuery(
   enableLegacyDatastream: boolean,
   enableStagProdDatastream: boolean,
-  flywayMigrationToWaitFor: ScanBigQueryConfig['flywayMigrationToWaitFor'] = 'V068__app_activity_record_meta.sql'
+  flywayMigrationToWaitFor: FlywayMigrationToWaitFor
 ): Promise<pulumi.Resource[]> {
   // imported here so the environment above is in place when the config modules load
   const { configureScanBigQuery } = await import('./bigQuery');
@@ -98,7 +99,7 @@ describe('configureScanBigQuery', () => {
   });
 
   test('disabling the legacy Datastream removes its stream path but keeps its dataset', async () => {
-    const resources = await installBigQuery(false, true);
+    const resources = await installBigQuery(false, true, 'V068__app_activity_record_meta.sql');
     expect(await legacyPath(resources)).toEqual({
       dataset: true,
       stream: false,
@@ -108,7 +109,7 @@ describe('configureScanBigQuery', () => {
   });
 
   test('enabling the legacy Datastream installs its whole path', async () => {
-    const resources = await installBigQuery(true, false);
+    const resources = await installBigQuery(true, false, 'V068__app_activity_record_meta.sql');
     expect(await legacyPath(resources)).toEqual({
       dataset: true,
       stream: true,

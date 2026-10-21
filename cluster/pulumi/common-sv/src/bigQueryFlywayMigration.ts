@@ -27,3 +27,5 @@ checkFlywayMigrationsExist(
 export const FlywayMigrationToWaitForSchema = z
   .enum(flywayMigrationsToWaitFor)
   .default('V068__app_activity_record_meta.sql');
+
+export type FlywayMigrationToWaitFor = z.infer<typeof FlywayMigrationToWaitForSchema>;

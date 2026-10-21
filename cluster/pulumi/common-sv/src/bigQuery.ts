@@ -25,6 +25,7 @@ import {
   commandScriptPath,
 } from '@canton-network/splice-pulumi-common/src/utils';
 
+import type { FlywayMigrationToWaitFor } from './bigQueryFlywayMigration';
 import { ScanBigQueryConfig } from './singleSvConfig';
 
 // ============================================================================
@@ -724,9 +725,9 @@ function createPublicationAndReplicationSlots(
   databaseInstance: gcp.sql.DatabaseInstance,
   replicatorUser: gcp.sql.User,
   scan: InstalledHelmChart | undefined,
+  flywayMigrationToWaitFor: FlywayMigrationToWaitFor,
   enableLegacy: boolean,
-  enableStagProd: boolean,
-  flywayMigrationToWaitFor: string
+  enableStagProd: boolean
 ): {
   slot1?: command.local.Command;
   slot2?: command.local.Command;
@@ -877,9 +878,9 @@ export async function configureScanBigQuery({
     databaseInstance,
     createPostgresReplicatorUser(namespace, databaseInstance, passwordSecret),
     scanChart,
+    flywayMigrationToWaitFor,
     enableLegacyDatastream,
-    enableStagProdDatastream,
-    flywayMigrationToWaitFor
+    enableStagProdDatastream
   );
 
   const natVm = installNatVm(namespace, zone, databaseInstance);
