@@ -240,6 +240,9 @@ svs:
     validatorApp:
       sweep:
         fromEnv: SV1
+    cantonBft:
+      cloudSql:
+        tier: "cantonbft-override-tier-sv-1"
     physicalSynchronizerOverrides:
       9:
         sequencer:
@@ -251,12 +254,7 @@ svs:
         cantonBft:
           cloudSql:
             tier: "cantonbft-ps9-override-tier-sv-1"
-  sv-2: !include(sv.yaml)
-    physicalSynchronizerOverrides:
-      8:
-        cantonBft:
-          cloudSql:
-            tier: "cantonbft-ps8-override-tier-sv-1"
+  sv-2: !include(sv.yaml) {}
   sv-da-1: !include(sv.yaml) # non "sv-X" key => additional SV that is always deployed (key == node name == k8s namespace)
     publicName: Digital-Asset-1
     subdomain: sv-1

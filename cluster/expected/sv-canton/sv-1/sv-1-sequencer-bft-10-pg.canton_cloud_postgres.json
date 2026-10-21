@@ -22,7 +22,7 @@
         "hour": 8
       },
       "protected": true,
-      "tier": "sequencer-override-tier"
+      "tier": "cantonbft-override-tier-sv-1"
     },
     "defaultUserName": "cnadmin",
     "deletionProtection": true,
