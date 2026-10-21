@@ -15,7 +15,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
-import com.digitalasset.canton.protocol.StaticSynchronizerParametersAccess.*
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.topology.transaction.GrpcConnection
 import com.digitalasset.canton.tracing.TraceContext
@@ -85,7 +84,8 @@ class LsuNodeInitializer(
       _ <- newMediatorInitializer.initializeFromDump(state.nodeIdentities.mediator)
       _ <- newSequencerIntializer.initializeFromDump(state.nodeIdentities.sequencer)
       parameters = successorSynchronizerNode.staticSynchronizerParameters(
-        successorSynchronizerId.serial
+        successorSynchronizerId.serial,
+        successorSynchronizerId.protocolVersion,
       )
       _ <- retryProvider.ensureThat(
         RetryFor.InitializingClientCalls,
@@ -99,15 +99,12 @@ class LsuNodeInitializer(
             Right(())
         },
         (_: String) => {
-          val initParams = parameters.copy(
-            protocolVersion = successorSynchronizerId.protocolVersion
-          )
           logger.info(
-            show"Initializing sequencer from predecessor with $initParams"
+            show"Initializing sequencer from predecessor with $parameters"
           )
           successorSynchronizerNode.sequencerAdminConnection.initializeFromPredecessor(
             state.synchronizerStatePath,
-            initParams,
+            parameters,
             ignorePsidCheck,
             successorSynchronizerId.logical,
           )
