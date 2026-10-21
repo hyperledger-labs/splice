@@ -52,8 +52,6 @@ const publicationName = 'update_history_datastream_pub';
 const replicationSlotNameStagProd = 'update_history_datastream_stag_prod_r_slot';
 const publicationNameStagProd = 'update_history_datastream_stag_prod_pub';
 
-const flywayMigrationToWaitFor = 'V068__app_activity_record_meta.sql';
-
 // ============================================================================
 // SINGLE SOURCE OF TRUTH: REPLICATED TABLE CONFIGURATION
 // ============================================================================
@@ -727,7 +725,8 @@ function createPublicationAndReplicationSlots(
   replicatorUser: gcp.sql.User,
   scan: InstalledHelmChart | undefined,
   enableLegacy: boolean,
-  enableStagProd: boolean
+  enableStagProd: boolean,
+  flywayMigrationToWaitFor: string
 ): {
   slot1?: command.local.Command;
   slot2?: command.local.Command;
@@ -854,6 +853,7 @@ export async function configureScanBigQuery({
     legacyDesiredState,
     stagProdDesiredState,
     retentionPeriodSeconds,
+    flywayMigrationToWaitFor,
   } = bigQueryConfig;
 
   if (!enableLegacyDatastream && !enableStagProdDatastream) {
@@ -878,7 +878,8 @@ export async function configureScanBigQuery({
     createPostgresReplicatorUser(namespace, databaseInstance, passwordSecret),
     scanChart,
     enableLegacyDatastream,
-    enableStagProdDatastream
+    enableStagProdDatastream,
+    flywayMigrationToWaitFor
   );
 
   const natVm = installNatVm(namespace, zone, databaseInstance);
