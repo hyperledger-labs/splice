@@ -88,9 +88,13 @@
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSequencerJvmFlag",
         "driver": {
-          "host": "global-domain-7-cometbft-cometbft-rpc.sv-1.svc.cluster.local",
-          "port": 26657,
-          "type": "cometbft"
+          "externalAddress": "sequencer-p2p-7.sv-2.mock.global.canton.network.digitalasset.com",
+          "externalPort": 443,
+          "persistence": {
+            "databaseName": "sequencer_7_dabft",
+            "secretName": "sequencer-bft-7-pg-secrets"
+          },
+          "type": "cantonbft"
         },
         "persistence": {
           "databaseName": "global_domain_7_sequencer",
