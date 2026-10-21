@@ -14,6 +14,8 @@ alter table app_activity_record_store
 
 alter table app_activity_party_totals
     rename column num_activity_records to num_app_activity_records;
+
+alter table app_activity_party_totals
     -- Per-party asset activity bytes for the round. Mirrors
     -- total_app_activity_weight.
     add column total_asset_activity_weight bigint not null default 0,
