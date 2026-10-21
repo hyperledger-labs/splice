@@ -6,17 +6,19 @@ import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.Config
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.{IngestionConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.InternedStringStore
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
 import pureconfig.ConfigReader
 import pureconfig.generic.semiauto.deriveReader
 
 import java.nio.file.Path
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.FiniteDuration
 
 class UpdateHistoryIngestionPerformanceTest(
@@ -43,12 +45,13 @@ class UpdateHistoryIngestionPerformanceTest(
     "update_history_exercises",
   )
 
-  override protected def mkStore(storage: DbStorage): UpdateHistory = {
-    new UpdateHistory(
+  override protected def mkStore(storage: DbStorage): Future[UpdateHistory] = {
+    implicit val initTc: TraceContext = TraceContext.empty
+    UpdateHistory.create(
       storage = storage,
       domainMigrationId = migrationId,
       storeName = this.getClass.getName,
-      participantId = mkParticipantId(this.getClass.getSimpleName),
+      participantId = StoreMemberId(mkParticipantId(this.getClass.getSimpleName)),
       updateStreamParty = dsoParty,
       backfillingRequired = UpdateHistory.BackfillingRequirement.BackfillingNotRequired,
       internedStringStore = InternedStringStore.createWithoutWarmup(
@@ -60,7 +63,6 @@ class UpdateHistoryIngestionPerformanceTest(
       ),
       analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
       loggerFactory = loggerFactory,
-      enableissue12777Workaround = true,
       enableImportUpdateBackfill = false,
       metrics = HistoryMetrics.apply(NoOpMetricsFactory, migrationId),
     )

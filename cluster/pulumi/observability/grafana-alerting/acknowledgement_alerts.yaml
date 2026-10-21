@@ -86,7 +86,7 @@ groups:
                 refId: No recent report
                 type: threshold
           dashboardUid: 3ccfda97-fb9c-4413-bc05-5ed6f2c888f7
-          panelId: 18
+          panelId: 13
           noDataState: Alerting
           execErrState: Alerting
           for: 5m

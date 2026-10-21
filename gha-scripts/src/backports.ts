@@ -82,9 +82,9 @@ export async function addBackportReminderComment(
   })
 }
 
-// TODO(#7248) Remove once we release from main again.
+// This can be used to temporarily add release-line-a.b.x branches that are not deployed on any cluster but make up the next release.
 function alwaysIncludedBranches(context: Context): Array<string> {
-  return isSpliceRepo(context) ? ['release-line-0.8.x'] : []
+  return isSpliceRepo(context) ? ['release-line-0.9.x'] : []
 }
 
 async function getRelevantReleaseBranchesFromProdClusters(

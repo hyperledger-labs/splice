@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.ActiveContract
@@ -138,6 +139,7 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import java.lang.IllegalStateException
 import scala.collection.immutable.SortedMap
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -2358,7 +2360,7 @@ class HttpScanHandler(
           .flatMap(_.getSequencerTrafficControlState(member))
         actualConsumed = actual.extraTrafficConsumed.value
         actualLimit = actual.extraTrafficLimit.value
-        targetTotalPurchased <- store.getTotalPurchasedMemberTraffic(member, domain)
+        targetTotalPurchased <- store.getTotalPurchasedMemberTraffic(StoreMemberId(member), domain)
       } yield {
         definitions.GetMemberTrafficStatusResponse(
           definitions.MemberTrafficStatus(

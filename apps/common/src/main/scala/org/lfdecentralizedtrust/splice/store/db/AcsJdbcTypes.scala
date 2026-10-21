@@ -254,14 +254,6 @@ trait AcsJdbcTypes extends JdbcTypes {
   protected implicit lazy val synchronizerIdJdbcType: JdbcType[SynchronizerId] =
     MappedColumnType.base[SynchronizerId, String](_.toProtoPrimitive, SynchronizerId.tryFromString)
 
-  protected implicit lazy val memberIdSetParameter: SetParameter[Member] =
-    (memberId: Member, pp: PositionedParameters) =>
-      implicitly[SetParameter[String300]].apply(memberId.toLengthLimitedString, pp)
-
-  protected implicit lazy val memberIdSetParameterOption: SetParameter[Option[Member]] =
-    (memberIdO: Option[Member], pp: PositionedParameters) =>
-      implicitly[SetParameter[Option[String300]]].apply(memberIdO.map(_.toLengthLimitedString), pp)
-
   protected implicit lazy val jsonJdbcType: JdbcType[Json] = new profile.DriverJdbcType[Json]() {
     override def sqlType: Int = java.sql.Types.OTHER
 
@@ -422,5 +414,22 @@ object AcsJdbcTypes {
     circeParse(
       javaapiDamlRecordCodec.apiValueToJsValue(Contract.javaValueToLfValue(record)).compactPrint
     ).fold(throw _, identity)
+  }
+
+  /** Wrapper for Member with Splice's historical SetParameter implementation.
+    * If the wrong implicit is picked (i.e., the one from Canton fork),
+    * then the wrong data is inserted into the database.
+    */
+  case class StoreMemberId(private val member: Member)
+
+  object StoreMemberId {
+    implicit val storeMemberIdSetParameter: SetParameter[StoreMemberId] =
+      (memberId: StoreMemberId, pp: PositionedParameters) =>
+        implicitly[SetParameter[String300]].apply(memberId.member.toLengthLimitedString, pp)
+
+    implicit val storeMemberIdSetParameterOption: SetParameter[Option[StoreMemberId]] =
+      (memberIdO: Option[StoreMemberId], pp: PositionedParameters) =>
+        implicitly[SetParameter[Option[String300]]]
+          .apply(memberIdO.map(_.member.toLengthLimitedString), pp)
   }
 }

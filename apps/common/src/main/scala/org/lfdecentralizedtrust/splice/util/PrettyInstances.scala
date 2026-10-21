@@ -35,6 +35,16 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
     }
   }
 
+  // Copy of the private method in Canton's PrettyInstances
+  private def treeOfIterable[T](prefix: String, elements: Iterable[T])(implicit
+      pretty: Pretty[T]
+  ): Tree =
+    if (elements.sizeCompare(1) == 0) {
+      pretty.treeOf(elements.iterator.next())
+    } else {
+      Tree.Apply(prefix, elements.map(pretty.treeOf).iterator)
+    }
+
   implicit val prettyNotUsed: Pretty[NotUsed] = _ => Tree.Literal("NotUsed")
 
   implicit def prettyIdentifier: Pretty[javaapi.data.Identifier] = prettyOfString(id =>

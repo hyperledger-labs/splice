@@ -35,6 +35,7 @@ import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService.AmuletOperationDedupConfig
 import com.digitalasset.nonempty.NonEmpty
+import com.digitalasset.canton.admin.api.client.data.SynchronizerConnectionConfigAccess.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.SignatureFormat.Raw
@@ -282,34 +283,38 @@ class HttpValidatorAdminHandler(
           .withDescription(s"failed to construct topology transaction: $error")
           .asRuntimeException()
       )
-    SignedTopologyTransaction(
-      transaction = tx,
-      signatures = NonEmpty.mk(
-        Set,
-        SingleTransactionSignature(
-          tx.hash,
-          Signature(
-            Raw,
-            HexString
-              .parseToByteString(topologyTx.signedHash)
-              .getOrElse(
-                throw Status.INVALID_ARGUMENT
-                  .withDescription(
-                    s"Failed to decode hex-encoded tx signature: ${topologyTx.signedHash}"
-                  )
-                  .asRuntimeException
-              ),
-            signedBy = publicKey.fingerprint,
-            signingAlgorithmSpec = None,
-            signatureDelegation = None,
+    SignedTopologyTransaction
+      .create(
+        transaction = tx,
+        signatures = NonEmpty.mk(
+          Set,
+          SingleTransactionSignature(
+            tx.hash,
+            Signature.create(
+              Raw,
+              HexString
+                .parseToByteString(topologyTx.signedHash)
+                .getOrElse(
+                  throw Status.INVALID_ARGUMENT
+                    .withDescription(
+                      s"Failed to decode hex-encoded tx signature: ${topologyTx.signedHash}"
+                    )
+                    .asRuntimeException
+                ),
+              signedBy = publicKey.fingerprint,
+              signingAlgorithmSpec = None,
+              signatureDelegation = None,
+            ),
           ),
         ),
-      ),
-      isProposal = true,
-    )(
-      SignedTopologyTransaction.versioningTable
-        .protocolVersionRepresentativeFor(ProtocolVersion.dev)
-    )
+        isProposal = true,
+        protocolVersion = ProtocolVersion.dev,
+      )
+      .valueOr(error =>
+        throw Status.INVALID_ARGUMENT
+          .withDescription(s"failed to construct signed topology transaction: $error")
+          .asRuntimeException()
+      )
   }
 
   override def submitExternalPartyTopology(

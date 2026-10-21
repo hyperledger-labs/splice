@@ -65,6 +65,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.I
   ResumeAtOffset,
   UpdateHistoryInitAtLatestPrunedOffset,
 }
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 abstract class ScanStoreTest
     extends StoreTestBase
@@ -119,7 +120,7 @@ abstract class ScanStoreTest
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.getTotalPurchasedMemberTraffic(
-            goodMember,
+            StoreMemberId(goodMember),
             dummyDomain,
           )
         } yield result shouldBe (1 to 3).sum.toLong
@@ -1751,21 +1752,23 @@ class DbScanStoreTest
   override def mkUpdateHistory(
       migrationId: Long
   ): Future[UpdateHistory] = {
-    val updateHistory = new UpdateHistory(
-      storage.underlying, // not under test
-      migrationId,
-      "update_history_scan_store_test",
-      mkParticipantId("whatever"),
-      dsoParty,
-      BackfillingRequirement.BackfillingNotRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = true,
-      HistoryMetrics(NoOpMetricsFactory, migrationId),
-    )
-    updateHistory.ingestionSink.initialize().map(_ => updateHistory)
+    for {
+      updateHistory <- UpdateHistory.create(
+        storage.underlying, // not under test
+        migrationId,
+        "update_history_scan_store_test",
+        StoreMemberId(mkParticipantId("whatever")),
+        dsoParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
+        loggerFactory,
+        enableImportUpdateBackfill = true,
+        HistoryMetrics(NoOpMetricsFactory, migrationId),
+      )
+
+      _ <- updateHistory.ingestionSink.initialize()
+    } yield updateHistory
   }
 
   override protected def cleanDb(

@@ -2,24 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   exactNamespace,
-  numInstances,
   imagePullSecret,
   DecentralizedSynchronizerUpgradeConfig,
 } from '@canton-network/splice-pulumi-common';
 import { installLoopback } from '@canton-network/splice-pulumi-common-sv';
+import { MultiValidatorConfig } from '@canton-network/splice-pulumi-common/src/config/multiValidatorConfig';
 
 import { MultiParticipant } from './multiParticipant';
 import { MultiValidator } from './multiValidator';
 import { installPostgres } from './postgres';
 
-export async function installNode(): Promise<void> {
+export async function installNode(config: MultiValidatorConfig): Promise<void> {
   const namespace = exactNamespace('multi-validator', true);
   installLoopback(namespace);
 
   const imagePullDeps = imagePullSecret(namespace);
 
-  for (let i = 0; i < numInstances; i++) {
-    const postgres = installPostgres(namespace, `postgres-${i}`, imagePullDeps);
+  for (let i = 0; i < config.instanceCount; i++) {
+    const postgres = installPostgres(namespace, `postgres-${i}`, config, imagePullDeps);
     const postgresConf = {
       // being just the init container it doesn't matter too much so as long as it has psql
       initImageName: 'postgres:18',
@@ -40,6 +40,7 @@ export async function installNode(): Promise<void> {
           ...postgresConf,
           db: `participant_${DecentralizedSynchronizerUpgradeConfig.activeMigrationId}`,
         },
+        config,
       },
       { dependsOn: [postgres] }
     );
@@ -50,6 +51,7 @@ export async function installNode(): Promise<void> {
         namespace: namespace.ns,
         participant: { address: participant.service.metadata.name },
         postgres: { ...postgresConf, db: `cantonnet_v` },
+        config,
       },
       { dependsOn: [postgres, participant] }
     );

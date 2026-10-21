@@ -9,6 +9,9 @@ import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.digitalasset.canton.admin.api.client.data.SequencerConnectionPoolDelaysAccess.*
+import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplificationAccess.*
+import com.digitalasset.canton.admin.api.client.data.SubscriptionLivenessLimitsAccess.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.lifecycle.CloseContext

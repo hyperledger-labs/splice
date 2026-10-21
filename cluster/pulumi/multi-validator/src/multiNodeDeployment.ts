@@ -5,15 +5,17 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   appsKubernetesScheduling,
   DOCKER_REPO,
+  EnvVarConfig,
   imagePullPolicy,
   jmxOptions,
-  numNodesPerInstance,
 } from '@canton-network/splice-pulumi-common';
+import {
+  MultiValidatorConfig,
+  numNodesPerInstance,
+} from '@canton-network/splice-pulumi-common/src/config/multiValidatorConfig';
 import { ServiceMonitor } from '@canton-network/splice-pulumi-common/src/metrics';
 import { versionFromDefault } from '@canton-network/splice-pulumi-common/src/version';
 import _ from 'lodash';
-
-import { EnvironmentVariable, multiValidatorConfig } from './config';
 
 export interface BaseMultiNodeArgs {
   namespace: k8s.core.v1.Namespace;
@@ -25,6 +27,7 @@ export interface BaseMultiNodeArgs {
     db: string;
     secret: { name: pulumi.Output<string>; key: string };
   };
+  config: MultiValidatorConfig;
 }
 
 interface MultiNodeDeploymentArgs extends BaseMultiNodeArgs {
@@ -50,7 +53,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
     args: MultiNodeDeploymentArgs,
     opts?: pulumi.ComponentResourceOptions,
     javaOpts?: string,
-    extraEnvVars?: EnvironmentVariable[]
+    extraEnvVars?: EnvVarConfig[]
   ) {
     super('canton:network:Deployment', name, {}, opts);
 
@@ -104,7 +107,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                     },
                   ]),
                   env: [
-                    ...(args.container.env || []),
+                    args.container.env || [],
                     {
                       name: 'NUM_NODES',
                       value: `${numNodesPerInstance}`,
@@ -123,18 +126,16 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                         `-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 ${javaOpts || ''} ` +
                         jmxOptions(),
                     },
-                  ]
-                    .concat(
-                      multiValidatorConfig?.requiresOnboardingSecret
-                        ? [
-                            {
-                              name: 'SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET',
-                              value: 'true',
-                            },
-                          ]
-                        : []
-                    )
-                    .concat(extraEnvVars || []),
+                    args.config.requiresOnboardingSecret
+                      ? [
+                          {
+                            name: 'SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET',
+                            value: 'true',
+                          },
+                        ]
+                      : [],
+                    extraEnvVars || [],
+                  ].flat(),
                 },
               ],
               volumes: args.volumes,
