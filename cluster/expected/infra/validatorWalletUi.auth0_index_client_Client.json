@@ -5,12 +5,16 @@
     "allowedLogoutUrls": [
       "https://wallet.validator.mock.network.canton.global",
       "https://wallet.validator.mock.global.canton.network.digitalasset.com",
+      "https://wallet.extra-validator.mock.network.canton.global",
+      "https://wallet.extra-validator.mock.global.canton.network.digitalasset.com",
       "http://localhost:3000",
       "http://wallet.localhost"
     ],
     "allowedOrigins": [
       "https://wallet.validator.mock.network.canton.global",
       "https://wallet.validator.mock.global.canton.network.digitalasset.com",
+      "https://wallet.extra-validator.mock.network.canton.global",
+      "https://wallet.extra-validator.mock.global.canton.network.digitalasset.com",
       "http://localhost:3000",
       "http://wallet.localhost"
     ],
@@ -18,6 +22,8 @@
     "callbacks": [
       "https://wallet.validator.mock.network.canton.global",
       "https://wallet.validator.mock.global.canton.network.digitalasset.com",
+      "https://wallet.extra-validator.mock.network.canton.global",
+      "https://wallet.extra-validator.mock.global.canton.network.digitalasset.com",
       "http://localhost:3000",
       "http://wallet.localhost"
     ],
@@ -42,6 +48,8 @@
     "webOrigins": [
       "https://wallet.validator.mock.network.canton.global",
       "https://wallet.validator.mock.global.canton.network.digitalasset.com",
+      "https://wallet.extra-validator.mock.network.canton.global",
+      "https://wallet.extra-validator.mock.global.canton.network.digitalasset.com",
       "http://localhost:3000",
       "http://wallet.localhost"
     ]

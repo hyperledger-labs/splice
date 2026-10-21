@@ -5,12 +5,16 @@
     "allowedLogoutUrls": [
       "https://cns.validator.mock.network.canton.global",
       "https://cns.validator.mock.global.canton.network.digitalasset.com",
+      "https://cns.extra-validator.mock.network.canton.global",
+      "https://cns.extra-validator.mock.global.canton.network.digitalasset.com",
       "http://localhost:3001",
       "http://ans.localhost"
     ],
     "allowedOrigins": [
       "https://cns.validator.mock.network.canton.global",
       "https://cns.validator.mock.global.canton.network.digitalasset.com",
+      "https://cns.extra-validator.mock.network.canton.global",
+      "https://cns.extra-validator.mock.global.canton.network.digitalasset.com",
       "http://localhost:3001",
       "http://ans.localhost"
     ],
@@ -18,6 +22,8 @@
     "callbacks": [
       "https://cns.validator.mock.network.canton.global",
       "https://cns.validator.mock.global.canton.network.digitalasset.com",
+      "https://cns.extra-validator.mock.network.canton.global",
+      "https://cns.extra-validator.mock.global.canton.network.digitalasset.com",
       "http://localhost:3001",
       "http://ans.localhost"
     ],
@@ -42,6 +48,8 @@
     "webOrigins": [
       "https://cns.validator.mock.network.canton.global",
       "https://cns.validator.mock.global.canton.network.digitalasset.com",
+      "https://cns.extra-validator.mock.network.canton.global",
+      "https://cns.extra-validator.mock.global.canton.network.digitalasset.com",
       "http://localhost:3001",
       "http://ans.localhost"
     ]
