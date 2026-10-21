@@ -1550,30 +1550,30 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
-  /v0/get-reward-coupons-v2-by-contract-id:
+  /v0/get-reward-coupons-v2-disclosures:
     post:
       tags: [external, scan]
       x-jvm-package: scan
-      operationId: "getRewardCouponsV2ByContractId"
+      operationId: "getRewardCouponsV2Disclosures"
       description: |
-        Retrieve active contracts of the Daml template `Splice.Amulet:RewardCouponV2`
-        by contract ID, including their created event blobs.
+        Retrieve created event blobs for active contracts of the Daml template
+        `Splice.Amulet:RewardCouponV2` by contract ID.
         Missing or archived contracts, and contracts of other templates, are omitted
         from the response. If no matching active contracts are found, the response
-        contains an empty array.
+        contains an empty map.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/GetRewardCouponsV2ByContractIdRequest"
+              "$ref": "#/components/schemas/GetRewardCouponsV2DisclosuresRequest"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetRewardCouponsV2ByContractIdResponse"
+                "$ref": "#/components/schemas/GetRewardCouponsV2DisclosuresResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "500":
@@ -4000,7 +4000,7 @@ components:
           items:
             "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
 
-    GetRewardCouponsV2ByContractIdRequest:
+    GetRewardCouponsV2DisclosuresRequest:
       type: object
       required: ["contract_ids"]
       properties:
@@ -4011,19 +4011,19 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
 
-    GetRewardCouponsV2ByContractIdResponse:
+    GetRewardCouponsV2DisclosuresResponse:
       type: object
-      required: ["reward_coupons"]
+      required: ["created_event_blobs"]
       properties:
-        reward_coupons:
+        created_event_blobs:
           description: |
-            The requested active `Splice.Amulet:RewardCouponV2` contracts.
+            A map from contract ID to base64-encoded created event blob for the
+            requested active `Splice.Amulet:RewardCouponV2` contracts.
             Missing or archived contracts, and contracts of other templates,
-            are omitted. Match results to the request using each contract's contract_id;
-            response order is not guaranteed.
-          type: array
-          items:
-            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+            are omitted. No contract payloads or other metadata are returned.
+          type: object
+          additionalProperties:
+            type: string
 
     ListBulkAcsSnapshotObjectsResponse:
       type: object
