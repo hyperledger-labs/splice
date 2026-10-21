@@ -594,6 +594,10 @@ SELECT count(*) FROM \`$BQ_DATASET.partition_test_sim_update_history_c_x\`;
 SELECT datastream_metadata.change_type, count(*)
   FROM \`$BQ_DATASET.partition_test_sim_scan_verdict_store\` GROUP BY 1;
 -- expect INSERT, 17 (no DELETE)
+
+SELECT datastream_metadata.change_type, count(*)
+  FROM \`$BQ_DATASET.partition_test_sim_update_history_c_x\` GROUP BY 1 ORDER BY 1;
+-- expect NULL, 12 (the rows filled in 2f) and INSERT, 9 (no DELETE)
 ```
 
 - **Expected:** the stream is still `RUNNING`.
