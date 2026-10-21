@@ -235,6 +235,14 @@ class DsoDelegateBasedAutomationService(
       )
     )
     registerTrigger(
+      new ExpireGovernanceLockTransferTrigger(
+        config,
+        triggerContext,
+        svTaskContext,
+        unavailablePartiesStore,
+      )
+    )
+    registerTrigger(
       new ProvisionalFeaturedAppLockConversionTrigger(
         config,
         triggerContext,
@@ -286,6 +294,7 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[ProcessRewardsTrigger],
     aTrigger[ProcessRewardsDryRunTrigger],
     aTrigger[ExpireVestingLockTrigger],
+    aTrigger[ExpireGovernanceLockTransferTrigger],
     aTrigger[ProvisionalFeaturedAppLockConversionTrigger],
   )
 }

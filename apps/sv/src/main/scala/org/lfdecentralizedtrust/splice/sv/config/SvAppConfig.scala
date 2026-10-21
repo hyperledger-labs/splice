@@ -495,6 +495,7 @@ case class SvAppBackendConfig(
     delegatelessAutomationExpiredAmuletAllocationBatchSize: Int = 100,
     delegatelessAutomationExpiredRewardCouponV2BatchSize: Int = 100,
     delegatelessAutomationExpiredVestingLockBatchSize: Int = 100,
+    delegatelessAutomationExpiredGovernanceLockTransferBatchSize: Int = 100,
     delegatelessAutomationUnhideRewardCouponV2SampleSize: Int = 100,
     // As RewardCouponV2 have default TTL of 36h, at max 216 (36*6) should be active
     // So try to unhide all in single batch and avoid race among SVs
