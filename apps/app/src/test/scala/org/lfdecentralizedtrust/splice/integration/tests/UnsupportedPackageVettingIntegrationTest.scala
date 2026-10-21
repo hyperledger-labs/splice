@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.automation.PackageVettingTrigger
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   PackageConfig,
+  USD,
 }
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
@@ -299,5 +300,108 @@ class UnsupportedPackageVettingIntegrationTest
         }
       }
 
+  }
+
+  "Package versions of an accepted, not yet effective upgrade stay vetted when the validator restarts" in {
+    implicit env =>
+      val synchronizerId =
+        sv1Backend.participantClient.synchronizers.list_connected().head.synchronizerId
+      // A def, as the connection is replaced when alice's validator restarts.
+      def aliceParticipant = aliceValidatorBackend.appState.participantAdminConnection
+      // No-op if an earlier test case already resumed it.
+      aliceValidatorBackend.validatorAutomation.trigger[ValidatorPackageVettingTrigger].resume()
+
+      def currentAmuletConfig() =
+        AmuletConfigSchedule(sv1ScanBackend.getAmuletRules())
+          .getConfigAsOf(env.environment.clock.now)
+      def withPackageConfig(config: AmuletConfig[USD], packageConfig: PackageConfig) =
+        new AmuletConfig(
+          config.transferConfig,
+          config.issuanceCurve,
+          config.decentralizedSynchronizer,
+          config.tickDuration,
+          packageConfig,
+          config.transferPreapprovalFee,
+          config.featuredAppActivityMarkerAmount,
+          config.optDevelopmentFundManager,
+          config.externalPartyConfigStateTickDuration,
+          config.rewardConfig,
+          config.transferPreapprovalBaseDuration,
+          config.developmentFundManagerBlacklist,
+          config.minDevelopmentFundMintingDelay,
+          config.amuletSwitchOverTimes,
+        )
+
+      actAndCheck(
+        "sv1 sets the package config to versions below the latest ones", {
+          val config = currentAmuletConfig()
+          val olderPackageConfig = new PackageConfig(
+            DarResources.amulet_0_1_19.metadata.version.toString(),
+            DarResources.amuletNameService_0_1_20.metadata.version.toString(),
+            DarResources.dsoGovernance_0_1_25.metadata.version.toString(),
+            config.packageConfig.validatorLifecycle,
+            DarResources.wallet_0_1_20.metadata.version.toString(),
+            DarResources.walletPayments_0_1_19.metadata.version.toString(),
+          )
+          setAmuletConfig(Seq((None, withPackageConfig(config, olderPackageConfig), config)))
+        },
+      )(
+        "the older package config is effective",
+        _ =>
+          currentAmuletConfig().packageConfig.amulet shouldBe
+            DarResources.amulet_0_1_19.metadata.version.toString(),
+      )
+
+      val scheduledValidatorDars = Seq(
+        DarResources.amulet_0_1_20,
+        DarResources.amuletNameService_0_1_21,
+        DarResources.wallet_0_1_21,
+        DarResources.walletPayments_0_1_20,
+      )
+      actAndCheck(
+        "sv1 schedules an upgrade to newer package versions, effective in one hour", {
+          val config = currentAmuletConfig()
+          val newerPackageConfig = new PackageConfig(
+            DarResources.amulet_0_1_20.metadata.version.toString(),
+            DarResources.amuletNameService_0_1_21.metadata.version.toString(),
+            DarResources.dsoGovernance_0_1_26.metadata.version.toString(),
+            config.packageConfig.validatorLifecycle,
+            DarResources.wallet_0_1_21.metadata.version.toString(),
+            DarResources.walletPayments_0_1_20.metadata.version.toString(),
+          )
+          setAmuletConfig(
+            Seq(
+              (
+                Some(java.time.Duration.ofHours(1)),
+                withPackageConfig(config, newerPackageConfig),
+                config,
+              )
+            )
+          )
+        },
+      )(
+        "alice's validator vets the package versions of the scheduled upgrade",
+        _ =>
+          getVettedPackageIds(aliceParticipant, synchronizerId) should contain allElementsOf
+            scheduledValidatorDars.map(_.packageId),
+      )
+
+      clue("alice's validator restarts") {
+        aliceValidatorBackend.stop()
+        aliceValidatorBackend.startSync()
+      }
+
+      clue("alice's package vetting trigger runs once after the restart") {
+        // The trigger starts paused, as configured in the environment definition.
+        aliceValidatorBackend.validatorAutomation
+          .trigger[ValidatorPackageVettingTrigger]
+          .runOnce()
+          .futureValue(timeout = PatienceConfiguration.Timeout(FiniteDuration(60, "seconds")))
+      }
+
+      clue("the package versions of the scheduled upgrade are still vetted") {
+        getVettedPackageIds(aliceParticipant, synchronizerId) should contain allElementsOf
+          scheduledValidatorDars.map(_.packageId)
+      }
   }
 }
