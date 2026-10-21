@@ -1550,7 +1550,7 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
-  /v0/get-reward-coupons-v2-disclosures:
+  /v0/reward-coupons-v2-disclosures:
     post:
       tags: [external, scan]
       x-jvm-package: scan
@@ -1558,6 +1558,7 @@ paths:
       description: |
         Retrieve created event blobs for active contracts of the Daml template
         `Splice.Amulet:RewardCouponV2` by contract ID.
+        Requests are limited to 100 contract IDs; larger requests return 400.
         Missing or archived contracts, and contracts of other templates, are omitted
         from the response. If no matching active contracts are found, the response
         contains an empty map.
@@ -4007,7 +4008,9 @@ components:
         contract_ids:
           description: |
             Contract IDs of the `Splice.Amulet:RewardCouponV2` contracts to retrieve.
+            At most 100 contract IDs may be supplied per request.
           type: array
+          maxItems: 100
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
 
