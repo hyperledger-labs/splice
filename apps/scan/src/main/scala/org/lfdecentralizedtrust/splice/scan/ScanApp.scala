@@ -21,7 +21,7 @@ import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
 import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler}
-import org.lfdecentralizedtrust.splice.automation.PartitionMaintenanceTrigger
+import org.lfdecentralizedtrust.splice.automation.UpdateHistoryPartitionMaintenanceTrigger
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round as roundCodegen
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.{
@@ -341,7 +341,7 @@ class ScanApp(
         loggerFactory,
       )
       _ <- appInitStep("Create initial update history partitions") {
-        PartitionMaintenanceTrigger.createMissingPartitions(
+        UpdateHistoryPartitionMaintenanceTrigger.createMissingPartitions(
           updateHistory,
           appInitConnection,
           config.updateHistoryPartitionRunwayDays,

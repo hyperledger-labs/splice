@@ -20,7 +20,7 @@ import org.lfdecentralizedtrust.splice.store.{PageLimit, UpdateHistory, UpdateHi
 import java.time.{Duration, LocalDate, ZoneOffset}
 import scala.concurrent.Future
 
-class PartitionMaintenanceTriggerTest extends UpdateHistoryTestBase {
+class UpdateHistoryPartitionMaintenanceTriggerTest extends UpdateHistoryTestBase {
 
   private val day0 = LocalDate.ofInstant(CantonTimestamp.Epoch.toInstant, ZoneOffset.UTC)
   private def daysAfter(days: Long) = CantonTimestamp.Epoch.plus(Duration.ofDays(days))
@@ -42,7 +42,7 @@ class PartitionMaintenanceTriggerTest extends UpdateHistoryTestBase {
       now: CantonTimestamp,
       connection: BaseLedgerConnection = mkConnection(),
   ): Future[Seq[LocalDate]] =
-    PartitionMaintenanceTrigger.createMissingPartitions(
+    UpdateHistoryPartitionMaintenanceTrigger.createMissingPartitions(
       store,
       connection,
       runwayDays = 7,
@@ -50,10 +50,10 @@ class PartitionMaintenanceTriggerTest extends UpdateHistoryTestBase {
       logger,
     )
 
-  private def mkTrigger(store: UpdateHistory, now: CantonTimestamp): PartitionMaintenanceTrigger = {
+  private def mkTrigger(store: UpdateHistory, now: CantonTimestamp): UpdateHistoryPartitionMaintenanceTrigger = {
     val clock = new SimClock(loggerFactory = loggerFactory)
     clock.advanceTo(now)
-    new PartitionMaintenanceTrigger(
+    new UpdateHistoryPartitionMaintenanceTrigger(
       store,
       7,
       TriggerContext(

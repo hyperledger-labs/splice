@@ -22,7 +22,7 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistory
 import java.time.{LocalDate, ZoneOffset}
 import scala.concurrent.{ExecutionContext, Future}
 
-class PartitionMaintenanceTrigger(
+class UpdateHistoryPartitionMaintenanceTrigger(
     updateHistory: UpdateHistory,
     runwayDays: Int,
     override protected val context: TriggerContext,
@@ -30,8 +30,8 @@ class PartitionMaintenanceTrigger(
     ec: ExecutionContext,
     override val tracer: Tracer,
     mat: Materializer,
-) extends PollingParallelTaskExecutionTrigger[PartitionMaintenanceTrigger.Task] {
-  import PartitionMaintenanceTrigger.*
+) extends PollingParallelTaskExecutionTrigger[UpdateHistoryPartitionMaintenanceTrigger.Task] {
+  import UpdateHistoryPartitionMaintenanceTrigger.*
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
@@ -57,7 +57,7 @@ class PartitionMaintenanceTrigger(
     updateHistory.listDatesWithAllPartitions().map(_.contains(task.day))
 }
 
-object PartitionMaintenanceTrigger {
+object UpdateHistoryPartitionMaintenanceTrigger {
 
   final case class Task(day: LocalDate) extends PrettyPrinting {
     override def pretty: Pretty[this.type] = prettyOfClass(param("day", _.day.toString.unquoted))

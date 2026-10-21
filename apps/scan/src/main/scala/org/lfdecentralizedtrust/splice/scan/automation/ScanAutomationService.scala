@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.automation
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
-  PartitionMaintenanceTrigger,
+  UpdateHistoryPartitionMaintenanceTrigger,
   SpliceAppAutomationService,
   SqlIndexInitializationTrigger,
   TxLogBackfillingTrigger,
@@ -112,7 +112,7 @@ class ScanAutomationService(
 
   registerUpdateHistoryIngestion(updateHistory)
   registerTrigger(
-    new PartitionMaintenanceTrigger(
+    new UpdateHistoryPartitionMaintenanceTrigger(
       updateHistory,
       config.updateHistoryPartitionRunwayDays,
       triggerContext,
