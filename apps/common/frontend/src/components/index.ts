@@ -11,7 +11,7 @@ import Copyright from './Copyright';
 import DateDisplay from './DateDisplay';
 import DateWithDurationDisplay from './DateWithDurationDisplay';
 import DisableConditionally from './DisableConditionally';
-import DsoViewPrettyJSON, { DsoInfo } from './Dso';
+import DsoViewPrettyJSON, { DsoInfo, SvInfo } from './Dso';
 import ErrorBoundary from './ErrorBoundary';
 import ErrorDisplay from './ErrorDisplay';
 import ErrorRouterPage from './ErrorRouterPage';
@@ -58,6 +58,7 @@ export {
   DateWithDurationDisplay,
   DisableConditionally,
   DsoInfo,
+  SvInfo,
   DsoViewPrettyJSON,
   ErrorBoundary,
   ErrorDisplay,

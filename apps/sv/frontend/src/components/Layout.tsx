@@ -47,7 +47,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const featureSupport = useFeatureSupport();
 
   const votesHooks = useVotesHooks();
-  const dsoInfosQuery = votesHooks.useDsoInfos();
+  const dsoInfosQuery = votesHooks.useSvInfo();
   const listVoteRequestsQuery = votesHooks.useListDsoRulesVoteRequests();
   const svPartyId = dsoInfosQuery.data?.svPartyId;
   const actionsPending = listVoteRequestsQuery.data?.filter(

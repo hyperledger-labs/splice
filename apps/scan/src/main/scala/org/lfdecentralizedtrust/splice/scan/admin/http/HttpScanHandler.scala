@@ -243,6 +243,15 @@ class HttpScanHandler(
     }
   }
 
+  def getSvInfo(
+      respond: v0.ScanResource.GetSvInfoResponse.type
+  )()(extracted: TraceContext): Future[v0.ScanResource.GetSvInfoResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getSvInfo") { _ => _ =>
+      Future.successful(definitions.GetSvInfoResponse(svUserName, svParty.toProtoPrimitive))
+    }
+  }
+
   private def lookupDsoInfo()(implicit tc: TraceContext): Future[DsoInfo] =
     for {
       latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()

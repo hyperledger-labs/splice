@@ -42,8 +42,8 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
     }
   }, [votesQuery, handleClose]);
 
-  const dsoInfosQuery = votesHooks.useDsoInfos();
-  const svPartyId = dsoInfosQuery.data?.svPartyId;
+  const svInfoQuery = votesHooks.useSvInfo();
+  const svPartyId = svInfoQuery.data?.svPartyId;
 
   if (voteRequestQuery.isLoading || voteRequests.isLoading) {
     return <Loading />;

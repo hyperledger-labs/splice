@@ -311,7 +311,7 @@ components:
           $ref: "#/components/schemas/ContractWithState"
         sv_node_states:
           description: |
-            For aevery one of `svs` listed in `dso_rules`, a contract of the Daml
+            For every one of `svs` listed in `dso_rules`, a contract of the Daml
             template `Splice.DSO.SvState.SvNodeState`. This does not include
             states for offboarded SVs, though they may still have an on-ledger
             state contract

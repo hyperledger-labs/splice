@@ -70,7 +70,7 @@ class UpdateHistorySanityCheckPlugin(
             val founder = founders.loneElement
             val dsoRules = founder.getDsoInfo().dsoRules.payload
             val (scansInDsoRules, scansNotInDsoRules) = others.partition { otherScan =>
-              val svPartyId = otherScan.getDsoInfo().svParty.toProtoPrimitive
+              val svPartyId = otherScan.getSvInfo().svParty.toProtoPrimitive
               dsoRules.svs.containsKey(svPartyId)
             }
             scansNotInDsoRules.foreach { notInDso =>
@@ -80,7 +80,7 @@ class UpdateHistorySanityCheckPlugin(
               //  - U2: Involves SV
               // founder sees U1, U2 but otherScan only U2
               logger.info(
-                s"The SV party of Scan ${notInDso.name} (partyId=${notInDso.getDsoInfo().svParty}) is not in DsoRules. Ignoring."
+                s"The SV party of Scan ${notInDso.name} (partyId=${notInDso.getSvInfo().svParty}) is not in DsoRules. Ignoring."
               )
             }
             compareHistories(founder, scansInDsoRules)

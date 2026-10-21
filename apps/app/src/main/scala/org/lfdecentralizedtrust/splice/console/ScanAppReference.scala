@@ -99,6 +99,12 @@ abstract class ScanAppReference(
     }
   }
 
+  def getSvInfo(): HttpScanAppClient.SvInfo = {
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetSvInfo(List()))
+    }
+  }
+
   @Help.Summary(
     "Returns the highest synchronizer migration id this scan is aware of."
   )

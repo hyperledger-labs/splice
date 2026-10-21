@@ -17,6 +17,8 @@
       `sv_user` and `sv_party_id` fields of the SV operating the Scan instance, so that
       responses match across Scan instances. `/v0/dso` is now deprecated.
 
+    - Add `/v0/sv-info`, which returns the `sv_user` and `sv_party_id` of the SV operating the Scan instance.
+
   - SV App
 
     - The following request fields now have a `maxItems` bound of 1000; requests exceeding it are rejected with 400:

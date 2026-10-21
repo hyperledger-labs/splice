@@ -186,6 +186,24 @@ object HttpScanAppClient {
     }
   }
 
+  final case class SvInfo(svUser: String, svParty: PartyId)
+
+  case class GetSvInfo(headers: List[HttpHeader])
+      extends InternalBaseCommand[http.GetSvInfoResponse, SvInfo] {
+
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSvInfoResponse] =
+      client.getSvInfo(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetSvInfoResponse.OK(response) =>
+      Codec.decode(Codec.Party)(response.svPartyId).map(SvInfo(response.svUser, _))
+    }
+  }
+
   case class ListDsoRulesVoteRequests()
       extends InternalBaseCommand[http.ListDsoRulesVoteRequestsResponse, Seq[
         Contract[VoteRequest.ContractId, VoteRequest]
