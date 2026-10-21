@@ -529,15 +529,18 @@ DELETE FROM \`$BQ_DATASET.cx_backfill_temp\`
 -- expect 0 rows removed
 
 INSERT INTO \`$BQ_DATASET.partition_test_sim_update_history_c_x\`
-  SELECT * FROM \`$BQ_DATASET.cx_backfill_temp\`;
+    (row_id, ingested_at, record_time, payload, payload_interned, datastream_metadata)
+  SELECT row_id, ingested_at, record_time, payload, payload_interned, datastream_metadata
+  FROM \`$BQ_DATASET.cx_backfill_temp\`;
 -- expect 12 rows inserted
 ```
 
-- **Record** whether `bq load` accepts the `ingested_at` values as
-  `row_to_json` writes them (`2026-10-21T10:00:00.123456+00:00`), and whether it
-  accepts rows without `datastream_metadata`. If the schema marks that column
-  `REQUIRED`, the load fails, and the rows need a synthesized
-  `datastream_metadata` in the `INSERT … SELECT` instead.
+- The column list is required: BigQuery rejects `INSERT … SELECT *` into an
+  ingestion-time partitioned table, as Datastream's appendOnly tables are.
+- **Seen in a real run:** `bq load` accepts `ingested_at` as `row_to_json`
+  writes it (`2026-10-21T10:00:00.123456+00:00`), and accepts the rows without
+  `datastream_metadata`. All of its fields, `uuid` included, are null in the
+  loaded rows.
 
 Verify, and clean up:
 
@@ -643,7 +646,9 @@ publication, slot and stream before the cutover.
 4. **Check** that `pg_publication_tables` lists the new parents and no
    `*_legacy` table, for both publications.
 5. **Fill the gap** between steps 2 and 3, for both tables in both datasets,
-   with the canton-network-internal#7622 procedure, as in section 2f. The legacy
+   with the canton-network-internal#7622 procedure, as in section 2f. Name the
+   columns in its `INSERT … SELECT`: the stag-prod tables are ingestion-time
+   partitioned, and BigQuery rejects `SELECT *` without a column list. The legacy
    stream uses `backfillAll`: watch whether it starts backfilling the new
    relations after step 3, and see #7622 on switching it to `--backfill-none`
    first.
