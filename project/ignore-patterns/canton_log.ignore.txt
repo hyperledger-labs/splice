@@ -226,6 +226,7 @@ Now retrying operation 'request current time'
 .*ParticipantSynchronizerPermission.*PAR::sv2::.*
 .*GrpcPermissionDeniedError.*PAR::sv2::.*
 .*PERMISSION_DENIED.*PAR::sv2::.*
+PERMISSION_DENIED.*Member access was revoked.*participant=sv2Participant
 .*PAR::sv2::.*access is disabled.*
 .*Failed to establish subscription.*PAR::sv2::.*
 
