@@ -43,11 +43,26 @@ export const SvSequencerConfigSchema = z
   })
   .strict();
 export type SvSequencerConfig = z.infer<typeof SvSequencerConfigSchema>;
+const CloudSqlOverrideSchema = z
+  .object(
+    _.mapValues(CloudSqlConfigSchema.shape, field =>
+      field instanceof z.ZodDefault ? field.unwrap() : field
+    )
+  )
+  .partial();
+export const SvCantonBftConfigSchema = z
+  .object({
+    cloudSql: CloudSqlOverrideSchema,
+    splicePostgres: SplicePostgresSchema,
+  })
+  .partial()
+  .strict();
+export type SvCantonBftConfig = Pick<SvSequencerConfig, 'cloudSql' | 'splicePostgres'>;
 const PhysicalSynchronizerConfigOverridesSchema = z
   .object({
     mediator: SvMediatorConfigSchema.partial().optional(),
     sequencer: SvSequencerConfigSchema.partial().optional(),
-    cantonbft: SvSequencerConfigSchema.partial().optional(),
+    cantonBft: SvCantonBftConfigSchema.optional(),
   })
   .strict();
 export const PhysicalSynchronizersConfigOverridesSchema = z
