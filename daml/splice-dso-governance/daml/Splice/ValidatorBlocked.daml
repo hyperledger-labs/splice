@@ -1,18 +1,18 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
-module Splice.ValidatorUnpermission where
+module Splice.ValidatorBlocked where
 
 import Splice.Util
 import Splice.Types (ForDso(..))
 
-data ValidatorUnpermission_ArchiveResult = ValidatorUnpermission_ArchiveResult
+data ValidatorBlocked_ArchiveResult = ValidatorBlocked_ArchiveResult
   deriving (Serializable)
 
--- | ValidatorUnpermission contract is created to manage
+-- | ValidatorBlocked contract is created to manage
 -- the validator's permissions on the synchronizer.
 -- It is created lazily when SVs successfully vote to restrict a validator's permissions.
-template ValidatorUnpermission
+template ValidatorBlocked
   with
     dso : Party
     participantId : Text
@@ -25,12 +25,12 @@ template ValidatorUnpermission
   where
     signatory dso
 
-    choice ValidatorUnpermission_Archive : ValidatorUnpermission_ArchiveResult
+    choice ValidatorBlocked_Archive : ValidatorBlocked_ArchiveResult
       controller dso
-      do return ValidatorUnpermission_ArchiveResult
+      do return ValidatorBlocked_ArchiveResult
 
 -- instances
 ------------
 
-instance HasCheckedFetch ValidatorUnpermission ForDso where
-  contractGroupId ValidatorUnpermission{..} = ForDso with dso
+instance HasCheckedFetch ValidatorBlocked ForDso where
+  contractGroupId ValidatorBlocked{..} = ForDso with dso

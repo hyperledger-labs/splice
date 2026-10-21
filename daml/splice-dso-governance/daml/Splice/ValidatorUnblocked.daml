@@ -1,0 +1,31 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.ValidatorUnblocked where
+
+import Splice.Util
+import Splice.Types (ForDso(..))
+
+data ValidatorUnblocked_ArchiveResult = ValidatorUnblocked_ArchiveResult
+  deriving (Serializable)
+
+
+-- | ValidatorUnblocked contract is created to
+-- restore validator's permissions on the synchronizer.
+-- It is created when SVs successfully vote to unblocked a validator.
+template ValidatorUnblocked
+  with
+    dso : Party
+    participantId : Text
+  where
+    signatory dso
+
+    choice ValidatorUnblocked_Archive : ValidatorUnblocked_ArchiveResult
+      controller dso
+      do return ValidatorUnblocked_ArchiveResult
+
+-- instances
+------------
+
+instance HasCheckedFetch ValidatorUnblocked ForDso where
+  contractGroupId ValidatorUnblocked{..} = ForDso with dso
