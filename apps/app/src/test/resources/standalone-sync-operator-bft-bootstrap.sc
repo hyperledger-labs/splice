@@ -27,6 +27,7 @@ val synchronizerId = bootstrap.synchronizer(
   staticSynchronizerParameters = StaticSynchronizerParameters.defaultsWithoutKMS(ProtocolVersion.v36),
   mediatorRequestAmplification = SubmissionRequestAmplification.NoAmplification,
   mediatorThreshold = PositiveInt.tryCreate(2),
+  identityTransactions = None,
 ).logical
 
 // Raise the sequencer threshold, which genesis leaves at 1.
