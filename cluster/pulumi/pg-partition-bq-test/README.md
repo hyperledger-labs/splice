@@ -454,8 +454,8 @@ SELECT column_name, data_type FROM \`$BQ_DATASET\`.INFORMATION_SCHEMA.COLUMNS
 ```
 
 - **Expected:** the stream stays `RUNNING`.
-- **Record** how Datastream reports the new relation behind the same name, and
-  whether the BigQuery table's clustering changes.
+- **Seen in a real run:** the BigQuery table is still clustered on `row_id`
+  only, although the new parent's primary key is `(row_id, record_time)`.
 
 ### 2f. Fill the gap
 
