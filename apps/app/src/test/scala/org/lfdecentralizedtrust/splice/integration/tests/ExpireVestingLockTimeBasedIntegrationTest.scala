@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 
 import java.time.Duration
+import scala.jdk.OptionConverters.*
 
 /** Covers `ExpireVestingLockTrigger`: batched archival of fully vested `GovernanceLock`s.
   *
@@ -105,7 +106,7 @@ class ExpireVestingLockTimeBasedIntegrationTest
     val vestingStartTime = getLedgerTime.plus(unlockDelay)
     val endTime = vestingStartTime.toInstant.plus(vestingDuration)
 
-    // `createGovernanceLockTSv1` feeds all of the owner's unlocked
+    // `tsv1Operations.createGovernanceLock` feeds all of the owner's unlocked
     // holdings into the `TransferFactory_Transfer` choice. Thus, the tap has to
     // have landed before the first lock is submitted.
     actAndCheck(
@@ -119,21 +120,22 @@ class ExpireVestingLockTimeBasedIntegrationTest
     actAndCheck(
       s"Lock and unlock $numLocks times, vesting until $endTime", {
         (1 to numLocks).map { _ =>
-          val governanceLock = createGovernanceLockTSv1(
+          val governanceLock = tsv1Operations.createGovernanceLock(
             participant,
             owner,
             lockKind,
             lockSubject = sv1Name,
             amount = lockAmount,
           )
-          unlockGovernanceLockTSv1(
+          tsv1Operations.unlockGovernanceLock(
             participant,
             owner,
             lockKind,
             sv1Name,
-            governanceLock,
             unlockAmount = lockAmount,
             vestingStartTime = vestingStartTime,
+            isValid =
+              _.originalInstructionCid.toScala.exists(_.contractId == governanceLock.contractId),
           )
         }
       },

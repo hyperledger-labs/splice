@@ -701,7 +701,7 @@ class LsuIntegrationTest
 
         actAndCheck(
           "external party transfer 10 cc",
-          executeTransferViaTokenStandard(
+          executeTransferViaTokenStandardV1(
             aliceValidatorBackend.participantClientWithAdminToken,
             externalPartyOnboarding.richPartyId,
             aliceValidatorBackend.getValidatorPartyId(),
