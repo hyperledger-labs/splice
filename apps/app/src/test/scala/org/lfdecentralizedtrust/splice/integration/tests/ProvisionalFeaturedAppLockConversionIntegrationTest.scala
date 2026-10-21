@@ -72,14 +72,14 @@ class ProvisionalFeaturedAppLockConversionIntegrationTest
 
       actAndCheck(
         "alice locks for charlie and bob locks for alice", {
-          createGovernanceLockTSv1(
+          tsv1Operations.createGovernanceLock(
             aliceValidatorBackend.participantClientWithAdminToken,
             RichPartyId.local(alice),
             lockKind = ProvisionalFeaturedAppLock,
             lockSubject = charlie.toProtoPrimitive,
             amount = lockAmount,
           )
-          createGovernanceLockTSv1(
+          tsv1Operations.createGovernanceLock(
             bobValidatorBackend.participantClientWithAdminToken,
             RichPartyId.local(bob),
             lockKind = ProvisionalFeaturedAppLock,

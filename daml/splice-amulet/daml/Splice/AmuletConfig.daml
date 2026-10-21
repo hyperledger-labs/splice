@@ -221,8 +221,8 @@ validPackageConfig _ = True
 
 -- | Config record grouping config values for governance locks.
 --
--- All fields are optional because this simplifies the code and matches the
--- fact that all of them have been added using SCU.
+-- All fields are optional to support changes to individual fields without requiring
+-- the specification of the default values for other fields.
 data GovernanceLockConfig = GovernanceLockConfig with
     minimumLockAmount : Optional Decimal
       -- ^ Minimum amount for a governance lock. Default: 10k Amulet.

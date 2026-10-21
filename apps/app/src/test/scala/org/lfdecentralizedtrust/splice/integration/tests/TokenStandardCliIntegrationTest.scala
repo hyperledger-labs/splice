@@ -90,7 +90,7 @@ class TokenStandardCliIntegrationTest
       // Transfers from non-external parties are not supported by the CLI
       actAndCheck(
         "Transfer 2000.0 to Alice via Token Standard", {
-          executeTransferViaTokenStandard(
+          executeTransferViaTokenStandardV1(
             aliceValidatorBackend.participantClientWithAdminToken,
             RichPartyId.local(aliceValidatorBackend.getValidatorPartyId()),
             alicePartyId,

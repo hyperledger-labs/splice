@@ -10,8 +10,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationv1,
   holdingv1,
+  holdingv2,
   metadatav1,
   transferinstructionv1,
+  transferinstructionv2,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletallocationCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.testing.apps.tradingapp
@@ -46,7 +48,7 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
   val emptyExtraArgs =
     org.lfdecentralizedtrust.splice.util.ChoiceContextWithDisclosures.emptyExtraArgs
 
-  def executeTransferViaTokenStandard(
+  def executeTransferViaTokenStandardV1(
       participant: ParticipantClientReference,
       sender: RichPartyId,
       receiver: PartyId,
@@ -62,7 +64,7 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
   ) = {
     actAndCheck(
       s"Instructing transfer of $amount amulets via token standard from $sender to $receiver", {
-        val (factoryChoice, senderHoldingCids) = transferViaTokenStandardCommands(
+        val (factoryChoice, senderHoldingCids) = transferViaTokenStandardCommandsV1(
           participant,
           sender.partyId,
           receiver,
@@ -98,7 +100,7 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
     )
   }
 
-  def transferViaTokenStandardCommands(
+  def transferViaTokenStandardCommandsV1(
       participant: ParticipantClientReference,
       sender: PartyId,
       receiver: PartyId,
@@ -142,6 +144,111 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
     )
     val scanResponse @ (factory, kind) = sv1ScanBackend.getTransferFactory(choiceArgs)
     aliceValidatorBackend.scanProxy.getTransferFactory(choiceArgs) shouldBe scanResponse
+    kind shouldBe expectedKind
+    (factory, senderHoldingCids)
+  }
+
+  def executeTransferViaTokenStandardV2(
+      participant: ParticipantClientReference,
+      sender: RichPartyId,
+      receiver: PartyId,
+      amount: BigDecimal,
+      expectedKind: transferinstruction.v2.definitions.TransferFactoryWithChoiceContext.TransferKind,
+      timeToLife: Duration = Duration.ofMinutes(10),
+      expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
+      advanceTimeBeforeExecute: Option[Duration] = None,
+      description: Option[String] = None,
+      wait: Boolean = true,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
+    actAndCheck(
+      s"Instructing transfer of $amount amulets via token standard v2 from $sender to $receiver", {
+        val (factoryChoice, senderHoldingCids) = transferViaTokenStandardCommandsV2(
+          participant,
+          sender.partyId,
+          receiver,
+          amount,
+          expectedKind,
+          timeToLife,
+          description,
+        )
+        participant.ledger_api_extensions.commands
+          .submitJavaExternalOrLocal(
+            sender,
+            commands = factoryChoice.factoryId
+              .exerciseTransferFactory_Transfer(factoryChoice.args)
+              .commands
+              .asScala
+              .toSeq,
+            disclosedContracts = factoryChoice.disclosedContracts,
+            expectedTimeBounds = expectedTimeBounds,
+            advanceTimeBeforeExecute = advanceTimeBeforeExecute,
+          )
+        senderHoldingCids.headOption
+      },
+    )(
+      // Prepared tx execution does not wait for the tx being committed.
+      // We thus wait here, as otherwise multiple transfer commands will use the same input holdings.
+      "Wait until we see at least one of the input holdings being consumed",
+      _.foreach { trackingHoldingCid =>
+        if (wait)
+          participant.ledger_api.event_query
+            .by_contract_id(trackingHoldingCid.contractId, requestingParties = Seq(sender.partyId))
+            .archived should not be empty withClue "archived holding"
+      },
+    )
+  }
+
+  def transferViaTokenStandardCommandsV2(
+      participant: ParticipantClientReference,
+      sender: PartyId,
+      receiver: PartyId,
+      amount: BigDecimal,
+      expectedKind: transferinstruction.v2.definitions.TransferFactoryWithChoiceContext.TransferKind,
+      timeToLife: Duration = Duration.ofMinutes(10),
+      description: Option[String] = None,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ): (
+      FactoryChoiceWithDisclosures[
+        transferinstructionv2.TransferFactory.ContractId,
+        transferinstructionv2.TransferFactory_Transfer,
+      ],
+      Seq[holdingv2.Holding.ContractId],
+  ) = {
+    val now = env.environment.clock.now.toInstant
+    def unlocked(optLock: java.util.Optional[holdingv1.Lock]): Boolean =
+      optLock.toScala.forall(lock => lock.expiresAt.toScala.exists(t => t.isBefore(now)))
+    def account(party: PartyId): holdingv2.Account =
+      new holdingv2.Account(
+        java.util.Optional.of(party.toProtoPrimitive),
+        java.util.Optional.empty(),
+        "",
+      )
+    val senderHoldingCids = listHoldings(participant, sender)
+      .collect {
+        case (holdingCid, holding)
+            if holding.owner == sender.toProtoPrimitive && unlocked(holding.lock) =>
+          new holdingv2.Holding.ContractId(holdingCid.contractId)
+      }
+    val choiceArgs = new transferinstructionv2.TransferFactory_Transfer(
+      new transferinstructionv2.Transfer(
+        account(sender),
+        account(receiver),
+        amount.bigDecimal,
+        new holdingv2.InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
+        now,
+        now.plus(timeToLife),
+        senderHoldingCids.asJava,
+        new metadatav1.Metadata(
+          description.toList.map(TokenStandardMetadata.reasonMetaKey -> _).toMap.asJava
+        ),
+      ),
+      Seq(sender.toProtoPrimitive).asJava,
+      emptyExtraArgs,
+    )
+    val (factory, kind) = sv1ScanBackend.getTransferFactoryV2(choiceArgs)
     kind shouldBe expectedKind
     (factory, senderHoldingCids)
   }
@@ -215,7 +322,42 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
     })
   }
 
-  def acceptTransferInstruction(
+  def listTransferInstructionsV2(
+      participantClient: ParticipantClientReference,
+      party: PartyId,
+  ): Seq[
+    (
+        transferinstructionv2.TransferInstruction.ContractId,
+        transferinstructionv2.TransferInstructionView,
+    )
+  ] = {
+    val instructions =
+      participantClient.ledger_api.state.acs.of_party(
+        party = party,
+        filterInterfaces =
+          Seq(transferinstructionv2.TransferInstruction.TEMPLATE_ID).map(templateId =>
+            TemplateId(
+              templateId.getPackageId,
+              templateId.getModuleName,
+              templateId.getEntityName,
+            )
+          ),
+      )
+    instructions.map(instr => {
+      val instrViewRaw = (instr.event.interfaceViews.head.viewValue
+        .getOrElse(throw new RuntimeException("expected an interface view to be present")))
+      val instrView = transferinstructionv2.TransferInstructionView
+        .valueDecoder()
+        .decode(
+          javaapi.data.DamlRecord.fromProto(
+            v2.value.Record.toJavaProto(instrViewRaw)
+          )
+        )
+      (new transferinstructionv2.TransferInstruction.ContractId(instr.contractId), instrView)
+    })
+  }
+
+  def acceptTransferInstructionV1(
       participant: ParticipantClientReference,
       receiver: RichPartyId,
       instructionCid: transferinstructionv1.TransferInstruction.ContractId,
@@ -240,7 +382,34 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       )
   }
 
-  def rejectTransferInstruction(
+  def acceptTransferInstructionV2(
+      participant: ParticipantClientReference,
+      receiver: RichPartyId,
+      instructionCid: transferinstructionv2.TransferInstruction.ContractId,
+      expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
+    val choiceContext = sv1ScanBackend.getTransferInstructionAcceptContextV2(instructionCid)
+    participant.ledger_api_extensions.commands
+      .submitJavaExternalOrLocal(
+        receiver,
+        commands = instructionCid
+          .exerciseTransferInstruction_Accept(
+            new transferinstructionv2.TransferInstruction_Accept(
+              List(receiver.partyId.toProtoPrimitive).asJava,
+              choiceContext.toExtraArgs(),
+            )
+          )
+          .commands()
+          .asScala
+          .toSeq,
+        disclosedContracts = choiceContext.disclosedContracts,
+        expectedTimeBounds = expectedTimeBounds,
+      )
+  }
+
+  def rejectTransferInstructionV1(
       participant: ParticipantClientReference,
       receiver: RichPartyId,
       instructionCid: transferinstructionv1.TransferInstruction.ContractId,
@@ -265,7 +434,34 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       )
   }
 
-  def withdrawTransferInstruction(
+  def rejectTransferInstructionV2(
+      participant: ParticipantClientReference,
+      receiver: RichPartyId,
+      instructionCid: transferinstructionv2.TransferInstruction.ContractId,
+      expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
+    val choiceContext = sv1ScanBackend.getTransferInstructionRejectContextV2(instructionCid)
+    participant.ledger_api_extensions.commands
+      .submitJavaExternalOrLocal(
+        receiver,
+        commands = instructionCid
+          .exerciseTransferInstruction_Reject(
+            new transferinstructionv2.TransferInstruction_Reject(
+              List(receiver.partyId.toProtoPrimitive).asJava,
+              choiceContext.toExtraArgs(),
+            )
+          )
+          .commands()
+          .asScala
+          .toSeq,
+        disclosedContracts = choiceContext.disclosedContracts,
+        expectedTimeBounds = expectedTimeBounds,
+      )
+  }
+
+  def withdrawTransferInstructionV1(
       participant: ParticipantClientReference,
       receiver: RichPartyId,
       instructionCid: transferinstructionv1.TransferInstruction.ContractId,
@@ -282,6 +478,33 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
         receiver,
         commands = instructionCid
           .exerciseTransferInstruction_Withdraw(choiceContext.toExtraArgs())
+          .commands()
+          .asScala
+          .toSeq,
+        disclosedContracts = choiceContext.disclosedContracts,
+        expectedTimeBounds = expectedTimeBounds,
+      )
+  }
+
+  def withdrawTransferInstructionV2(
+      participant: ParticipantClientReference,
+      receiver: RichPartyId,
+      instructionCid: transferinstructionv2.TransferInstruction.ContractId,
+      expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
+    val choiceContext = sv1ScanBackend.getTransferInstructionWithdrawContextV2(instructionCid)
+    participant.ledger_api_extensions.commands
+      .submitJavaExternalOrLocal(
+        receiver,
+        commands = instructionCid
+          .exerciseTransferInstruction_Withdraw(
+            new transferinstructionv2.TransferInstruction_Withdraw(
+              List(receiver.partyId.toProtoPrimitive).asJava,
+              choiceContext.toExtraArgs(),
+            )
+          )
           .commands()
           .asScala
           .toSeq,

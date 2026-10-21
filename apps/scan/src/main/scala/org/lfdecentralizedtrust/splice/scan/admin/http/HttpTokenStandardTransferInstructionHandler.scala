@@ -391,15 +391,19 @@ class HttpTokenStandardTransferInstructionHandler(
   }
 
   /** Generic method to fetch choice contexts for all choices on a transfer instruction */
-  private def getTransferInstructionChoiceContextV1(
+  private def getTransferInstructionChoiceContext[
+      DisclosedContract,
+      ChoiceContext,
+      Builder <: util.ChoiceContextBuilder[
+        DisclosedContract,
+        ChoiceContext,
+        Builder,
+      ],
+  ](
       transferInstructionId: String,
       requireLockedAmulet: Boolean,
-      excludeDebugFields: Boolean,
-  )(implicit
-      tc: TraceContext
-  ): Future[v1.definitions.ChoiceContext] = {
-    val newBuilder = new V1ChoiceContextBuilder(_, excludeDebugFields)
-
+      newBuilder: String => Builder,
+  )(implicit tc: TraceContext): Future[ChoiceContext] = {
     def description(type_ : String): String = s"$type_ '$transferInstructionId'"
 
     def getGovernanceLockContext(
@@ -408,9 +412,9 @@ class HttpTokenStandardTransferInstructionHandler(
         requireLockedAmulet: Boolean,
     ) =
       util.ChoiceContextBuilder.getGovernanceLockContext[
-        v1.definitions.DisclosedContract,
-        v1.definitions.ChoiceContext,
-        V1ChoiceContextBuilder,
+        DisclosedContract,
+        ChoiceContext,
+        Builder,
       ](
         description(tpe),
         lockedAmuletId,
@@ -428,9 +432,9 @@ class HttpTokenStandardTransferInstructionHandler(
           contract.payload match {
             case amuletInstr: splice.amulettransferinstruction.AmuletTransferInstruction =>
               util.ChoiceContextBuilder.getTwoStepTransferContext[
-                v1.definitions.DisclosedContract,
-                v1.definitions.ChoiceContext,
-                V1ChoiceContextBuilder,
+                DisclosedContract,
+                ChoiceContext,
+                Builder,
               ](
                 description("AmuletTransferInstruction"),
                 Some(amuletInstr.lockedAmulet),
@@ -465,40 +469,39 @@ class HttpTokenStandardTransferInstructionHandler(
       }
   }
 
+  private def getTransferInstructionChoiceContextV1(
+      transferInstructionId: String,
+      requireLockedAmulet: Boolean,
+      excludeDebugFields: Boolean,
+  )(implicit
+      tc: TraceContext
+  ): Future[v1.definitions.ChoiceContext] =
+    getTransferInstructionChoiceContext[
+      v1.definitions.DisclosedContract,
+      v1.definitions.ChoiceContext,
+      V1ChoiceContextBuilder,
+    ](
+      transferInstructionId,
+      requireLockedAmulet,
+      new V1ChoiceContextBuilder(_, excludeDebugFields),
+    )
+
   private def getTransferInstructionChoiceContextV2(
       transferInstructionId: String,
       requireLockedAmulet: Boolean,
       excludeDebugFields: Boolean,
   )(implicit
       tc: TraceContext
-  ): Future[v2.definitions.ChoiceContext] = {
-    for {
-      amuletInstr <- contractFetcher
-        .lookupContractById(
-          splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION
-        )(
-          new splice.amulettransferinstruction.AmuletTransferInstruction.ContractId(
-            transferInstructionId
-          )
-        )
-        .map(_.getOrElse(transferInstructionNotFound(transferInstructionId, None)))
-      context <- util.ChoiceContextBuilder.getTwoStepTransferContext[
-        v2.definitions.DisclosedContract,
-        v2.definitions.ChoiceContext,
-        V2ChoiceContextBuilder,
-      ](
-        s"AmuletTransferInstruction '$transferInstructionId'",
-        Some(amuletInstr.payload.lockedAmulet),
-        Some(amuletInstr.payload.transfer.executeBefore),
-        requireLockedAmulet,
-        None,
-        store,
-        contractFetcher,
-        clock,
-        new V2ChoiceContextBuilder(_, excludeDebugFields),
-      )
-    } yield context
-  }
+  ): Future[v2.definitions.ChoiceContext] =
+    getTransferInstructionChoiceContext[
+      v2.definitions.DisclosedContract,
+      v2.definitions.ChoiceContext,
+      V2ChoiceContextBuilder,
+    ](
+      transferInstructionId,
+      requireLockedAmulet,
+      new V2ChoiceContextBuilder(_, excludeDebugFields),
+    )
 
   private def transferInstructionNotFound[A](
       transferInstructionId: String,

@@ -47,7 +47,7 @@ lockWithSpec
 lockWithSpec ops env owner amount specification = do
   let registry = env.registriesEnv.amuletV2
   AmuletRegistryV2.tapFaucet registry owner amount
-  lockCid <- expectSuccess $ ops.governanceLock (testEnvRegistries env) owner amount (governanceLockKind specification) emptyMetadata
+  lockCid <- expectSuccess $ ops.governanceLock (testEnvRegistries env) owner amount (governanceLockKind specification)
   Some lock <- queryContractId owner lockCid
   pure (lockCid, lock)
 

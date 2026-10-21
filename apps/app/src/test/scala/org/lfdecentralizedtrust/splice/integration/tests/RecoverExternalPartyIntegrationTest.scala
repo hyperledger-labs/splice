@@ -54,7 +54,7 @@ class RecoverExternalPartyIntegrationTest
 
     actAndCheck(
       "Transfer 2000.0 to Alice via Token Standard", {
-        executeTransferViaTokenStandard(
+        executeTransferViaTokenStandardV1(
           aliceValidatorBackend.participantClientWithAdminToken,
           RichPartyId.local(aliceValidatorBackend.getValidatorPartyId()),
           aliceParty,
@@ -206,7 +206,7 @@ class RecoverExternalPartyIntegrationTest
     // Check that alice can transfer through bob's node
     actAndCheck(
       "alice transfer 1000 cc to bob's validator",
-      executeTransferViaTokenStandard(
+      executeTransferViaTokenStandardV1(
         bobValidatorBackend.participantClientWithAdminToken,
         onboarding.richPartyId,
         bobValidatorBackend.getValidatorUserInfo().primaryParty,

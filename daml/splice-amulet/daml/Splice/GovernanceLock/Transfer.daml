@@ -28,6 +28,7 @@ import Splice.Api.Token.TransferInstructionV2 qualified as V2
 import Splice.GovernanceLock
 import Splice.TokenStandard.Utils hiding (require, reasonMetaKey)
 import Splice.Types
+import Splice.Util (HasCheckedFetch(..))
 
 -- | Arguments of `createGovernanceLockTransfer`.
 data LockTransferArgs = LockTransferArgs with
@@ -187,10 +188,7 @@ governanceLockTransfer_acceptImpl self GovernanceLockTransfer{..} actors extraAr
   -- The legs report the memo of the accepted proposal
   let reason = reasonFromMeta $ transferGovernanceLockMetadata source.specification
   FetchAndMergeLocksResult{lockCid} <- fetchAndMergeGovernanceLocks source context state reason
-  result <- exercise lockCid GovernanceLock_DsoTransfer with
-    transferredAmount = amount
-    reason
-    extraArgs
+  result <- governanceLock_dsoTransferImpl (ForOwner with dso = source.dso; owner = source.owner) lockCid amount reason extraArgs
   -- Lock the unlocked funds of the sender again, now for the receiver.
   -- This needs the authority of the receiver.
   ([newLockedAmulet], None) <- lockAmuletFor
@@ -240,7 +238,9 @@ validateLockTransfer expiresAt LockTransferArgs{..} = do
 -- messages.
 isValidLockTransfer : GovernanceLockTransfer -> Bool
 isValidLockTransfer GovernanceLockTransfer{..} =
-  let validEndTime = foldGovernanceLockSpecification (const True) (\v -> expiresAt <= v.endTime) source.specification
+  let validEndTime = case source.specification of
+        GLS_FullLock _ -> True
+        GLS_VestingLock v -> expiresAt <= v.endTime
   in amount > 0.0 && receiver /= source.owner && validEndTime
 
 -- | When a lock transfer proposal expires
@@ -248,3 +248,9 @@ lockTransferExpiresAt : LockTransferArgs -> Update Time
 lockTransferExpiresAt LockTransferArgs{..} = do
   (_, state) <- unfeaturedPaymentContextAndConfigFromChoiceContext source.dso extraArgs.context
   pure $ requestedAt `addRelTime` getTokenStandardMaxTTL state.transferConfig
+
+-- Instances
+------------
+
+instance HasCheckedFetch GovernanceLockTransfer ForDso where
+  contractGroupId GovernanceLockTransfer{..} = ForDso with dso = source.dso

@@ -83,7 +83,7 @@ class ExternallySignedTxsTimeBasedIntegrationTest
       submitExternalPartySetupProposal(aliceValidatorBackend, onboarding2, preparePartySetup2)
       val beforePrepare = env.environment.clock.now
 
-      executeTransferViaTokenStandard(
+      executeTransferViaTokenStandardV1(
         aliceValidatorBackend.participantClientWithAdminToken,
         onboarding1.richPartyId,
         onboarding2.party,
