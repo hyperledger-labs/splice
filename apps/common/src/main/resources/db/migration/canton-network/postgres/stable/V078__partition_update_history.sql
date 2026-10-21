@@ -125,7 +125,6 @@ create table update_history_creates
     partition by range (record_time);
 select setval(pg_get_serial_sequence('update_history_creates', 'row_id'), last_value, is_called)
 from update_history_creates_legacy_row_id_seq;
-create index contract_create_lookup on update_history_creates (contract_id);
 create index updt_hist_crea_hi_mi_rt on update_history_creates (history_id, migration_id, record_time);
 create index updt_hist_crea_uri on update_history_creates (update_row_id);
 
