@@ -400,20 +400,12 @@ governanceLockMetadataParser : Parser Metadata Metadata
 governanceLockMetadataParser = do
   meta <- inputParser
   case Text.stripPrefix cipMemoPrefix $ reasonFromMeta meta of
-    Some reason -> do
-      let
-        -- Prefix all parsed keys with the CIP prefix to avoid clashes
-        -- with metadata keys from other namespaces.
-        adjustPrefix k = cipMetaPrefix <> k
-        textMapMapKeys f = TextMap.fromList . fmap (\(k, v) -> (f k, v)) . TextMap.toList
-      parsedReasonMeta <- textMapMapKeys adjustPrefix <$> keyValueParser reason
-      -- Prefer the original metadata keys to avoid users overwriting
-      -- metadata that is already set via their "memo" tag.
-      -- Delete the parsed reason as it will be repopulated when
-      -- encoding the governance lock via the token standard interface.
-      pure $ Metadata $ TextMap.union (TextMap.delete reasonMetaKey meta.values) parsedReasonMeta
+    Some reason ->
+      -- Prefix all parsed keys with the CIP prefix
+      let adjustKeys = TextMap.fromList . fmap (\(k, v) -> (cipMetaPrefix <> k, v)) . TextMap.toList
+      in Metadata <$> adjustKeys <$> keyValueParser reason
 
-    None -> pure meta
+    None -> pure emptyMetadata
 
 parseGovernanceLockMetadata : CanAssert m => Metadata -> m Metadata
 parseGovernanceLockMetadata = assertParsed governanceLockMetadataParser

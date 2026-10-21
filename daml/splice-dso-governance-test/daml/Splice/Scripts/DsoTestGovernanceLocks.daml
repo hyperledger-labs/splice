@@ -11,7 +11,6 @@ import DA.Time
 import Daml.Script
 
 import Splice.Amulet (Amulet, FeaturedAppRight(..), LockedAmulet, LockedAmulet_OwnerExpireLockV2(..))
-import Splice.Api.Token.MetadataV1 (emptyMetadata)
 import Splice.DsoRules (DsoRules, DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLock(..), DsoRules_GovernanceLockSubstitution_DsoExpire(..), DsoRules_GovernanceLockTransfer_DsoExpire(..), DsoRules_GovernanceLock_DsoExpire(..))
 import Splice.GovernanceLock
 import Splice.GovernanceLock.Substitution
@@ -47,7 +46,7 @@ setupSharedLock kind = do
   WalletClientV2.createBatchingUtility alice.primaryParty
 
   governanceLockCid <- expectSuccess $
-    tsv1Operations.governanceLock (TestEnvRegistries registries registry) alice.primaryParty testVestingAmount (kind alice) emptyMetadata
+    tsv1Operations.governanceLock (TestEnvRegistries registries registry) alice.primaryParty testVestingAmount (kind alice)
 
   pure SharedLockEnv with ..
 

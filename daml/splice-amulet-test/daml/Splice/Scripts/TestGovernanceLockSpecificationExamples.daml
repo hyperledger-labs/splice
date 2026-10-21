@@ -13,7 +13,6 @@ import DA.Time
 
 import Daml.Script
 import Splice.Amulet
-import Splice.Api.Token.MetadataV1 (emptyMetadata)
 import Splice.Api.Token.TransferInstructionV1 qualified as V1
 import Splice.Expiry (TimeLock(..))
 import Splice.GovernanceLock
@@ -80,7 +79,7 @@ submitMemo env sender amount memo = do
   inputs <- if amount > 0.0
     then WalletClientV2.listUnlockedHoldingCidsFor (basicAccount sender) sender registry.instrumentId
     else pure []
-  request <- lockRequestV1 registry sender amount memo emptyMetadata
+  request <- lockRequestV1 registry sender amount memo
   expectSuccess $ submitLockRequestV1 env.registries request with inputHoldingCids = downcast <$> inputs
 
 -- | Creates the 5M FA lock of `A` for `X` with the memo of the "Creating Locks" example.
@@ -248,7 +247,6 @@ test_spec_unlockFaLockNeedsVestingStartTime = do
 
   request <- lockRequestV1 registriesEnv.amuletV2 a 0.0
     "cip-127/memo:request=unlock-and-start-vesting&unlock-amount=1000000&lock-kind=fa-lock&lock-subject=X"
-    emptyMetadata
   expectFailureContaining (missingMetadataMessage vestingStartTimeMetaKey) =<< submitLockRequestV1 registries request
   checkLockUntouched a (fromInterfaceContractId @GovernanceLock lockCid) lock
 

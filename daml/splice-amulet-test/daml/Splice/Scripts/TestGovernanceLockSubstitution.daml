@@ -9,7 +9,6 @@ import DA.Map qualified as Map
 import DA.Time
 
 import Daml.Script
-import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as V1
 import Splice.Api.Token.TransferInstructionV2 qualified as V2
 import Splice.GovernanceLock
@@ -38,7 +37,7 @@ testSubstitution_governanceLock ops = do
   AmuletRegistryV2.tapFaucet registriesEnv.amuletV2 alice (testLockAmount - 1000.0) -- Env creates 1000.0 for alice, so we top up to 180k
   AmuletRegistryV2.tapFaucet registriesEnv.amuletV2 bob testLockAmount
 
-  ops.governanceLock (testEnvRegistries env) alice testLockAmount someSvKind emptyMetadata
+  ops.governanceLock (testEnvRegistries env) alice testLockAmount someSvKind
 
   -- check balances
   let checkBalances (aliceUnlocked, aliceLocked) (bobUnlocked, bobLocked) = do
@@ -98,7 +97,7 @@ testSubstitution_failures ops = do
   AmuletRegistryV2.tapFaucet registry bob 60000.0
 
   let targetSpec = fullLockSpecification kind
-  ops.governanceLock (testEnvRegistries env) alice 50000.0 kind emptyMetadata
+  ops.governanceLock (testEnvRegistries env) alice 50000.0 kind
 
   -- Insufficient funds to create the substitution
   WalletClientV2.createBatchingUtility charlie
@@ -132,7 +131,7 @@ testSubstitution_futureRequestedAt ops = do
   AmuletRegistryV2.tapFaucet registry bob 20000.0
 
   let targetSpec = fullLockSpecification kind
-  ops.governanceLock (testEnvRegistries env) alice 50000.0 kind emptyMetadata
+  ops.governanceLock (testEnvRegistries env) alice 50000.0 kind
 
   requestedAt <- (`addRelTime` days 1) <$> getTime
   expectFailureContaining "requestedAt" =<< ops.proposeSubstitutionAt (testEnvRegistries env) bob
@@ -147,7 +146,7 @@ setupSubstitution ops = do
       kind = GLK_SuperValidatorRightsOwner "TestSV"
   AmuletRegistryV2.tapFaucet registry alice 49000.0
   AmuletRegistryV2.tapFaucet registry bob 20000.0
-  targetCid <- expectSuccess $ ops.governanceLock (testEnvRegistries env) alice 50000.0 kind emptyMetadata
+  targetCid <- expectSuccess $ ops.governanceLock (testEnvRegistries env) alice 50000.0 kind
   let targetKey = GovernanceLockKey with dso = instrId.admin; owner = alice; specification = fullLockSpecification kind
       newSpec = fullLockSpecification kind
   proposal <- ops.expectPendingTransfer =<< expectSuccess (ops.proposeSubstitution (testEnvRegistries env) bob targetKey 20000.0)
@@ -243,7 +242,7 @@ testSubstitution_vestingTarget ops = do
       kind = GLK_SuperValidatorRightsOwner "TestSV"
   AmuletRegistryV2.tapFaucet registry alice 49000.0
   AmuletRegistryV2.tapFaucet registry bob 20000.0
-  lockCid <- expectSuccess $ ops.governanceLock (testEnvRegistries env) alice 50000.0 kind emptyMetadata
+  lockCid <- expectSuccess $ ops.governanceLock (testEnvRegistries env) alice 50000.0 kind
   unlockAt <- (`addRelTime` hours 1) <$> getTime
   vestingCid <- expectSuccess $ ops.governanceUnlock (testEnvRegistries env) lockCid alice (unlockMeta 50000.0 unlockAt)
   Some vestingLock <- queryContractId alice vestingCid
@@ -276,7 +275,7 @@ setupSelfSubstitution : GovernanceLockOperations i r t -> GovernanceLockSpecific
 setupSelfSubstitution ops targetSpec = do
   env@TestEnv{..} <- setupTest
   AmuletRegistryV2.tapFaucet registriesEnv.amuletV2 alice 49000.0 -- alice starts with 1000.0
-  targetCid <- expectSuccess $ ops.governanceLock (testEnvRegistries env) alice 50000.0 (governanceLockKind targetSpec) emptyMetadata
+  targetCid <- expectSuccess $ ops.governanceLock (testEnvRegistries env) alice 50000.0 (governanceLockKind targetSpec)
   WalletClientV2.checkUnlockedBalance alice instrId 0.0
   pure (env, targetCid, targetSpec)
 
