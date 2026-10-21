@@ -29,6 +29,7 @@ import Splice.AmuletAllocation as AmuletAllocationV1
 import Splice.AmuletAllocationV2 as AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
+import Splice.Round (OpenMiningRound(..), OpenMiningRound_Fetch(..))
 import Splice.Types
 import Splice.Util
 
@@ -45,6 +46,16 @@ data ExternalPartyAmuletRules_ExpireAmuletAllocationsResult = ExternalPartyAmule
 
 data ExternalPartyAmuletRules_ExpireAmuletAllocationsV2Result = ExternalPartyAmuletRules_ExpireAmuletAllocationsV2Result {}
   -- intentionally no results to save storage space in Scan
+  deriving (Eq, Show, Serializable)
+
+-- | What `ExternalPartyAmuletRules_BurnAmulet` destroyed as a fee, priced at the open round.
+-- Holding fees charged while splitting the inputs are not included.
+data ExternalPartyAmuletRules_BurnAmuletResult = ExternalPartyAmuletRules_BurnAmuletResult
+  with
+    ccBurned : Decimal
+    usdValue : Decimal
+    senderChangeAmulet : Optional (ContractId Amulet)
+    meta : Metadata
   deriving (Eq, Show, Serializable)
 
 -- | Rules contract that can be used in transactions that require signatures
@@ -126,6 +137,37 @@ template ExternalPartyAmuletRules
            nonce
            description
          pure (ExternalPartyAmuletRules_CreateTransferCommandResult cmd)
+
+    -- | Burn `amount` of `owner`'s CC.
+    -- `dso` is a controller so the owner cannot call this on their own.
+    -- `usdValue` is `amount` times the open round's price, not the holding fees.
+    nonconsuming choice ExternalPartyAmuletRules_BurnAmulet : ExternalPartyAmuletRules_BurnAmuletResult
+      with
+        owner : Party
+        amount : Decimal
+        inputHoldingCids : [ContractId V1.Holding]
+        amuletRules : ContractId AmuletRules
+        openMiningRound : ContractId OpenMiningRound
+        description : Text
+      controller owner, dso
+      do
+        require "amount must be positive" (amount > 0.0)
+        round <- exercise openMiningRound OpenMiningRound_Fetch with p = owner
+        require "CC price must be positive" (round.amuletPrice > 0.0)
+        inputs <- holdingToTransferInputs (ForOwner with dso; owner) inputHoldingCids
+        (burnResult, meta) <- splitAndBurn
+          (toInterfaceContractId amuletRules)
+          owner
+          amount
+          inputs
+          (amuletTransferContext openMiningRound None)
+          dso
+          description
+        pure ExternalPartyAmuletRules_BurnAmuletResult with
+          ccBurned = amount
+          usdValue = amount * round.amuletPrice
+          senderChangeAmulet = burnResult.senderChangeAmulet
+          meta
 
     interface instance Api.Token.TransferInstructionV1.TransferFactory for ExternalPartyAmuletRules where
       view = Api.Token.TransferInstructionV1.TransferFactoryView with

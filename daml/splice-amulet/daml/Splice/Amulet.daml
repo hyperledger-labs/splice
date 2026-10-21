@@ -18,7 +18,6 @@ import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
 import Splice.Api.Token.HoldingV2 qualified as Api.Token.HoldingV2
 import Splice.Api.Token.TransferEventsV2 as TransferEventsV2
 import Splice.TokenStandard.Utils hiding (require)
-import Splice.Api.Credential.RegistryV1 qualified as Api.Credential.RegistryV1
 
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletEventLog (withTempAmuletEventLog)
@@ -366,30 +365,6 @@ template FeaturedAppRight with
               beneficiary = beneficiary
               weight = weight * fromOptional 1.0 arg.weight
         pure (Splice.Api.FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
-
-    interface instance Api.Credential.RegistryV1.Credential for FeaturedAppRight where
-      view = Api.Credential.RegistryV1.CredentialView with
-        admin = dso
-        issuer = dso
-        holder = provider
-        claims = Api.Credential.RegistryV1.Claims with
-          values = TextMap.fromList [
-              ("cip-TBD/is-featured-app", "")
-              -- TODO: replace TBD with the actual CIP number once it is assigned; factor it out into a constant
-            ]
-          validFrom = None
-          validUntil = None
-          meta = Api.Token.MetadataV1.emptyMetadata
-        createdAt = None
-        expiresAt = None
-        meta = Api.Token.MetadataV1.emptyMetadata
-
-      credential_publicFetchImpl _self _arg = pure (view (toInterface @Api.Credential.RegistryV1.Credential this))
-
-      credential_archiveAsHolderImpl _self _arg = do
-        pure Api.Credential.RegistryV1.Credential_ArchiveAsHolderResult with
-          archivedCredential = view (toInterface @Api.Credential.RegistryV1.Credential this)
-          meta = Api.Token.MetadataV1.emptyMetadata
 
 validateAppRewardBeneficiaries : [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary] -> Update ()
 validateAppRewardBeneficiaries beneficiaries = do
