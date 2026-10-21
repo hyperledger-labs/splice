@@ -135,8 +135,7 @@ class RollForwardLsuDRIntegrationTest
                     .focus(_.localSynchronizerNodes)
                     .modify(c =>
                       c.copy(
-                        legacy = c.current.some,
-                        current = c.current.focus(_.protocolVersion).replace(ProtocolVersion.v37),
+                        legacy = c.current.some
                       )
                     )
                     .focus(_.onboarding)
