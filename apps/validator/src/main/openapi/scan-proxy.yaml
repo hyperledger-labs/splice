@@ -20,6 +20,7 @@ paths:
               schema:
                 "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/GetDsoPartyIdResponse"
   /v0/scan-proxy/dso:
+    # TODO (#7882): remove
     get:
       deprecated: true
       tags: [ deprecated ]

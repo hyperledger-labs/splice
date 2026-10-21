@@ -34,6 +34,7 @@ paths:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
 
   /v0/dso:
+    # TODO (#7882): remove
     get:
       deprecated: true
       tags: [deprecated]

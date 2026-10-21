@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.util.{ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 
+// TODO (#7882): remove and use only DsoInfoV1
 /** Decoded version of [[definitions.GetDsoInfoResponse]], as served by scan's `/v0/dso`
   * and the SV app's `/v1/dso` endpoints.
   */
