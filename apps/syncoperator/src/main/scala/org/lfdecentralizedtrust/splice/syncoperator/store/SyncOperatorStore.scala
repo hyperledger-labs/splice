@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.syncoperator.store.db.DbSyncOperatorStore
 import org.lfdecentralizedtrust.splice.syncoperator.store.db.SyncOperatorTables.SyncOperatorAcsStoreRowData
@@ -121,7 +122,7 @@ object SyncOperatorStore {
                   )(TraceContext.empty)
                   None
                 },
-                Some(_),
+                member => Some(StoreMemberId(member)),
               ),
             // the filter has already established these agree, so avoid parsing per contract
             memberTrafficDomain = Some(key.synchronizerId),

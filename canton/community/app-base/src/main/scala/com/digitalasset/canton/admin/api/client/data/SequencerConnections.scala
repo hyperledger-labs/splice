@@ -282,7 +282,7 @@ final case class SubmissionRequestAmplification(
     paramIfDefined("confirmationResponsePatience", _.confirmationResponsePatienceO),
   )
 
-  def toInternal: SubmissionRequestAmplificationInternal =
+  private[canton] def toInternal: SubmissionRequestAmplificationInternal =
     this.transformInto[SubmissionRequestAmplificationInternal]
 }
 
@@ -327,7 +327,7 @@ final case class SequencerConnectionPoolDelays(
   ): SequencerConnectionPoolDelays =
     copy(warnValidationDelay = delay)
 
-  def toInternal: SequencerConnectionPoolDelaysInternal =
+  private[canton] def toInternal: SequencerConnectionPoolDelaysInternal =
     this.transformInto[SequencerConnectionPoolDelaysInternal]
 }
 
@@ -363,7 +363,7 @@ final case class SubscriptionLivenessLimits(
     param("maxOrdinalDelta", _.maxOrdinalDelta),
   )
 
-  def toInternal: SubscriptionLivenessLimitsInternal =
+  private[canton] def toInternal: SubscriptionLivenessLimitsInternal =
     this.transformInto[SubscriptionLivenessLimitsInternal]
 }
 

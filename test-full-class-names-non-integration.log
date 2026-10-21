@@ -1,7 +1,9 @@
 org.lfdecentralizedtrust.splice.admin.api.HttpRequestLoggerTest
 org.lfdecentralizedtrust.splice.admin.api.client.ApiClientRequestLoggerTest
+org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandlerBftCallFailedTest
 org.lfdecentralizedtrust.splice.auth.AuthTokenManagerTest
 org.lfdecentralizedtrust.splice.auth.SignatureVerifierTest
+org.lfdecentralizedtrust.splice.automation.AutomationMetricsTest
 org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTriggerTest
 org.lfdecentralizedtrust.splice.automation.SqlIndexInitializationTriggerStoreTest
 org.lfdecentralizedtrust.splice.build_tools.DarLockCheckerTest
@@ -11,6 +13,7 @@ org.lfdecentralizedtrust.splice.config.ThresholdsTest
 org.lfdecentralizedtrust.splice.environment.ActiveContractsRestartTest
 org.lfdecentralizedtrust.splice.environment.CommandCircuitBreakerTest
 org.lfdecentralizedtrust.splice.environment.CommandIdDedupTest
+org.lfdecentralizedtrust.splice.environment.RetryProviderBftCallFailedTest
 org.lfdecentralizedtrust.splice.environment.TopologyAwarePackageVersionSupportTest
 org.lfdecentralizedtrust.splice.http.HttpRateLimiterTest
 org.lfdecentralizedtrust.splice.http.InvalidResponseContentTest
@@ -38,6 +41,7 @@ org.lfdecentralizedtrust.splice.scan.store.bulk.ZstdTest
 org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.BftBulkObjectListingTest
 org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.KvBackfillingProgressTest
 org.lfdecentralizedtrust.splice.scan.store.db.CheckMetaVersionsTest
+org.lfdecentralizedtrust.splice.scan.store.historystart.HistoryReadinessTest
 org.lfdecentralizedtrust.splice.scan.store.historystart.ScanHistoryStartTest
 org.lfdecentralizedtrust.splice.store.DbUnavailablePartiesStoreTest
 org.lfdecentralizedtrust.splice.store.DomainTimeStoreTest
@@ -62,8 +66,6 @@ org.lfdecentralizedtrust.splice.store.db.LegacyAcsSnapshotStoreTest
 org.lfdecentralizedtrust.splice.store.db.SpliceStorageMultiLockTest
 org.lfdecentralizedtrust.splice.store.db.TablePerAcsSnapshotStoreTest
 org.lfdecentralizedtrust.splice.sv.automation.VoteRequestMetricsTriggerTest
-org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNodeTest
-org.lfdecentralizedtrust.splice.sv.cometbft.CometBftRequestSignerTest
 org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconcilerSpec
 org.lfdecentralizedtrust.splice.sv.util.SvOnboardingTokenTest
 org.lfdecentralizedtrust.splice.sv.util.WeightDistributionForSvTest

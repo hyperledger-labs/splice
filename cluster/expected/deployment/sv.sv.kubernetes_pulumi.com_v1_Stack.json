@@ -115,7 +115,7 @@
       },
       "refresh": true,
       "resyncFrequencySeconds": 300,
-      "retryMaxBackoffDurationSeconds": 600,
+      "retryMaxBackoffDurationSeconds": 900,
       "retryOnUpdateConflict": true,
       "serviceAccountName": "sv.sv-sa",
       "stack": "organization/sv/sv.sv.mock",

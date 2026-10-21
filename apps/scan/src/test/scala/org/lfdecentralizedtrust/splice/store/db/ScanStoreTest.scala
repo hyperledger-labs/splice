@@ -69,6 +69,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.I
   ResumeAtOffset,
   UpdateHistoryInitAtLatestPrunedOffset,
 }
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 abstract class ScanStoreTest
     extends StoreTestBase
@@ -123,7 +124,7 @@ abstract class ScanStoreTest
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.getTotalPurchasedMemberTraffic(
-            goodMember,
+            StoreMemberId(goodMember),
             dummyDomain,
           )
         } yield result shouldBe (1 to 3).sum.toLong
@@ -152,7 +153,7 @@ abstract class ScanStoreTest
             memberTraffic(member, 0L, 1000L, operator = Some(operatorParty)),
             createdEventObservers = Seq(operatorParty),
           )(store.multiDomainAcsStore)
-          result <- store.getTotalPurchasedMemberTraffic(member, dummyDomain)
+          result <- store.getTotalPurchasedMemberTraffic(StoreMemberId(member), dummyDomain)
           // 10 => the registered-synchronizer purchase was dropped at ingestion;
           // 1110 => the generation check was deleted rather than widened;
           // 1000 => current-generation ingestion broke.
@@ -172,7 +173,7 @@ abstract class ScanStoreTest
           _ <- dummyDomain.create(memberTraffic(member, domainMigrationId, 100L))(
             store.multiDomainAcsStore
           )
-          result <- store.getTotalPurchasedMemberTraffic(member, dummyDomain)
+          result <- store.getTotalPurchasedMemberTraffic(StoreMemberId(member), dummyDomain)
           // The unparseable row is ingested with a null synchronizer id and never matches a
           // lookup, which takes an already parsed SynchronizerId. Ingestion itself survives.
         } yield result shouldBe 100L
@@ -1881,21 +1882,23 @@ class DbScanStoreTest
   override def mkUpdateHistory(
       migrationId: Long
   ): Future[UpdateHistory] = {
-    val updateHistory = new UpdateHistory(
-      storage.underlying, // not under test
-      migrationId,
-      "update_history_scan_store_test",
-      mkParticipantId("whatever"),
-      dsoParty,
-      BackfillingRequirement.BackfillingNotRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = true,
-      HistoryMetrics(NoOpMetricsFactory, migrationId),
-    )
-    updateHistory.ingestionSink.initialize().map(_ => updateHistory)
+    for {
+      updateHistory <- UpdateHistory.create(
+        storage.underlying, // not under test
+        migrationId,
+        "update_history_scan_store_test",
+        StoreMemberId(mkParticipantId("whatever")),
+        dsoParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
+        loggerFactory,
+        enableImportUpdateBackfill = true,
+        HistoryMetrics(NoOpMetricsFactory, migrationId),
+      )
+
+      _ <- updateHistory.ingestionSink.initialize()
+    } yield updateHistory
   }
 
   override protected def cleanDb(

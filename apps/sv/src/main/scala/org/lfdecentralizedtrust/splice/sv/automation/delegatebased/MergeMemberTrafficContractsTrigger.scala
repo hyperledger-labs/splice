@@ -18,6 +18,7 @@ import com.digitalasset.canton.topology.{Member, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
@@ -66,7 +67,7 @@ class MergeMemberTrafficContractsTrigger(
                   dsoRules <- store.getDsoRules()
                   threshold = dsoRules.payload.config.numMemberTrafficContractsThreshold
                   memberTraffics <- store.listMemberTrafficContracts(
-                    memberId,
+                    StoreMemberId(memberId),
                     synchronizerId,
                     PageLimit.tryCreate(2 * threshold.toInt),
                   )

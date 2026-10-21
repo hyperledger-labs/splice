@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 import scala.concurrent.Future
 
@@ -1323,21 +1324,22 @@ class DbAppActivityRecordStoreTest
   ): Future[(DbAppActivityRecordStore, Long)] = {
     val n = storeCounter.getAndIncrement()
     val participantId = mkParticipantId(s"activity-test-$n")
-    val updateHistory = new UpdateHistory(
-      storage,
-      migrationId,
-      s"app_activity_test_$n",
-      participantId,
-      dsoParty,
-      BackfillingRequirement.BackfillingNotRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = false,
-      HistoryMetrics(NoOpMetricsFactory, migrationId),
-    )
-    updateHistory.ingestionSink.initialize().map { _ =>
+    for {
+      updateHistory <- UpdateHistory.create(
+        storage,
+        migrationId,
+        s"app_activity_test_$n",
+        StoreMemberId(participantId),
+        dsoParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
+        loggerFactory,
+        enableImportUpdateBackfill = false,
+        HistoryMetrics(NoOpMetricsFactory, migrationId),
+      )
+      _ <- updateHistory.ingestionSink.initialize()
+    } yield {
       val store = new DbAppActivityRecordStore(
         storage,
         updateHistory,
@@ -1357,21 +1359,22 @@ class DbAppActivityRecordStoreTest
       isFirstSv: Boolean = false
   ): Future[(DbAppActivityRecordStore, DbScanVerdictStore)] = {
     val participantId = mkParticipantId("activity-test")
-    val updateHistory = new UpdateHistory(
-      storage,
-      migrationId,
-      "app_activity_combined_test",
-      participantId,
-      dsoParty,
-      BackfillingRequirement.BackfillingNotRequired,
-      internedStringStore(storage),
-      analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
-      loggerFactory,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = false,
-      HistoryMetrics(NoOpMetricsFactory, migrationId),
-    )
-    updateHistory.ingestionSink.initialize().map { _ =>
+    for {
+      updateHistory <- UpdateHistory.create(
+        storage,
+        migrationId,
+        "app_activity_combined_test",
+        StoreMemberId(participantId),
+        dsoParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        internedStringStore(storage),
+        analyzableTimeWindowDuration = AnalyzableTimeWindowConfig.UnlimitedAtw,
+        loggerFactory,
+        enableImportUpdateBackfill = false,
+        HistoryMetrics(NoOpMetricsFactory, migrationId),
+      )
+      _ <- updateHistory.ingestionSink.initialize()
+    } yield {
       val appStore = new DbAppActivityRecordStore(
         storage.underlying,
         updateHistory,

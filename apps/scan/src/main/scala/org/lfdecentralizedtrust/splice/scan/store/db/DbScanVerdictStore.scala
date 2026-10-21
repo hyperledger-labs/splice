@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.digitalasset.nonempty.NonEmpty
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.sequencer.admin.{v30 as seqv30}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
@@ -712,6 +713,52 @@ class DbScanVerdictStore(
       )
     } yield applyLimitOrFail(opName, limit, views)
   }
+
+  /** Batched [[listTransactionViews]]: one query for the views of all `verdictRowIds`, each in
+    * view_id order. Verdicts without views are absent from the result. Fails if any verdict has
+    * more than `maxViewsPerVerdict` views.
+    */
+  def listTransactionViewsByVerdictRowIds(
+      verdictRowIds: Seq[Long],
+      maxViewsPerVerdict: HardLimit = DbScanVerdictStore.MaxTransactionViewsPerVerdict,
+  )(implicit
+      tc: TraceContext
+  ): Future[Map[Long, Seq[TransactionViewT]]] =
+    verdictRowIds.distinct match {
+      case NonEmpty(verdictRowIds) =>
+        // - 1 leaves room for the HardLimit's extra sqlLimit row
+        val maxViews =
+          (verdictRowIds.size.toLong * maxViewsPerVerdict.limit).min(Int.MaxValue - 1L).toInt
+        val overallLimit = HardLimit.tryCreate(maxViews, maxViews)
+        val opName = "scanVerdict.listTransactionViewsByVerdictRowIds"
+        storage
+          .query(
+            (sql"""
+               select
+                 verdict_row_id,
+                 view_id,
+                 informees,
+                 confirming_parties,
+                 sub_views
+               from #${Tables.views}
+               where """ ++ DbStorage.toInClause("verdict_row_id", verdictRowIds) ++ sql"""
+               order by verdict_row_id, view_id
+               limit ${sqlLimit(overallLimit)}
+             """).toActionBuilder.as[TransactionViewT],
+            opName,
+          )
+          .map { views =>
+            applyLimitOrFail(opName, overallLimit, views).groupBy(_.verdictRowId).transform {
+              (verdictRowId, verdictViews) =>
+                applyLimitOrFail(
+                  s"$opName for verdict $verdictRowId",
+                  maxViewsPerVerdict,
+                  verdictViews,
+                )
+            }
+          }
+      case _ => Future.successful(Map.empty)
+    }
 
   def maxVerdictRecordTime(migrationId: Long)(implicit
       tc: TraceContext

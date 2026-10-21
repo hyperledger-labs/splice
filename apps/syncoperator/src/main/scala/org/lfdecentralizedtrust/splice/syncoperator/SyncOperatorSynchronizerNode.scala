@@ -17,6 +17,7 @@ import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
+import com.digitalasset.canton.protocol.StaticSynchronizerParametersAccess.*
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.version.ProtocolVersion
