@@ -127,9 +127,6 @@ select setval(pg_get_serial_sequence('update_history_creates', 'row_id'), last_v
 from update_history_creates_legacy_row_id_seq;
 create index contract_create_lookup on update_history_creates (contract_id);
 create index updt_hist_crea_hi_mi_rt on update_history_creates (history_id, migration_id, record_time);
-create index updt_hist_crea_hi_tidmn_tiden_pn_rid on update_history_creates (history_id, template_id_module_name,
-                                                                             template_id_entity_name, package_name,
-                                                                             row_id);
 create index updt_hist_crea_uri on update_history_creates (update_row_id);
 
 create table update_history_exercises
