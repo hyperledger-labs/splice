@@ -152,8 +152,8 @@ class DbAppActivityRecordStore(
         appProviderParties = stringArrayGetResult(prs).toSeq,
         appActivityWeights = longArrayGetResult(prs).toSeq,
         submittingAppProvider = prs.<<[Option[String]],
-        assetActivityProviderParties = stringSeqOptGetResult(prs).getOrElse(Seq.empty),
-        assetActivityWeights = longSeqOptGetResult(prs).getOrElse(Seq.empty),
+        assetActivityProviderParties = stringSeqGetResult(prs),
+        assetActivityWeights = longSeqGetResult(prs),
       )
   }
 

@@ -155,6 +155,10 @@ class DbScanAppRewardsStoreTest
           totalAppRewardThresholded = BigDecimal("10.2500000000"),
           totalAppRewardUnclaimed = BigDecimal("5.0000000000"),
           rewardedAppProviderPartiesCount = 3L,
+          totalAppRewardFromAppActivity = BigDecimal("90.0000000000"),
+          totalAppRewardFromAssetActivity = BigDecimal("20.7500000000"),
+          issuancePerFeaturedAppActivity = BigDecimal("1.5000000000"),
+          issuancePerFeaturedAssetActivity = BigDecimal("0.2500000000"),
         )
         _ <- store.insertAppRewardRoundTotals(Seq(row))
         loaded <- store.getAppRewardRoundTotalByRound(roundNumber)
@@ -1104,6 +1108,10 @@ class DbScanAppRewardsStoreTest
                 BigDecimal(0),
                 BigDecimal(0),
                 1L,
+                BigDecimal(0),
+                BigDecimal(0),
+                BigDecimal(0),
+                BigDecimal(0),
               )
             )
           )

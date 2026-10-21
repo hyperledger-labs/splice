@@ -66,10 +66,10 @@ object DbScanAppRewardsStore {
       totalAppRewardThresholded: BigDecimal,
       totalAppRewardUnclaimed: BigDecimal,
       rewardedAppProviderPartiesCount: Long,
-      totalAppReward: BigDecimal = BigDecimal(0),
-      totalAssetReward: BigDecimal = BigDecimal(0),
-      issuancePerFeaturedAppActivity: BigDecimal = BigDecimal(0),
-      issuancePerFeaturedAssetActivity: BigDecimal = BigDecimal(0),
+      totalAppRewardFromAppActivity: BigDecimal,
+      totalAppRewardFromAssetActivity: BigDecimal,
+      issuancePerFeaturedAppActivity: BigDecimal,
+      issuancePerFeaturedAssetActivity: BigDecimal,
   )
 
   final case class AppRewardBatchHashT(
@@ -208,8 +208,8 @@ class DbScanAppRewardsStore(
       totalAppRewardThresholded = prs.<<[BigDecimal],
       totalAppRewardUnclaimed = prs.<<[BigDecimal],
       rewardedAppProviderPartiesCount = prs.<<[Long],
-      totalAppReward = prs.<<[BigDecimal],
-      totalAssetReward = prs.<<[BigDecimal],
+      totalAppRewardFromAppActivity = prs.<<[BigDecimal],
+      totalAppRewardFromAssetActivity = prs.<<[BigDecimal],
       issuancePerFeaturedAppActivity = prs.<<[BigDecimal],
       issuancePerFeaturedAssetActivity = prs.<<[BigDecimal],
     )
@@ -418,14 +418,14 @@ class DbScanAppRewardsStore(
         sql"""(${row.historyId}, ${row.roundNumber},
               ${row.totalAppRewardMintingAllowance}, ${row.totalAppRewardThresholded},
               ${row.totalAppRewardUnclaimed}, ${row.rewardedAppProviderPartiesCount},
-              ${row.totalAppReward}, ${row.totalAssetReward},
+              ${row.totalAppRewardFromAppActivity}, ${row.totalAppRewardFromAssetActivity},
               ${row.issuancePerFeaturedAppActivity}, ${row.issuancePerFeaturedAssetActivity})"""
       })
       (sql"""insert into #${Tables.appRewardRoundTotals}(
               history_id, round_number,
               total_app_reward_minting_allowance, total_app_reward_thresholded,
               total_app_reward_unclaimed, rewarded_app_provider_parties_count,
-              total_app_reward, total_asset_reward,
+              total_app_reward_from_app_activity, total_app_reward_from_asset_activity,
               issuance_per_featured_app_activity, issuance_per_featured_asset_activity
             ) values """ ++ values).asUpdate
     }
@@ -454,7 +454,7 @@ class DbScanAppRewardsStore(
       sql"""select history_id, round_number,
                    total_app_reward_minting_allowance, total_app_reward_thresholded,
                    total_app_reward_unclaimed, rewarded_app_provider_parties_count,
-                   total_app_reward, total_asset_reward,
+                   total_app_reward_from_app_activity, total_app_reward_from_asset_activity,
                    issuance_per_featured_app_activity, issuance_per_featured_asset_activity
             from #${Tables.appRewardRoundTotals}
             where history_id = $historyId and round_number = $roundNumber
