@@ -86,8 +86,9 @@ template AnsRules
     signatory dso
     ensure validAnsConfig config
 
-    -- Credential-expiry burn. The body is the v1 choice; v2 downcasts into it.
-    -- The sender may be either the holder or the issuer.
+    -- Credential expiry. A positive amount burns CC. A zero amount with no
+    -- holdings applies only the free period. The body is the v1 choice; v2
+    -- downcasts into it. The sender may be either the holder or the issuer.
     interface instance TransferV1.TransferFactory for AnsRules where
       view = TransferV1.TransferFactoryView with
         admin = dso
