@@ -216,6 +216,29 @@ testDsoRulesExpireVestingLockRejectsNonSv = do
   assertMsg "the GovernanceLock is still live" (isSome vestingLockO)
 
 
+-- | Negative: an SV may not expire a lock of a different DSO party.
+testDsoRulesExpireVestingLockRejectsForeignDso : Script ()
+testDsoRulesExpireVestingLockRejectsForeignDso = do
+  env <- setupVestingLock
+
+  passVestingPeriod env
+
+  Some vestingLock <- queryContractId env.alice.primaryParty env.vestingLockCid
+  foreignLockCid <- submit env.sv1 $ createCmd vestingLock with
+    dso = env.sv1
+    owner = env.sv1
+
+  actionMustFail (expectMessageContains "Contract group identifier mismatch") do
+    r <- trySubmit (actAs env.sv1 <> readAs env.app.dso) $
+      exerciseCmd env.dsoRulesCid DsoRules_GovernanceLock_DsoExpire with
+        governanceLockCid = foreignLockCid
+        sv = env.sv1
+    pure (() <$ r)
+
+  foreignLockO <- queryContractId env.sv1 foreignLockCid
+  assertMsg "the foreign GovernanceLock is still live" (isSome foreignLockO)
+
+
 -- | A vesting lock that nobody collects may eventually has its `LockedAmulet`
 -- removed from under it if the owner decides to unlock it to spend it, so the
 -- collection must still work against a dangling `lockedAmulet` id.
@@ -312,6 +335,31 @@ testDsoRulesConvertProvisionalFeaturedAppLockWrongFeaturedAppRight = do
 
   optLock <- queryContractId env.app.dso env.governanceLockCid
   assertMsg "the GovernanceLock is still active" (isSome optLock)
+
+-- | Negative: an SV may not convert a lock of a different DSO party.
+testDsoRulesConvertProvisionalFeaturedAppLockRejectsForeignDso : Script ()
+testDsoRulesConvertProvisionalFeaturedAppLockRejectsForeignDso = do
+  env <- setupProvisionalFeaturedAppLock
+
+  Some provisionalLock <- queryContractId env.app.dso env.governanceLockCid
+  foreignLockCid <- submit env.sv1 $ createCmd provisionalLock with
+    dso = env.sv1
+    owner = env.sv1
+  foreignFeaturedAppRightCid <- submit env.sv1 $ createCmd FeaturedAppRight with
+    dso = env.sv1
+    provider = env.alice.primaryParty
+    activityWeight = None
+
+  actionMustFail (expectMessageContains "Contract group identifier mismatch") do
+    r <- trySubmit (actAs env.sv1 <> readAs env.app.dso) $
+      exerciseCmd env.dsoRulesCid DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLock with
+        governanceLockCid = foreignLockCid
+        featuredAppRightCid = foreignFeaturedAppRightCid
+        sv = env.sv1
+    pure (() <$ r)
+
+  optLock <- queryContractId env.sv1 foreignLockCid
+  assertMsg "the foreign GovernanceLock is still active" (isSome optLock)
 
 -- | A DsoRules test environment holding a single substitution proposal made by bob
 -- against a lock owned by alice.
@@ -410,6 +458,29 @@ testDsoRulesWithdrawExpiredGovernanceSubstitutionRejectsNonSv = do
 
   optSubstitution <- queryContractId env.app.dso substitutionCid
   assertMsg "the substitution proposal is still live" (isSome optSubstitution)
+
+-- | Negative: an SV may not withdraw a proposal of a different DSO party.
+testDsoRulesWithdrawExpiredGovernanceSubstitutionRejectsForeignDso : Script ()
+testDsoRulesWithdrawExpiredGovernanceSubstitutionRejectsForeignDso = do
+  (env, substitutionCid) <- setupGovernanceSubstitution
+
+  Some substitution <- queryContractId env.bob.primaryParty substitutionCid
+  -- A proposal by the target lock owner must not lock any funds.
+  foreignSubstitutionCid <- submit env.sv1 $ createCmd substitution with
+    target = (substitution.target with dso = env.sv1; owner = env.sv1)
+    owner = env.sv1
+    lockedAmulet = None
+  passTime (days 91)
+
+  actionMustFail (expectMessageContains "Contract group identifier mismatch") do
+    r <- trySubmit (actAs env.sv1 <> readAs env.app.dso) $
+      exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockSubstitution_DsoExpire with
+        substitutionCid = foreignSubstitutionCid
+        sv = env.sv1
+    pure (() <$ r)
+
+  optSubstitution <- queryContractId env.sv1 foreignSubstitutionCid
+  assertMsg "the foreign substitution proposal is still live" (isSome optSubstitution)
 
 -- | Negative: the proposal has not expired yet, so there is nothing to collect.
 testDsoRulesWithdrawExpiredVestingSubstitutionNotYetExpired : Script ()
@@ -517,6 +588,26 @@ testDsoRulesExpireGovernanceLockTransferRejectsNonSv = do
 
   optTransfer <- queryContractId env.app.dso transferCid
   assertMsg "the transfer proposal is still live" (isSome optTransfer)
+
+-- | Negative: an SV may not expire a proposal of a different DSO party.
+testDsoRulesExpireGovernanceLockTransferRejectsForeignDso : Script ()
+testDsoRulesExpireGovernanceLockTransferRejectsForeignDso = do
+  (env, transferCid) <- setupGovernanceLockTransfer
+
+  Some transfer <- queryContractId env.app.dso transferCid
+  foreignTransferCid <- submit env.sv1 $ createCmd transfer with
+    source = (transfer.source with dso = env.sv1; owner = env.sv1)
+  passTime (days 91)
+
+  actionMustFail (expectMessageContains "Contract group identifier mismatch") do
+    r <- trySubmit (actAs env.sv1 <> readAs env.app.dso) $
+      exerciseCmd env.dsoRulesCid DsoRules_GovernanceLockTransfer_DsoExpire with
+        transferCid = foreignTransferCid
+        sv = env.sv1
+    pure (() <$ r)
+
+  optTransfer <- queryContractId env.sv1 foreignTransferCid
+  assertMsg "the foreign transfer proposal is still live" (isSome optTransfer)
 
 -- | Negative: the proposal has not expired yet, so there is nothing to collect.
 testDsoRulesExpireVestingLockTransferNotYetExpired : Script ()

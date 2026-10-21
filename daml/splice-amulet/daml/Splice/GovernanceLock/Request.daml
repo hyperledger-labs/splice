@@ -151,6 +151,7 @@ governanceLock_transferFactoryV1_lockImpl dso V1.TransferFactory_Transfer{transf
   (lock, lockCid, changeCid) <- governanceLock_lockForGovernance_impl
     dso transfer.amount transfer.inputHoldingCids specification extraArgs transfer.sender transfer.requestedAt (reasonFromMeta transfer.meta)
 
+  -- Sanity check that the output transfer matches the input (excluding some fields which we expect to differ)
   let lockTransfer = (view $ toInterface @V1.TransferInstruction lock).transfer
   requireMatchExpected ("lock transfer", lockTransfer) transfer with
     amount = lockTransfer.amount
@@ -205,6 +206,7 @@ governanceLock_transferFactoryV1_transferLockImpl V1.TransferFactory_Transfer{tr
     requestedAt = inputTransfer.requestedAt
     extraArgs
 
+  -- Sanity check that the output transfer matches the input (excluding some fields which we expect to differ)
   let outputTransfer = (view $ toInterface @V1.TransferInstruction transfer).transfer
   requireMatchExpected ("transfer", outputTransfer) inputTransfer with
     -- The receiver of the transfer is the new owner, not `lockManagerParty`
@@ -265,6 +267,7 @@ governanceLock_transferFactoryV1_substituteImpl dso V1.TransferFactory_Transfer{
       context
       state
 
+  -- Sanity check that the output transfer matches the input (excluding some fields which we expect to differ)
   let substitutionTransfer = (view substitution).transfer
   requireMatchExpected ("substitution transfer", substitutionTransfer) transfer with
     -- The receiver of the substitution is the owner of the target lock, not `lockManagerParty`

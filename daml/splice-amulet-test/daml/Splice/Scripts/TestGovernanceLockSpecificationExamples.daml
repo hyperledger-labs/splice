@@ -56,16 +56,21 @@ data DisplayedTransfer = DisplayedTransfer with
   memo : Text
     deriving (Eq, Show)
 
--- | Checks how `party`'s wallet displays the pending transfer instruction `cid`.
-checkDisplayedAs : Party -> ContractId V1.TransferInstruction -> DisplayedTransfer -> Script ()
-checkDisplayedAs party cid expected = do
-  Some view <- queryInterfaceContractId party cid
+-- | Checks how `party`'s wallet displays the pending transfer instruction.
+checkDisplayedAs' : V1.TransferInstructionView -> DisplayedTransfer -> Script ()
+checkDisplayedAs' view expected =
   DisplayedTransfer with
       sender = partyToText view.transfer.sender
       receiver = partyToText view.transfer.receiver
       amount = view.transfer.amount
       memo = reasonFromMeta view.transfer.meta
     === expected
+
+-- | Checks how `party`'s wallet displays the pending transfer instruction `cid`.
+checkDisplayedAs : Party -> ContractId V1.TransferInstruction -> DisplayedTransfer -> Script ()
+checkDisplayedAs party cid expected = do
+  Some view <- queryInterfaceContractId party cid
+  checkDisplayedAs' view expected
 
 -- | Submits a TSv1 lock request of `sender` with the memo `memo`.
 -- Funded with all unlocked holdings of `sender` if `amount` is positive, and with no holdings otherwise.
@@ -107,7 +112,6 @@ expectSingleFaLock owner amount = do
 --------------------------
 
 -- | The vesting FA lock that was created at the start of the Unix epoch.
--- The ledger time cannot go back to 1970, so the test creates the lock directly.
 test_example_lockDisplay : Script ()
 test_example_lockDisplay = do
   TestEnv{..} <- setupTest
@@ -117,28 +121,23 @@ test_example_lockDisplay = do
       vestingPeriod = days 60
       endTime = epoch `addRelTime` vestingPeriod
 
-  -- vesting duration: `60 days` = `5,184,000` seconds
-  convertRelTimeToMicroseconds vestingPeriod === 5184000 * 1000000
-  -- vesting end: `0 + 60 days` = `60 × 24 × 60 × 60` = `5,184,000` seconds after Unix epoch
-  convertRelTimeToMicroseconds (endTime `subTime` epoch) === 60 * 24 * 60 * 60 * 1000000
-
   lockedAmulet <- AmuletRegistryV2.createLockedAmulet registriesEnv.amuletV2 a 1000000.0 TimeLock with
     expiresAt = endTime
     holders = [dso]
     optContext = None
-  lockCid <- submit (actAs [dso, a]) $ createCmd GovernanceLock with
-    dso
-    owner = a
-    amount = 1000000.0
-    lockedAmulet = coerceContractId lockedAmulet
-    specification = GLS_VestingLock VestingLockSpecification with
-      kind = GLK_FeaturedApp x
-      vestingPeriod
-      endTime
-    originalLockCid = None
-    requestedAt = epoch
+  let lock = GovernanceLock with
+        dso
+        owner = a
+        amount = 1000000.0
+        lockedAmulet = coerceContractId lockedAmulet
+        specification = GLS_VestingLock VestingLockSpecification with
+          kind = GLK_FeaturedApp x
+          vestingPeriod
+          endTime
+        originalLockCid = None
+        requestedAt = epoch
 
-  checkDisplayedAs a (toInterfaceContractId lockCid) DisplayedTransfer with
+  checkDisplayedAs' (view $ toInterface @V1.TransferInstruction lock) DisplayedTransfer with
     sender = "A"
     receiver = lockManager
     amount = 1000000.0
@@ -276,7 +275,7 @@ test_example_substituteLock = do
   checkDisplayedAs a substitutionCid displayedSubstitution
   checkDisplayedAs b substitutionCid displayedSubstitution
 
-  -- If `A` accepts, then 1M is paid out to `A`, the existing FA lock is reduced to 4M,
+  -- If `A` accepts, then 1M is paid out to `A`, the existing FA lock for `A` is reduced to 4M,
   -- and a new FA lock for `B` is created with subject `X` and amount 1M
   acceptResult <- expectSuccess $ tsv1Operations.acceptInstruction env substitutionCid a
   [payoutCid] <- tsv1Operations.expectCompletedTransfer acceptResult

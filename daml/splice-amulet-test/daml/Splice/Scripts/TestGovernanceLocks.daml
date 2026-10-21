@@ -91,10 +91,6 @@ testGovernanceLockHappyPathScenario ops = do
   passTime (days 47)
 
   -- Chosen to be exactly 1/8th of the specified 365.25 year.
-  -- 1/8th and 80k are reliably exactly representible in fixed-point binary
-  -- with at least three fractional places, so the arithmetic is exact and we can
-  -- comfortably use equality.
-
   let withdrawTime = unlockTime `addRelTime` (days 45 + hours 15 + minutes 45)
 
   Some newVestingLock <- expectSuccess $ ops.vestingWithdraw env aliceVesting alice (withdrawMeta withdrawTime)
@@ -775,16 +771,21 @@ vestingTargetMetaEntries vestingPeriod endTime =
   (lockStatusMetaKey, lockStateToText LS_Vesting) :: vestingLockMetaEntries vestingPeriod endTime
 
 isFullLock : GovernanceLock -> Bool
-isFullLock lock = foldGovernanceLockSpecification (const True) (const False) lock.specification
+isFullLock lock = case lock.specification of
+  GLS_FullLock _ -> True
+  GLS_VestingLock _ -> False
 
 isVestingLock : GovernanceLock -> Bool
-isVestingLock lock = foldGovernanceLockSpecification (const False) (const True) lock.specification
+isVestingLock lock = case lock.specification of
+  GLS_FullLock _ -> False
+  GLS_VestingLock _ -> True
 
 fullLockSpecification : GovernanceLockKind -> GovernanceLockSpecification
 fullLockSpecification kind = GLS_FullLock FullLockSpecification with kind
 
 lockTargetMetaEntries : GovernanceLockSpecification -> [(Text, Text)]
-lockTargetMetaEntries = foldGovernanceLockSpecification (const []) \v -> vestingTargetMetaEntries v.vestingPeriod v.endTime
+lockTargetMetaEntries (GLS_FullLock _) = []
+lockTargetMetaEntries (GLS_VestingLock v) = vestingTargetMetaEntries v.vestingPeriod v.endTime
 
 -- | The memo of a request to substitute a lock.
 substitutionMemo : GovernanceLockKey -> Text
