@@ -10,7 +10,7 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
 } from '@canton-network/splice-pulumi-common';
-import { allValidatorsConfig } from '@canton-network/splice-pulumi-common-validator';
+import { allValidatorIngressNames } from '@canton-network/splice-pulumi-common-validator';
 
 import { coreSvsToDeploy, svRunbookConfig } from './svConfigs';
 import { cometBFTExternalPort } from './synchronizer/cometbftConfig';
@@ -71,9 +71,10 @@ export function installLoopback(
     .concat([svRunbookConfig])
     .map(sv => [`${sv.ingressName}.${clusterHostname}`, `*.${sv.ingressName}.${clusterHostname}`])
     .flat();
-  const validatorHosts = [
-    ...new Set(Object.values(allValidatorsConfig).map(v => v.namespace)),
-  ].flatMap(ns => [`${ns}.${clusterHostname}`, `*.${ns}.${clusterHostname}`]);
+  const validatorHosts = allValidatorIngressNames.flatMap(ingress => [
+    `${ingress}.${clusterHostname}`,
+    `*.${ingress}.${clusterHostname}`,
+  ]);
 
   const allHosts = [
     clusterHostname,
