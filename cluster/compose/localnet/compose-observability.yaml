@@ -52,7 +52,7 @@ services:
       - multi-sync
 
   grafana:
-    image: grafana/grafana:12.4.3
+    image: grafana/grafana:13.2.2
     container_name: localnet-grafana
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
