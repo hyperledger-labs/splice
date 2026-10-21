@@ -16,7 +16,7 @@ import scala.util.Using
 
 object DarResourcesGenerator {
 
-  // TODO(tech-debt): consider moving this to a dedicated config file if it bugs us here
+  // TODO(DACH-NY/canton-network-internal#7639): consider moving this to a dedicated config file if it bugs us here
   private val minimumInitializations: Map[String, String] = Map(
     "splice-amulet" -> "0.1.19",
     "splice-amulet-name-service" -> "0.1.20",
