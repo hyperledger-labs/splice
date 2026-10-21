@@ -344,7 +344,6 @@ class UpdateHistory private (
     val start = startOf(firstDay)
     val end = startOf(firstDay.plusDays(1))
 
-    // TODO(#6313): compare CREATE TABLE ... PARTITION OF with separate CREATE and ATTACH PARTITION
     storage.queryAndUpdate(
       // CREATE TABLE is transactional, so the partitions of all tables are created atomically.
       // The lock makes concurrent callers wait for each other instead of failing.
@@ -352,7 +351,10 @@ class UpdateHistory private (
         profile,
         AdvisoryLockIds.createUpdateHistoryPartitionStatement,
         DBIO.seq(PartitionedTables.map { table =>
-          sqlu"create table if not exists #${table}_#$tableSuffix partition of #$table for values from (#${start.toMicros}) to (#${end.toMicros})"
+          DBIO.seq(
+            sqlu"create table if not exists #${table}_#$tableSuffix (like #$table including defaults including constraints);",
+            sqlu"alter table #$table attach partition #${table}_#$tableSuffix for values from (#${start.toMicros}) to (#${end.toMicros});",
+          )
         }*),
       ),
       "createPartitions",
