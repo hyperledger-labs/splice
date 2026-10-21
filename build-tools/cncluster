@@ -107,6 +107,62 @@ function _needs_auth0_validator_management_api_creds() {
         exit 1
     fi
 }
+
+function _gcloud_active_account() {
+    local config_file
+    config_file="${HOME}/.config/gcloud/configurations/config_$(cat "${HOME}/.config/gcloud/active_config" 2>/dev/null || echo default)"
+    grep -E "^account\s*=" "${config_file}" 2>/dev/null | sed 's/^account\s*=\s*//' | tr -d '[:space:]'
+}
+
+function _gcloud_account_active() {
+    local account
+    account=$(_gcloud_active_account)
+    # This checks the sqlite3 access_tokens.db for a valid token for the active account.
+    # We're using this check because it is faster than invoking gcloud (0.03s vs ~1s)
+    # But the tokens there are valid for ~1h
+    if [ -n "${account}" ] && [ -f "${HOME}/.config/gcloud/access_tokens.db" ]; then
+        if sqlite3 "${HOME}/.config/gcloud/access_tokens.db" \
+                "SELECT account_id FROM access_tokens WHERE token_expiry > datetime('now');" 2>/dev/null \
+                | grep -qxF "${account}"; then
+            return 0
+        fi
+    fi
+    # Fallback to the slow gcloud check, which may refresh the token.
+    local token
+    token=$(gcloud auth print-access-token 2>/dev/null)
+    [ -n "${token}" ]
+}
+
+function _gcloud_adc_configured() {
+    if [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ] && [ -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
+        return 0
+    fi
+    if [ -f "${HOME}/.config/gcloud/application_default_credentials.json" ] && \
+            jq -e '.refresh_token' "${HOME}/.config/gcloud/application_default_credentials.json" >/dev/null 2>&1; then
+        return 0
+    fi
+    # Fallback to the slow gcloud check, which may refresh the token.
+    local token
+    token=$(gcloud auth application-default print-access-token 2>/dev/null)
+    [ -n "${token}" ]
+}
+
+function _ensure_gcloud_auth() {
+    if ! _gcloud_account_active; then
+        if [ -n "${CI:-}" ]; then
+            _error "Not authenticated to Google Cloud. In CI, ensure a service account is activated (e.g., via gcloud auth activate-service-account)."
+        fi
+        _info "Google Cloud authentication required. Running gcloud auth login..."
+        # we use --no-launch-browser to prevent gcloud from trying to open a browser, which is useful in headless environments (i.e. tmux)
+        gcloud auth login --no-launch-browser
+    fi
+
+    if [ -z "${CI:-}" ] && ! _gcloud_adc_configured; then
+        _info "Google Cloud application-default credentials required. Running gcloud auth application-default login..."
+        gcloud auth application-default login --no-launch-browser
+    fi
+}
+
 function _cluster_show() {
     _log "CLOUDSDK_COMPUTE_REGION : ${CLOUDSDK_COMPUTE_REGION}"
     _log "CLOUDSDK_CORE_PROJECT   : ${CLOUDSDK_CORE_PROJECT}"
@@ -2627,6 +2683,10 @@ if [ ! ${subcommand_whitelist[${SUBCOMMAND_NAME}]+_} ]; then
     subcmd_help
 
     _error  "Unknown subcommand: ${SUBCOMMAND_NAME}"
+fi
+
+if [ "${SUBCOMMAND_NAME}" != "help" ] && [ "${SUBCOMMAND_NAME}" != "_autocomplete" ]; then
+    _ensure_gcloud_auth
 fi
 
 "subcmd_${SUBCOMMAND_NAME}" "$@"
