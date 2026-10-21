@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import { Alert } from '@mui/material';
 import { useSearchParams } from 'react-router';
 import { useDsoInfos } from '../../contexts/SvContext';
 import dayjs from 'dayjs';
@@ -50,7 +49,7 @@ import { ProposalSubmissionError } from '../form-components/ProposalSubmissionEr
 import { useProposalMutation } from '../../hooks/useProposalMutation';
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useFeaturedAppRightPicker } from '../../hooks/useFeaturedAppRightPicker';
-import { useFeaturedAppGrantWarnings } from '../../hooks/useFeaturedAppGrantWarnings';
+import { GrantWarnings } from './GrantWarnings';
 
 type ProviderId = string;
 type FeaturedAppRightId = string;
@@ -206,10 +205,6 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
   const providerHasNoRights =
     picker.providerSearched && picker.rightOptions.length === 0 && !validatePartyId(partyId);
 
-  const grantProvider = useStore(form.store, state => state.values.idValue);
-  const grantOpsParties = useStore(form.store, state => state.values.opsParties);
-  const grantWarnings = useFeaturedAppGrantWarnings(grantProvider, grantOpsParties);
-
   return (
     <>
       <FormLayout
@@ -293,7 +288,6 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
                     title="App Kind"
                     id={`${testIdPrefix}-appKind`}
                     options={appKindSelectOptions()}
-                    placeholder="Default (General)"
                   />
                 )}
               </form.AppField>
@@ -323,27 +317,16 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
               </form.Field>
             )}
 
-            {formAction === 'SRARC_GrantFeaturedAppRight' &&
-              grantWarnings.providerHasRightWarning && (
-                <Alert
-                  severity="info"
-                  color="warning"
-                  variant="outlined"
-                  data-testid="grant-featured-app-provider-warning"
-                >
-                  {grantWarnings.providerHasRightWarning}
-                </Alert>
-              )}
-
-            {formAction === 'SRARC_GrantFeaturedAppRight' && grantWarnings.opsOverlapWarning && (
-              <Alert
-                severity="info"
-                color="warning"
-                variant="outlined"
-                data-testid="grant-featured-app-ops-overlap-warning"
-              >
-                {grantWarnings.opsOverlapWarning}
-              </Alert>
+            {formAction === 'SRARC_GrantFeaturedAppRight' && (
+              <form.Subscribe
+                selector={state => ({
+                  provider: state.values.idValue,
+                  opsParties: state.values.opsParties,
+                })}
+                children={({ provider, opsParties }) => (
+                  <GrantWarnings provider={provider} opsParties={opsParties} />
+                )}
+              />
             )}
 
             {formAction === 'SRARC_RevokeFeaturedAppRight' && (

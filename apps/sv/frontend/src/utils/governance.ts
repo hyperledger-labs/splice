@@ -497,7 +497,7 @@ export function buildFeaturedAppConfigUpdateEntry(
 // Collect all opsParties referenced by in-flight (pending) vote requests — both
 // SRARC_GrantFeaturedAppRight (opsParties) and SRARC_CreateFeaturedAppConfigUpdateInstruction
 // (updates[].newConfig.opsParties). Used by the grant/amend forms to warn (non-blocking) when
-// the author picks an opsParty already pending in another vote. Shared by #7665/#7674.
+// the author picks an opsParty already pending in another vote.
 export function extractInFlightOpsParties(
   proposals: Contract<VoteRequest>[] | undefined
 ): string[] {

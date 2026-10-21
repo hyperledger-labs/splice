@@ -6,6 +6,7 @@ import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 import { useListDsoRulesVoteRequests } from './useListVoteRequests';
 import { validatePartyId } from '../components/forms/formValidators';
 import { extractInFlightOpsParties } from '../utils/governance';
+import { useMemo } from 'react';
 
 export interface FeaturedAppGrantWarnings {
   providerHasRightWarning?: string;
@@ -38,7 +39,10 @@ export const useFeaturedAppGrantWarnings = (
       : undefined;
 
   const cleanedOps = opsParties.map(p => p.trim()).filter(p => p !== '');
-  const inFlight = new Set(extractInFlightOpsParties(voteRequestsQuery.data));
+  const inFlight = useMemo(
+    () => new Set(extractInFlightOpsParties(voteRequestsQuery.data)),
+    [voteRequestsQuery.data]
+  );
   const overlap = cleanedOps.filter(p => inFlight.has(p));
   const opsOverlapWarning =
     overlap.length > 0
