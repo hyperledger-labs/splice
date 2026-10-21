@@ -81,6 +81,10 @@ export const allDSyncNodeNames = (): string[] => {
   return Array.from(dsyncNameByNodeName.keys());
 };
 
+export const dSyncNodeNamesInSameDSync = (dSyncNodeName: string): string[] => {
+  return Object.keys(dsyncForNode(dSyncNodeName).nodes);
+};
+
 export const configForDSyncNode = (dSyncNodeName: string): SingleDSyncNodeConfiguration => {
   return dsyncForNode(dSyncNodeName).nodes[dSyncNodeName];
 };
