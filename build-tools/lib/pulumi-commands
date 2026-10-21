@@ -646,6 +646,30 @@ function subcmd_pulumi_up_canton() {
 }
 
 ###
+subcommand_whitelist[pulumi_preview_dsync]="Preview the changes for the dsync operator stacks"
+
+function subcmd_pulumi_preview_dsync() {
+  npm --prefix "${SPLICE_ROOT}/cluster/pulumi/dsync" run preview
+}
+
+
+###
+subcommand_whitelist[pulumi_down_dsync]="Down the dsync operator stacks"
+
+function subcmd_pulumi_down_dsync() {
+  _info "Resetting dsync stacks"
+  _pulumi_automation_run_down "dsync"
+}
+
+###
+subcommand_whitelist[pulumi_up_dsync]="Up the dsync operator stacks"
+
+function subcmd_pulumi_up_dsync() {
+  _info "Updating dsync stacks"
+  _pulumi_automation_run_up "dsync"
+}
+
+###
 subcommand_whitelist[pulumi_preview_svs]="Preview the changes for the sv stacks"
 
 function subcmd_pulumi_preview_svs() {

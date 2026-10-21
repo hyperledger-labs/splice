@@ -10,6 +10,7 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
 } from '@canton-network/splice-pulumi-common';
+import { allDSyncNodeNames } from '@canton-network/splice-pulumi-common-sv/src/dSyncNode';
 
 import { coreSvsToDeploy, svRunbookConfig } from './svConfigs';
 import { cometBFTExternalPort } from './synchronizer/cometbftConfig';
@@ -71,6 +72,10 @@ export function installLoopback(
     .concat([svRunbookConfig])
     .map(sv => [`${sv.ingressName}.${clusterHostname}`, `*.${sv.ingressName}.${clusterHostname}`])
     .flat();
+  const dsyncHosts = allDSyncNodeNames().map(dsync => [
+    `${dsync}.${clusterHostname}`,
+    `*.${dsync}.${clusterHostname}`,
+  ]).flat();
   const allHosts = [
     clusterHostname,
     `validator.${clusterHostname}`,
@@ -79,7 +84,7 @@ export function installLoopback(
     `*.validator1.${clusterHostname}`,
     `splitwell.${clusterHostname}`,
     `*.splitwell.${clusterHostname}`,
-  ].concat(svHosts);
+  ].concat(svHosts).concat(dsyncHosts);
 
   const virtualService = new k8s.apiextensions.CustomResource(
     `loopback-virtual-service-${namespace.logicalName}`,
