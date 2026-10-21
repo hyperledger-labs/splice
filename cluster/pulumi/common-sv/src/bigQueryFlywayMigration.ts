@@ -4,9 +4,6 @@ import * as fs from 'fs';
 import { SPLICE_ROOT } from '@canton-network/splice-pulumi-common/src/utils';
 import { z } from 'zod';
 
-// The migrations bigquery-cloudsql.sh may wait for before it (re)applies the
-// Datastream publications. V078 renames the replicated update_history tables,
-// so the publications have to be applied again after it.
 const flywayMigrationsToWaitFor = [
   'V068__app_activity_record_meta.sql',
   'V078__partition_update_history.sql',
