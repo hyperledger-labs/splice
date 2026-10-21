@@ -104,7 +104,7 @@ spec:
                         external-address="{{ .Values.sequencer.driver.externalAddress }}"
                         external-port={{ .Values.sequencer.driver.externalPort }}
                       }
-                      peer-endpoints = []
+                      peer-endpoints = {{ (.Values.sequencer.driver).peerEndpoints | default (list) | toJson }}
                     }
                   }
                   type = "BFT"
