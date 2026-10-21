@@ -1,5 +1,5 @@
 -- TBAR v1.1 (CIP-104 amendment): add per-verdict asset-side activity columns
--- plus the two bytes aggregates that mirror the app-side bytes aggregates.
+-- plus the asset activity totals that mirror the app activity totals.
 -- All further aggregates (CC values, issuance rate, reward split, thresholded
 -- split) are derived at query time from these + the OpenMiningRound config.
 
@@ -14,8 +14,6 @@ alter table app_activity_record_store
 
 alter table app_activity_party_totals
     rename column num_activity_records to num_app_activity_records;
-
-alter table app_activity_party_totals
     -- Per-party asset activity bytes for the round. Mirrors
     -- total_app_activity_weight.
     add column total_asset_activity_weight bigint not null default 0,
