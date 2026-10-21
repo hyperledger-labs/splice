@@ -27,6 +27,13 @@ if __name__ == "__main__":
   slack_msg = SlackNotification(args).build_msg("##GH_ISSUE##")
   channel = os.environ.get('NOTIFICATION_SLACK_CHANNEL')
 
+  if args.dry_run:
+    logging.info("Dry run, not sending notification")
+    logging.info("Issue title: %s", gh_title)
+    logging.info("Issue body: %s", gh_msg)
+    logging.info("Slack message: %s", slack_msg)
+    sys.exit(0)
+
   token = os.environ.get('FAILURE_NOTIFICATIONS_TOKEN')
   if not token:
     logging.error("FAILURE_NOTIFICATIONS_TOKEN is not set")

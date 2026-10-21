@@ -8,6 +8,10 @@ inputs:
     description: "A more specific name for the job to report"
     required: false
     default: ""
+  dry_run:
+    description: "If true, skip authentication and do not send any notifications"
+    required: false
+    default: "false"
   workload_identity_provider:
     description: "Workload identity provider"
     required: true
@@ -26,6 +30,7 @@ runs:
   steps:
     - name: Authenticate
       id: auth
+      if: ${{ inputs.dry_run != 'true' }}
       uses: 'google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193' #v2.1.10
       with:
         token_format: id_token
@@ -40,11 +45,12 @@ runs:
         FAILURE_NOTIFICATIONS_TOKEN: ${{ steps.auth.outputs.id_token }}
         FAILURE_NOTIFICATIONS_URL: ${{ inputs.notifications_url }}
         NOTIFICATION_SLACK_CHANNEL: ${{ inputs.slack_channel }}
-      shell: bash
-      # on self-hosted runners all python packages are preinstalled but on github-hosted they will be missing
+      # Run inside the nix dev shell so that python3 with GitPython and requests is available.
+      shell: bash -euo pipefail -c "source $NIX_ENV_SOURCE && source $ENVRC_SOURCE && env bash {0}"
       run: |
-        if [[ "${RUNNER_ENVIRONMENT}" != "self-hosted" ]]; then
-          echo "Not a self-hosted runner. Installing required Python packages..."
-          python3 -m pip install GitPython requests
+        set -euo pipefail
+        dry_run_flag=""
+        if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+          dry_run_flag="--dry_run"
         fi
-        ${GITHUB_ACTION_PATH}/../../scripts/notification-scripts/failure_notification.py --job_subname "${{ inputs.job_subname }}"
+        ${GITHUB_ACTION_PATH}/../../scripts/notification-scripts/failure_notification.py --job_subname "${{ inputs.job_subname }}" ${dry_run_flag}
