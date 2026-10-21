@@ -42,7 +42,8 @@
       The purchased traffic is calculated from the CC price and traffic price in the referenced `ExternalPartyConfigState`
       and rounded down to whole bytes.
       Any sub-byte remainder is also burned. Purchases below the minimum traffic top-up amount are rejected.
-      By default, the transaction must be executed within about 10 minutes after it is prepared.
+      By default, the transaction must be executed within about 10 minutes after it is prepared
+      due to its dependency on the `OpenMiningRound` contract of the current round.
       If you need more time, set the optional `forfeit-validator-reward-coupon` memo key to `true` to skip the validator reward coupon for the traffic burn.
 
     - Traffic purchases, including those made through `AmuletRules_BuyMemberTraffic`, now include the purchased
