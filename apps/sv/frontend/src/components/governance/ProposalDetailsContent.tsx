@@ -964,10 +964,10 @@ interface AmendFeatureAppSectionProps {
   updates: FeatureAppConfigUpdateEntry[];
 }
 
-// Amend (#7674) details: one block per provider — provider id, scalar changes
-// (appKind / activityWeight) via ConfigValuesChanges, and opsParties as an added/removed
-// diff (Option D-alt). The amend form authors a single provider; the list form here keeps
-// the details forward-compatible with multi-provider instructions.
+// Amend details: one block per provider — provider id, scalar changes (appKind /
+// activityWeight) via ConfigValuesChanges, and opsParties as an added/removed diff. The amend
+// form authors a single provider; the list keeps details forward-compatible with multi-provider
+// instructions.
 const AmendFeatureAppSection = ({ updates }: AmendFeatureAppSectionProps) => {
   return (
     <Box

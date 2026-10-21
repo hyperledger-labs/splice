@@ -415,18 +415,16 @@ export function appKindToOptional(kind: string): FeaturedAppKind | null {
   return kind === '' ? null : (kind as FeaturedAppKind);
 }
 
-// opsParties mapper. Empty (after trimming blank rows) → None, per the frozen
-// None-vs-empty decision: canonicalize empty to None everywhere so the None-vs-[]
-// boundary never occurs (DAML patchScalar uses raw Optional equality). Dedup is the
-// validator's job (validateOpsParties), not the mapper's.
+// opsParties mapper. Empty (after trimming blank rows) → None: canonicalize empty to None
+// everywhere so a None-vs-[] mismatch never reaches DAML patchScalar (raw Optional equality).
+// Dedup is the validator's job (validateOpsParties), not the mapper's.
 export function opsPartiesToOptional(parties: string[]): string[] | null {
   const cleaned = parties.map(p => p.trim()).filter(p => p !== '');
   return cleaned.length === 0 ? null : cleaned;
 }
 
-// Presentational list diff for the amend (#7674) D-alt renderer. On-ledger the
-// opsParties change is a whole-list replacement (patchScalar); added/removed is only
-// how we display base→next. Caller passes already-cleaned lists.
+// Presentational list diff: on-ledger the opsParties change is a whole-list replacement
+// (patchScalar); added/removed is only how we display base→next. Caller passes cleaned lists.
 export function diffOpsParties(
   base: string[],
   next: string[]
@@ -450,7 +448,7 @@ export function appKindSelectOptions(): { key: string; value: string }[] {
 // Label shown for an unset (None) appKind in change/diff displays.
 const APP_KIND_DEFAULT_LABEL = 'Default (General)';
 
-// Build the UI-facing view of a single provider's config amendment (#7674): scalar
+// Build the UI-facing view of a single provider's config amendment: scalar
 // changes (appKind / activityWeight) as ConfigChange rows (only changed fields), and the
 // opsParties change as added/removed party lists. Shared by the review summary and the
 // vote-request details section so both render identically.

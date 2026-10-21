@@ -4,6 +4,15 @@
 import { Box, Stack, Typography } from '@mui/material';
 import { CopyableIdentifier } from '../ui';
 
+const VISUALLY_HIDDEN_SX = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+} as const;
+
 // Read-only renderer for an opsParties value (review summary + vote-request details).
 // None/empty renders the default hint; otherwise a stacked list of copyable party ids.
 export const OpsPartiesDisplay: React.FC<{
@@ -22,9 +31,8 @@ export const OpsPartiesDisplay: React.FC<{
     </Stack>
   );
 
-// List-aware opsParties diff for the amend (#7674) details/review (Option D-alt): one
-// line per added (+) / removed (−) party. On-ledger the change is a whole-list replace;
-// added/removed is purely how we present base→next.
+// opsParties diff for the amend details/review: one line per added (+) / removed (−) party.
+// On-ledger the change is a whole-list replace; added/removed is only how we present base→next.
 export const OpsPartiesDiff: React.FC<{
   added: string[];
   removed: string[];
@@ -41,6 +49,9 @@ export const OpsPartiesDiff: React.FC<{
           <Typography variant="body2" color="success.main" sx={{ minWidth: 14 }}>
             +
           </Typography>
+          <Box component="span" sx={VISUALLY_HIDDEN_SX}>
+            Added:
+          </Box>
           <CopyableIdentifier value={p} size="small" data-testid={`${idPrefix}-added-${i}`} />
         </Box>
       ))}
@@ -49,6 +60,9 @@ export const OpsPartiesDiff: React.FC<{
           <Typography variant="body2" color="error.main" sx={{ minWidth: 14 }}>
             −
           </Typography>
+          <Box component="span" sx={VISUALLY_HIDDEN_SX}>
+            Removed:
+          </Box>
           <CopyableIdentifier value={p} size="small" data-testid={`${idPrefix}-removed-${i}`} />
         </Box>
       ))}

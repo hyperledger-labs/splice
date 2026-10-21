@@ -38,7 +38,7 @@ export interface UpdateFeatureAppProposal {
  * One provider's config amendment within a
  * SRARC_CreateFeaturedAppConfigUpdateInstruction proposal. Scalar field changes
  * (appKind, activityWeight) are rendered via ConfigValuesChanges; opsParties is a
- * list, so its change is expressed as added/removed party ids (D-alt renderer).
+ * list, so its change is expressed as added/removed party ids.
  */
 export interface FeatureAppConfigUpdateEntry {
   provider: string;

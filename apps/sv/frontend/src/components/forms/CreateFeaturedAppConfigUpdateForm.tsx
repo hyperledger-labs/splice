@@ -3,7 +3,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import dayjs from 'dayjs';
-import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-form';
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { FeaturedAppConfig } from '@daml.js/splice-amulet/lib/Splice/Amulet';
@@ -43,6 +42,8 @@ import {
   SUPPORTING_URL_PLACEHOLDER,
   THRESHOLD_DEADLINE_SUBTITLE,
 } from '../../utils/constants';
+import { useFeaturedAppRightConfig } from '../../hooks/useFeaturedAppRightConfig';
+import { Alert } from '@mui/material';
 
 export const CreateFeaturedAppConfigUpdateForm: React.FC = () => {
   const svAdminClient = useSvAdminClient();
@@ -83,7 +84,7 @@ export const CreateFeaturedAppConfigUpdateForm: React.FC = () => {
     defaultValues,
     onSubmit: async ({ value }) => {
       // baseConfig must be the provider's CURRENT config, verbatim (None stays None), so
-      // DAML patchScalar treats untouched fields as no-ops. See the None-vs-empty decision.
+      // DAML patchScalar treats untouched fields as no-ops.
       const baseConfig = baseConfigRef.current;
       if (!baseConfig) return;
 
@@ -123,25 +124,7 @@ export const CreateFeaturedAppConfigUpdateForm: React.FC = () => {
 
   // Fetch the selected right's full current config (appKind / activityWeight / opsParties)
   // to prepopulate the editor and serve as the amend baseConfig.
-  const currentConfigQuery = useQuery({
-    queryKey: ['featuredAppRightConfig', rightCid],
-    enabled: !!rightCid,
-    queryFn: async (): Promise<FeaturedAppConfig> => {
-      const response = await svAdminClient.lookupFeaturedAppRightByContractId(rightCid);
-      const payload = response.featured_app_right?.payload as
-        | {
-            appKind?: FeaturedAppConfig['appKind'];
-            activityWeight?: FeaturedAppConfig['activityWeight'];
-            opsParties?: FeaturedAppConfig['opsParties'];
-          }
-        | undefined;
-      return {
-        appKind: payload?.appKind ?? null,
-        activityWeight: payload?.activityWeight ?? null,
-        opsParties: payload?.opsParties ?? null,
-      };
-    },
-  });
+  const currentConfigQuery = useFeaturedAppRightConfig(rightCid);
 
   useEffect(() => {
     baseConfigRef.current = currentConfigQuery.data ?? null;
@@ -176,6 +159,8 @@ export const CreateFeaturedAppConfigUpdateForm: React.FC = () => {
         opsParties: opsPartiesToOptional(form.state.values.opsParties),
       })
     : undefined;
+
+  const configNotReady = !!rightCid && (currentConfigQuery.isError || !currentConfigQuery.data);
 
   return (
     <>
@@ -253,13 +238,19 @@ export const CreateFeaturedAppConfigUpdateForm: React.FC = () => {
               )}
             </form.AppField>
 
+            {currentConfigQuery.isError && (
+              <Alert severity="error" data-testid={`${idPrefix}-config-load-error`}>
+                Could not load the current configuration for the selected right. Reload and try
+                again.
+              </Alert>
+            )}
+
             <form.AppField name="appKind">
               {field => (
                 <field.SelectField
                   title="App Kind"
                   id={`${idPrefix}-appKind`}
                   options={appKindSelectOptions()}
-                  placeholder="Default (General)"
                 />
               )}
             </form.AppField>
@@ -364,6 +355,7 @@ export const CreateFeaturedAppConfigUpdateForm: React.FC = () => {
           <form.FormControls
             showConfirmation={showConfirmation}
             onEdit={() => setShowConfirmation(false)}
+            disabled={configNotReady}
           />
         </form.AppForm>
       </FormLayout>
