@@ -74,7 +74,7 @@ final class SyncOperatorSynchronizerNode(
     SynchronizerParametersConfig(synchronizerLimits =
       config.synchronizerLimits
         .map(_.toInternal)
-        .filter(_ => config.protocolVersion >= ProtocolVersion.v36)
+        .filter(_ => config.protocolVersion >= ProtocolVersion.v37)
     )
       .toStaticSynchronizerParameters(
         CryptoConfig(provider = CryptoProvider.Jce),
