@@ -2,6 +2,7 @@
 
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 """Helpers for the sarif-unused-symbols skill.
 
   candidates  Read a SARIF file produced by IntelliJ's inspection run, map every

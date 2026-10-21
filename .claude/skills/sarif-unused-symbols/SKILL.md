@@ -8,9 +8,6 @@ description: Remove unused Scala symbols reported in an IntelliJ SARIF inspectio
 Input: a SARIF file (`jq '.runs[0].results'` is a list) and, optionally, the commit it was run on.
 Reference example: `log/report_2026-10-19_07-14-18.sarif.json`, run on `ef62712d6d58bc9063b8bd32137181f12176cc8b`.
 
-Related memories: commit-conventions (trailers, tag, no push), builds-allowed-serialized (flock),
-sandbox-build-notes (`bash -l -c`, nohup + until-loop), license-header-year.
-
 ## SARIF format (verified exactly against ef62712d6d, 957/957 results)
 
 Each result with `ruleId == "ScalaUnusedSymbol"` has:
@@ -71,15 +68,24 @@ fine; do not chase it in the same run. Note newly-unused things for a re-run wit
 ## Step 3: compile check
 
 Test code compiles with `-Xfatal-warnings`, so this also catches newly unused privates/params.
-Serialize all builds (builds-allowed-serialized), and background long sbt runs:
+Run only one sbt build or Canton start at a time in a checkout (they share CPU, ports and `target/`
+directories): wrap every build in `flock log/build.lock`. Run sbt through `bash -l -c 'cd <repo> && direnv exec . <cmd>'`
+so the nix/direnv dev shell and `PATH` are loaded even from a non-login shell. Background long sbt runs:
 
 ```
-flock log/build.lock bash -l -c 'cd /Users/stephencompall/ide/splice && direnv exec . sbt -batch Test/compile' > $SCRATCH/compile-N.log 2>&1
+flock log/build.lock bash -l -c 'cd <repo> && direnv exec . sbt -batch Test/compile' > $SCRATCH/compile-N.log 2>&1
 ```
-Use `nohup`/`run_in_background` and wait; do not poll. Then `grep '^\[error\]' $SCRATCH/compile-N.log`.
+Run it with `nohup`/`run_in_background` (output to the log file) and wait for it to finish with an until-loop on the
+process or log rather than a bare `sleep`, which some environments block; do not poll. Then
+`grep '^\[error\]' $SCRATCH/compile-N.log`.
 (Whole-project `Test/compile` is deliberate: removals in `apps-common` affect every app and test module.
 If a root aggregate is too slow, fall back to the aggregated modules of the touched files **and** every
 dependent: `sbt "<mod>/Test/compile"` for each plus `apps-app/Test/compile`.)
+
+If the run adds or edits any non-Scala file that needs a license header (e.g. a helper script), copy the header
+from an existing file verbatim: `project/Headers.scala` hard-codes the year 2024 and `sbt -batch headerCheck` (run it
+from the root project; per-module `headerCheck` flags unrelated files) compares the text exactly, including the blank
+line before the first code or docstring.
 
 Success: `[success]` and no `[error]`. Frontend/Daml/`.sc` are not part of this; the `.sc` safety net is the
 Step 1 grep.
@@ -100,14 +106,10 @@ Step 1 grep.
 
 ## Step 5: commit
 
-One commit per passing batch, on the branch from Step 0, following commit-conventions:
+One commit per passing batch, on the branch from Step 0, following the repository's and your user's
+commit conventions (see AGENTS.md "Contributing"):
 - Subject e.g. `Remove unused private defs in apps/scan (batch 3)`; body lists the symbols
   (name + file) and that the project compiles.
-- `git commit -s`; message body ends with the trailer
-  `Assisted-by: Claude:claude-5.5-<model>` (the model actually in use, e.g. `claude-5.5-sonnet`) placed before
-  `Signed-off-by`; no Co-Authored-By line.
-- Only the **last** commit on the branch gets ` [ci]` at the END of its subject: after the final
-  batch passes, `git commit --amend` the tip (unpushed local commit) to add it.
 - Never push, unless the user asks.
 
 ## Step 6: report
