@@ -20,6 +20,9 @@ trait GovernanceLockTest extends TokenStandardTest {
   private val lockCipPrefix = "cip-127"
   private val lockMemoPrefix = s"$lockCipPrefix/memo:"
 
+  // Same as `defaultGovernanceLockMinimumLockAmount` in Daml.
+  protected val minimumLockAmount = BigDecimal(10000.0)
+
   val lockManagerParty = PartyId.tryFromProtoPrimitive(
     s"${lockCipPrefix}_lock-manager::1220000000000000000000000000000000000000000000000000000000000000abcd"
   )

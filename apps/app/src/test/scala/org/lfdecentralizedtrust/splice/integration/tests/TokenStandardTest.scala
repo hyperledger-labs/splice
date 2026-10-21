@@ -56,6 +56,8 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
       advanceTimeBeforeExecute: Option[Duration] = None,
       description: Option[String] = None,
+      // Whether to wait for the input holdings to be consumed. Setting this to false is necessary
+      // for transfers where the inputs are ignored, e.g. governance lock unlocks and withdrawals
       wait: Boolean = true,
   )(implicit
       env: SpliceTestConsoleEnvironment

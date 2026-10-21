@@ -8,7 +8,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{amulet as amuletCode
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTestWithIsolatedEnvironment,
+  SpliceTestConsoleEnvironment,
+}
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExpireVestingLockTrigger
 import org.lfdecentralizedtrust.splice.sv.config.InitialGovernanceLockConfig
 import org.lfdecentralizedtrust.splice.util.{
   GovernanceLockUtil,
@@ -27,6 +31,9 @@ class GovernanceLockTimeBasedIntegrationTest
     with TimeTestUtil
     with GovernanceLockTest {
 
+  private val triggerBatchSize = 2
+  private val vestingDuration = Duration.ofMinutes(2)
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
@@ -37,12 +44,29 @@ class GovernanceLockTimeBasedIntegrationTest
             // advancing the clock a couple minutes
             initialGovernanceLockConfig = Some(
               InitialGovernanceLockConfig(
-                superValidatorLockVestingDuration = Some(NonNegativeFiniteDuration.ofMinutes(2))
+                superValidatorLockVestingDuration =
+                  Some(NonNegativeFiniteDuration.tryFromJavaDuration(vestingDuration))
               )
             )
           )
         )(config)
       )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs_(
+          _.copy(
+            delegatelessAutomationExpiredVestingLockBatchSize = triggerBatchSize
+          )
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
+          _.withPausedTrigger[ExpireVestingLockTrigger]
+        )(config)
+      )
+
+  private val lockAmount = BigDecimal(10000)
+  private val lockKind = SuperValidatorLock
+  private val lockSubject = "sv1"
 
   private def matchSVKind(kind: governancelock.GovernanceLockKind): Unit =
     kind match {
@@ -52,10 +76,6 @@ class GovernanceLockTimeBasedIntegrationTest
 
   "SV GovernanceLock created via TSv1 compatibility interface can be unlocked into a vesting GovernanceLock" in {
     implicit env =>
-      val lockAmount = BigDecimal(10000)
-      val lockKind = SuperValidatorLock
-      val lockSubject = "sv1"
-
       // Setup alice as the lock owner
       val ownerParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val owner = RichPartyId.local(ownerParty)
@@ -103,9 +123,6 @@ class GovernanceLockTimeBasedIntegrationTest
           .getTransferInstructionWithdrawContext(governanceLockCid)
           .disclosedContracts should not be empty
       }
-
-      // Advance sim-time past the lock's requestedAt time
-      advanceTimeAndWaitForRoundOpening
 
       // Withdraw the governance lock; it's relocked as a vesting GovernanceLock and funds remain locked
       val vestingStartTime = getLedgerTime.plusSeconds(1)
@@ -230,4 +247,82 @@ class GovernanceLockTimeBasedIntegrationTest
         )
       }
   }
+
+  "ExpireVestingLockTrigger archives fully vested VestingLocks in batches" in { implicit env =>
+    val numLocks = 3
+    val trigger = sv1Backend.dsoDelegateBasedAutomation.trigger[ExpireVestingLockTrigger]
+
+    val sv1Party = sv1Backend.getDsoInfo().svParty
+    val owner = RichPartyId.local(sv1Party)
+    val participant = sv1Backend.participantClientWithAdminToken
+
+    val vestingStartTime = getLedgerTime.plusSeconds(1)
+    val endTime = vestingStartTime.toInstant.plus(vestingDuration)
+
+    // `createGovernanceLockTSv1` feeds all of the owner's unlocked
+    // holdings into the `TransferFactory_Transfer` choice. Thus, the tap has to
+    // have landed before the first lock is submitted.
+    actAndCheck(
+      s"Tap ${numLocks * minimumLockAmount} CC for sv1",
+      sv1WalletClient.tap(walletAmuletToUsd(numLocks * minimumLockAmount)),
+    )(
+      "the tapped amulet is visible",
+      _ => listHoldings(participant, sv1Party).filter(_._2.lock.isEmpty) should have length 1,
+    )
+
+    actAndCheck(
+      s"Lock and unlock $numLocks times, vesting until $endTime", {
+        (1 to numLocks).map { _ =>
+          val governanceLock = createGovernanceLockTSv1(
+            participant,
+            owner,
+            lockKind,
+            lockSubject = lockSubject,
+            amount = lockAmount,
+          )
+          unlockGovernanceLockTSv1(
+            participant,
+            owner,
+            lockKind,
+            lockSubject,
+            governanceLock,
+            unlockAmount = lockAmount,
+            vestingStartTime = vestingStartTime,
+          )
+        }
+      },
+    )(
+      "SvDsoStore ingests all VestingLocks",
+      _ => listVestingLocks should have length numLocks.toLong,
+    )
+
+    clue("The locks are not yet expired, so the trigger has no work") {
+      trigger.runOnce().futureValue shouldBe false
+      listVestingLocks should have length numLocks.toLong
+    }
+
+    // `listExpiredFromPayloadExpiry` uses a strict `expires_at < now`, and the trigger reads `now`
+    // 5s behind the clock (`clockSkewAutomationDelay`), so step well past `endTime`.
+    advanceTime(vestingDuration.plusSeconds(10))
+
+    clue("The locks stay put while the trigger is paused") {
+      listVestingLocks should have length numLocks.toLong
+    }
+
+    clue(s"First run archives one full batch of $triggerBatchSize") {
+      eventually()(trigger.runOnce().futureValue shouldBe true)
+      listVestingLocks should have length (numLocks - triggerBatchSize).toLong
+    }
+
+    clue("Second run archives the remaining partial batch") {
+      trigger.runOnce().futureValue shouldBe true
+      listVestingLocks shouldBe empty
+    }
+  }
+
+  private def listVestingLocks(implicit env: SpliceTestConsoleEnvironment) =
+    sv1Backend.appState.dsoStore.multiDomainAcsStore
+      .listContracts(governancelock.GovernanceLock.COMPANION)
+      .futureValue
+      .filter(lock => GovernanceLockUtil.getVestingLockSpecification(lock.payload).isDefined)
 }
