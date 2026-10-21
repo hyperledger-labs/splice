@@ -31,6 +31,76 @@
         }
       },
       "required": ["pod", "containers"]
+    },
+    "sequencer": {
+      "type": "object",
+      "properties": {
+        "driver": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "persistence": {
+              "type": "object"
+            },
+            "externalAddress": {
+              "type": "string"
+            },
+            "externalPort": {
+              "type": "integer"
+            },
+            "peerEndpoints": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "address": {
+                    "type": "string"
+                  },
+                  "port": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      },
+      "required": [
+        "driver"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "driver": {
+                "properties": {
+                  "type": {
+                    "const": "cantonbft"
+                  }
+                },
+                "required": [
+                  "type",
+                  "externalAddress",
+                  "externalPort"
+                ]
+              }
+            },
+            "required": [
+              "driver"
+            ]
+          },
+          "then": {
+            "required": [
+              "imageName"
+            ]
+          }
+        }
+      ]
     }
   }
 }

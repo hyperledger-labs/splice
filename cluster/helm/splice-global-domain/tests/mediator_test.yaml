@@ -11,6 +11,11 @@ chart:
   # Override for testing labels
   version: 0.1.1
   appVersion: 0.1.0
+set:
+  # Things we need just to pass the schema
+  sequencer:
+    driver:
+      type: mock
 tests:
   - it: "sets labels as expected"
     documentSelector:
