@@ -86,7 +86,7 @@ and fetch no other branches by default.
 - To diff against another branch, fetch just its tip with `git fetch --depth=1`; `git diff` compares trees,
   so no shared history is needed.
 
-`scripts/check-git-fetch-depth.sh`, run in the static tests, rejects `fetch-depth: 0` and `git fetch`/`git clone`
+`scripts/check-git-fetch-depth.py`, run in the static tests, rejects `fetch-depth: 0` and `git fetch`/`git clone`
 without `--depth`, `--deepen`, `--shallow-*` or `--filter`.
 If full history is really needed, add `# full-history-ok: <reason>` on that line or the line above.
 
