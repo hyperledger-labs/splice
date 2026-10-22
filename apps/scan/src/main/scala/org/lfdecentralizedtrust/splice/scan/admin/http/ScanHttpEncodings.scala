@@ -623,14 +623,14 @@ object ScanHttpEncodings {
 
   def encodeAppActivityRecord(
       record: AppActivityRecordT
-  ): definitions.EventHistoryActivityRecords = {
+  ): definitions.EventHistoryAppActivityRecords = {
     val records = record.appProviderParties
       .zip(record.appActivityWeights)
       .map { case (party, weight) =>
         definitions.ActivityRecord(party = party, weight = weight)
       }
       .toVector
-    definitions.EventHistoryActivityRecords(
+    definitions.EventHistoryAppActivityRecords(
       roundNumber = record.roundNumber,
       records = records,
     )
@@ -645,10 +645,7 @@ object ScanHttpEncodings {
         definitions.ActivityRecord(party = party, weight = weight)
       }
       .toVector
-    definitions.EventHistoryActivityRecords(
-      roundNumber = record.roundNumber,
-      records = records,
-    )
+    definitions.EventHistoryActivityRecords(records = records)
   }
 
   def fromDamlValueEncoding(encoding: definitions.DamlValueEncoding): ScanHttpEncodings =

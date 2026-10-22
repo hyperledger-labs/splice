@@ -3744,7 +3744,7 @@ components:
           $ref: "#/components/schemas/EventHistoryTrafficSummary"
           nullable: true
         app_activity_records:
-          $ref: "#/components/schemas/EventHistoryActivityRecords"
+          $ref: "#/components/schemas/EventHistoryAppActivityRecords"
           nullable: true
         asset_activity_records:
           $ref: "#/components/schemas/EventHistoryActivityRecords"
@@ -3924,11 +3924,14 @@ components:
           items:
             type: integer
             format: int32
-    EventHistoryActivityRecords:
+    EventHistoryAppActivityRecords:
       type: object
       description: |
         Activity records computed from verdicts and traffic summaries
         as per [CIP-104](https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md).
+
+        Semantically `EventHistoryActivityRecords`; the extra wrapping and
+        the `round_number` field are retained for backwards compatibility.
       required:
         - round_number
         - records
@@ -3938,6 +3941,20 @@ components:
             The round number assigned to the activity records.
           type: integer
           format: int64
+        records:
+          description: |
+            Activity records, one per provider.
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityRecord"
+    EventHistoryActivityRecords:
+      type: object
+      description: |
+        Activity records computed from a single verdict and traffic summary.
+        The round the records belong to is carried by the enclosing envelope.
+      required:
+        - records
+      properties:
         records:
           description: |
             Activity records, one per provider.
