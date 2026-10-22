@@ -17,6 +17,8 @@ fi
 
 # Check if we are on a commit that is on a release branch but not on the main branch.
 # (when checking out Splice as a submodule, we might be losing the branch information).
+# This needs refs/remotes/origin/release-line-* with enough history to reach HEAD; shallow CI
+# checkouts don't fetch those by default (FETCH_GIT_REFS in .github/actions/scripts/common_setup.sh).
 sha=$(git rev-parse HEAD)
 if ! (git branch -r --contains "$sha" | grep -q "\borigin/main\b"); then
     if [[ $(git branch -r --contains "$sha") =~ origin/release-line-[0-9]+\.[0-9]+\.[0-9]+ ]]; then

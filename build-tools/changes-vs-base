@@ -13,6 +13,7 @@ fi
 
 latest_base_version=$("$SPLICE_ROOT"/build-tools/find_latest_base_version.sh)
 
+# Needs the release-line ref; a depth-1 fetch of it is enough, as diff compares trees.
 # 'git diff --quiet' exits with 1 if there were differences and 0 means no differences.
 if git diff --quiet "$latest_base_version" HEAD "$file_path"; then
     echo "There's been no changes in $file_path since the latest base version ($latest_base_version)."

@@ -5,5 +5,6 @@ if [ "$current_branch" == "main" ] || [ "$CIRCLE_BRANCH" == "main" ] || [ "${GIT
     # If we are on main, we consider the previous commit on main to be the "latest"
     git rev-parse HEAD^
 else
+    # Needs origin/main with history down to the merge base; not available in shallow CI checkouts.
     git merge-base origin/main "$current_branch"
 fi

@@ -78,8 +78,9 @@ jobs:
           base_branch="${{ inputs.base_branch }}"
           new_branch="automation/backport-$commit_sha-$base_branch"
           echo "Backporting commit $commit_sha to branch $base_branch (using branch $new_branch)"
-          git fetch origin $base_branch
-          git fetch origin --recurse-submodules=no $commit_sha
+          git fetch --depth=1 origin $base_branch
+          # cherry-pick needs the commit and its parent
+          git fetch --depth=2 origin --recurse-submodules=no $commit_sha
           git config user.email "splice-maintainers@digitalasset.com"
           git config user.name "DA Automation"
           git checkout -b $new_branch origin/$base_branch
