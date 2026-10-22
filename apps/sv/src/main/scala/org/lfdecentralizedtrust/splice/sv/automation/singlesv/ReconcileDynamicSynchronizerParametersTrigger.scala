@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
 import com.digitalasset.canton.admin.api.client.data.DynamicSynchronizerParameters as ConsoleDynamicSynchronizerParameters
+import com.digitalasset.canton.admin.api.client.data.DynamicSynchronizerParametersAccess.*
 import com.digitalasset.canton.time.{PositiveFiniteDuration, PositiveSeconds}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp

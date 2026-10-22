@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{BulkStorageConfig, ScanStora
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection
 import org.lfdecentralizedtrust.splice.store.bulk.ZstdGroupedWeight
 
+import java.nio.charset.StandardCharsets
 import scala.concurrent.ExecutionContext
 
 /** Pekko source for compressing data and dumping it to S3 objects.
@@ -37,9 +38,27 @@ class S3ZstdObjects(
 
   private def getFlow(
       getObjectKey: Int => String
-  ): Flow[ByteString, String, NotUsed] =
-    Flow[ByteString]
-      .via(ZstdGroupedWeight(storageConfig.zstdCompressionLevel, storageConfig.bulkZstdFrameSize))
+  ): Flow[String, String, NotUsed] =
+    Flow[String]
+      .map(str => (str + "\n").getBytes(StandardCharsets.UTF_8))
+      .groupedWeighted(storageConfig.bulkZstdBlockSize)(_.length.toLong)
+      .map(group => {
+        val builder = ByteString.newBuilder
+        builder.sizeHint(group.iterator.map(_.length).sum)
+        group.foreach(builder.putBytes)
+        val bytes = builder.result()
+        logger.trace(
+          s"Concatenated ${group.length} objects from DB (after encoding), to a bytestring of size ${bytes.length} bytes."
+        )
+        bytes
+      })
+      .via(
+        ZstdGroupedWeight(
+          storageConfig.zstdCompressionLevel,
+          storageConfig.bulkZstdFrameSize,
+          appConfig.tmpBufferSize,
+        )
+      )
       .via(
         GroupedWeightS3ObjectFlow(
           s3Connection,
@@ -61,6 +80,6 @@ object S3ZstdObjects {
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Flow[ByteString, String, NotUsed] =
+  ): Flow[String, String, NotUsed] =
     new S3ZstdObjects(config, appConfig, s3Connection, loggerFactory).getFlow(getObjectKey)
 }

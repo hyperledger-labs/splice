@@ -20,7 +20,7 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.scalatest.{Inspectors, LoneElement}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.time.{Millis, Span}
+import org.scalatest.time.{Millis, Minute, Span}
 
 import scala.annotation.tailrec
 import scala.concurrent.duration.*
@@ -61,6 +61,7 @@ class UpdateHistorySanityCheckPlugin(
             if (trigger.isPaused) None else Some(trigger)
           },
           triggersToResumeAtStart = Seq(),
+          pauseTimeout = timeout(Span(1, Minute)),
         ) {
           // This flag should have the same value on all scans
           if (initializedScans.exists(_.config.updateHistoryBackfillEnabled)) {

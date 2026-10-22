@@ -25,20 +25,21 @@ runs:
           classes-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles(format('{0}/project/build.properties', inputs.splice_root), format('{0}/project/BuildCommon.scala', inputs.splice_root), format('{0}/project/DamlPlugin.scala', inputs.splice_root), format('{0}/project/Dependencies.scala', inputs.splice_root), format('{0}/project/CantonDependencies.scala', inputs.splice_root), format('{0}/project/Houserules.scala', inputs.splice_root), format('{0}/project/plugins.sbt', inputs.splice_root), format('{0}/build.sbt', inputs.splice_root), format('{0}/daml/dars.lock', inputs.splice_root), format('{0}/openapi-cache-key.txt', inputs.splice_root)) }}
           classes-${{ inputs.cache_version }} branch:main dependencies:${{ hashFiles(format('{0}/project/build.properties', inputs.splice_root), format('{0}/project/BuildCommon.scala', inputs.splice_root), format('{0}/project/DamlPlugin.scala', inputs.splice_root), format('{0}/project/Dependencies.scala', inputs.splice_root), format('{0}/project/CantonDependencies.scala', inputs.splice_root), format('{0}/project/Houserules.scala', inputs.splice_root), format('{0}/project/plugins.sbt', inputs.splice_root), format('{0}/build.sbt', inputs.splice_root), format('{0}/daml/dars.lock', inputs.splice_root), format('{0}/openapi-cache-key.txt', inputs.splice_root)) }}
     - name: Extract precompiled classes
-      shell: bash
-      run: |
-        set -euo pipefail
-        if [[ -e /tmp/classes/classes.tar.gz ]]; then
-          pushd ${{ inputs.splice_root }}
-          tar --use-compress-program=pigz -xf /tmp/classes/classes.tar.gz
-          # For some reason, the reset below may change file modification times stamps, if we don't run `git status`.
-          git status
-          # Reset changes to files under version control.
-          git reset --hard
-          # Delete untracked files, except for ignored files.
-          git clean -fd
-          echo "Finished restoring the pre-compiled cache files"
-          popd
-        else
-          echo "No precompiled classes found. Skipping..."
-        fi
+      uses: ./.github/actions/nix/run
+      with:
+        cmd: |
+          set -euo pipefail
+          if [[ -e /tmp/classes/classes.tar.gz ]]; then
+            pushd ${{ inputs.splice_root }}
+            tar --use-compress-program=pigz -xf /tmp/classes/classes.tar.gz
+            # For some reason, the reset below may change file modification times stamps, if we don't run `git status`.
+            git status
+            # Reset changes to files under version control.
+            git reset --hard
+            # Delete untracked files, except for ignored files.
+            git clean -fd
+            echo "Finished restoring the pre-compiled cache files"
+            popd
+          else
+            echo "No precompiled classes found. Skipping..."
+          fi

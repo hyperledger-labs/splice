@@ -1,0 +1,69 @@
+## Upcoming for next patch release:
+
+{/* Add all release notes in this section */}
+
+  - Scan App
+
+    - The following request fields now have a `maxItems` bound of 1000; requests exceeding it are rejected with 400:
+
+      - `/v0/open-and-issuing-mining-rounds`: `cached_open_mining_round_contract_ids`, `cached_issuing_round_contract_ids`
+      - `/v2/state/acs`: `party_ids`, `templates`
+      - `/v2/holdings/state`: `owner_party_ids`
+      - `/v0/holdings/summary`, `/v1/holdings/summary`: `owner_party_ids`
+      - `/v0/voterequest`: `vote_request_contract_ids`
+      - `/v0/validators/validator-faucets`: `validator_ids`
+
+  - SV App
+
+    - The following request fields now have a `maxItems` bound of 1000; requests exceeding it are rejected with 400:
+
+      - `/v0/admin/sv/voterequest`: `vote_request_contract_ids`
+
+  - Grafana
+
+    - **Breaking**: The Grafana dashboards in the release bundle now use the V2 resource format.
+      Upgrade to Grafana 13 or newer before importing them.
+      Dashboard UIDs are unchanged, so existing dashboard links will keep working.
+
+  - Validator app
+
+     - The validator now starts automation external parties with keys embedded in a
+       `PartyToParticipant` mapping by default. The prior behavior can
+       be restored with the
+       `canton.validator-apps.validator_backend.support-embedded-party-signing-keys = false` but it is recommended to instead make sure that the
+       `ValidatorRight` contracts are [configured such that they won't start automation](https://docs.canton.network/global-synchronizer/production-operations/scalability#bypassing-the-limit).
+
+## Upcoming for next minor release (template):
+
+{/* If you introduce any breaking changes in the next minor release,
+    then in addition to the release notes as above,
+    please also duplicate this template (if it's not duplicated already),
+    update the yes/no columns, and write up the corresponding details. */}
+
+
+  - Summary of Breaking Changes:
+
+    | Breaking API Changes | Protocol Changes  | Daml Model Changes |
+    | :------------------- | :---------------- | :----------------- |
+    | yes/no               | yes/no            | yes/no             |
+
+    Details:
+
+    - Breaking API Changes:
+
+
+    - Protocol Changes:
+
+
+    - Daml Model Changes:
+
+      - These changes require a Daml upgrade to the following versions:
+
+        | name | version |
+        | :--- | :--- |
+        | amulet | XXX |
+        | amuletNameService | XXX |
+        | dsoGovernance | XXX |
+        | validatorLifecycle | XXX |
+        | wallet | XXX |
+        | walletPayments | XXX |

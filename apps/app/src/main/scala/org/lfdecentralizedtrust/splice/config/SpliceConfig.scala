@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.http.UrlValidator
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.{
   AnalyzableTimeWindowConfig,
+  BulkStorageBackfillingConfig,
   BulkStorageConfig,
   CantonBftPeerConfig,
   MediatorVerdictIngestionConfig,
@@ -54,6 +55,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.{
 }
 import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.config.CantonConfigAccess.*
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.{
   CantonConfigError,
@@ -61,6 +63,8 @@ import com.digitalasset.canton.config.ConfigErrors.{
   NoConfigFiles,
   SubstitutionError,
 }
+import com.digitalasset.canton.config.NonNegativeFiniteDurationAccess.*
+import com.digitalasset.canton.config.PositiveFiniteDurationAccess.*
 import com.digitalasset.canton.config.{PerClientIpRateLimitConfig as _, RateLimitersConfig as _, *}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -520,8 +524,18 @@ object SpliceConfig {
     implicit val tokenStandardSettlementConfigReader
         : ConfigReader[TokenStandardConfig.SettlementConfig] =
       deriveReader[TokenStandardConfig.SettlementConfig]
+    implicit val bulkStorageBackfillingConfigReader: ConfigReader[BulkStorageBackfillingConfig] =
+      deriveReader[BulkStorageBackfillingConfig]
     implicit val bulkStorageConfigReader: ConfigReader[BulkStorageConfig] =
-      deriveReader[BulkStorageConfig]
+      deriveReader[BulkStorageConfig].emap { conf =>
+        Either.cond(
+          conf.dbReadChunkSize > 0,
+          conf,
+          ConfigValidationFailed(
+            s"dbReadChunkSize must be positive, but was ${conf.dbReadChunkSize}"
+          ),
+        )
+      }
     implicit val S3ConfigReader: ConfigReader[S3Config] =
       deriveReader[S3Config]
     implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
@@ -1081,6 +1095,8 @@ object SpliceConfig {
     implicit val tokenStandardSettlementConfigWriter
         : ConfigWriter[TokenStandardConfig.SettlementConfig] =
       deriveWriter[TokenStandardConfig.SettlementConfig]
+    implicit val bulkStorageBackfillingConfigWriter: ConfigWriter[BulkStorageBackfillingConfig] =
+      deriveWriter[BulkStorageBackfillingConfig]
     implicit val BulkStorageConfigWriter: ConfigWriter[BulkStorageConfig] =
       deriveWriter[BulkStorageConfig]
     implicit val S3ConfigWriter: ConfigWriter[S3Config] =

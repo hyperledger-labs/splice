@@ -16,14 +16,15 @@ runs:
   steps:
     - name: Archive precompiled classes
       if: ${{ ! fromJson(inputs.load_cache_hit) }}
-      shell: bash
-      run: |
-        set -euo pipefail
-        mkdir -p /tmp/classes
-        # We cache */target/scala/* files and */target/streams/* which
-        # includes everything that is required for SBT to do fast rebuilds
-        # while avoiding issues arising from caching typescript, daml files or anything else.
-        find ${{ inputs.splice_root }} -type f -a \( -path '*/target/scala*' -o -path '*/target/streams/*' \) | tar --use-compress-program=pigz -cf /tmp/classes/classes.tar.gz --exclude-vcs -T -
+      uses: ./.github/actions/nix/run
+      with:
+        cmd: |
+          set -euo pipefail
+          mkdir -p /tmp/classes
+          # We cache */target/scala/* files and */target/streams/* which
+          # includes everything that is required for SBT to do fast rebuilds
+          # while avoiding issues arising from caching typescript, daml files or anything else.
+          find ${{ inputs.splice_root }} -type f -a \( -path '*/target/scala*' -o -path '*/target/streams/*' \) | tar --use-compress-program=pigz -cf /tmp/classes/classes.tar.gz --exclude-vcs -T -
 
     - name: Not archiving preceompiled classes
       if: ${{ fromJson(inputs.load_cache_hit) }}

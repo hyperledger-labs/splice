@@ -23057,6 +23057,14 @@ var XMLParser = class {
 
 // src/split_tests.ts
 var import_fs2 = __toESM(require("fs"));
+var UNKNOWN_TEST_TIME_SECONDS = 300;
+function isTrustedReport(testsuite, time) {
+  const tests = parseInt(testsuite["@_tests"]);
+  const failures = parseInt(testsuite["@_failures"] ?? "0");
+  const errors = parseInt(testsuite["@_errors"] ?? "0");
+  const skipped = parseInt(testsuite["@_skipped"] ?? "0");
+  return tests > 0 && failures === 0 && errors === 0 && skipped < tests && time > 0;
+}
 function getTestSuiteTimesFromXml(testReportsDir) {
   const options = {
     ignoreAttributes: false
@@ -23073,7 +23081,11 @@ function getTestSuiteTimesFromXml(testReportsDir) {
           const parsed = parser.parse(XMLdata);
           const testSuiteName = parsed.testsuite["@_name"];
           const testSuiteTime = parseFloat(parsed.testsuite["@_time"]);
-          testTimes[testSuiteName] = testSuiteTime;
+          if (isTrustedReport(parsed.testsuite, testSuiteTime)) {
+            testTimes[testSuiteName] = testSuiteTime;
+          } else {
+            console.log(`Ignoring untrusted report ${file} (tests=${parsed.testsuite["@_tests"]}, failures=${parsed.testsuite["@_failures"]}, errors=${parsed.testsuite["@_errors"]}, skipped=${parsed.testsuite["@_skipped"]}, time=${testSuiteTime})`);
+          }
         } catch (e) {
           console.error(`Failed to parse xml report ${file}`);
         }
@@ -23085,12 +23097,9 @@ function getTestSuiteTimesFromXml(testReportsDir) {
   return testTimes;
 }
 function estimateTestTimes(testTimes, testNames) {
-  let maxTestTime = Math.max(...Object.values(testTimes));
-  maxTestTime = Math.max(maxTestTime, 1);
   const estimatedTestTimes = {};
   testNames.forEach((testName) => {
-    const known = testTimes[testName] ?? maxTestTime;
-    estimatedTestTimes[testName] = Math.max(known, 0);
+    estimatedTestTimes[testName] = testTimes[testName] ?? UNKNOWN_TEST_TIME_SECONDS;
   });
   return estimatedTestTimes;
 }

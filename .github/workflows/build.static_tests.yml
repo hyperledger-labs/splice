@@ -36,7 +36,7 @@ jobs:
           target: 'static_tests'
 
       - name: Run consistency check
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           additional_nix_args: "--keep PATH"
           cmd: |
@@ -89,32 +89,32 @@ jobs:
           target: 'static_tests'
 
       - name: Check Grafana Dashboards
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: ./scripts/check-grafana-dashboards.sh
 
       - name: Check trailing whitespace
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: ./scripts/check-trailing-whitespace.sh
 
       - name: Run Daml warts check
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: ./scripts/check-daml-warts.sh
 
       - name: Run Daml return types check
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: ./scripts/check-daml-return-types.sh
 
       - name: Run Daml interface implementations check
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: ./scripts/check-daml-interface-impls.sh
 
       - name: Checking TODOs
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         if: ${{ inputs.skip_todo_check == false }}
         with:
           cmd: |
@@ -129,17 +129,17 @@ jobs:
           CIRCLE_PULL_REQUEST: ${{ github.event.pull_request.number }}
 
       - name: Lint GHA
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: ./scripts/actionlint.sh
 
       - name: Check that docker base images are pinned by digest
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: ./scripts/check-base-images.sh
 
       - name: Check that npm packages are properly namespaced
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: ./scripts/check-npm-package-names.py
 
@@ -149,7 +149,7 @@ jobs:
           cmd: "Test/compile lint updateTestConfigForParallelRuns updateDarResources"
 
       - name: Verify no changes in SBT test files
-        uses: ./.github/actions/nix/run_bash_command_in_nix
+        uses: ./.github/actions/nix/run
         with:
           cmd: git add . && git diff --staged --exit-code test*.log '**/DarResources.scala'
 

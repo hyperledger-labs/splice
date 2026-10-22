@@ -188,11 +188,16 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
         const syncMigrationId =
           formData.config.nextScheduledSynchronizerUpgradeMigrationId?.value ?? '';
         const effectiveDate = formData.common.effectiveDate.effectiveDate;
+        const currentValue = (fieldName: string) => defaultValues.config[fieldName]?.value ?? '';
 
         const synchronizerUpgradeError = validateNextScheduledSynchronizerUpgrade(
           syncUpgradeTime,
           syncMigrationId,
-          effectiveDate
+          effectiveDate,
+          {
+            upgradeTime: currentValue('nextScheduledSynchronizerUpgradeTime'),
+            migrationId: currentValue('nextScheduledSynchronizerUpgradeMigrationId'),
+          }
         );
         if (synchronizerUpgradeError) return synchronizerUpgradeError;
         const logicalSynchronizerUpgradeError = validateNextScheduledLogicalSynchronizerUpgrade(
@@ -203,7 +208,19 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
           formData.config
             .nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerProtocolVersion?.value ??
             '',
-          effectiveDate
+          effectiveDate,
+          {
+            topologyFreezeTime: currentValue(
+              'nextScheduledLogicalSynchronizerUpgradeTopologyFreezeTime'
+            ),
+            upgradeTime: currentValue('nextScheduledLogicalSynchronizerUpgradeUpgradeTime'),
+            newPhysicalSynchronizerSerial: currentValue(
+              'nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerSerial'
+            ),
+            newPhysicalSynchronizerProtocolVersion: currentValue(
+              'nextScheduledLogicalSynchronizerUpgradeNewPhysicalSynchronizerProtocolVersion'
+            ),
+          }
         );
         if (logicalSynchronizerUpgradeError) return logicalSynchronizerUpgradeError;
         return false;
@@ -350,6 +367,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
               form={form}
               title="SV operations switch-over times"
               effectiveDate={form.state.values.common.effectiveDate.effectiveDate}
+              currentEntries={defaultValues.switchOverTimes.entries}
             />
 
             <JsonDiffAccordion variant="form">{jsonDiffContent}</JsonDiffAccordion>

@@ -116,7 +116,6 @@ SEQUENCER_UNKNOWN_RECIPIENTS.*(?:alice-validatorLocalForValidatorReonboardingIT|
 Instrument rpc\.server\.duration has exceeded the maximum allowed cardinality
 Too many log messages detected
 
-
 # TODO(#655) Figure out why this happens
 Thread starvation or clock leap detected
 
@@ -163,8 +162,9 @@ The synchronizer Synchronizer 'global' failed the following topology transaction
 # error code will change in the future to MAX_SEQUENCING_TIME_EXCEEDED
 SEQUENCER_SUBMISSION_REQUEST_REFUSED.* The estimated sequencing time .* is already past the max sequencing time
 
-# Sometimes the CI executor seems to take a break, which leads to spurious failed DB activeness checks, see #9388
+# Sometimes the CI executor seems to take a break, which leads to spurious failed DB activeness checks
 DB_CONNECTION_LOST.*Database health check failed to establish a valid connection.*Connection is not available, request timed out
+Sequencer is unhealthy, so disconnecting all members. Can't connect to database
 
 # Likely a race in the shutdown of the actor system vs us scheduling something else on it
 java.lang.IllegalStateException: cannot enqueue after timer shutdown
@@ -221,3 +221,9 @@ StateService/GetConnectedSynchronizers.*INTERNAL/Failed retrieving SynchronizerT
 # topology-init download rejection under the test concurrency limit (3); the
 # client retries and succeeds
 SERVER_OVERLOADED.*Reached the limit of concurrent requests for.*DownloadTopologyStateForInit
+
+# TODO(#7789) Remove this once Canton stops logging warnings due to normal concurrent operations.
+sequenced.*but rejected.*during topology validation
+
+Not accepting submission as aggregation ID.*is already marked as delivered
+SEQUENCER_AGGREGATE_SUBMISSION_ALREADY_SENT

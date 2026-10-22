@@ -10,8 +10,9 @@ import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.logging.{SuppressingLogger, SuppressionRule}
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.WallClock
@@ -55,7 +56,7 @@ class UpdateHistoryBulkStorageTest
   val bulkStorageTestConfig = ScanStorageConfig(
     dbAcsSnapshotPeriodHours = 1,
     bulkAcsSnapshotPeriodHours = 2,
-    bulkDbReadChunkSize = 500,
+    bulkZstdBlockSize = 2000L,
     bulkZstdFrameSize = 10000L,
     maxFileSize,
     zstdCompressionLevel = 3,
@@ -64,6 +65,7 @@ class UpdateHistoryBulkStorageTest
     updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
     bftCheckEnabled = false, // bft checks are tested elsewhere
   )
+  override val initialBuckets = Seq("bucket", "bucket2")
 
   "UpdateHistoryBulkStorage" should {
 
@@ -79,10 +81,7 @@ class UpdateHistoryBulkStorageTest
       val toTimestamp =
         CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp + segmentSize))
 
-      val segment = UpdatesSegment(
-        TimestampWithMigrationId(fromTimestamp, 0),
-        TimestampWithMigrationId(toTimestamp, 0),
-      )
+      val segment = UpdatesSegment(fromTimestamp, toTimestamp)
       val metricsFactory = new InMemoryMetricsFactory
       val probe = UpdateHistorySegmentBulkStorage
         .asSource(
@@ -102,7 +101,7 @@ class UpdateHistoryBulkStorageTest
       clue(
         "Initially, 1000 updates will be ready, but the segment will not be complete, so no output is expected"
       ) {
-        probe.expectNoMessage(20.seconds)
+        assertSegmentNotComplete(loggerFactory)
       }
 
       clue(
@@ -113,6 +112,7 @@ class UpdateHistoryBulkStorageTest
           Seq(
             s"1970-01-01T00:00:00.100Z~1970-01-01T00:00:02.300Z/${e.storageKey("updates", 0)}",
             s"1970-01-01T00:00:00.100Z~1970-01-01T00:00:02.300Z/${e.storageKey("updates", 1)}",
+            s"1970-01-01T00:00:00.100Z~1970-01-01T00:00:02.300Z/${e.storageKey("updates", 2)}",
           )
         )
         val actualKeys = probe.expectNext(20.seconds)
@@ -144,8 +144,8 @@ class UpdateHistoryBulkStorageTest
             )
             .value
             .get()
-        numObjectsFromMetric(ScanStorageConfig.Encoding.CompactJson) shouldBe 2
-        numObjectsFromMetric(ScanStorageConfig.Encoding.ProtobufJson) shouldBe 2
+        numObjectsFromMetric(ScanStorageConfig.Encoding.CompactJson) shouldBe 3
+        numObjectsFromMetric(ScanStorageConfig.Encoding.ProtobufJson) shouldBe 3
       }
 
       clue("Check that the dumped content is correct") {
@@ -169,16 +169,18 @@ class UpdateHistoryBulkStorageTest
                 (
                   new CompactJsonScanHttpEncodings(identity, identity),
                   Seq(
-                    "MM+DyxPP6UgpAaSCsm99j4ZAtYIK3TIrPmxFyodBrQQ=",
-                    "2oWb5Um18xwnJTMkC4yilyrcsUADYoxtV7toJi29VsI=",
+                    "0eImmIjyazFOwY+FTTPTTz3OhIO17/M6lDLHAtIEsK4=",
+                    "7w/7yx+uWqZK8TlolFRUnvEVjNsQNv1LXfS576d4UqA=",
+                    "ZTMI/VrXRZzbrm022fpd42lazU+GW6j/7czNHorI0h8=",
                   ),
                 )
               case ScanStorageConfig.Encoding.ProtobufJson =>
                 (
                   ProtobufJsonScanHttpEncodings,
                   Seq(
-                    "9QrYwnzkSce+GIh82uzY+1JHv4ukYC+llD0Idx1GDio=",
-                    "pCOz8MG6Zoxup4NGnzBx48kFPm582cWn+GxWSZFyq+E=",
+                    "+MeeOS/qMeEWaqaf0SXscROnVNmCEac2OIcv2z+k6hc=",
+                    "Y9IX/Ku0drtxoYGAdV6t63c+Szpjuz9v0q0/Z9ybWNs=",
+                    "P/Y+o2eY+nl8p5bgxsqsRd6E6fIrZ5H7z4FZNwSRewM=",
                   ),
                 )
             }
@@ -217,10 +219,7 @@ class UpdateHistoryBulkStorageTest
       val toTimestamp =
         CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(200L))
 
-      val segment = UpdatesSegment(
-        TimestampWithMigrationId(fromTimestamp, 0),
-        TimestampWithMigrationId(toTimestamp, 0),
-      )
+      val segment = UpdatesSegment(fromTimestamp, toTimestamp)
       val metricsFactory = new InMemoryMetricsFactory
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
@@ -251,6 +250,70 @@ class UpdateHistoryBulkStorageTest
 
     }
 
+    "maintain BFT guarantees regardless of DB read chunk size and ingestion rate" in {
+      val bucketConnection1 = new S3BucketConnectionForUnitTests(s3ConfigMock(), loggerFactory)
+      val bucketConnection2 =
+        new S3BucketConnectionForUnitTests(s3ConfigMock("bucket2"), loggerFactory)
+      val initialStoreSize1 = 100
+      val initialStoreSize2 = 10
+      val segmentSize = 160L
+      val segmentFromTimestamp = 0L
+      val fromTimestamp =
+        CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp))
+      val toTimestamp =
+        CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp + segmentSize))
+      val segment = UpdatesSegment(fromTimestamp, toTimestamp)
+      val dbReadChunkSize1 = 30
+      val dbReadChunkSize2 = 4
+
+      def completePipeline(
+          initialStoreSize: Int,
+          dbReadChunkSize: Int,
+          connection: S3BucketConnection,
+      ): Seq[String] = {
+        val _appConfig = BulkStorageConfig(
+          updatesPollingInterval = NonNegativeFiniteDuration.ofSeconds(5),
+          bftCheckEnabled = false, // bft checks are tested elsewhere
+          dbReadChunkSize = dbReadChunkSize,
+        )
+
+        val mockStore = new MockUpdateHistoryStore(initialStoreSize, Instant.ofEpochMilli)
+        val probe = UpdateHistorySegmentBulkStorage
+          .asSource(
+            bulkStorageTestConfig,
+            _appConfig,
+            mockStore.store,
+            connection,
+            segment,
+            new HistoryMetrics(new InMemoryMetricsFactory)(MetricsContext.Empty),
+            loggerFactory,
+          )
+          .toMat(TestSink.probe[Seq[String]])(Keep.right)
+          .run()
+
+        probe.request(1)
+        assertSegmentNotComplete(loggerFactory)
+        mockStore.mockIngestion(
+          segmentSize.toInt - initialStoreSize + 2
+        ) // +2 to have another update beyond the segment, so that the source completes
+        val ret = probe.expectNext(20.seconds)
+        probe.expectComplete()
+        ret
+      }
+
+      val objs1 = completePipeline(initialStoreSize1, dbReadChunkSize1, bucketConnection1)
+      val objs2 = completePipeline(initialStoreSize2, dbReadChunkSize2, bucketConnection2)
+
+      // The results interleave objects from both encodings in non-deterministic order, so we should not compare with theSameElementsInOrderAs
+      objs1 should contain theSameElementsAs objs2
+      // getChecksums has parallelism, so we should not compare the checksums with theSameElementsInOrderAs either
+      bucketConnection1
+        .getChecksums(objs1)
+        .futureValue should contain theSameElementsAs bucketConnection2
+        .getChecksums(objs2)
+        .futureValue
+    }
+
     "successfully dump all segments" in {
       val bucketConnection = new S3BucketConnectionForUnitTests(s3ConfigMock(), loggerFactory)
       val initialStoreSize = 2000
@@ -270,7 +333,7 @@ class UpdateHistoryBulkStorageTest
       )
       val kvProvider = mkProvider.futureValue
 
-      def newRetryProviderAndUpdatesBulkStorageService(migrationId: Long) = {
+      def newRetryProviderAndUpdatesBulkStorageService() = {
 
         val retryProvider =
           RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)
@@ -281,7 +344,6 @@ class UpdateHistoryBulkStorageTest
           mockStore.store,
           bucketConnection,
           metrics,
-          migrationId,
           loggerFactory,
         )
         val progress = new UpdateHistoryBulkStoragePersistentProgress(
@@ -313,22 +375,14 @@ class UpdateHistoryBulkStorageTest
       def assertLatestSegmentInDb(
           progress: UpdateHistoryBulkStoragePersistentProgress,
           fromHour: Int,
-          fromMigration: Int,
           toHour: Int,
-          toMigration: Int,
       ) = {
         val segment = UpdatesSegment(
-          TimestampWithMigrationId(
-            CantonTimestamp.tryFromInstant(
-              genesisDate.atTime(fromHour, 0).toInstant(ZoneOffset.UTC)
-            ),
-            fromMigration.toLong,
+          CantonTimestamp.tryFromInstant(
+            genesisDate.atTime(fromHour, 0).toInstant(ZoneOffset.UTC)
           ),
-          TimestampWithMigrationId(
-            CantonTimestamp.tryFromInstant(
-              genesisDate.atTime(toHour, 0).toInstant(ZoneOffset.UTC)
-            ),
-            toMigration.toLong,
+          CantonTimestamp.tryFromInstant(
+            genesisDate.atTime(toHour, 0).toInstant(ZoneOffset.UTC)
           ),
         )
         progress.readLatestProcessedSegment.futureValue.value shouldBe segment
@@ -341,14 +395,14 @@ class UpdateHistoryBulkStorageTest
           .toEpochMilli * 1000
 
       val (retryProvider, bulkStorage, svc, progress) =
-        newRetryProviderAndUpdatesBulkStorageService(0L)
+        newRetryProviderAndUpdatesBulkStorageService()
       Using.resources(
         svc,
         retryProvider,
       ) { (_, _) =>
         clue("First 2000 events end at 08:07:10, so expecting segments up to 08:00") {
           eventually() {
-            assertLatestSegmentInDb(progress, 6, 0, 8, 0)
+            assertLatestSegmentInDb(progress, 6, 8)
 
             assertLatestSegmentInMetrics(8)
           }
@@ -357,7 +411,7 @@ class UpdateHistoryBulkStorageTest
         clue("Ingest 2000 more updates, up to 13:14, expecting segments up to 12:00") {
           mockStore.mockIngestion(2000)
           eventually() {
-            assertLatestSegmentInDb(progress, 10, 0, 12, 0)
+            assertLatestSegmentInDb(progress, 10, 12)
             assertLatestSegmentInMetrics(12)
           }
 
@@ -369,12 +423,12 @@ class UpdateHistoryBulkStorageTest
 
       mockStore.mockMigration()
       val (retryProvider1, bulkStorage1, svc1, progress1) =
-        newRetryProviderAndUpdatesBulkStorageService(1L)
+        newRetryProviderAndUpdatesBulkStorageService()
       Using.resources(svc1, retryProvider1) { (_, _) =>
         clue("500 more updates in the new migration, up to 15:03") {
           mockStore.mockIngestion(500)
           eventually() {
-            assertLatestSegmentInDb(progress1, 12, 0, 14, 1)
+            assertLatestSegmentInDb(progress1, 12, 14)
             assertLatestSegmentInMetrics(14)
           }
         }
@@ -397,14 +451,8 @@ class UpdateHistoryBulkStorageTest
           Future(
             Some(
               UpdatesSegment(
-                TimestampWithMigrationId(
-                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-23T00:00:00Z")),
-                  1L,
-                ),
-                TimestampWithMigrationId(
-                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-24T00:00:00Z")),
-                  1L,
-                ),
+                CantonTimestamp.tryFromInstant(Instant.parse("2015-10-23T00:00:00Z")),
+                CantonTimestamp.tryFromInstant(Instant.parse("2015-10-24T00:00:00Z")),
               )
             )
           )
@@ -428,7 +476,8 @@ class UpdateHistoryBulkStorageTest
         stagingS3Connection = bucketConnection,
         committedS3Connection =
           bucketConnection, // we use the same bucket for staging and committed for this test, as we don't run the commit from staging flow
-        loggerFactory,
+        firstOwnSegmentStart = () => Future.successful(None),
+        loggerFactory = loggerFactory,
       )
 
       def makeObjectKeys(dates: String, prefix: String = "updates"): Seq[String] =
@@ -531,14 +580,8 @@ class UpdateHistoryBulkStorageTest
           Future(
             Some(
               UpdatesSegment(
-                TimestampWithMigrationId(
-                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-26T00:00:00Z")),
-                  1L,
-                ),
-                TimestampWithMigrationId(
-                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-27T00:00:00Z")),
-                  1L,
-                ),
+                CantonTimestamp.tryFromInstant(Instant.parse("2015-10-26T00:00:00Z")),
+                CantonTimestamp.tryFromInstant(Instant.parse("2015-10-27T00:00:00Z")),
               )
             )
           )
@@ -657,6 +700,13 @@ class UpdateHistoryBulkStorageTest
       loggerFactory,
     ).map(new ScanKeyValueProvider(_, loggerFactory))
   }
+
+  def assertSegmentNotComplete(loggerFactory: SuppressingLogger) =
+    loggerFactory.assertEventuallyLogsSeq_(SuppressionRule.Level(Level.DEBUG))(entries =>
+      forAtLeast(1, entries)(entry =>
+        entry.message should include("we don't know if we're done with the segment")
+      )
+    )
 
   override protected def cleanDb(
       storage: DbStorage

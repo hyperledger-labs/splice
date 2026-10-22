@@ -709,6 +709,27 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
       }
     }
 
+    "create" should {
+
+      "store the participant id in its prefixed form" in {
+        import storage.api.jdbcProfile.api.*
+
+        val store = mkStore(party1, migration1, participant1)
+        for {
+          stored <- storage
+            .query(
+              sql"select participant_id from update_history_descriptors where id = ${store.historyId}"
+                .as[String],
+              "readParticipantId",
+            )
+            .failOnShutdown
+        } yield {
+          stored shouldBe Seq(participant1.toProtoPrimitive)
+          all(stored) should startWith("PAR::")
+        }
+      }
+    }
+
     "getImportUpdates" should {
 
       "return consistent ids" in {

@@ -37,5 +37,9 @@
     "msw": "^2.14.2",
     "uuid": "^14.0.0",
     "zod": "^3.25.76"
+  },
+  "allowScripts": {
+    "msw": true,
+    "file:../../../token-standard/splice-api-token-metadata-v1/openapi-ts-client": true
   }
 }

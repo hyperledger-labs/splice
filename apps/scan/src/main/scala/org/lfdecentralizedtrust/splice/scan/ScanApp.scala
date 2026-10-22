@@ -80,6 +80,7 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorage
 import org.lfdecentralizedtrust.splice.scan.store.historystart.{
   KvHistoryStartStore,
   ParticipantHistoryStartSources,
+  ScanHistoryReadiness,
   ScanHistoryStart,
 }
 import org.lfdecentralizedtrust.splice.scan.store.db.{
@@ -100,6 +101,7 @@ import org.lfdecentralizedtrust.splice.util.HasHealth
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import cats.implicits.*
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 /** Class representing a Scan app instance.
   *
@@ -228,17 +230,16 @@ class ScanApp(
         loggerFactory,
         retryProvider.metricsFactory,
       )
-      updateHistory = new UpdateHistory(
+      updateHistory <- UpdateHistory.create(
         storage,
         domainMigrationId,
         store.storeName,
-        participantId,
+        StoreMemberId(participantId),
         store.acsContractFilter.ingestionFilter.primaryParty,
         BackfillingRequirement.NeedsBackfilling,
         internedStringStore,
         config.analyzableTimeWindow.duration,
         loggerFactory,
-        enableissue12777Workaround = true,
         enableImportUpdateBackfill = config.updateHistoryBackfillImportUpdatesEnabled,
         scanAppMetrics.dbScanStore.history,
       )
@@ -281,6 +282,10 @@ class ScanApp(
         ),
         loggerFactory,
       )
+      _ <-
+        if (config.bulkStorage.debugReresolveHistoryStart) historyStart.forgetRecorded()
+        else Future.unit
+      historyReadiness = new ScanHistoryReadiness(updateHistory, historyStart)
       bulkStorage <- (config.bulkStorage.staging, config.bulkStorage.committed).tupled.traverse(_ =>
         appInitStep("Initialize bulk storage") {
           BulkStorage(
@@ -290,6 +295,8 @@ class ScanApp(
             updateHistory,
             currentMigrationId = domainMigrationId,
             kvProvider,
+            historyStart,
+            historyReadiness,
             retryProvider.metricsFactory,
             config.automation,
             backoffClock = new WallClock(retryProvider.timeouts, loggerFactory),
@@ -349,6 +356,7 @@ class ScanApp(
         svName,
         amuletAppParameters.upgradesConfig,
         packageVersionSupport,
+        historyReadiness,
       )
       _ = automation.registerHistoryStartTrigger(historyStart)
       scanVerdictStore = DbScanVerdictStore(

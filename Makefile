@@ -30,7 +30,8 @@ $(canton-amulet-dar) $(wallet-payments-dar) &:
 $(load-tester):
 	cd "${SPLICE_ROOT}/load-tester" && npm ci && npm run build
 
-$(party-allocator):
+## Order-only dependency so a parallel make doesn't boot a second sbt server alongside $(canton-amulet-dar) $(wallet-payments-dar)
+$(party-allocator): | $(canton-amulet-dar) $(wallet-payments-dar)
 	sbt --client --batch 'party-allocator/npmBuild'
 
 .PHONY: update-expected

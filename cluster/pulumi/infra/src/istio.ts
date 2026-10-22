@@ -39,11 +39,11 @@ interface ConfiguredIstio {
 }
 
 export const istioVersion = {
-  istio: '1.29.2',
+  istio: '1.30.5',
   //   updated from https://grafana.com/orgs/istio/dashboards, must be updated on each istio version
   dashboards: {
-    general: 300,
-    wasm: 258,
+    general: 332, // https://grafana.com/grafana/dashboards/7645-istio-control-plane-dashboard/
+    wasm: 290, // https://grafana.com/grafana/dashboards/13277-istio-wasm-extension-dashboard/
   },
 };
 

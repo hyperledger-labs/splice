@@ -13,6 +13,7 @@ To update the versions used in the project follow the steps:
 - Open a terminal outside a direnv nix environment
 - Run `nix flake update --flake path:<path-to-the-splice-repository>/nix`
 - Commit the changes to the `flake.lock` file
+- Run `scripts/nixpkgs-version-changes.sh`; include its output in the PR description, calling out any especially notable upgrades
 
 
 ## Pulumi setup

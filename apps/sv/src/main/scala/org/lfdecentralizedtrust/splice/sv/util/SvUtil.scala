@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.util
 
+import cats.syntax.either.*
 import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.cometbft.{
   CometBftConfig,
@@ -66,13 +67,15 @@ object SvUtil {
     PositiveDurationSeconds.ofMinutes(30)
 
   val defaultAcsCommitmentsCatchUpParameters: AcsCommitmentsCatchUpParameters =
-    AcsCommitmentsCatchUpParameters(
-      // With the default reconciliation interval of 30m this corresponds to a catchup interval of 30m * 24 = 12 hours.
-      // Catchup mode will trigger after a participant has been lagging for 1 day i.e. 2 "catchup" intervals and
-      // the participant will only send an ACS commitment every 12 hours during catchup.
-      catchUpIntervalSkip = PositiveInt.tryCreate(24),
-      nrIntervalsToTriggerCatchUp = PositiveInt.tryCreate(2),
-    )
+    AcsCommitmentsCatchUpParameters
+      .create(
+        // With the default reconciliation interval of 30m this corresponds to a catchup interval of 30m * 24 = 12 hours.
+        // Catchup mode will trigger after a participant has been lagging for 1 day i.e. 2 "catchup" intervals and
+        // the participant will only send an ACS commitment every 12 hours during catchup.
+        catchUpIntervalSkip = PositiveInt.tryCreate(24),
+        nrIntervalsToTriggerCatchUp = PositiveInt.tryCreate(2),
+      )
+      .valueOr(err => throw new IllegalStateException(err))
 
   def weightDistributionForSv(
       memberSvRewardWeightBps: Long,

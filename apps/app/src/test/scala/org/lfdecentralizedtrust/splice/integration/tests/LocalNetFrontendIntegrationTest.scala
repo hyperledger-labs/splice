@@ -99,7 +99,7 @@ class LocalNetFrontendIntegrationTest
       withFrontEnd("frontend") { implicit webDriver =>
         actAndCheck(
           "Open the Scan UI",
-          go to "scan.localhost:4000",
+          go to "http://scan.localhost:4000",
         )(
           "Open rounds should be listed",
           _ => findAll(className("open-mining-round-row")) should have length 2,
@@ -191,7 +191,7 @@ class LocalNetFrontendIntegrationTest
   }
 
   "localnet supports configurable protocol versions" in { implicit env =>
-    withLocalNet(Seq("-u", "-p", "35")) { implicit env =>
+    withLocalNet(Seq("-u", "-p", "37")) { implicit env =>
       val appProviderParticipant =
         env.participants.remote
           .find(_.name == "app-provider")
@@ -206,7 +206,7 @@ class LocalNetFrontendIntegrationTest
         .list_connected()
         .loneElement
         .physicalSynchronizerId
-        .protocolVersion shouldBe ProtocolVersion.v35
+        .protocolVersion shouldBe ProtocolVersion.v37
     }
   }
 }

@@ -22,12 +22,13 @@ import org.lfdecentralizedtrust.splice.scan.config.ScanCacheConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanAcsStoreRowData
 import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanStore, DbScanStoreMetrics}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes}
 import org.lfdecentralizedtrust.splice.store.{
   AppStore,
   DsoRulesStore,
-  Limit,
   ExternalPartyConfigStateStore,
+  Limit,
   MiningRoundsStore,
   MultiDomainAcsStore,
   TxLogAppStore,
@@ -162,15 +163,15 @@ trait ScanStore
     ]
   ]]
 
-  def getTotalPurchasedMemberTraffic(memberId: Member, synchronizerId: SynchronizerId)(implicit
-      tc: TraceContext
+  def getTotalPurchasedMemberTraffic(memberId: StoreMemberId, synchronizerId: SynchronizerId)(
+      implicit tc: TraceContext
   ): Future[Long]
 
   def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
-  def listFeaturedAppRightsByProvider(providerPartyId: PartyId)(implicit
+  def listFeaturedAppRightsByProvider(providerPartyId: PartyId, limit: Limit)(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
@@ -380,7 +381,7 @@ object ScanStore {
                 // we ignore cases where the member id is invalid instead of throwing an exception
                 // to avoid killing the entire ingestion pipeline as a result
                 _ => None,
-                Some(_),
+                member => Some(StoreMemberId(member)),
               ),
             memberTrafficDomain =
               Some(SynchronizerId.tryFromString(contract.payload.synchronizerId)),

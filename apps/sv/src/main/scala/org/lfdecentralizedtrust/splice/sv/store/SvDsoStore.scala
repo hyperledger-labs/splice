@@ -53,6 +53,7 @@ import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
@@ -890,8 +891,12 @@ trait SvDsoStore
       )
     } yield unclaimedRewards map (_.contract)
 
-  def listMemberTrafficContracts(memberId: Member, synchronizerId: SynchronizerId, limit: Limit)(
-      implicit tc: TraceContext
+  def listMemberTrafficContracts(
+      memberId: StoreMemberId,
+      synchronizerId: SynchronizerId,
+      limit: Limit,
+  )(implicit
+      tc: TraceContext
   ): Future[
     Seq[Contract[
       splice.decentralizedsynchronizer.MemberTraffic.ContractId,
@@ -953,8 +958,8 @@ trait SvDsoStore
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]]
 
-  def getTotalPurchasedMemberTraffic(memberId: Member, synchronizerId: SynchronizerId)(implicit
-      tc: TraceContext
+  def getTotalPurchasedMemberTraffic(memberId: StoreMemberId, synchronizerId: SynchronizerId)(
+      implicit tc: TraceContext
   ): Future[Long]
 
   def lookupVoteByThisSvAndVoteRequestWithOffset(
@@ -1488,7 +1493,7 @@ object SvDsoStore {
               // we ignore cases where the member id is invalid instead of throwing an exception
               // to avoid killing the entire ingestion pipeline as a result
               _ => None,
-              Some(_),
+              member => Some(StoreMemberId(member)),
             ),
           memberTrafficDomain = Some(SynchronizerId.tryFromString(contract.payload.synchronizerId)),
           totalTrafficPurchased = Some(contract.payload.totalPurchased),

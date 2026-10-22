@@ -84,14 +84,14 @@ class ScanEventStore(
       isAllowed = ScanEventStore.allowF(afterO, currentMigrationId, currentCap)
       cappedVerdicts = verdictsAll.filter(v => isAllowed(v.migrationId, v.recordTime))
       // Fetch views only for filtered verdicts
-      verdictsWithViews <- Future.traverse(cappedVerdicts)(v =>
-        verdictStore.listTransactionViews(v.rowId).map(views => v -> views)
+      viewsByVerdictRowId <- verdictStore.listTransactionViewsByVerdictRowIds(
+        cappedVerdicts.map(_.rowId)
       )
     } yield {
       val verdictEntries: Iterator[(TimestampWithMigrationId, Verdict)] =
-        verdictsWithViews.iterator.map { case (v, views) =>
+        cappedVerdicts.iterator.map { v =>
           val k = TimestampWithMigrationId(v.recordTime, v.migrationId)
-          k -> (v -> views)
+          k -> (v -> viewsByVerdictRowId.getOrElse(v.rowId, Seq.empty))
         }
 
       val filteredUpdates =

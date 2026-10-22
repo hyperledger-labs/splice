@@ -228,7 +228,7 @@ class AppActivityComputationTest extends AnyWordSpec with BaseTest {
     new AppActivityComputation(store, loggerFactory)(directExecutionContext)
       .computeActivities(input)(traceContext)
       .futureValue
-      .flatMap { case (_, _, recordO) => recordO }
+      .flatMap { case (_, _, recordO, _) => recordO }
   }
 
   private def mkVerdict(

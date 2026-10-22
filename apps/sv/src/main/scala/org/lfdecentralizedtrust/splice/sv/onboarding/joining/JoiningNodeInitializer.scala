@@ -9,6 +9,9 @@ import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.digitalasset.canton.admin.api.client.data.SequencerConnectionPoolDelaysAccess.*
+import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplificationAccess.*
+import com.digitalasset.canton.admin.api.client.data.SubscriptionLivenessLimitsAccess.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -187,8 +190,14 @@ class JoiningNodeInitializer(
           )
         ),
       ).tupled
-      psid <- participantAdminConnection
-        .getPhysicalSynchronizerId(config.domains.global.alias)
+      psid <- retryProvider.retry(
+        RetryFor.WaitingOnInitDependency,
+        "getPhysicalSynchronizerId",
+        "Get the physical synchronizer id in joinDsoAndOnboardNodes",
+        participantAdminConnection
+          .getPhysicalSynchronizerId(config.domains.global.alias),
+        logger,
+      )
       decentralizedSynchronizerId = psid.logical
       dsoPartyHosting = newDsoPartyHosting(dsoPartyId)
       dsoPartyIsAuthorized <- dsoPartyHosting.isDsoPartyAuthorizedOn(
@@ -463,8 +472,15 @@ class JoiningNodeInitializer(
       )
       // Register triggers once the DsoRules are visible and have been ingested
       _ = dsoAutomationService.registerPostOnboardingTriggers()
-      participantReportedPSid <- participantAdminConnection.getPhysicalSynchronizerId(
-        config.domains.global.alias
+      // During LSUs this can fail with 'NOT_FOUND: No synchronizer registered and handshaked for Synchronizer'
+      // If the call happens while the participant is reconnecting.
+      participantReportedPSid <- retryProvider.retry(
+        RetryFor.WaitingOnInitDependency,
+        "getPhysicalSynchronizerId",
+        "Get the physical synchronizer id in onboard",
+        participantAdminConnection
+          .getPhysicalSynchronizerId(config.domains.global.alias),
+        logger,
       )
       currentNode <- synchronizerNodeService.activeSynchronizerNode()
       // It is important to wait only here since at this point we may have been added

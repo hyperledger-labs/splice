@@ -981,6 +981,8 @@ object FrontendIntegrationTest {
           case "url" => {
             url = input.read[String](classOf[String])
           }
+          // fields we don't use, e.g. userContext, which newer Firefox versions send
+          case _ => input.skipValue()
         }
       }
       input.endObject()

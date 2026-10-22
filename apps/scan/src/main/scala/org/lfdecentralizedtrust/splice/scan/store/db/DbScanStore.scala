@@ -15,7 +15,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
@@ -60,10 +60,10 @@ import org.lfdecentralizedtrust.splice.store.{
   DbVotesAcsStoreQueryBuilder,
   DbVotesTxLogStoreQueryBuilder,
   Limit,
-  VoteResultsFilters,
   ResultsPage,
   TxLogStore,
   UpdateHistory,
+  VoteResultsFilters,
 }
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
@@ -76,6 +76,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 
@@ -416,7 +417,8 @@ class DbScanStore(
     }
 
   override def listFeaturedAppRightsByProvider(
-      providerPartyId: PartyId
+      providerPartyId: PartyId,
+      limit: Limit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
@@ -431,10 +433,13 @@ class DbScanStore(
             additionalWhere = sql"""
                   and featured_app_right_provider = $providerPartyId
                """,
+            orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
           ),
           "listFeaturedAppRightsByProvider",
         )
-      } yield rows.map(contractWithStateFromRow(FeaturedAppRight.COMPANION))
+      } yield applyLimit("listFeaturedAppRightsByProvider", limit, rows).map(
+        contractWithStateFromRow(FeaturedAppRight.COMPANION)
+      )
     }
 
   override def getAmuletConfigForRound(round: Long)(implicit
@@ -499,7 +504,7 @@ class DbScanStore(
   override def getValidatorLicenseByValidator(validators: Vector[PartyId])(implicit
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] = waitUntilAcsIngested {
-    NonEmpty.from(validators) match {
+    NonEmpty.from(validators.distinct) match {
       case None => Future.successful(Seq.empty)
       case Some(validators) =>
         val validatorPartyIds = DbStorage.toInClause("validator", validators)
@@ -512,11 +517,12 @@ class DbScanStore(
                 domainMigrationId,
                 ValidatorLicense.COMPANION,
                 where = validatorPartyIds,
+                orderLimit = sql"limit ${sqlLimit(defaultLimit)}",
               ),
               "getValidatorLicenseByValidator",
             )
         } yield {
-          rows
+          applyLimit("getValidatorLicenseByValidator", defaultLimit, rows)
             .map(
               contractFromRow(ValidatorLicense.COMPANION)(_)
             )
@@ -524,8 +530,11 @@ class DbScanStore(
     }
   }
 
-  override def getTotalPurchasedMemberTraffic(memberId: Member, synchronizerId: SynchronizerId)(
-      implicit tc: TraceContext
+  override def getTotalPurchasedMemberTraffic(
+      memberId: StoreMemberId,
+      synchronizerId: SynchronizerId,
+  )(implicit
+      tc: TraceContext
   ): Future[Long] = waitUntilAcsIngested {
     for {
       sum <- storage
@@ -539,7 +548,7 @@ class DbScanStore(
                 and template_id_qualified_name = ${QualifiedName(
               MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
             )}
-                and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
+                and member_traffic_member = $memberId
                 and member_traffic_domain = ${lengthLimited(synchronizerId.toProtoPrimitive)}
              """.as[Long].headOption,
           "getTotalPurchasedMemberTraffic",

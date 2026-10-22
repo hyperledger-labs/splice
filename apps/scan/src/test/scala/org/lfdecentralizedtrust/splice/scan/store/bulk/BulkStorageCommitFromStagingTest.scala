@@ -20,7 +20,11 @@ import org.apache.pekko.stream.scaladsl.{Flow, Keep}
 import org.apache.pekko.stream.testkit.scaladsl.{TestSink, TestSource}
 import org.lfdecentralizedtrust.splice.environment.SpliceLedgerClient
 import org.lfdecentralizedtrust.splice.http.HttpClient
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import org.lfdecentralizedtrust.splice.http.HttpRequestLimits
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  BulkObjectsAvailability,
+  BulkStorageBucket,
   GetBulkObjectChecksumsResponse,
   GetBulkObjectsProgressResponse,
 }
@@ -38,7 +42,7 @@ import org.scalatest.Assertion
 
 import java.security.MessageDigest
 import java.util.Base64
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.concurrent.duration.*
@@ -51,7 +55,7 @@ class BulkStorageCommitFromStagingTest
     with SplicePostgresTest
     with HasRetryProvider {
 
-  override val initialBuckets = Seq("staging", "committed")
+  override val initialBuckets = Seq("staging", "committed", "batched-staging", "batched-committed")
   implicit val httpClient: HttpClient = null
   implicit val templateJsonDecoder: TemplateJsonDecoder = null
 
@@ -102,6 +106,7 @@ class BulkStorageCommitFromStagingTest
       BulkStorageCommitFromStaging[String](
         stagingS3Connection,
         committedS3Connection,
+        BulkObjectKind.Updates,
         _ => Future.successful(objsWithDigests),
         _ => CantonTimestamp.MinValue,
         appConfig,
@@ -123,6 +128,53 @@ class BulkStorageCommitFromStagingTest
       val mockScanConnections = new MockScanConnections(objsWithDigests)
       Seq.range(0, mockScanConnections.nrResponses).foreach { i =>
         mockScanConnections.scanAgrees(i)
+      }
+
+      val flow = newCopyFlow(
+        stagingS3Connection,
+        committedS3Connection,
+        objsWithDigests,
+        mockScanConnections,
+      )
+
+      triggerCopyFlowAndAssertCompletion(flow)
+
+      assertObjectsMoved(stagingS3Connection, committedS3Connection, objsWithDigests)
+    }
+
+    "check more objects than one request may carry in batches, and commit them all" in {
+      val (stagingS3Connection, committedS3Connection, objsWithDigests) =
+        setupTest(HttpRequestLimits.MaxRequestArrayItems + 1, bucketPrefix = "batched-")
+
+      val mockScanConnections = new MockScanConnections(objsWithDigests)
+      mockScanConnections.scansAgreeOnRequestedKeys()
+
+      val flow = newCopyFlow(
+        stagingS3Connection,
+        committedS3Connection,
+        objsWithDigests,
+        mockScanConnections,
+      )
+
+      triggerCopyFlowAndAssertCompletion(flow, completionTimeout = 20.seconds)
+
+      withClue(s"largest checksums request for ${objsWithDigests.size} objects: ") {
+        mockScanConnections.largestRequest.get() shouldBe HttpRequestLimits.MaxRequestArrayItems
+      }
+      clue("Staging is empty and every object is in committed with its checksum") {
+        stagingS3Connection.listObjects.futureValue.contents().asScala shouldBe empty
+        committedS3Connection
+          .getChecksums(objsWithDigests.map(_.key))
+          .futureValue should contain theSameElementsAs objsWithDigests
+      }
+    }
+
+    "commit on its own checksums when every peer will never have the objects" in {
+      val (stagingS3Connection, committedS3Connection, objsWithDigests) = setupTest
+
+      val mockScanConnections = new MockScanConnections(objsWithDigests)
+      Seq.range(0, mockScanConnections.nrResponses).foreach { i =>
+        mockScanConnections.scanWillNeverHaveData(i)
       }
 
       val flow = newCopyFlow(
@@ -350,6 +402,11 @@ class BulkStorageCommitFromStagingTest
         Seq.fill(nrResponses)(
           new AtomicReference[Option[(Boolean, GetBulkObjectChecksumsResponse)]](None)
         )
+      private val neverHaveData: Seq[AtomicBoolean] =
+        Seq.fill(nrResponses)(new AtomicBoolean(false))
+      private val answerForRequestedKeys = new AtomicBoolean(false)
+      private val checksumByKey = objsWithDigests.map(obj => obj.key -> obj.checksum).toMap
+      val largestRequest = new AtomicInteger(0)
 
       private val singleScanConnections: Seq[SingleScanConnection] =
         Seq.range(0, nrResponses).map { i =>
@@ -361,16 +418,31 @@ class BulkStorageCommitFromStagingTest
           )
           when(mockConn.url) thenReturn Uri(s"http://scan_$i")
           when(
-            mockConn.getBulkObjectChecksums(any[CantonTimestamp], any[Seq[String]])(
+            mockConn.getBulkObjectChecksums(
+              any[CantonTimestamp],
+              eqTo(BulkObjectKind.Updates),
+              any[Seq[String]],
+            )(
               any[ExecutionContext],
               any[TraceContext],
             )
-          ).thenAnswer {
+          ).thenAnswer { (_: CantonTimestamp, _: BulkObjectKind, keys: Seq[String]) =>
+            largestRequest.accumulateAndGet(keys.size, math.max).discard
             responses(i).get() match {
               case Some((false, _)) =>
                 Future.failed[GetBulkObjectChecksumsResponse](
                   new IllegalStateException(
                     s"Scan scan_$i has no data, getChecksums should not have been called"
+                  )
+                )
+              case Some((true, _)) if answerForRequestedKeys.get() =>
+                Future.successful(
+                  new GetBulkObjectChecksumsResponse(
+                    keys
+                      .map(key =>
+                        new GetBulkObjectChecksumsResponse.Checksums(checksumByKey.get(key))
+                      )
+                      .toVector
                   )
                 )
               case Some((true, checksums)) => Future.successful(checksums)
@@ -381,14 +453,27 @@ class BulkStorageCommitFromStagingTest
             }
           }
           when(
-            mockConn.getBulkObjectsProgress(any[CantonTimestamp])(
+            mockConn.getBulkObjectsProgress(
+              any[CantonTimestamp],
+              any[BulkStorageBucket],
+              eqTo(BulkObjectKind.Updates),
+            )(
               any[ExecutionContext],
               any[TraceContext],
             )
           ).thenAnswer(
             responses(i).get() match {
+              case _ if neverHaveData(i).get() =>
+                Future.successful(
+                  GetBulkObjectsProgressResponse(BulkObjectsAvailability.Backfilling)
+                )
               case Some((hasData, _)) =>
-                Future.successful(new GetBulkObjectsProgressResponse(hasData))
+                Future.successful(
+                  GetBulkObjectsProgressResponse(
+                    if (hasData) BulkObjectsAvailability.Available
+                    else BulkObjectsAvailability.Processing
+                  )
+                )
               case None =>
                 Future.failed[GetBulkObjectsProgressResponse](
                   new IllegalStateException(s"No response configured for scan_$i")
@@ -419,8 +504,16 @@ class BulkStorageCommitFromStagingTest
           )
         )
 
+      def scanWillNeverHaveData(idx: Integer): Unit =
+        neverHaveData(idx).set(true)
+
       def scanAgrees(idx: Integer): Unit =
         setChecksumsResponse(idx, objsWithDigests.map(obj => Some(obj.checksum)))
+
+      def scansAgreeOnRequestedKeys(): Unit = {
+        answerForRequestedKeys.set(true)
+        Seq.range(0, nrResponses).foreach(scanAgrees(_))
+      }
 
       def scanDisagreesOnDigest(scanIdx: Integer, objIdx: Integer): Unit =
         setChecksumsResponse(
@@ -467,6 +560,7 @@ class BulkStorageCommitFromStagingTest
       new BulkStorageCommitFromStaging[String](
         stagingS3Connection,
         committedS3Connection,
+        BulkObjectKind.Updates,
         _ => Future.successful(objsWithDigests),
         _ => CantonTimestamp.MinValue,
         config,
@@ -477,7 +571,8 @@ class BulkStorageCommitFromStagingTest
   }
 
   private def triggerCopyFlowAndAssertCompletion(
-      flow: Flow[String, String, NotUsed]
+      flow: Flow[String, String, NotUsed],
+      completionTimeout: FiniteDuration = 3.seconds,
   ) = {
     val (pub, sub) = TestSource
       .probe[String]
@@ -488,7 +583,7 @@ class BulkStorageCommitFromStagingTest
     try {
       sub.request(1)
       pub.sendNext("go")
-      sub.expectNext("go")
+      sub.expectNext(completionTimeout, "go")
       pub.sendComplete()
       sub.expectComplete()
     } catch {
@@ -518,11 +613,17 @@ class BulkStorageCommitFromStagingTest
     }
   }
 
-  private def setupTest = {
+  private def setupTest: (
+      S3BucketConnectionForUnitTests,
+      S3BucketConnectionForUnitTests,
+      Seq[ObjectKeyAndChecksum],
+  ) = setupTest(3)
+
+  private def setupTest(numObjects: Int, bucketPrefix: String = "") = {
     val stagingS3Connection =
-      new S3BucketConnectionForUnitTests(s3ConfigMock("staging"), loggerFactory)
+      new S3BucketConnectionForUnitTests(s3ConfigMock(s"${bucketPrefix}staging"), loggerFactory)
     val committedS3Connection =
-      new S3BucketConnectionForUnitTests(s3ConfigMock("committed"), loggerFactory)
+      new S3BucketConnectionForUnitTests(s3ConfigMock(s"${bucketPrefix}committed"), loggerFactory)
 
     def createStagingObject(content: String) = {
       val md = MessageDigest.getInstance("SHA-256")
@@ -534,7 +635,7 @@ class BulkStorageCommitFromStagingTest
     }
 
     val objsWithDigests =
-      Seq("object1", "object2", "object3").map(createStagingObject)
+      Seq.tabulate(numObjects)(i => s"object${i + 1}").map(createStagingObject)
     (stagingS3Connection, committedS3Connection, objsWithDigests)
   }
 

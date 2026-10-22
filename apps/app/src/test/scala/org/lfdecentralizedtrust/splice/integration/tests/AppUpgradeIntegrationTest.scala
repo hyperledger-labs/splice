@@ -28,6 +28,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.store.TimeQuery.HeadState
+import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
@@ -209,7 +210,7 @@ class AppUpgradeIntegrationTest
             p2pTransfer(
               bobValidatorWalletClient,
               sv1WalletClient,
-              sv1Client.getDsoInfo().svParty,
+              PartyId.tryFromProtoPrimitive(sv1WalletClient.userStatus().party),
               501,
             )
             sv1WalletClient.balance().unlockedQty should be > BigDecimal(400)

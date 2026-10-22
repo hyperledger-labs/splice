@@ -7,6 +7,7 @@ import better.files.File
 import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
+import com.digitalasset.canton.admin.api.client.commands.AdminCommandAccess.*
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
   PruningSchedulerCommands,

@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.historystart
 
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import io.circe.syntax.*
@@ -26,6 +27,7 @@ class ScanHistoryStartTest extends AsyncWordSpec with BaseTest with HasExecution
     override def read(implicit tc: TraceContext) = Future.successful(value.get())
     override def recordOnce(start: HistoryStart)(implicit tc: TraceContext) =
       Future.successful(value.updateAndGet(_.orElse(Some(start))).getOrElse(start))
+    override def reset()(implicit tc: TraceContext) = Future.successful(value.set(None))
   }
 
   private class FakeSources(
@@ -44,6 +46,24 @@ class ScanHistoryStartTest extends AsyncWordSpec with BaseTest with HasExecution
     new ScanHistoryStart(store, sources, loggerFactory)
 
   "ScanHistoryStart" should {
+    "determine the history start again after forgetting a recorded one" in {
+      val store = new InMemoryStore
+      store.value.set(Some(HistoryStart.From(ts("2026-01-02T10:15:00Z"))))
+      val start = historyStart(store, new FakeSources(backfilled = Some(true)))
+      for {
+        before <- start.get
+        _ <- loggerFactory.assertLogs(
+          start.forgetRecorded(),
+          _.warningMessage should include("Forgot the recorded history start"),
+        )
+        after <- start.get
+      } yield {
+        before shouldBe Some(HistoryStart.From(ts("2026-01-02T10:15:00Z")))
+        after shouldBe Some(HistoryStart.Genesis)
+        store.value.get() shouldBe Some(HistoryStart.Genesis)
+      }
+    }
+
     "record genesis on the founding SV without asking anything else" in {
       val store = new InMemoryStore
       historyStart(

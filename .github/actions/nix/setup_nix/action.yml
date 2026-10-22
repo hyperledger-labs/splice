@@ -62,8 +62,8 @@ runs:
         cache_key=($(md5sum "/tmp/nix-cache-key"))
         echo "cache_key=$cache_key" >> $GITHUB_ENV
 
-        echo ${{ inputs.target }} > /tmp/nix_target # Create a file to indicate which target are we using (so we don't need to re-specifify target to run_bash_command_in_nix)
-        echo ${{ inputs.nix_path }} > /tmp/nix_path # Create a file to indicate where the nix config is (so we don't need to re-specifify nix_path to run_bash_command_in_nix)
+        echo ${{ inputs.target }} > /tmp/nix_target # Create a file to indicate which target are we using (so we don't need to re-specifify target to run)
+        echo ${{ inputs.nix_path }} > /tmp/nix_path # Create a file to indicate where the nix config is (so we don't need to re-specifify nix_path to run)
 
     - name: Download cache (for non-self-hosted)
       if: ${{ !startsWith(runner.name, 'self-hosted') }}
@@ -141,7 +141,7 @@ runs:
 
     - name: Invoke nix before saving cache
       if: ${{ github.repository == 'canton-network/splice' }}
-      uses: ./.github/actions/nix/run_bash_command_in_nix
+      uses: ./.github/actions/nix/run
       with:
         cmd: |
           echo "Validated nix"

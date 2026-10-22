@@ -230,7 +230,7 @@ abstract class NodeBootstrapBase[
       if (isRunningVar.getAndSet(false)) {
         val stores = List()
         val instances =
-          grpcAdminServers ++ getNode.toList ++ stores ++ List(clock, httpAdminService)
+          List(httpAdminService) ++ grpcAdminServers ++ getNode.toList ++ stores ++ List(clock)
         LifeCycle.close(instances*)(logger)
         logger.debug(s"Successfully completed shutdown of $name")
       } else {

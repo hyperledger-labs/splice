@@ -137,6 +137,10 @@ lazy val root: Project = (project in file("."))
     `canton-ledger-api-value`,
     `canton-fork-community-common-test`,
     `canton-fork-logback-test`,
+    `canton-fork-app-base`,
+    `canton-fork-base`,
+    `canton-fork-common`,
+    `canton-fork-testing`,
     pulumi,
     `load-tester`,
     tools,
@@ -1199,12 +1203,44 @@ lazy val `canton-fork-community-common-test` =
       Headers.ApacheDAHeaderSettings,
     )
 
+lazy val `canton-fork-base` =
+  project
+    .in(file("canton-fork/base"))
+    .dependsOn(`canton-community-base`)
+    .settings(Headers.ApacheDAHeaderSettings)
+
+lazy val `canton-fork-common` =
+  project
+    .in(file("canton-fork/common"))
+    .dependsOn(`canton-community-common`)
+    .settings(Headers.ApacheDAHeaderSettings)
+
+lazy val `canton-fork-testing` =
+  project
+    .in(file("canton-fork/testing"))
+    .dependsOn(`canton-community-testing`)
+    .settings(
+      scalacOptions --= JvmRulesPlugin.scalacOptionsToDisableForTests,
+      Headers.ApacheDAHeaderSettings,
+    )
+
+lazy val `canton-fork-app-base` =
+  project
+    .in(file("canton-fork/app-base"))
+    .dependsOn(`canton-community-app-base`)
+    .settings(
+      Headers.ApacheDAHeaderSettings,
+      CantonDependencies.excludeTranscodeConflictingDependencies,
+    )
+
 lazy val `apps-common` =
   project
     .in(file("apps/common"))
     .dependsOn(
       `canton-community-common`,
       `canton-community-app`,
+      `canton-fork-app-base`,
+      `canton-fork-base`,
       `canton-community-testing` % Test,
       `canton-fork-community-common-test` % Test,
       `lf-value-json`,
@@ -1910,6 +1946,7 @@ lazy val `apps-splitwell` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
+      `canton-fork-common`,
       `splitwell-daml`,
     )
     .settings(
@@ -2432,6 +2469,7 @@ lazy val `apps-app`: Project =
       `canton-community-app`,
       `canton-community-base`,
       `canton-community-integration-testing` % "test",
+      `canton-fork-testing` % "test",
       `splice-amulet-test-daml` % "test",
       `splice-util-featured-app-proxies-daml` % "test",
       // necessary for token-standard-cli to get `npm install`ed so that TokenStandardCliSanityCheckPlugin can run
@@ -2440,7 +2478,8 @@ lazy val `apps-app`: Project =
     .settings(
       // scalatestplus-selenium is lagging behind, it depends on selenium 4.12,
       // but that's fine as it's compatible with selenium 4.44 that we end up using
-      libraryDependencies += "org.scalatestplus" %% "selenium-4-12" % "3.2.17.0" % "test",
+      libraryDependencies += ("org.scalatestplus" %% "selenium-4-12" % "3.2.17.0" % "test")
+        .exclude("org.seleniumhq.selenium", "htmlunit-driver"),
       libraryDependencies += CantonDependencies.scalatest_shouldmatchers,
       libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.44.0" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
@@ -2544,9 +2583,8 @@ updateTestConfigForParallelRuns := {
   def isWithDockerWithoutCantonTest(name: String): Boolean =
     name.contains("LocalNet") || name.contains("BulkStorage") || name.contains("S3Upload")
   def isWithDockerWithSimtimeCantonTest(name: String): Boolean =
-    name contains "ScanTimeBasedIntegrationTest"
-  def isCometBftTest(name: String): Boolean =
-    name contains "CometBft"
+    Seq("ScanTimeBasedIntegrationTest", "ScanNewNetworkBackfillingTimeBasedIntegrationTest")
+      .exists(name.contains)
   def isDynamicSynchronizerParamsReconciliationTest(name: String): Boolean =
     name contains "DynamicSynchronizerParamsReconciliationTimeBasedIntegrationTest"
   def isLSUTest(name: String): Boolean =
@@ -2603,13 +2641,7 @@ updateTestConfigForParallelRuns := {
     (
       "Preflight tests against core nodes",
       "test-full-class-names-core-preflight.log",
-      (t: String) =>
-        isCoreDeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t) && !isCometBftTest(t),
-    ),
-    (
-      "Preflight tests against core nodes for cometBft",
-      "test-full-class-names-core-preflight-cometbft.log",
-      (t: String) => isCoreDeploymentPreflightIntegrationTest(t) && isCometBftTest(t),
+      (t: String) => isCoreDeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t),
     ),
     (
       "Preflight tests against validator1",
@@ -2624,13 +2656,7 @@ updateTestConfigForParallelRuns := {
     (
       "Preflight tests against runbook SV",
       "test-full-class-names-sv-preflight.log",
-      (t: String) =>
-        isRunbookSvPreflightIntegrationTest(t) && !isNonDevNetTest(t) && !isCometBftTest(t),
-    ),
-    (
-      "Preflight tests against runbook SV for cometBft",
-      "test-full-class-names-sv-preflight-cometbft.log",
-      (t: String) => isRunbookSvPreflightIntegrationTest(t) && isCometBftTest(t),
+      (t: String) => isRunbookSvPreflightIntegrationTest(t) && !isNonDevNetTest(t),
     ),
     (
       "Non-DevNet Preflight tests against runbook SV",
@@ -2661,11 +2687,6 @@ updateTestConfigForParallelRuns := {
       "tests using docker images",
       "test-full-class-names-docker-based.log",
       (t: String) => isDockerComposeBasedTest(t),
-    ),
-    (
-      "tests with wall clock time using CometBFT",
-      "test-cometbft-full-class-names.log",
-      (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t) && isCometBftTest(t),
     ),
     (
       "tests to check logical sync roll-forward upgrade",

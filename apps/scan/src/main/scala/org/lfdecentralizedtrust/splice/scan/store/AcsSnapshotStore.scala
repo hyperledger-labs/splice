@@ -19,7 +19,12 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
 }
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.SelectFromCreateEvents
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, LimitHelpers, UpdateHistory}
-import org.lfdecentralizedtrust.splice.store.db.AdvisoryLocks
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsJdbcTypes,
+  AcsQueries,
+  AdvisoryLockIds,
+  AdvisoryLocks,
+}
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
@@ -33,7 +38,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.circe.Decoder.Result
 import io.circe.HCursor
-import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.util.{EventId, ValueJsonCodecProtobuf as ProtobufCodec}
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -440,11 +444,23 @@ class AcsSnapshotStore(
         .query(
           (sql"""
                with snapshot as (
-                  select create_id, max(row_id) as row_id
-                  from acs_snapshot_data
-                  where row_id between $begin and $end and
+                  -- acs_snapshot_data contains one row per stakeholder of each contract, so we need to deduplicate.
+                  -- The rows of each contract have contiguous row_ids: they are inserted ordered by (created_at, contract_id).
+                  -- We therefore keep only the last matching row of each contract.
+                  -- Unlike a `group by create_id`, this doesn't require fetching all the rows and then grouping them,
+                  -- instead it streams rows until it arrives to LIMIT rows.
+                  -- i.e., at maximum it will fetch limit*length(stakeholders)*length(templates) rows
+                  select create_id, row_id
+                  from (
+                    select
+                      create_id,
+                      row_id,
+                      lead(create_id) over (order by row_id) as next_create_id
+                    from acs_snapshot_data
+                    where row_id between $begin and $end and
                """ ++ stakeholdersFilter(partyIds) ++ templatesFilter(templates) ++ sql"""
-                  group by create_id
+                  ) matching_rows
+                  where next_create_id is distinct from create_id
                   order by row_id asc
                   -- this CTE already will contain all snapshot rows (filtered by party id and template, if necessary).
                   -- They just need to be joined with u_h_creates.
@@ -481,13 +497,20 @@ class AcsSnapshotStore(
     }
   }
 
-  private def stakeholdersFilter(partyIds: Seq[PartyId]) = NonEmpty.from(partyIds) match {
-    case None =>
-      // This expression is always true (scan only processes data where the DSO is stakeholder).
-      // It is included to make sure the query plan uses the right index (acs_snapshot_data_all_filters)
-      sql" stakeholder = ${dsoParty}"
-    case Some(partyIds) =>
-      DbStorage.toInClause("stakeholder", partyIds)
+  private def stakeholdersFilter(partyIds: Seq[PartyId]) = {
+    def dsoClause = sql" stakeholder = ${dsoParty}"
+
+    NonEmpty.from(partyIds) match {
+      case None =>
+        // This expression is always true (scan only processes data where the DSO is stakeholder).
+        // It is included to make sure the query plan uses the right index (acs_snapshot_data_all_filters)
+        dsoClause
+      case Some(partyIds) if partyIds.contains(dsoParty) =>
+        // Optimization: DSO is stakeholder in all contracts so no need to include filters for the other parties
+        dsoClause
+      case Some(partyIds) =>
+        DbStorage.toInClause("stakeholder", partyIds)
+    }
   }
 
   private def templatesFilter(templates: Seq[PackageQualifiedName]) =
@@ -798,12 +821,10 @@ class AcsSnapshotStore(
         saveV2IncrementalSnapshot(table, snapshot, nextSnapshotTargetRecordTime)(tc)
     }
     storage.queryAndUpdate(
-      AdvisoryLocks.withDdlLock(
-        withIncrementalSnapshotIdempotencyCheck(
-          table,
-          statement,
-          Some(snapshot),
-        )
+      withIncrementalSnapshotIdempotencyCheck(
+        table,
+        statement,
+        Some(snapshot),
       ),
       "saveIncrementalSnapshot",
     )
@@ -906,22 +927,24 @@ class AcsSnapshotStore(
     // - otherwise, on retry the `create index IF NOT EXISTS` will just move on.
     for {
       _ <- storage.queryAndUpdate(
-        AdvisoryLocks.withDdlLock(
+        AdvisoryLocks.withSessionLock(
+          AdvisoryLockIds.acsSnapshotIndex,
           AcsSnapshotDDL.stakeholderIndexAction(
             snapshot.stakeholdersTableName,
             historyId,
             snapshot.snapshotRecordTime,
-          )
+          ),
         ),
         "index_stakeholders",
       )
       _ <- storage.queryAndUpdate(
-        AdvisoryLocks.withDdlLock(
+        AdvisoryLocks.withSessionLock(
+          AdvisoryLockIds.acsSnapshotIndex,
           AcsSnapshotDDL.stakeholderTemplateIdIndexAction(
             snapshot.stakeholdersTableName,
             historyId,
             snapshot.snapshotRecordTime,
-          )
+          ),
         ),
         "index_stakeholders_templateid",
       )

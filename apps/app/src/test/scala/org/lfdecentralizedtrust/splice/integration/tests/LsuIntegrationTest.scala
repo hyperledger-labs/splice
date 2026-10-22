@@ -84,7 +84,7 @@ class LsuIntegrationTest
     SynchronizerUpgradeUtil.migrationDumpDir.delete(swallowIOExceptions = true)
   }
 
-  private val successorPv = ProtocolVersion.v36
+  private val successorPv = ProtocolVersion.v37
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
