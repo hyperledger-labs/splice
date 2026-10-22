@@ -304,13 +304,13 @@ defaultAppActivityWeight : Decimal
 defaultAppActivityWeight = 1.0
 
 defaultAppKind : FeaturedAppKind
-defaultAppKind = FAK_General
+defaultAppKind = FAK_Basic
 
 defaultOpsParties : [Party]
 defaultOpsParties = []
 
 data FeaturedAppKind
-  = FAK_General  -- ^ A normal featured app.
+  = FAK_Basic  -- ^ A basic featured app.
   | FAK_AssetMoving  -- ^ A featured asset mover, e.g., a trading venue.
   | FAK_Asset -- ^ A featured asset.
   deriving (Eq, Show, Serializable)
@@ -319,7 +319,7 @@ data FeaturedAppConfig = FeaturedAppConfig with
     appKind : Optional FeaturedAppKind
       -- ^ The kind of the featured app.
       --
-      -- If not set, use the default value of FAK_General
+      -- If not set, use the default value of FAK_Basic
     activityWeight : Optional Decimal
       -- ^ Weight of the this provider's app activity in the computation of app activity
       -- records in composed transactions.
@@ -351,7 +351,7 @@ template FeaturedAppRight with
     appKind : Optional FeaturedAppKind
       -- ^ The kind of the featured app.
       --
-      -- If not set, use the default value of FAK_General
+      -- If not set, use the default value of FAK_Basic
     opsParties : Optional [Party]
       -- ^ Operational parties for the featured app whose submissions should be considered
       -- as submissions by this featured app.
