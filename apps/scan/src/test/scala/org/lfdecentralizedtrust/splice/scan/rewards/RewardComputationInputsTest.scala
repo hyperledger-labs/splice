@@ -422,9 +422,154 @@ object RewardComputationInputsTest {
 
     // --- 7. TBAR v1.1 asset side ---
 
-    // Simple + cap=0.1 binding, 1 MB app traffic, 0.1 CC asset burn fits within
-    // the leftover: app allocation = 0.1, leftover = 0.35, asset gets 0.1 at
-    // 1:1 CC burned → CC minted. Unclaimed = 0.45 - 0.1 - 0.1 = 0.25.
+    // 7a. Zero burn → zero-guard
+    TestCase(
+      label = "MainNet+asset: zero burn exercises zero-guard",
+      inputs = mainNet,
+      totalRoundAppActivityWeight = 95129376L,
+      totalFeaturedAssetBurnCc = BigDecimal("0"),
+      expected = RewardIssuanceParams(
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("604.9606775559"),
+        threshold_CC = BigDecimal("3.3608926531"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("112062.4048706240"),
+        unclaimedAppRewardAmount = BigDecimal("54512.8731101940"),
+        issuancePerFeaturedAssetBurnCC = BigDecimal("0"),
+        totalIssuanceForFeaturedAssetRewards = BigDecimal("0"),
+        issuancePerFeaturedAppBurnCC = BigDecimal("1.5"),
+        featuredAppMintingAllowanceCC = BigDecimal("57549.5317604300"),
+      ),
+    ),
+    // Simple: cap doesn't bind, exact zero budget.
+    TestCase(
+      label = "simple+asset: zero burn exercises zero-guard",
+      inputs = simpleArithmetic,
+      totalRoundAppActivityWeight = 1000000L,
+      totalFeaturedAssetBurnCc = BigDecimal("0"),
+      expected = RewardIssuanceParams(
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("0.45"),
+        threshold_CC = BigDecimal("0.5"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("0.45"),
+        unclaimedAppRewardAmount = BigDecimal("0"),
+        issuancePerFeaturedAssetBurnCC = BigDecimal("0"),
+        totalIssuanceForFeaturedAssetRewards = BigDecimal("0"),
+        issuancePerFeaturedAppBurnCC = BigDecimal("0.45"),
+        featuredAppMintingAllowanceCC = BigDecimal("0.45"),
+      ),
+    ),
+
+    // 7b. Burn exceeds leftover → asset prorated
+
+    // MainNet: burn=100000 » leftover ≈ 54512.87 → rate ≈ 0.5451.
+    TestCase(
+      label = "MainNet+asset: burn exceeds leftover, asset prorated",
+      inputs = mainNet,
+      totalRoundAppActivityWeight = 95129376L,
+      totalFeaturedAssetBurnCc = BigDecimal("100000"),
+      expected = RewardIssuanceParams(
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("604.9606775559"),
+        threshold_CC = BigDecimal("3.3608926531"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("112062.4048706240"),
+        unclaimedAppRewardAmount = BigDecimal("0"),
+        issuancePerFeaturedAssetBurnCC = BigDecimal("0.5451287311"),
+        totalIssuanceForFeaturedAssetRewards = BigDecimal("54512.8731101940"),
+        issuancePerFeaturedAppBurnCC = BigDecimal("1.5"),
+        featuredAppMintingAllowanceCC = BigDecimal("57549.5317604300"),
+      ),
+    ),
+    // Simple: cap=0.1 binds; burn=1.0 » leftover=0.35 → rate = 0.35.
+    TestCase(
+      label = "simple+asset: burn exceeds leftover, asset prorated",
+      inputs = simpleArithmetic.copy(featuredAppRewardCap = n(BigDecimal("0.1"))),
+      totalRoundAppActivityWeight = 1000000L,
+      totalFeaturedAssetBurnCc = BigDecimal("1.0"),
+      expected = RewardIssuanceParams(
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("0.1"),
+        threshold_CC = BigDecimal("0.5"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("0.45"),
+        unclaimedAppRewardAmount = BigDecimal("0"),
+        issuancePerFeaturedAssetBurnCC = BigDecimal("0.35"),
+        totalIssuanceForFeaturedAssetRewards = BigDecimal("0.35"),
+        issuancePerFeaturedAppBurnCC = BigDecimal("0.1"),
+        featuredAppMintingAllowanceCC = BigDecimal("0.1"),
+      ),
+    ),
+
+    // 7c. Cap not binding → asset arm vanishes
+
+    // MainNet: doubled traffic $120/MB — drift ≈ 3.7e-6 triggers clamp.
+    TestCase(
+      label = "MainNet+asset: cap not binding, asset arm vanishes",
+      inputs = mainNet.copy(trafficPrice = n(BigDecimal("120"))),
+      totalRoundAppActivityWeight = 95129376L,
+      totalFeaturedAssetBurnCc = BigDecimal("100"),
+      expected = RewardIssuanceParams(
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("1177.9999994354"),
+        threshold_CC = BigDecimal("3.3608926531"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("112062.4048706240"),
+        unclaimedAppRewardAmount = BigDecimal("0E-10"),
+        issuancePerFeaturedAssetBurnCC = BigDecimal("0"),
+        totalIssuanceForFeaturedAssetRewards = BigDecimal("0"),
+        issuancePerFeaturedAppBurnCC = BigDecimal("1.4604254993"),
+        featuredAppMintingAllowanceCC = BigDecimal("112062.4048742900"),
+      ),
+    ),
+    // Simple: cap=100 doesn't bind; exact arithmetic → assetBudget = 0, no drift.
+    TestCase(
+      label = "simple+asset: cap not binding, asset arm vanishes",
+      inputs = simpleArithmetic,
+      totalRoundAppActivityWeight = 1000000L,
+      totalFeaturedAssetBurnCc = BigDecimal("0.5"),
+      expected = RewardIssuanceParams(
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("0.45"),
+        threshold_CC = BigDecimal("0.5"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("0.45"),
+        unclaimedAppRewardAmount = BigDecimal("0"),
+        issuancePerFeaturedAssetBurnCC = BigDecimal("0"),
+        totalIssuanceForFeaturedAssetRewards = BigDecimal("0"),
+        issuancePerFeaturedAppBurnCC = BigDecimal("0.45"),
+        featuredAppMintingAllowanceCC = BigDecimal("0.45"),
+      ),
+    ),
+
+    // 7d. Drift-clamp witness at simple magnitudes
+    // 7 MB → 45/700 = 0.0642857143 × 7 = 0.4500000001 (1 ULP above 0.45).
+    TestCase(
+      label = "simple+asset: drift-clamp witness (7 MB, cap not binding)",
+      inputs = simpleArithmetic,
+      totalRoundAppActivityWeight = 7000000L,
+      totalFeaturedAssetBurnCc = BigDecimal("0.1"),
+      expected = RewardIssuanceParams(
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("0.0642857143"),
+        threshold_CC = BigDecimal("0.5"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("0.45"),
+        unclaimedAppRewardAmount = BigDecimal("0"),
+        issuancePerFeaturedAssetBurnCC = BigDecimal("0"),
+        totalIssuanceForFeaturedAssetRewards = BigDecimal("0"),
+        issuancePerFeaturedAppBurnCC = BigDecimal("0.0642857143"),
+        featuredAppMintingAllowanceCC = BigDecimal("0.4500000001"),
+      ),
+    ),
+
+    // 7e. Cap binds + asset burn fits within leftover
+
+    // MainNet: 1000 CC burn fits within 54512.87 leftover → 1:1 rate.
+    TestCase(
+      label = "MainNet+asset: cap binds, asset fits within leftover",
+      inputs = mainNet,
+      totalRoundAppActivityWeight = 95129376L,
+      totalFeaturedAssetBurnCc = BigDecimal("1000"),
+      expected = RewardIssuanceParams(
+        issuancePerFeaturedAppTraffic_CCperMB = BigDecimal("604.9606775559"),
+        threshold_CC = BigDecimal("3.3608926531"),
+        totalIssuanceForFeaturedAppRewards = BigDecimal("112062.4048706240"),
+        unclaimedAppRewardAmount = BigDecimal("53512.8731101940"),
+        issuancePerFeaturedAssetBurnCC = BigDecimal("1"),
+        totalIssuanceForFeaturedAssetRewards = BigDecimal("1000"),
+        issuancePerFeaturedAppBurnCC = BigDecimal("1.5"),
+        featuredAppMintingAllowanceCC = BigDecimal("57549.5317604300"),
+      ),
+    ),
+    // Simple: cap=0.1 binds; 0.1 CC burn fits within 0.35 leftover → 1:1 rate.
     TestCase(
       label = "simple+asset: cap binds, asset fits within leftover",
       inputs = simpleArithmetic.copy(featuredAppRewardCap = n(BigDecimal("0.1"))),
