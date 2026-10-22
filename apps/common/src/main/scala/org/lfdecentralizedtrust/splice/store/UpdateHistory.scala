@@ -377,7 +377,9 @@ class UpdateHistory private (
         }*),
       ),
       "createPartitions",
-    )
+    ).map { _ =>
+      metrics.UpdateHistory.partitionRunwayEnd.updateValue(_.max(end))
+    }
   }
 
   def readLastIngestedRecordTime()(implicit

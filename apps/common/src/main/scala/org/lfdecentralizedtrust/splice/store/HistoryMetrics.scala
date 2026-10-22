@@ -371,6 +371,18 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
         initial = CantonTimestamp.MinValue,
       )(metricsContext)
 
+    lazy val partitionRunwayEnd: Gauge[CantonTimestamp] =
+      SpliceMetrics.cantonTimestampGauge(
+        metricsFactory,
+        MetricInfo(
+          name = updateHistoryPrefix :+ "partition-runway-end",
+          summary =
+            "The end of the consecutive daily update history partitions. Ingestion fails once the record time reaches it.",
+          Errors,
+        ),
+        initial = CantonTimestamp.MinValue,
+      )(metricsContext)
+
     val latency: Timer =
       metricsFactory.timer(
         MetricInfo(
