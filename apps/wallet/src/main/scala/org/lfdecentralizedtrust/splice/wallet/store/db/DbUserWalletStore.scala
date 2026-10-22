@@ -3,6 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.wallet.store.db
 
+import scala.concurrent.Future
+
+import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore
+
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
@@ -77,7 +81,87 @@ class DbUserWalletTxLogStoreConfig(loggerFactory: NamedLoggerFactory, key: UserW
   override def decodeEntry = TxLogEntry.decode
 }
 
-class DbUserWalletStore(
+object DbUserWalletStore {
+
+  /** Looks up the store ids, and creates the store. */
+  def create(
+      key: UserWalletStore.Key,
+      storage: DbStorage,
+      loggerFactory: NamedLoggerFactory,
+      retryProvider: RetryProvider,
+      domainMigrationId: Long,
+      participantId: ParticipantId,
+      ingestionConfig: IngestionConfig,
+      defaultLimit: Limit,
+  )(implicit
+      ec: ExecutionContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+      closeContext: CloseContext,
+      tc: TraceContext,
+  ): Future[DbUserWalletStore] =
+    DbMultiDomainAcsStore
+      .lookupStoreIds(
+        storage,
+        acsStoreDescriptor(key, participantId),
+        Some(txLogStoreDescriptor(key, participantId)),
+      )
+      .map { storeIds =>
+        new DbUserWalletStore(
+          key = key,
+          storage = storage,
+          loggerFactory = loggerFactory,
+          retryProvider = retryProvider,
+          domainMigrationId = domainMigrationId,
+          participantId = participantId,
+          ingestionConfig = ingestionConfig,
+          storeIds,
+          defaultLimit = defaultLimit,
+        )
+      }
+
+  // Any change in the store descriptor will lead to previously deployed applications
+  // forgetting all persisted data once they upgrade to the new version.
+  // WARNING: Reinitializing the acs store is a very expensive operation, as it currently fetches the full
+  // unfiltered ACS from the participant, irrespective of the filter defined by `acsContractFilter`.
+  // This may lead to the entire app being unavailable or not working properly until the full ACS has been ingested.
+  // Do not modify any part of the store descriptor unless you are sure that the resulting downtime is acceptable.
+  // If you do modify it, make sure to very clearly document in the release notes that there will be planned downtime,
+  // and notify the person coordinating the deployment.
+  def acsStoreDescriptor(
+      key: UserWalletStore.Key,
+      participantId: ParticipantId,
+  ): StoreDescriptor =
+    StoreDescriptor(
+      version = 4,
+      name = "DbUserWalletStore",
+      party = key.endUserParty,
+      participant = participantId,
+      key = Map(
+        "endUserParty" -> key.endUserParty.toProtoPrimitive,
+        "validatorParty" -> key.validatorParty.toProtoPrimitive,
+        "dsoParty" -> key.dsoParty.toProtoPrimitive,
+      ),
+    )
+  def txLogStoreDescriptor(
+      key: UserWalletStore.Key,
+      participantId: ParticipantId,
+  ): StoreDescriptor =
+    StoreDescriptor(
+      // Note that the V005__no_end_user_name_in_user_wallet_store.sql DB migration converts from version 1 descriptors
+      // to version 2 descriptors.
+      version = 2,
+      name = "DbUserWalletStore",
+      party = key.endUserParty,
+      participant = participantId,
+      key = Map(
+        "endUserParty" -> key.endUserParty.toProtoPrimitive,
+        "validatorParty" -> key.validatorParty.toProtoPrimitive,
+        "dsoParty" -> key.dsoParty.toProtoPrimitive,
+      ),
+    )
+}
+
+class DbUserWalletStore private (
     override val key: UserWalletStore.Key,
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -85,6 +169,7 @@ class DbUserWalletStore(
     val domainMigrationId: Long,
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
+    storeIds: DbMultiDomainAcsStore.StoreIds,
     override val defaultLimit: Limit,
 )(implicit
     override protected val ec: ExecutionContext,
@@ -95,40 +180,11 @@ class DbUserWalletStore(
       acsTableName = WalletTables.acsTableName,
       txLogTableName = WalletTables.txLogTableName,
       interfaceViewsTableNameOpt = Some(WalletTables.interfaceViewsTableName),
-      // Any change in the store descriptor will lead to previously deployed applications
-      // forgetting all persisted data once they upgrade to the new version.
-      // WARNING: Reinitializing the acs store is a very expensive operation, as it currently fetches the full
-      // unfiltered ACS from the participant, irrespective of the filter defined by `acsContractFilter`.
-      // This may lead to the entire app being unavailable or not working properly until the full ACS has been ingested.
-      // Do not modify any part of the store descriptor unless you are sure that the resulting downtime is acceptable.
-      // If you do modify it, make sure to very clearly document in the release notes that there will be planned downtime,
-      // and notify the person coordinating the deployment.
-      acsStoreDescriptor = StoreDescriptor(
-        version = 4,
-        name = "DbUserWalletStore",
-        party = key.endUserParty,
-        participant = participantId,
-        key = Map(
-          "endUserParty" -> key.endUserParty.toProtoPrimitive,
-          "validatorParty" -> key.validatorParty.toProtoPrimitive,
-          "dsoParty" -> key.dsoParty.toProtoPrimitive,
-        ),
-      ),
-      txLogStoreDescriptor = StoreDescriptor(
-        // Note that the V005__no_end_user_name_in_user_wallet_store.sql DB migration converts from version 1 descriptors
-        // to version 2 descriptors.
-        version = 2,
-        name = "DbUserWalletStore",
-        party = key.endUserParty,
-        participant = participantId,
-        key = Map(
-          "endUserParty" -> key.endUserParty.toProtoPrimitive,
-          "validatorParty" -> key.validatorParty.toProtoPrimitive,
-          "dsoParty" -> key.dsoParty.toProtoPrimitive,
-        ),
-      ),
-      domainMigrationId,
-      ingestionConfig,
+      acsStoreDescriptor = DbUserWalletStore.acsStoreDescriptor(key, participantId),
+      txLogStoreDescriptor = DbUserWalletStore.txLogStoreDescriptor(key, participantId),
+      storeIds = storeIds,
+      migrationId = domainMigrationId,
+      ingestionConfig = ingestionConfig,
     )
     with UserWalletStore
     with DbTransferInputQueries

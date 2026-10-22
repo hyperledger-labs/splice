@@ -14,7 +14,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install as ins
 import org.lfdecentralizedtrust.splice.environment.{RetryFor, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
-import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -53,18 +52,21 @@ class WalletAppInstallTrigger(
     for {
       // actAs rights for the validator user might have gone lost during a hard migration or a disaster recovery
       _ <- ensureActAsRight(endUserParty)
-    } yield walletManager.getOrCreateUserWallet(install.contract) match {
-      case UnlessShutdown.AbortedDueToShutdown =>
-        TaskSuccess(
-          s"skipped or aborted starting wallet automation for end-user party '$endUserParty', as we are shutting down."
+      outcome <- walletManager
+        .getOrCreateUserWallet(install.contract)
+        .map[TaskOutcome] {
+          case true => TaskSuccess(show"started wallet automation for end-user party $endUserParty")
+          case false =>
+            TaskSuccess(
+              show"skipped starting wallet automation for end-user party '$endUserParty', as it is already running."
+            )
+        }
+        .onShutdown(
+          TaskSuccess(
+            s"skipped or aborted starting wallet automation for end-user party '$endUserParty', as we are shutting down."
+          )
         )
-      case UnlessShutdown.Outcome(true) =>
-        TaskSuccess(show"started wallet automation for end-user party $endUserParty")
-      case UnlessShutdown.Outcome(false) =>
-        TaskSuccess(
-          show"skipped starting wallet automation for end-user party '$endUserParty', as it is already running."
-        )
-    }
+    } yield outcome
   }
 
   private def ensureActAsRight(endUserParty: PartyId)(implicit tc: TraceContext): Future[Unit] = {

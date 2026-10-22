@@ -230,13 +230,13 @@ class JoiningNodeInitializer(
         } else Future.unit
       }
       domainMigrationId <- resolveDomainMigrationId(migrationIdFromSponsorSv())
-      svStore = newSvStore(
+      svStore <- newSvStore(
         storeKey,
         domainMigrationId,
         participantId,
         svAcsStoreDescriptorUserVersion,
       )
-      dsoStore = newDsoStore(
+      dsoStore <- newDsoStore(
         svStore.key,
         domainMigrationId,
         participantId,

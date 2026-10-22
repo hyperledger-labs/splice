@@ -3,6 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.sv.store.db
 
+import com.digitalasset.canton.tracing.TraceContext
+
+import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore
+
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.{
   UsedSecret,
   ValidatorOnboarding,
@@ -18,14 +22,13 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
-import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DbSvSvStore(
+class DbSvSvStore private (
     override val key: SvStore.Key,
     storage: DbStorage,
     override protected val outerLoggerFactory: NamedLoggerFactory,
@@ -33,7 +36,8 @@ class DbSvSvStore(
     val domainMigrationId: Long,
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
-    acsStoreDescriptorUserVersion: Option[Long] = None,
+    storeIds: DbMultiDomainAcsStore.StoreIds,
+    acsStoreDescriptorUserVersion: Option[Long],
     override val defaultLimit: Limit,
 )(implicit
     override protected val ec: ExecutionContext,
@@ -43,27 +47,11 @@ class DbSvSvStore(
       storage,
       DbSvSvStore.tableName,
       interfaceViewsTableNameOpt = None,
-      // Any change in the store descriptor will lead to previously deployed applications
-      // forgetting all persisted data once they upgrade to the new version.
-      // WARNING: Reinitializing the acs store is a very expensive operation, as it currently fetches the full
-      // unfiltered ACS from the participant, irrespective of the filter defined by `acsContractFilter`.
-      // This may lead to the entire app being unavailable or not working properly until the full ACS has been ingested.
-      // Do not modify any part of the store descriptor unless you are sure that the resulting downtime is acceptable.
-      // If you do modify it, make sure to very clearly document in the release notes that there will be planned downtime,
-      // and notify the person coordinating the deployment.
-      acsStoreDescriptor = StoreDescriptor(
-        version = 2,
-        name = "DbSvSvStore",
-        party = key.svParty,
-        participant = participantId,
-        key = Map(
-          "svParty" -> key.svParty.toProtoPrimitive,
-          "dsoParty" -> key.dsoParty.toProtoPrimitive,
-        ),
-        userVersion = acsStoreDescriptorUserVersion,
-      ),
+      acsStoreDescriptor =
+        DbSvSvStore.acsStoreDescriptor(key, participantId, acsStoreDescriptorUserVersion),
+      storeIds = storeIds,
       migrationId = domainMigrationId,
-      ingestionConfig,
+      ingestionConfig = ingestionConfig,
     )
     with SvSvStore
     with AcsTables
@@ -134,6 +122,69 @@ class DbSvSvStore(
 }
 
 object DbSvSvStore {
+
+  /** Looks up the store ids, and creates the store. */
+  def create(
+      key: SvStore.Key,
+      storage: DbStorage,
+      outerLoggerFactory: NamedLoggerFactory,
+      retryProvider: RetryProvider,
+      domainMigrationId: Long,
+      participantId: ParticipantId,
+      ingestionConfig: IngestionConfig,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
+      defaultLimit: Limit,
+  )(implicit
+      ec: ExecutionContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+      closeContext: CloseContext,
+      tc: TraceContext,
+  ): Future[DbSvSvStore] =
+    DbMultiDomainAcsStore
+      .lookupStoreIds(
+        storage,
+        acsStoreDescriptor(key, participantId, acsStoreDescriptorUserVersion),
+        None,
+      )
+      .map { storeIds =>
+        new DbSvSvStore(
+          key = key,
+          storage = storage,
+          outerLoggerFactory = outerLoggerFactory,
+          retryProvider = retryProvider,
+          domainMigrationId = domainMigrationId,
+          participantId = participantId,
+          ingestionConfig = ingestionConfig,
+          storeIds,
+          acsStoreDescriptorUserVersion = acsStoreDescriptorUserVersion,
+          defaultLimit = defaultLimit,
+        )
+      }
+
+  // Any change in the store descriptor will lead to previously deployed applications
+  // forgetting all persisted data once they upgrade to the new version.
+  // WARNING: Reinitializing the acs store is a very expensive operation, as it currently fetches the full
+  // unfiltered ACS from the participant, irrespective of the filter defined by `acsContractFilter`.
+  // This may lead to the entire app being unavailable or not working properly until the full ACS has been ingested.
+  // Do not modify any part of the store descriptor unless you are sure that the resulting downtime is acceptable.
+  // If you do modify it, make sure to very clearly document in the release notes that there will be planned downtime,
+  // and notify the person coordinating the deployment.
+  def acsStoreDescriptor(
+      key: SvStore.Key,
+      participantId: ParticipantId,
+      acsStoreDescriptorUserVersion: Option[Long],
+  ): StoreDescriptor =
+    StoreDescriptor(
+      version = 2,
+      name = "DbSvSvStore",
+      party = key.svParty,
+      participant = participantId,
+      key = Map(
+        "svParty" -> key.svParty.toProtoPrimitive,
+        "dsoParty" -> key.dsoParty.toProtoPrimitive,
+      ),
+      userVersion = acsStoreDescriptorUserVersion,
+    )
 
   val tableName = "sv_acs_store"
 

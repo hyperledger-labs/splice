@@ -660,7 +660,7 @@ class ValidatorApp(
         validatorParty = validatorParty,
         dsoParty = dsoParty,
       )
-      store = ValidatorStore(
+      store <- ValidatorStore(
         key,
         storage,
         loggerFactory,

@@ -1103,16 +1103,18 @@ class DbScanRewardsReferenceStoreTest
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    new DbScanRewardsReferenceStore(
-      key = ScanRewardsReferenceStore.Key(dsoParty, sync1),
-      storage,
-      loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      0L,
-      participantId,
-      IngestionConfig(),
-      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-    )
+    DbScanRewardsReferenceStore
+      .create(
+        key = ScanRewardsReferenceStore.Key(dsoParty, sync1),
+        storage,
+        loggerFactory,
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+        0L,
+        participantId,
+        IngestionConfig(),
+        defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+      )
+      .futureValue
   }
 
   override protected def cleanDb(

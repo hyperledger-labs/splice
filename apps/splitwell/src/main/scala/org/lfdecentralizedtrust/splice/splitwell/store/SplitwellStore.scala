@@ -3,12 +3,13 @@
 
 package org.lfdecentralizedtrust.splice.splitwell.store
 
+import com.digitalasset.canton.tracing.TraceContext
+
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.automation.TransferFollowTrigger
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
@@ -198,8 +199,9 @@ object SplitwellStore {
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       close: CloseContext,
-  ): SplitwellStore =
-    new DbSplitwellStore(
+      tc: TraceContext,
+  ): Future[SplitwellStore] =
+    DbSplitwellStore.create(
       key,
       dsoParty,
       domainConfig,
