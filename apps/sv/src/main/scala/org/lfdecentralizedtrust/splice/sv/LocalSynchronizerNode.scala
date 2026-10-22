@@ -95,15 +95,18 @@ class LocalSynchronizerNode(
       : Option[org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig] =
     config.sequencer.pruning
 
-  def staticSynchronizerParameters(serial: NonNegativeInt): StaticSynchronizerParameters = {
+  def staticSynchronizerParameters(
+      serial: NonNegativeInt,
+      protocolVersion: ProtocolVersion,
+  ): StaticSynchronizerParameters = {
     SynchronizerParametersConfig(synchronizerLimits =
       config.synchronizerLimits
         .map(_.toInternal)
-        .filter(_ => config.protocolVersion >= ProtocolVersion.v37)
+        .filter(_ => protocolVersion >= ProtocolVersion.v36)
     )
       .toStaticSynchronizerParameters(
         CryptoConfig(provider = CryptoProvider.Jce),
-        config.protocolVersion,
+        protocolVersion,
         config.serial
           .getOrElse(serial),
       )
