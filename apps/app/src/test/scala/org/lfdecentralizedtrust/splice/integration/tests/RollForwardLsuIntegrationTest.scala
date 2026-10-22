@@ -58,6 +58,8 @@ class RollForwardLsuIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(5, Minutes)))
 
+  private val successorPv = ProtocolVersion.v37
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
@@ -101,8 +103,7 @@ class RollForwardLsuIntegrationTest
                     .focus(_.localSynchronizerNodes)
                     .modify(c =>
                       c.copy(
-                        legacy = c.current.some,
-                        current = c.current.focus(_.protocolVersion).replace(ProtocolVersion.v37),
+                        legacy = c.current.some
                       )
                     )
                     .focus(_.onboarding)
@@ -111,7 +112,7 @@ class RollForwardLsuIntegrationTest
                         .RollForwardLsu(
                           c.value.name,
                           NonNegativeInt.tryCreate(2),
-                          ProtocolVersion.v37,
+                          successorPv,
                           exportTimes = None,
                         )
                         .some
@@ -198,12 +199,17 @@ class RollForwardLsuIntegrationTest
     val newSynchronizerSerial = decentralizedSynchronizerPSId.serial + NonNegativeInt.two
     val successorPsid = decentralizedSynchronizerPSId.copy(
       serial = newSynchronizerSerial,
-      protocolVersion = ProtocolVersion.v37,
+      protocolVersion = successorPv,
     )
     val topologyFreezeTime = CantonTimestamp.now()
     val upgradeTime = CantonTimestamp.now().plusSeconds(60)
     clue("Schedule logical synchronizer upgrade") {
-      scheduleLsu(topologyFreezeTime, upgradeTime, announcementNewSynchronizerSerial.value.toLong)
+      scheduleLsu(
+        topologyFreezeTime,
+        upgradeTime,
+        announcementNewSynchronizerSerial.value.toLong,
+        successorPv,
+      )
     }
     clue("Topology state contains LSU announcement") {
       eventually(3.minutes) {

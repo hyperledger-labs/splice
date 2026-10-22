@@ -198,10 +198,11 @@ class LocalSynchronizerNode(
   }
 
   def addLocalMediatorIdentityIfRequired(
-      synchronizerId: SynchronizerId
+      synchronizerId: SynchronizerId,
+      protocolVersion: ProtocolVersion,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     onMediatorNotInitialized {
-      addMediatorIdentityTransactions(synchronizerId)
+      addMediatorIdentityTransactions(synchronizerId, protocolVersion)
     }
   }
 
@@ -226,13 +227,14 @@ class LocalSynchronizerNode(
   }
 
   private def addMediatorIdentityTransactions(
-      synchronizerId: SynchronizerId
+      synchronizerId: SynchronizerId,
+      protocolVersion: ProtocolVersion,
   )(implicit traceContext: TraceContext) = {
     logger.info("Adding mediator identity transactions")
     for {
       mediatorId <- mediatorAdminConnection.getMediatorId
       identity <- mediatorAdminConnection.generateOnboardingTopologyTransactions(
-        config.protocolVersion
+        protocolVersion
       )
       _ <- addIdentityTransactions(
         "mediator",
@@ -367,6 +369,7 @@ class LocalSynchronizerNode(
   def addLocalSequencerIdentityIfRequired(
       synchronizerAlias: SynchronizerAlias,
       synchronizerId: SynchronizerId,
+      protocolVersion: ProtocolVersion,
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider
       .getValueWithRetries(
@@ -382,6 +385,7 @@ class LocalSynchronizerNode(
           addLocalSequencerIdentity(
             synchronizerAlias,
             synchronizerId,
+            protocolVersion,
           )
         case Right(NodeStatus.Success(_)) =>
           logger.info("Sequencer identity is already added")
@@ -391,6 +395,7 @@ class LocalSynchronizerNode(
   private def addLocalSequencerIdentity(
       synchronizerAlias: SynchronizerAlias,
       synchronizerId: SynchronizerId,
+      protocolVersion: ProtocolVersion,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info(
       s"Adding sequencer identity transactions for domain ${synchronizerAlias.toProtoPrimitive}"
@@ -398,7 +403,7 @@ class LocalSynchronizerNode(
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
       identity <- sequencerAdminConnection.generateOnboardingTopologyTransactions(
-        config.protocolVersion
+        protocolVersion
       )
       _ <- addIdentityTransactions(
         "sequencer",

@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.util
 
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.version.ProtocolVersion
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.LogicalSynchronizerUpgradeSchedule
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
@@ -15,6 +16,7 @@ trait LsuTestUtil extends SvTestUtil with TestCommon {
       topologyFreezeTime: CantonTimestamp,
       upgradeTime: CantonTimestamp,
       serial: Long,
+      protocolVersion: ProtocolVersion,
   )(implicit ec: ExecutionContextExecutor, env: SpliceTestConsoleEnvironment): Unit = {
     scheduleLogicalSynchronizerUpgrade(
       sv1Backend,
@@ -23,10 +25,7 @@ trait LsuTestUtil extends SvTestUtil with TestCommon {
         topologyFreezeTime.toInstant,
         upgradeTime.toInstant,
         serial,
-        sv1Backend.config.localSynchronizerNodes.successor
-          .map(_.protocolVersion)
-          .getOrElse(sv1Backend.config.localSynchronizerNodes.current.protocolVersion)
-          .toString,
+        protocolVersion.toString,
       ),
     )
   }
