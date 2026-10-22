@@ -10,8 +10,8 @@ data ValidatorBlocked_ArchiveResult = ValidatorBlocked_ArchiveResult
   deriving (Serializable)
 
 -- | ValidatorBlocked contract is created to manage
--- the validator's permissions on the synchronizer.
--- It is created lazily when SVs successfully vote to restrict a validator's permissions.
+-- the validator's access on the synchronizer.
+-- It is created lazily when SVs successfully vote to restrict a validator's access.
 template ValidatorBlocked
   with
     dso : Party
@@ -20,7 +20,7 @@ template ValidatorBlocked
     -- If set, this acts as a temporary suspension until the specified time.
     loginAfter : Optional Time
     -- A flag indicating whether the validator has been permanently banned.
-    -- If True, the validator's ParticipantSynchronizerPermission topology is revoked.
+    -- If True, the validator's ParticipantSynchronizer topology is revoked.
     revoked : Bool
   where
     signatory dso

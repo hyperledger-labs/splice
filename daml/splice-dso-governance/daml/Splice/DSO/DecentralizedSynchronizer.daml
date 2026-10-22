@@ -39,7 +39,7 @@ data SynchronizerConfig = SynchronizerConfig with
     acsCommitmentReconciliationInterval : Optional Int
       -- ^ Participants connected to the decentralized synchronizer exchange ACS commitment messages
       -- every reconciliation interval seconds.
-    minMemberTrafficToOnboardValidator: Optional Int -- ^ Minimum amount of traffic a validator must purchase to be granted a ParticipantSynchronizerPermission.
+    minMemberTrafficToOnboardValidator: Optional Int -- ^ Minimum amount of traffic a validator must purchase to be granted a ParticipantSynchronizer topology.
     devNetPublicSetupTrafficAmount: Optional Int -- ^ Traffic amount purchased for validators onboarded via the DevNet faucet.
   deriving (Eq, Show, Serializable)
 

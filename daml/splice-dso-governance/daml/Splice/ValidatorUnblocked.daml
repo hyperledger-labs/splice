@@ -11,7 +11,7 @@ data ValidatorUnblocked_ArchiveResult = ValidatorUnblocked_ArchiveResult
 
 
 -- | ValidatorUnblocked contract is created to
--- restore validator's permissions on the synchronizer.
+-- restore validator's access on the synchronizer.
 -- It is created when SVs successfully vote to unblocked a validator.
 template ValidatorUnblocked
   with

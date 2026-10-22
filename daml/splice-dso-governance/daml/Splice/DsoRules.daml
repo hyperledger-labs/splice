@@ -131,7 +131,7 @@ data DsoRules_ActionRequiringConfirmation
   | SRARC_BlockValidator DsoRules_BlockValidator
       -- ^ Voted action to update a validator's blocked state.
   | SRARC_UnblockValidator DsoRules_UnblockValidator
-      -- ^ Voted action to restore a validator's permissions.
+      -- ^ Voted action to restore a validator's access.
   | SRARC_ArchiveValidatorUnblocked DsoRules_ArchiveValidatorUnblocked
       -- ^ Voted action by automation to archive a processed unblocked.
   deriving (Eq, Show, Serializable)
