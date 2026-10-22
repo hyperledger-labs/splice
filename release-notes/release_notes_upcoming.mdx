@@ -2,6 +2,14 @@
 
 {/* Add all release notes in this section */}
 
+  - Docker Compose deployments and localnet
+
+    - **Breaking** The Docker Compose deployments (validator, sv and localnet) now set the default Postgres version to 18.
+      Additionally, due to [upstream image's changes](https://github.com/docker-library/postgres/pull/1259) the data volume is now mounted to `/var/lib/postgresql` instead of `/var/lib/postgresql/data`.
+      You should [upgrade](https://docs.canton.network/global-synchronizer/production-operations/validator-postgres-migration),
+      as the previous default (14) is reaching end-of-life on November 12, 2026 and won't be supported by Splice nor receive updates from upstream Postgres.
+      If you cannot yet upgrade, you can change the Postgres version in the `.env` file back to 14 and restore the previous volume in `compose.yaml`.
+
   - Scan App
 
     - The following request fields now have a `maxItems` bound of 1000; requests exceeding it are rejected with 400:
