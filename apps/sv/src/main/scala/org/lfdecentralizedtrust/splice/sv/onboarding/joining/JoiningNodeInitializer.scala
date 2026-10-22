@@ -500,9 +500,11 @@ class JoiningNodeInitializer(
                 currentNode.addLocalSequencerIdentityIfRequired(
                   config.domains.global.alias,
                   decentralizedSynchronizer,
+                  participantReportedPSid.protocolVersion,
                 ),
                 currentNode.addLocalMediatorIdentityIfRequired(
-                  decentralizedSynchronizer
+                  decentralizedSynchronizer,
+                  participantReportedPSid.protocolVersion,
                 ),
               ).tupled
             // Finally, fully onboard the sequencer and mediator

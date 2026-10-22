@@ -57,7 +57,6 @@ export interface Auth0Client {
     audience: string
   ) => Promise<string>;
   getCfg: () => Auth0Config;
-  reuseNamespaceConfig(fromNamespace: string, toNamespace: string): void;
 }
 
 export type Auth0ClusterConfig = {
