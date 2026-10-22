@@ -7,6 +7,8 @@
 # prints the first answer in full, and then only answers that differ from it and SVs that failed.
 # Read-only: one GET to scan, one gRPC call per sequencer.
 #
+# Requires curl, jq and grpcurl (https://github.com/fullstorydev/grpcurl).
+#
 # Usage: compare-sequencer-synchronizer-params.sh <scan-url> <serial>
 #   e.g. compare-sequencer-synchronizer-params.sh https://scan.sv-1.example.com 1
 
