@@ -12,10 +12,12 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.rewardaccountingv2.CalculateRewardsV2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.scan.rewards.AssetActivityParams
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanRewardsReferenceTables.ScanRewardsReferenceStoreRowData
 import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
@@ -44,7 +46,7 @@ trait ScanRewardsReferenceStore extends AppStore {
   def waitUntilInitialized: Future[Unit]
 
   /** For a batch of record times, resolve the oldest open mining round at each time.
-    * Returns map from record_time to (roundNumber, roundOpensAt).
+    * Returns map from record_time to the round's info.
     * This will wait till the round info could be obtained for record_times
     * which are yet to be ingested.
     *
@@ -58,11 +60,24 @@ trait ScanRewardsReferenceStore extends AppStore {
     */
   def lookupActiveOpenMiningRounds(
       recordTimes: Seq[CantonTimestamp]
-  )(implicit tc: TraceContext): Future[Map[CantonTimestamp, (Long, CantonTimestamp)]]
+  )(implicit
+      tc: TraceContext
+  ): Future[Map[CantonTimestamp, ScanRewardsReferenceStore.ActiveRoundInfo]]
 
+  /** Returns the providers and opsParties of the FeaturedAppRights active as of the given time.
+    *
+    * If a provider has multiple FeaturedAppRights, their opsParties are combined,
+    * the highest activityWeight is used, and the highest appKind is used
+    * (FAK_General < FAK_AssetMoving < FAK_Asset), to be in favor of the app.
+    *
+    * If an ops party belongs to FeaturedAppRights of multiple providers,
+    * then the lexicographically lowest provider is chosen.
+    */
   def lookupFeaturedAppPartiesAsOf(
       asOf: CantonTimestamp
-  )(implicit tc: TraceContext): Future[Map[String, BigDecimal]]
+  )(implicit
+      tc: TraceContext
+  ): Future[ScanRewardsReferenceStore.FeaturedAppParties]
 
   /** Returns the set of SV participant UIDs from the DsoRules active as of the given time.
     * Returns an empty set only if asOf time is before the creation time of oldest DsoRules ingested.
@@ -70,6 +85,13 @@ trait ScanRewardsReferenceStore extends AppStore {
   def lookupSvParticipantIdsAsOf(
       asOf: CantonTimestamp
   )(implicit tc: TraceContext): Future[Set[String]]
+
+  /** Returns the AmuletConfig active at the given time
+    * Returns None only if asOf time is before the creation time of oldest AmuletRules ingested.
+    */
+  def lookupAmuletConfigAsOf(
+      asOf: CantonTimestamp
+  )(implicit tc: TraceContext): Future[Option[AmuletConfig[USD]]]
 
   /** Look up an OpenMiningRound contract by its round number.
     * Checks both the active ACS table and the archive table,
@@ -131,7 +153,16 @@ trait ScanRewardsReferenceStore extends AppStore {
             .map(_.get(lastIngestedRecordTime))
           archivedAtNextO <- lookupArchivedAtForOpenMiningRound(roundNumber + 1)
         } yield (activeRoundO, archivedAtNextO) match {
-          case (Some((activeRoundNumber, activeRoundOpensAt)), Some(archivedAtNext)) =>
+          case (
+                Some(
+                  ScanRewardsReferenceStore.ActiveRoundInfo(
+                    activeRoundNumber,
+                    activeRoundOpensAt,
+                    _,
+                  )
+                ),
+                Some(archivedAtNext),
+              ) =>
             val retainUntil = now.minus(retentionPeriod.asJava)
             if (retainUntil <= archivedAtNext) {
               // We compare retentionPeriod with archived_at of roundNumber + 1
@@ -226,6 +257,27 @@ object ScanRewardsReferenceStore {
     new CachingScanRewardsReferenceStore(dbStore, loggerFactory)
   }
 
+  /** The info we need from OpenMiningRound for activity-record calcs
+    *
+    * @param assetActivityParams the params from the round's reward config,
+    *                            with defaults for the params that are not set.
+    */
+  final case class ActiveRoundInfo(
+      roundNumber: Long,
+      opensAt: CantonTimestamp,
+      assetActivityParams: AssetActivityParams,
+  )
+
+  /** The featured apps active as of a given time, see `lookupFeaturedAppPartiesAsOf`.
+    *
+    * @param providers map from the provider of a FeaturedAppRight to its (appKind, activityWeight)
+    * @param opsPartyProviders map from an ops party to its provider
+    */
+  final case class FeaturedAppParties(
+      providers: Map[String, (splice.amulet.FeaturedAppKind, BigDecimal)],
+      opsPartyProviders: Map[String, String],
+  )
+
   case class Key(
       dsoParty: PartyId,
       synchronizerId: SynchronizerId,
@@ -267,6 +319,10 @@ object ScanRewardsReferenceStore {
         },
         mkFilter(splice.dsorules.DsoRules.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanRewardsReferenceStoreRowData(contract = contract)
+        },
+        mkFilter(splice.amuletrules.AmuletRules.COMPANION)(co => co.payload.dso == dso) {
+          contract =>
+            ScanRewardsReferenceStoreRowData(contract = contract)
         },
         mkFilter(splice.amulet.rewardaccountingv2.CalculateRewardsV2.COMPANION)(
           co => co.payload.dso == dso,

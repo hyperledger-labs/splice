@@ -10,12 +10,18 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppKind,
+  FeaturedAppRight,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.rewardaccountingv2.CalculateRewardsV2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.scan.rewards.AssetActivityParams
 import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers, TcsStore}
 import org.lfdecentralizedtrust.splice.store.db.{
@@ -28,6 +34,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
 }
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.SelectFromAcsTableResult
 import org.lfdecentralizedtrust.splice.util.{
+  AmuletConfigSchedule,
   Contract,
   ContractWithState,
   PackageQualifiedName,
@@ -37,12 +44,25 @@ import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnles
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 object DbScanRewardsReferenceStore {
 
   // same as `defaultAppActivityWeight` in the daml.
   val DefaultAppActivityWeight: BigDecimal = BigDecimal(1)
+
+  // same as `defaultAppKind` in the daml.
+  val DefaultAppKind: FeaturedAppKind = FeaturedAppKind.FAK_GENERAL
+
+  private def appKindPrecedence(kind: FeaturedAppKind): Int = kind match {
+    case FeaturedAppKind.FAK_GENERAL => 0
+    case FeaturedAppKind.FAK_ASSETMOVING => 1
+    case FeaturedAppKind.FAK_ASSET => 2
+  }
+
+  private def maxAppKind(a: FeaturedAppKind, b: FeaturedAppKind): FeaturedAppKind =
+    if (appKindPrecedence(a) >= appKindPrecedence(b)) a else b
 }
 
 class DbScanRewardsReferenceStore(
@@ -103,7 +123,9 @@ class DbScanRewardsReferenceStore(
 
   override def lookupActiveOpenMiningRounds(
       recordTimes: Seq[CantonTimestamp]
-  )(implicit tc: TraceContext): Future[Map[CantonTimestamp, (Long, CantonTimestamp)]] = {
+  )(implicit
+      tc: TraceContext
+  ): Future[Map[CantonTimestamp, ScanRewardsReferenceStore.ActiveRoundInfo]] = {
     tcsStore.getEarliestArchivedAt().flatMap {
       case None =>
         Future.successful(Map.empty)
@@ -125,7 +147,12 @@ class DbScanRewardsReferenceStore(
                 .flatMap { r =>
                   val opensAt = CantonTimestamp.assertFromInstant(r.contract.payload.opensAt)
                   Option.when(opensAt >= ingestionStart) {
-                    recordTime -> (r.contract.payload.round.number.toLong, opensAt)
+                    recordTime -> ScanRewardsReferenceStore.ActiveRoundInfo(
+                      roundNumber = r.contract.payload.round.number.toLong,
+                      opensAt = opensAt,
+                      assetActivityParams = AssetActivityParams
+                        .fromRewardConfig(r.contract.payload.rewardConfig.toScala),
+                    )
                   }
                 }
             }.toMap
@@ -136,16 +163,47 @@ class DbScanRewardsReferenceStore(
 
   override def lookupFeaturedAppPartiesAsOf(
       asOf: CantonTimestamp
-  )(implicit tc: TraceContext): Future[Map[String, BigDecimal]] =
+  )(implicit
+      tc: TraceContext
+  ): Future[ScanRewardsReferenceStore.FeaturedAppParties] =
     lookupFeaturedAppRightsAsOf(asOf).map { rights =>
-      rights.foldLeft(Map.empty[String, BigDecimal]) { (weights, right) =>
+      // Combine all the FeaturedAppRights of a provider
+      val perProvider = rights.foldLeft(
+        Map.empty[String, (BigDecimal, FeaturedAppKind, Set[String])]
+      ) { (acc, right) =>
         val payload = right.contract.payload
         val weight = payload.activityWeight.toScala
           .map(BigDecimal(_))
           .getOrElse(DbScanRewardsReferenceStore.DefaultAppActivityWeight)
-        // Use the max of all weights, in case multiple contracts exist for a party
-        weights.updated(payload.provider, weights.get(payload.provider).fold(weight)(_ max weight))
+        val kind = payload.appKind.toScala.getOrElse(DbScanRewardsReferenceStore.DefaultAppKind)
+        val opsParties = payload.opsParties.toScala.fold(Set.empty[String])(_.asScala.toSet)
+        acc.updated(
+          payload.provider,
+          acc.get(payload.provider).fold((weight, kind, opsParties)) {
+            case (prevWeight, prevKind, prevOpsParties) =>
+              (
+                // Use the max of all weights and kind, in case multiple contracts exist for a party
+                prevWeight max weight,
+                DbScanRewardsReferenceStore.maxAppKind(prevKind, kind),
+                prevOpsParties ++ opsParties,
+              )
+          },
+        )
       }
+      ScanRewardsReferenceStore.FeaturedAppParties(
+        providers = perProvider.view.mapValues { case (weight, kind, _) => (kind, weight) }.toMap,
+        opsPartyProviders = perProvider.foldLeft(Map.empty[String, String]) {
+          case (acc, (provider, (_, _, opsParties))) =>
+            opsParties.foldLeft(acc) { (innerAcc, opsParty) =>
+              innerAcc.get(opsParty) match {
+                // On conflict keep the lexicographically lowest provider
+                // TODO: consider emitting a warning on conflict
+                case Some(existingProvider) if existingProvider <= provider => innerAcc
+                case _ => innerAcc.updated(opsParty, provider)
+              }
+            }
+        },
+      )
     }
 
   override def lookupSvParticipantIdsAsOf(
@@ -165,6 +223,19 @@ class DbScanRewardsReferenceStore(
       case multiple =>
         throw new IllegalStateException(
           s"Expected at most one active DsoRules contract as of $asOf, but found ${multiple.size}: " +
+            multiple.map(_.contract.contractId.contractId).mkString(", ")
+        )
+    }
+
+  override def lookupAmuletConfigAsOf(
+      asOf: CantonTimestamp
+  )(implicit tc: TraceContext): Future[Option[AmuletConfig[USD]]] =
+    tcsStore.listAllContractsAsOf(AmuletRules.COMPANION, asOf, limit = Some(2)).map {
+      case Seq() => None
+      case Seq(c) => Some(AmuletConfigSchedule(c.contract).getConfigAsOf(asOf))
+      case multiple =>
+        throw new IllegalStateException(
+          s"Expected at most one active AmuletRules contract as of $asOf, but found ${multiple.size}: " +
             multiple.map(_.contract.contractId.contractId).mkString(", ")
         )
     }

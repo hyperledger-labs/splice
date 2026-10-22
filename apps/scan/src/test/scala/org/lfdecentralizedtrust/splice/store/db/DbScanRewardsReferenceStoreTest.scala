@@ -13,7 +13,16 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppKind,
+  FeaturedAppRight,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
+  RewardConfig,
+  RewardVersion,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer as decentralizedsynchronizerCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
@@ -23,15 +32,17 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TreeUpdateOrOffsetCheckpoint
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
+import org.lfdecentralizedtrust.splice.scan.rewards.AssetActivityParams
 import org.lfdecentralizedtrust.splice.scan.store.ScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanRewardsReferenceStore
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, PageLimit, StoreTestBase, TcsStore}
-import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import slick.jdbc.JdbcProfile
 
 import java.util.{Collections, Optional}
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 class DbScanRewardsReferenceStoreTest
     extends StoreTestBase
@@ -81,6 +92,134 @@ class DbScanRewardsReferenceStoreTest
         resultAt400 <- store.lookupFeaturedAppRightsAsOf(CantonTimestamp.ofEpochSecond(400))
         _ = resultAt400.map(_.contract) shouldBe Seq(far2)
       } yield succeed
+    }
+
+    "lookupFeaturedAppPartiesAsOf" should {
+
+      "combine the FeaturedAppRights of the same provider" in {
+        val store = mkStore()
+        val p1 = userParty(1)
+        val p2 = userParty(2)
+        val p3 = userParty(3)
+        val ops1 = userParty(11)
+        val ops2 = userParty(12)
+        // weights and kinds are combined to max weight and max kind
+        val far1a = featuredAppRight(
+          p1,
+          activityWeight = Some(BigDecimal(2)),
+          appKind = Some(FeaturedAppKind.FAK_GENERAL),
+          opsParties = Some(Seq(ops1)),
+        )
+        val far1b = featuredAppRight(
+          p1,
+          activityWeight = Some(BigDecimal("0.5")),
+          appKind = Some(FeaturedAppKind.FAK_ASSET),
+          opsParties = Some(Seq(ops2)),
+        )
+        val far2a = featuredAppRight(p2, appKind = Some(FeaturedAppKind.FAK_ASSET))
+        val far2b = featuredAppRight(p2, appKind = Some(FeaturedAppKind.FAK_ASSETMOVING))
+        val far3 = featuredAppRight(p3)
+        val p1Entry = (FeaturedAppKind.FAK_ASSET, BigDecimal(2))
+        val p1EntryAfterArchive = (FeaturedAppKind.FAK_GENERAL, BigDecimal(2))
+        val p2Entry = (FeaturedAppKind.FAK_ASSET, BigDecimal(1))
+        val p3Entry = (FeaturedAppKind.FAK_GENERAL, BigDecimal(1))
+        for {
+          _ <- initWithAcs()(store.multiDomainAcsStore)
+          _ <- MonadUtil.sequentialTraverse_(Seq(far1a, far1b, far2a, far2b, far3))(
+            createFeaturedAppRight(store, _, ts(100))
+          )
+          result <- store.lookupFeaturedAppPartiesAsOf(ts(100))
+          _ = result shouldBe ScanRewardsReferenceStore.FeaturedAppParties(
+            providers = Map(
+              p1.toProtoPrimitive -> p1Entry,
+              p2.toProtoPrimitive -> p2Entry,
+              p3.toProtoPrimitive -> p3Entry,
+            ),
+            opsPartyProviders = Map(
+              ops1.toProtoPrimitive -> p1.toProtoPrimitive,
+              ops2.toProtoPrimitive -> p1.toProtoPrimitive,
+            ),
+          )
+          // archiving the far1b, fixes the ops2
+          _ <- sync1.archive(far1b, recordTime = ts(200).toInstant)(store.multiDomainAcsStore)
+          resultAfterArchive <- store.lookupFeaturedAppPartiesAsOf(ts(200))
+          _ = resultAfterArchive shouldBe ScanRewardsReferenceStore.FeaturedAppParties(
+            providers = Map(
+              p1.toProtoPrimitive -> p1EntryAfterArchive,
+              p2.toProtoPrimitive -> p2Entry,
+              p3.toProtoPrimitive -> p3Entry,
+            ),
+            opsPartyProviders = Map(ops1.toProtoPrimitive -> p1.toProtoPrimitive),
+          )
+        } yield succeed
+      }
+
+      "resolve an ops party claimed by several providers to the lexicographically lowest provider" in {
+        val store = mkStore()
+        val p1 = userParty(1)
+        val p2 = userParty(2)
+        val p3 = userParty(3)
+        val x = userParty(10)
+        p1.toProtoPrimitive should be < p2.toProtoPrimitive
+        p2.toProtoPrimitive should be < p3.toProtoPrimitive
+        // p1 lists x
+        val far1 = featuredAppRight(p1, opsParties = Some(Seq(x)))
+        // p2 lists both x and the provider p3 as ops parties
+        val far2 = featuredAppRight(
+          p2,
+          activityWeight = Some(BigDecimal(2)),
+          appKind = Some(FeaturedAppKind.FAK_ASSETMOVING),
+          opsParties = Some(Seq(x, p3)),
+        )
+        // p3 lists the provider p1
+        val far3 = featuredAppRight(
+          p3,
+          activityWeight = Some(BigDecimal(3)),
+          opsParties = Some(Seq(p1)),
+        )
+        val p1Entry = (FeaturedAppKind.FAK_GENERAL, BigDecimal(1))
+        val p2Entry = (FeaturedAppKind.FAK_ASSETMOVING, BigDecimal(2))
+        val p3Entry = (FeaturedAppKind.FAK_GENERAL, BigDecimal(3))
+        for {
+          _ <- initWithAcs()(store.multiDomainAcsStore)
+          _ <- MonadUtil.sequentialTraverse_(Seq(far3, far2, far1))(
+            createFeaturedAppRight(store, _, ts(100))
+          )
+          resultAt100 <- store.lookupFeaturedAppPartiesAsOf(ts(100))
+          _ = resultAt100 shouldBe ScanRewardsReferenceStore.FeaturedAppParties(
+            providers = Map(
+              p1.toProtoPrimitive -> p1Entry,
+              p2.toProtoPrimitive -> p2Entry,
+              p3.toProtoPrimitive -> p3Entry,
+            ),
+            opsPartyProviders = Map(
+              x.toProtoPrimitive -> p1.toProtoPrimitive,
+              p1.toProtoPrimitive -> p3.toProtoPrimitive,
+              p3.toProtoPrimitive -> p2.toProtoPrimitive,
+            ),
+          )
+          _ <- sync1.archive(far1, recordTime = ts(200).toInstant)(store.multiDomainAcsStore)
+          resultAt200 <- store.lookupFeaturedAppPartiesAsOf(ts(200))
+          // x falls back to p2
+          _ = resultAt200 shouldBe ScanRewardsReferenceStore.FeaturedAppParties(
+            providers = Map(
+              p2.toProtoPrimitive -> p2Entry,
+              p3.toProtoPrimitive -> p3Entry,
+            ),
+            opsPartyProviders = Map(
+              x.toProtoPrimitive -> p2.toProtoPrimitive,
+              p1.toProtoPrimitive -> p3.toProtoPrimitive,
+              p3.toProtoPrimitive -> p2.toProtoPrimitive,
+            ),
+          )
+          _ <- sync1.archive(far2, recordTime = ts(300).toInstant)(store.multiDomainAcsStore)
+          resultAt300 <- store.lookupFeaturedAppPartiesAsOf(ts(300))
+          _ = resultAt300 shouldBe ScanRewardsReferenceStore.FeaturedAppParties(
+            providers = Map(p3.toProtoPrimitive -> p3Entry),
+            opsPartyProviders = Map(p1.toProtoPrimitive -> p3.toProtoPrimitive),
+          )
+        } yield succeed
+      }
     }
 
     "lookupOpenMiningRoundsAsOf and lookupOpenMiningRoundsActiveWithin return correct contracts" in {
@@ -236,6 +375,43 @@ class DbScanRewardsReferenceStoreTest
 
         atV2 <- store.lookupSvParticipantIdsAsOf(CantonTimestamp.ofEpochSecond(300))
         _ = atV2 shouldBe Set(sv1Pid.uid.toProtoPrimitive, sv3Pid.uid.toProtoPrimitive)
+      } yield succeed
+    }
+
+    "lookupAmuletConfigAsOf returns the config from the AmuletRules active at a given time" in {
+      val store = mkStore()
+
+      val rulesV1 = amuletRules(initialTickDuration = 10)
+        .copy(createdAt = CantonTimestamp.ofEpochSecond(100).toInstant)
+      val rulesV2 = amuletRules(initialTickDuration = 20)
+        .copy(createdAt = CantonTimestamp.ofEpochSecond(300).toInstant)
+
+      for {
+        _ <- initWithAcs()(store.multiDomainAcsStore)
+
+        // Ingest v1 at t=100, swap to v2 at t=300.
+        _ <- sync1.create(rulesV1, recordTime = CantonTimestamp.ofEpochSecond(100).toInstant)(
+          store.multiDomainAcsStore
+        )
+        _ <- sync1.archive(rulesV1, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+          store.multiDomainAcsStore
+        )
+        _ <- sync1.create(rulesV2, recordTime = CantonTimestamp.ofEpochSecond(300).toInstant)(
+          store.multiDomainAcsStore
+        )
+
+        // Before ingestion start
+        emptyResult <- store.lookupAmuletConfigAsOf(CantonTimestamp.ofEpochSecond(50))
+        _ = emptyResult shouldBe None
+
+        atV1 <- store.lookupAmuletConfigAsOf(CantonTimestamp.ofEpochSecond(100))
+        _ = atV1 shouldBe Some(rulesV1.payload.configSchedule.initialValue)
+
+        midV1 <- store.lookupAmuletConfigAsOf(CantonTimestamp.ofEpochSecond(150))
+        _ = midV1 shouldBe Some(rulesV1.payload.configSchedule.initialValue)
+
+        atV2 <- store.lookupAmuletConfigAsOf(CantonTimestamp.ofEpochSecond(300))
+        _ = atV2 shouldBe Some(rulesV2.payload.configSchedule.initialValue)
       } yield succeed
     }
 
@@ -494,8 +670,8 @@ class DbScanRewardsReferenceStoreTest
           lowestPrunableBeforePrune shouldBe Some(3L)
           lowestPrunableAfterPrune shouldBe None
           afterPruneRound3 shouldBe None
-          farAfterPrune.keySet should not contain userParty(1).toProtoPrimitive
-          farAfterPrune.keySet should contain(userParty(2).toProtoPrimitive)
+          farAfterPrune.providers.keySet should not contain userParty(1).toProtoPrimitive
+          farAfterPrune.providers.keySet should contain(userParty(2).toProtoPrimitive)
           afterPruneRound4 shouldBe defined
         }
       }
@@ -506,7 +682,10 @@ class DbScanRewardsReferenceStoreTest
           _ <- ingestOverlappingRounds(store)
 
           beforePrune <- store.lookupActiveOpenMiningRounds(Seq(ts(450), ts(620)))
-          _ = beforePrune shouldBe Map(ts(450) -> (5L, ts(300)), ts(620) -> (7L, ts(500)))
+          _ = beforePrune shouldBe Map(
+            ts(450) -> roundInfo(5L, ts(300)),
+            ts(620) -> roundInfo(7L, ts(500)),
+          )
 
           deleted <- store.pruneArchivedUpToRound(3)
           _ = deleted shouldBe 1L
@@ -514,7 +693,7 @@ class DbScanRewardsReferenceStoreTest
           // The store's "ingestion start" now moved to round 4's archival at t=400
           // so we no longer have the complete data for 450.
           afterPrune <- store.lookupActiveOpenMiningRounds(Seq(ts(450), ts(620)))
-          _ = afterPrune shouldBe Map(ts(620) -> (7L, ts(500)))
+          _ = afterPrune shouldBe Map(ts(620) -> roundInfo(7L, ts(500)))
         } yield succeed
       }
 
@@ -668,7 +847,7 @@ class DbScanRewardsReferenceStoreTest
           _ = atRound7 shouldBe Some(3L)
 
           activeAtRound7 <- store.lookupActiveOpenMiningRounds(Seq(ts(620)))
-          _ = activeAtRound7 shouldBe Map(ts(620) -> ((7L, ts(500))))
+          _ = activeAtRound7 shouldBe Map(ts(620) -> roundInfo(7L, ts(500)))
 
           // Doing prune here confirms that the lookupPrunableRewardRound works with the new db state
           deleted <- store.pruneArchivedUpToRound(3)
@@ -676,7 +855,7 @@ class DbScanRewardsReferenceStoreTest
 
           // Lookup works even after prune
           activeAtRound7AfterDelete <- store.lookupActiveOpenMiningRounds(Seq(ts(620)))
-          _ = activeAtRound7AfterDelete shouldBe Map(ts(620) -> ((7L, ts(500))))
+          _ = activeAtRound7AfterDelete shouldBe Map(ts(620) -> roundInfo(7L, ts(500)))
 
           // Round 4 is now the lowest prunable round, and round 5 archived at t=500.
           afterPruneAtRound7 <- store.lookupPrunableRewardRound(
@@ -736,7 +915,7 @@ class DbScanRewardsReferenceStoreTest
           _ = atRound7 shouldBe Some(3L)
 
           activeAtRound7 <- store.lookupActiveOpenMiningRounds(Seq(ts(820)))
-          _ = activeAtRound7 shouldBe Map(ts(820) -> ((7L, ts(600))))
+          _ = activeAtRound7 shouldBe Map(ts(820) -> roundInfo(7L, ts(600)))
 
           // Doing prune here confirms that the lookupPrunableRewardRound works with the new db state
           deleted <- store.pruneArchivedUpToRound(3)
@@ -744,7 +923,7 @@ class DbScanRewardsReferenceStoreTest
 
           // Lookup works even after prune
           activeAtRound7AfterDelete <- store.lookupActiveOpenMiningRounds(Seq(ts(820)))
-          _ = activeAtRound7AfterDelete shouldBe Map(ts(820) -> ((7L, ts(600))))
+          _ = activeAtRound7AfterDelete shouldBe Map(ts(820) -> roundInfo(7L, ts(600)))
 
           // Round 4 is now the lowest prunable round, and round 5 archived at t=650.
           afterPruneAtRound7 <- store.lookupPrunableRewardRound(
@@ -881,11 +1060,43 @@ class DbScanRewardsReferenceStoreTest
         openMiningRound(dsoParty, round = 4, amuletPrice = 1.5, opensAt = ts(200).toInstant)
           .copy(createdAt = ts(200).toInstant)
       val round5 =
-        openMiningRound(dsoParty, round = 5, amuletPrice = 2.0, opensAt = ts(400).toInstant)
-          .copy(createdAt = ts(300).toInstant)
+        openMiningRound(
+          dsoParty,
+          round = 5,
+          amuletPrice = 2.0,
+          opensAt = ts(400).toInstant,
+          rewardConfig = Optional.of(
+            rewardConfig(
+              extraFeaturedAssetActivityWeight = Some("0.2"),
+              maxExtraFeaturedAssetActivityWeightPerAsset = Some("0.1"),
+              dsoAppActivityWeight = Some("0.5"),
+            )
+          ),
+        ).copy(createdAt = ts(300).toInstant)
+      // round6 does not set all the asset activity params, the default is used for the missing one
       val round6 =
-        openMiningRound(dsoParty, round = 6, amuletPrice = 2.5, opensAt = ts(500).toInstant)
-          .copy(createdAt = ts(400).toInstant)
+        openMiningRound(
+          dsoParty,
+          round = 6,
+          amuletPrice = 2.5,
+          opensAt = ts(500).toInstant,
+          rewardConfig = Optional.of(
+            rewardConfig(
+              extraFeaturedAssetActivityWeight = Some("0.2"),
+              maxExtraFeaturedAssetActivityWeightPerAsset = Some("0.1"),
+              dsoAppActivityWeight = None,
+            )
+          ),
+        ).copy(createdAt = ts(400).toInstant)
+      val round5Info = ScanRewardsReferenceStore.ActiveRoundInfo(
+        5L,
+        ts(400),
+        AssetActivityParams(
+          extraFeaturedAssetActivityWeight = BigDecimal("0.2"),
+          maxExtraFeaturedAssetActivityWeightPerAsset = BigDecimal("0.1"),
+          dsoAppActivityWeight = BigDecimal("0.5"),
+        ),
+      )
       for {
         _ <- initWithAcs()(store.multiDomainAcsStore)
 
@@ -917,6 +1128,8 @@ class DbScanRewardsReferenceStoreTest
         result <- store.lookupActiveOpenMiningRounds(
           Seq(30L, 150L, 220L, 250L, 275L, 350L, 375L, 400L, 450L, 550L).map(ts)
         )
+        _ <- sync1.archive(round5, recordTime = ts(650).toInstant)(store.multiDomainAcsStore)
+        afterRound5Archived <- store.lookupActiveOpenMiningRounds(Seq(ts(650)))
       } yield {
         result.get(ts(30)) shouldBe None // before earliest archived_at
         result.get(ts(150)) shouldBe None // before earliest archived_at
@@ -925,16 +1138,66 @@ class DbScanRewardsReferenceStoreTest
         result.get(ts(275)) shouldBe None // round4.opensAt before earliest archived_at
         result.get(ts(350)) shouldBe None // round4.opensAt before earliest archived_at
         result.get(ts(375)) shouldBe None // gap: round4 archived, round5 not yet open
-        result(ts(400)) shouldBe (5L, ts(400))
+        result(ts(400)) shouldBe round5Info
         result.get(ts(401)) shouldBe None // 401 was not present in request
-        result(ts(450)) shouldBe (5L, ts(400)) // round5 open, round6 not yet open
-        result(ts(550)) shouldBe (5L, ts(400)) // both open, lowest round selected
+        result(ts(450)) shouldBe round5Info // round5 open, round6 not yet open
+        result(ts(550)) shouldBe round5Info // both open, lowest round selected
+        afterRound5Archived shouldBe Map(
+          ts(650) -> ScanRewardsReferenceStore.ActiveRoundInfo(
+            6L,
+            ts(500),
+            AssetActivityParams(
+              extraFeaturedAssetActivityWeight = BigDecimal("0.2"),
+              maxExtraFeaturedAssetActivityWeightPerAsset = BigDecimal("0.1"),
+              dsoAppActivityWeight = BigDecimal("0.1"),
+            ),
+          )
+        )
       }
     }
   }
 
   private def ts(epochSecond: Long): CantonTimestamp =
     CantonTimestamp.ofEpochSecond(epochSecond)
+
+  // The info of a round without a reward config
+  private def roundInfo(roundNumber: Long, opensAt: CantonTimestamp) =
+    ScanRewardsReferenceStore.ActiveRoundInfo(
+      roundNumber,
+      opensAt,
+      AssetActivityParams(
+        extraFeaturedAssetActivityWeight = BigDecimal("0.2"),
+        maxExtraFeaturedAssetActivityWeightPerAsset = BigDecimal("0.1"),
+        dsoAppActivityWeight = BigDecimal("0.1"),
+      ),
+    )
+
+  private def rewardConfig(
+      extraFeaturedAssetActivityWeight: Option[String],
+      maxExtraFeaturedAssetActivityWeightPerAsset: Option[String],
+      dsoAppActivityWeight: Option[String],
+  ): RewardConfig = {
+    def decimal(value: Option[String]) = value.map(new java.math.BigDecimal(_)).toJava
+    new RewardConfig(
+      RewardVersion.REWARDVERSION_TRAFFICBASEDAPPREWARDS,
+      Optional.empty(),
+      100L,
+      new RelTime(36L * 3600L * 1000000L),
+      new java.math.BigDecimal("0.5"),
+      decimal(extraFeaturedAssetActivityWeight),
+      decimal(maxExtraFeaturedAssetActivityWeightPerAsset),
+      decimal(dsoAppActivityWeight),
+    )
+  }
+
+  private def createFeaturedAppRight(
+      store: DbScanRewardsReferenceStore,
+      far: Contract[FeaturedAppRight.ContractId, FeaturedAppRight],
+      recordTime: CantonTimestamp,
+  ): Future[?] =
+    sync1.create(far.copy(createdAt = recordTime.toInstant), recordTime = recordTime.toInstant)(
+      store.multiDomainAcsStore
+    )
 
   /** A `now` past every timeline used here, to ensure that when paired with a noRetention
     * it never gates lookupPrunableRewardRound.

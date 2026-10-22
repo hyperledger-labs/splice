@@ -32,12 +32,19 @@ object DbAppActivityRecordStore {
     * @param appProviderParties app providers for which app activity should be recorded
     * @param appActivityWeights activity weight (in bytes of traffic) for each app provider,
     *                           in one-to-one correspondence with appProviderParties
+    * @param submittingAppProvider the featured app that submitted the transaction, if any
+    * @param assetActivityProviderParties featured asset providers for which asset activity should be recorded
+    * @param assetActivityWeights asset activity weight (in bytes of traffic) for each asset provider,
+    *                             in one-to-one correspondence with assetActivityProviderParties
     */
   final case class AppActivityRecordT(
       verdictRowId: Long,
       roundNumber: Long,
       appProviderParties: Seq[String],
       appActivityWeights: Seq[Long],
+      submittingAppProvider: Option[String] = None,
+      assetActivityProviderParties: Seq[String] = Seq.empty,
+      assetActivityWeights: Seq[Long] = Seq.empty,
   )
 
   val DUMMY_VERDICT_ROW_ID: Long = -123456789L
