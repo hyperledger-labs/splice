@@ -737,7 +737,7 @@ class DbScanAppRewardsStore(
           ),
           app_aggregated as (
             select party, sum(weight) as total_app_weight,
-                   count(*) as num_app_records
+                   count(*) as num_app_activity_records
             from app_unnested
             group by party
           ),
@@ -746,21 +746,23 @@ class DbScanAppRewardsStore(
             from app_activity_record_store a
             cross join lateral unnest(
                    coalesce(a.asset_activity_provider_parties, '{}'::text[]),
-                   coalesce(a.asset_activity_weights,           '{}'::bigint[]))
+                   coalesce(a.asset_activity_weights,          '{}'::bigint[]))
                  as pw(party, weight)
             where a.history_id = $historyId
               and a.round_number = $roundNumber
           ),
           asset_aggregated as (
-            select party, sum(weight) as total_asset_weight
+            select party, sum(weight) as total_asset_weight,
+                   count(*) as num_asset_activity_records
             from asset_unnested
             group by party
           ),
           combined_parties as (
-            select coalesce(a.party, s.party)      as party,
-                   coalesce(a.total_app_weight, 0) as total_app_weight,
-                   coalesce(a.num_app_records, 0)  as num_app_records,
-                   coalesce(s.total_asset_weight, 0) as total_asset_weight
+            select coalesce(a.party, s.party)                as party,
+                   coalesce(a.total_app_weight, 0)           as total_app_weight,
+                   coalesce(a.num_app_activity_records, 0)   as num_app_activity_records,
+                   coalesce(s.total_asset_weight, 0)         as total_asset_weight,
+                   coalesce(s.num_asset_activity_records, 0) as num_asset_activity_records
             from app_aggregated a
             full outer join asset_aggregated s on a.party = s.party
           )"""
@@ -771,9 +773,10 @@ class DbScanAppRewardsStore(
             insert into #${Tables.appActivityPartyTotals}
               (history_id, round_number, total_app_activity_weight,
                app_provider_party, num_app_activity_records,
-               total_asset_activity_weight)
+               num_asset_activity_records, total_asset_activity_weight)
             select $historyId, $roundNumber, total_app_weight, party,
-                   num_app_records,
+                   num_app_activity_records,
+                   num_asset_activity_records,
                    total_asset_weight
             from combined_parties
             returning total_app_activity_weight, num_app_activity_records,
