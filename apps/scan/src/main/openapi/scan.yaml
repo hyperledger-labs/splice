@@ -3821,6 +3821,14 @@ components:
           format: int32
         transaction_views:
           $ref: '#/components/schemas/TransactionViews'
+        round_number:
+          description: |
+            The oldest open mining round active at record_time.  Same as the round assigned to the `app_activity_records` associated with this verdict, if there are any.
+            Null for
+              - verdicts at a record_time before the SVs started populating this field
+              - verdicts served by an SV node that is in the process of onboarding
+          type: integer
+          format: int64
     TransactionViews:
       type: object
       required:

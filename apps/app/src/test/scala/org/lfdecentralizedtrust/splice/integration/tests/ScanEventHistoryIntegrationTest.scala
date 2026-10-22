@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
@@ -17,12 +18,19 @@ import definitions.UpdateHistoryItemV2.members.{
 
 import scala.concurrent.duration.*
 import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.metrics.MetricValue
 import monocle.macros.syntax.lens.*
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
 
 class ScanEventHistoryIntegrationTest
     extends IntegrationTestWithIsolatedEnvironment
     with ScanTestUtil
+    with TriggerTestUtil
     with WalletTestUtil
     with WalletTxLogTestUtil {
 
@@ -36,6 +44,24 @@ class ScanEventHistoryIntegrationTest
             synchronizerNodes = scanConfig.synchronizerNodes
               .focus(_.current.mediator.port)
               .modify(p => Port.tryCreate(p.unwrap + 20000))
+          )
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Sv)(
+          _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
+        )(config)
+      )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
+      )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(dsoConfig =>
+          dsoConfig.copy(
+            initialSvOperationsSwitchOverTimes = Some(
+              dsoConfig.initialSvOperationsSwitchOverTimes.getOrElse(Map.empty) +
+                (SwitchOverTimes.AlwaysServeVerdictRoundNumber -> CantonTimestamp.MinValue)
+            )
           )
         )(config)
       )
@@ -236,28 +262,24 @@ class ScanEventHistoryIntegrationTest
     startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
     val _ = onboardAliceAndBob()
-    // Get the current top wallet transaction event id (if any)
-    val topBeforeO = withoutDevNetTopups(
-      aliceWalletClient
-        .listTransactions(beginAfterId = None, pageSize = 1)
-    ).headOption
-      .map(_.eventId)
-
-    // Create a new event (tap) and capture its update id from wallet transaction history
-    aliceWalletClient.tap(4)
-
+    val cursorBeforeTap = eventuallySucceeds() { latestEventHistoryCursor(sv1ScanBackend) }
     val updateIdFromTap = eventuallySucceeds() {
-      val latest =
-        withoutDevNetTopups(aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 10))
-      // Prefer the first new entry different from the previous top if available
-      val candidateEventId = topBeforeO match {
-        case Some(prev) =>
-          latest.find(_.eventId != prev).map(_.eventId).orElse(latest.headOption.map(_.eventId))
-        case None => latest.headOption.map(_.eventId)
-      }
-      val eventId =
-        candidateEventId.getOrElse(fail("Expected at least one wallet transaction after tap"))
-      EventId.updateIdFromEventId(eventId)
+      advanceRoundsByOneTickViaAutomation()
+      aliceWalletClient.tap(4)
+
+      val eventId = withoutDevNetTopups(
+        aliceWalletClient.listTransactions(beginAfterId = None, pageSize = 10)
+      ).headOption
+        .map(_.eventId)
+        .getOrElse(fail("Expected a wallet transaction after tap"))
+      val updateId = EventId.updateIdFromEventId(eventId)
+
+      val roundO = sv1ScanBackend
+        .getEventById(updateId, Some(CompactJson))
+        .flatMap(_.verdict)
+        .flatMap(_.roundNumber)
+      roundO shouldBe defined withClue "verdict round_number not populated yet (advance more)"
+      updateId
     }
 
     // Both update, and verdict should be returned
@@ -272,6 +294,22 @@ class ScanEventHistoryIntegrationTest
 
     eventById.update shouldBe defined
     eventById.verdict shouldBe defined
+    eventById.verdict.flatMap(
+      _.roundNumber
+    ) shouldBe defined withClue "getEventById verdict round_number"
+
+    eventually() {
+      val history = getEventHistoryAndCheckTxVerdicts(after = Some(cursorBeforeTap))
+      val tapItem = history
+        .find(_.update.exists {
+          case UpdateHistoryTransactionV2(tx) => tx.updateId == updateIdFromTap
+          case _ => false
+        })
+        .getOrElse(fail(s"tap update $updateIdFromTap not yet in event history"))
+      tapItem.verdict.flatMap(
+        _.roundNumber
+      ) shouldBe defined withClue "getEventHistory verdict round_number"
+    }
 
     // Missing id: expect 404 -> client returns None
     val missingId = "does-not-exist-12345"

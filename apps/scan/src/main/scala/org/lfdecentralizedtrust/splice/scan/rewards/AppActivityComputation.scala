@@ -50,14 +50,6 @@ class AppActivityComputation(
   )(implicit tc: TraceContext): Future[Option[Long]] =
     rewardsReferenceStore.lookupLatestArchivedOpenMiningRound(asOf)
 
-  /** The OpenMiningRound round number active at asOf, if the round data has been ingested. */
-  def lookupActiveOpenMiningRound(
-      asOf: CantonTimestamp
-  )(implicit tc: TraceContext): Future[Option[Long]] =
-    rewardsReferenceStore
-      .lookupActiveOpenMiningRounds(Seq(asOf))
-      .map(_.get(asOf).map { case (roundNumber, _) => roundNumber })
-
   /** Compute app activity records for a batch of verdicts.
     *
     * Records are returned with verdictRowId = DUMMY_VERDICT_ROW_ID as a placeholder.

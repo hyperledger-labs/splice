@@ -22,8 +22,12 @@ object SwitchOverTimes {
   private def shouldSwitchOver(clock: Clock, dsoRules: DsoRules, key: String): Boolean =
     shouldSwitchOver(clock, dsoRules.config.svOperationsSwitchOverTimes, key)
 
-  def omitFeaturedAppRightInChoiceContext(clock: Clock, dsoRules: DsoRules) =
+  def omitFeaturedAppRightInChoiceContext(clock: Clock, dsoRules: DsoRules): Boolean =
     shouldSwitchOver(clock, dsoRules, NoFeaturedAppChoiceContext)
 
+  def alwaysServeVerdictRoundNumber(clock: Clock, dsoRules: DsoRules): Boolean =
+    shouldSwitchOver(clock, dsoRules, AlwaysServeVerdictRoundNumber)
+
   val NoFeaturedAppChoiceContext = "no-featured-app-choice-context"
+  val AlwaysServeVerdictRoundNumber = "always-serve-verdict-round-number"
 }

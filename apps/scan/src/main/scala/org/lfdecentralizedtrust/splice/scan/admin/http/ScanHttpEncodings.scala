@@ -559,6 +559,7 @@ object ScanHttpEncodings {
   def encodeVerdict(
       verdict: VerdictT,
       views: Seq[TransactionViewT],
+      includeRound: Boolean,
   ): definitions.EventHistoryVerdict = {
     val verdictResultEnum: definitions.VerdictResult = verdict.verdictResult match {
       case VerdictResultDbValue.Accepted =>
@@ -603,6 +604,7 @@ object ScanHttpEncodings {
       verdictResult = verdictResultEnum,
       mediatorGroup = verdict.mediatorGroup,
       transactionViews = txViews,
+      roundNumber = if (includeRound) verdict.roundNumber else None,
     )
   }
 
