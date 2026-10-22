@@ -10,6 +10,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.base.error.BaseAlarm
+import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{
@@ -261,7 +262,9 @@ final class BlockChunkProcessor(
 
     val sendOutcomesStr = sendOutcomes.mapFilter {
       case x: SubmissionOutcome.Deliver => Some((x.submission.messageId, "Deliver"))
-      case x: SubmissionOutcome.Reject => Some((x.submission.messageId, s"Reject(${x.error})"))
+      case x: SubmissionOutcome.Reject =>
+        val code = CantonBaseError.statusErrorCodes(x.error).headOption.getOrElse("Unknown")
+        Some((x.submission.messageId, s"Reject($code)"))
       case x: SubmissionOutcome.DeliverReceipt => Some((x.submission.messageId, "Receipt"))
       case SubmissionOutcome.Discard =>
         logger.error(
