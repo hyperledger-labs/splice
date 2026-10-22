@@ -25,6 +25,7 @@ import {
   commandScriptPath,
 } from '@canton-network/splice-pulumi-common/src/utils';
 
+import type { FlywayMigrationToWaitFor } from './bigQueryFlywayMigration';
 import { ScanBigQueryConfig } from './singleSvConfig';
 
 // ============================================================================
@@ -51,8 +52,6 @@ const publicationName = 'update_history_datastream_pub';
 // Stream 2 (Stag-Prod) CDC Replication Configuration
 const replicationSlotNameStagProd = 'update_history_datastream_stag_prod_r_slot';
 const publicationNameStagProd = 'update_history_datastream_stag_prod_pub';
-
-const flywayMigrationToWaitFor = 'V068__app_activity_record_meta.sql';
 
 // ============================================================================
 // SINGLE SOURCE OF TRUTH: REPLICATED TABLE CONFIGURATION
@@ -726,6 +725,7 @@ function createPublicationAndReplicationSlots(
   databaseInstance: gcp.sql.DatabaseInstance,
   replicatorUser: gcp.sql.User,
   scan: InstalledHelmChart | undefined,
+  flywayMigrationToWaitFor: FlywayMigrationToWaitFor,
   enableLegacy: boolean,
   enableStagProd: boolean
 ): {
@@ -854,6 +854,7 @@ export async function configureScanBigQuery({
     legacyDesiredState,
     stagProdDesiredState,
     retentionPeriodSeconds,
+    flywayMigrationToWaitFor,
   } = bigQueryConfig;
 
   if (!enableLegacyDatastream && !enableStagProdDatastream) {
@@ -877,6 +878,7 @@ export async function configureScanBigQuery({
     databaseInstance,
     createPostgresReplicatorUser(namespace, databaseInstance, passwordSecret),
     scanChart,
+    flywayMigrationToWaitFor,
     enableLegacyDatastream,
     enableStagProdDatastream
   );
