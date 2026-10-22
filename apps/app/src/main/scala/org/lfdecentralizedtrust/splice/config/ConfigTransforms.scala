@@ -301,7 +301,7 @@ object ConfigTransforms {
     ConfigTransforms.updateAllValidatorAppConfigs_(c =>
       c.copy(treasury =
         c.treasury.copy(
-          grpcDeadline = Some(NonNegativeFiniteDuration.ofSeconds(10))
+          grpcDeadline = Some(NonNegativeFiniteDuration.ofSeconds(30))
         )
       )
     )
