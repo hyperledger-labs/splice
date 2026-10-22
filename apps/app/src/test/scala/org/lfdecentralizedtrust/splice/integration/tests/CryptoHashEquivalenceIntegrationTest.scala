@@ -204,6 +204,8 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
                 1000L,
                 party.toProtoPrimitive,
                 1L,
+                0L,
+                0L,
               )
             })
             .futureValue
