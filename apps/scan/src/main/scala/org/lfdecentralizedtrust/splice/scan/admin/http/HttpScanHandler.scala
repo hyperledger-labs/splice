@@ -2871,15 +2871,15 @@ class HttpScanHandler(
                     status = "Ok",
                     roundNumber = activityTotal.roundNumber,
                     totalAppActivityWeight = activityTotal.totalRoundAppActivityWeight,
-                    totalAssetActivityWeight = Some(activityTotal.totalRoundAssetActivityWeight),
+                    totalAssetActivityWeight = activityTotal.totalRoundAssetActivityWeight,
                     activePartiesCount = activityTotal.activeAppProviderPartiesCount,
                     activityRecordsCount = activityTotal.activityRecordsCount,
-                    totalAppReward = Some(rewardTotal.totalAppRewardFromAppActivity.toString),
-                    totalAssetReward = Some(rewardTotal.totalAppRewardFromAssetActivity.toString),
+                    totalAppReward = rewardTotal.totalAppRewardFromAppActivity.toString,
+                    totalAssetReward = rewardTotal.totalAppRewardFromAssetActivity.toString,
                     issuancePerFeaturedAppActivity =
-                      Some(rewardTotal.issuancePerFeaturedAppActivity.toString),
+                      rewardTotal.issuancePerFeaturedAppActivity.toString,
                     issuancePerFeaturedAssetActivity =
-                      Some(rewardTotal.issuancePerFeaturedAssetActivity.toString),
+                      rewardTotal.issuancePerFeaturedAssetActivity.toString,
                     totalAppRewardMintingAllowance =
                       rewardTotal.totalAppRewardMintingAllowance.toString,
                     totalAppRewardThresholded = rewardTotal.totalAppRewardThresholded.toString,

@@ -4144,8 +4144,13 @@ components:
         - status
         - round_number
         - total_app_activity_weight
+        - total_asset_activity_weight
         - active_parties_count
         - activity_records_count
+        - total_app_reward
+        - total_asset_reward
+        - issuance_per_featured_app_activity
+        - issuance_per_featured_asset_activity
         - total_app_reward_minting_allowance
         - total_app_reward_thresholded
         - total_app_reward_unclaimed
