@@ -30,7 +30,7 @@ import Splice.AmuletAllocationV2 as AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
 import Splice.DecentralizedSynchronizer (MemberTrafficPurchase(..), parseTrafficPurchaseMemo)
-import Splice.Round (OpenMiningRound(..), OpenMiningRound_Fetch(..))
+import Splice.Round (OpenMiningRound(..))
 import Splice.Types
 import Splice.Util
 
@@ -419,7 +419,7 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
               "Traffic purchase needs an OpenMiningRound under the choice context key " <> openRoundContextKey <>
               " to issue the validator reward coupon; set forfeit-validator-reward-coupon=true in the memo to purchase without it"
             Some cid -> pure cid
-          openRound <- fetchPublicReferenceData (ForDso dso) openRoundCid (OpenMiningRound_Fetch transfer.sender)
+          openRound <- fetchChecked (ForDso dso) openRoundCid
           assertDeadlineExceeded "openRound.opensAt" openRound.opensAt
           pure (IssueValidatorRewardCoupon openRound.round)
     let trafficCostUsd = transfer.amount * csum.amuletPrice
@@ -428,7 +428,7 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
           memberId = purchaseMemo.memberId
           synchronizerId = purchaseMemo.synchronizerId
           migrationId = purchaseMemo.migrationId
-          trafficAmount = floor (transfer.amount * csum.amuletPrice * 1e6 / trafficConfig.trafficPrice)
+          trafficAmount = floor (trafficCostUsd * 1e6 / trafficConfig.trafficPrice)
     inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) transfer.inputHoldingCids
     result <- buyMemberTraffic (toInterfaceContractId configStateCid) csum trafficConfig purchase
       (transfer.amount, trafficCostUsd) inputs
