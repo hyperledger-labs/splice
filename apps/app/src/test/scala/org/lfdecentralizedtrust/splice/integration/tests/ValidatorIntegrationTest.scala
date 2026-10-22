@@ -124,6 +124,7 @@ class ValidatorIntegrationTest extends IntegrationTestWithIsolatedEnvironment wi
     // dso info is available on the scan proxy
     val dsoInfo = aliceValidatorBackend.scanProxy.getDsoInfoV1()
     dsoInfo.dsoParty shouldBe dsoParty
+    dsoInfo.dsoRules.payload.svs should have size 4
     dsoInfo shouldBe sv1ScanBackend.getDsoInfoV1()
 
     val now = env.environment.clock.now

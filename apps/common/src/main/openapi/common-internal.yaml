@@ -205,7 +205,6 @@ components:
           type: string
 
     GetDsoInfoResponse:
-      deprecated: true
       type: object
       required:
         - sv_user
