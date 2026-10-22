@@ -17,7 +17,7 @@ import {
 } from './formValidators';
 import { FormLayout } from './FormLayout';
 import { useState } from 'react';
-import { UnpermissionValidatorFormData } from '../../utils/types';
+import { BlockValidatorFormData } from '../../utils/types';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
 import { ProposalSummary } from '../governance/ProposalSummary';
 import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
@@ -32,18 +32,16 @@ import {
   THRESHOLD_DEADLINE_SUBTITLE,
 } from '../../utils/constants';
 
-export const UnpermissionValidatorForm: React.FC = () => {
+export const BlockValidatorForm: React.FC = () => {
   const dsoInfosQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
   const [showConfirmation, setShowConfirmation] = useState(false);
   const mutation = useProposalMutation();
 
-  const createProposalAction = createProposalActions.find(
-    a => a.value === 'SRARC_UnpermissionValidator'
-  );
+  const createProposalAction = createProposalActions.find(a => a.value === 'SRARC_BlockValidator');
 
-  const defaultValues: UnpermissionValidatorFormData = {
+  const defaultValues: BlockValidatorFormData = {
     action: createProposalAction?.name || '',
     expiryDate: initialExpiration.format(dateTimeFormatISO),
     effectiveDate: {
@@ -64,7 +62,7 @@ export const UnpermissionValidatorForm: React.FC = () => {
         tag: 'ARC_DsoRules',
         value: {
           dsoAction: {
-            tag: 'SRARC_UnpermissionValidator',
+            tag: 'SRARC_BlockValidator',
             value: {
               participantId: value.participantId,
               revoked: value.revoked,
@@ -96,7 +94,7 @@ export const UnpermissionValidatorForm: React.FC = () => {
     <>
       <FormLayout
         form={form}
-        id="unpermission-validator-form"
+        id="block-validator-form"
         actionName={form.state.values.action}
         isReviewStep={showConfirmation}
       >
@@ -107,7 +105,7 @@ export const UnpermissionValidatorForm: React.FC = () => {
             summary={form.state.values.summary}
             expiryDate={form.state.values.expiryDate}
             effectiveDate={form.state.values.effectiveDate.effectiveDate}
-            formType="unpermission-validator"
+            formType="block-validator"
             participantId={form.state.values.participantId}
             revoked={form.state.values.revoked}
             loginAfter={form.state.values.revoked ? undefined : form.state.values.loginAfter}
@@ -119,7 +117,7 @@ export const UnpermissionValidatorForm: React.FC = () => {
             <form.AppField name="action">
               {field => (
                 <field.ProposalTypeField
-                  id="unpermission-validator-action"
+                  id="block-validator-action"
                   title={CREATE_PROPOSAL_LABEL_PROPOSAL_TYPE}
                 />
               )}
@@ -135,7 +133,7 @@ export const UnpermissionValidatorForm: React.FC = () => {
               {field => (
                 <field.TextField
                   title="Participant ID"
-                  id="unpermission-validator-participant-id"
+                  id="block-validator-participant-id"
                   muiTextFieldProps={{ placeholder: 'Enter Participant ID' }}
                 />
               )}
@@ -149,13 +147,13 @@ export const UnpermissionValidatorForm: React.FC = () => {
                       <Checkbox
                         checked={field.state.value}
                         onChange={e => field.handleChange(e.target.checked)}
-                        id="unpermission-validator-revoked"
+                        id="block-validator-revoked"
                       />
                     }
                     label={<Typography fontWeight="bold">Permanent Revocation</Typography>}
                   />
                   <Typography variant="body2" color="text.secondary" sx={{ ml: 4, mt: -0.5 }}>
-                    If checked, the validator needs an sv vote to repermission.
+                    If checked, the validator needs an sv vote to unblocked.
                   </Typography>
                 </FormGroup>
               )}
@@ -170,7 +168,7 @@ export const UnpermissionValidatorForm: React.FC = () => {
                       <field.DateField
                         title="Login After"
                         description="The date and time after which the validator can log in again."
-                        id="unpermission-validator-login-after"
+                        id="block-validator-login-after"
                       />
                     )}
                   </form.AppField>
@@ -189,7 +187,7 @@ export const UnpermissionValidatorForm: React.FC = () => {
                 <field.DateField
                   title={CREATE_PROPOSAL_LABEL_THRESHOLD_DEADLINE}
                   description={THRESHOLD_DEADLINE_SUBTITLE}
-                  id="unpermission-validator-expiry-date"
+                  id="block-validator-expiry-date"
                 />
               )}
             </form.AppField>
@@ -205,7 +203,7 @@ export const UnpermissionValidatorForm: React.FC = () => {
                   title={CREATE_PROPOSAL_LABEL_EFFECTIVE_AT}
                   description="Select the date and time the proposal will take effect"
                   initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
-                  id="unpermission-validator-effective-date"
+                  id="block-validator-effective-date"
                 />
               )}
             />
@@ -219,7 +217,7 @@ export const UnpermissionValidatorForm: React.FC = () => {
             >
               {field => (
                 <field.ProposalSummaryField
-                  id="unpermission-validator-summary"
+                  id="block-validator-summary"
                   title={CREATE_PROPOSAL_LABEL_PROPOSAL_SUMMARY}
                 />
               )}
@@ -235,7 +233,7 @@ export const UnpermissionValidatorForm: React.FC = () => {
               {field => (
                 <field.TextField
                   title={CREATE_PROPOSAL_LABEL_SUPPORTING_URL}
-                  id="unpermission-validator-url"
+                  id="block-validator-url"
                   muiTextFieldProps={{ placeholder: SUPPORTING_URL_PLACEHOLDER }}
                 />
               )}

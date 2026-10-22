@@ -475,7 +475,7 @@ class SV1Initializer(
           onboardingRestriction =
             if (
               sv1Config.initialSvOperationsSwitchOverTimes
-                .exists(_.contains(SwitchOverTimes.PermissionedSynchronizer))
+                .exists(_.contains(SwitchOverTimes.TrafficBasedOnboarding))
             ) {
               logger.info("Using RestrictedOpen onboarding restriction for the synchronizer")
               RestrictedOpen
@@ -501,7 +501,7 @@ class SV1Initializer(
               sv1PermissionTx <-
                 if (
                   sv1Config.initialSvOperationsSwitchOverTimes
-                    .exists(_.contains(SwitchOverTimes.PermissionedSynchronizer))
+                    .exists(_.contains(SwitchOverTimes.TrafficBasedOnboarding))
                 ) {
                   logger.debug(
                     "Proposing ParticipantSynchronizerPermission topology transaction for self"

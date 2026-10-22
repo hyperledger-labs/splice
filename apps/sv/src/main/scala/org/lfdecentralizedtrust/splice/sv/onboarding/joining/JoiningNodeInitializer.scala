@@ -853,10 +853,10 @@ class JoiningNodeInitializer(
         dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
         svConnection: SvConnection,
         joiningConfig: SvOnboardingConfig.JoinWithKey,
-        permissionedSynchronizer: Boolean,
+        trafficBasedOnboarding: Boolean,
     ): Future[Unit] = {
       new WithDsoStore(dsoStoreWithIngestion)
-        .startOnboardingWithDsoPartyHosted(svConnection, joiningConfig, permissionedSynchronizer)
+        .startOnboardingWithDsoPartyHosted(svConnection, joiningConfig, trafficBasedOnboarding)
     }
 
     /** A private class to share the dsoStoreWithIngestion across utility methods. */
@@ -868,14 +868,14 @@ class JoiningNodeInitializer(
       def startOnboardingWithDsoPartyHosted(
           svConnection: SvConnection,
           joiningConfig: SvOnboardingConfig.JoinWithKey,
-          permissionedSynchronizer: Boolean,
+          trafficBasedOnboarding: Boolean,
       ): Future[Unit] = {
         val SvOnboardingConfig.JoinWithKey(name, _, publicKey, privateKey, _) = joiningConfig
         SvUtil.keyPairMatches(publicKey, privateKey) match {
           case Right(privateKey_) =>
             for {
               _ <-
-                if (!permissionedSynchronizer) {
+                if (!trafficBasedOnboarding) {
                   requestOnboarding(
                     svConnection,
                     name,
@@ -967,7 +967,7 @@ class JoiningNodeInitializer(
         joiningConfig: SvOnboardingConfig.JoinWithKey,
         packageVersionSupport: PackageVersionSupport,
         synchronizerId: SynchronizerId,
-        permissionedSynchronizer: Boolean,
+        trafficBasedOnboarding: Boolean,
     ): Future[SvDsoAutomationService] = {
       joiningConfig match {
         case SvOnboardingConfig.JoinWithKey(name, _, publicKey, privateKey, _) =>
@@ -982,7 +982,7 @@ class JoiningNodeInitializer(
                     for {
                       _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
                       _ <-
-                        if (!permissionedSynchronizer) {
+                        if (!trafficBasedOnboarding) {
                           requestOnboarding(
                             svConnection,
                             name,
@@ -1148,7 +1148,7 @@ class JoiningNodeInitializer(
         "dso_info_from_sponsor_for_permissioned_flag",
         "DSO info from sponsoring SV",
         getDsoInfoFromSponsor(conf, upgradesConfig).map { dsoInfo =>
-          SwitchOverTimes.permissionedSynchronizerScheduled(dsoInfo.dsoRules.payload)
+          SwitchOverTimes.trafficBasedOnboardingScheduled(dsoInfo.dsoRules.payload)
         },
         logger,
       )

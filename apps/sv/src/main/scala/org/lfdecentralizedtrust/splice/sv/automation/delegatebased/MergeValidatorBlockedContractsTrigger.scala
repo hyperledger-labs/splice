@@ -9,22 +9,22 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_MergeValidatorUnpermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_MergeValidatorBlocked
 import org.lfdecentralizedtrust.splice.store.PageLimit
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorblocked.ValidatorBlocked
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
-/** Trigger to merge multiple ValidatorUnpermission contracts for the same validator */
+/** Trigger to merge multiple ValidatorBlocked contracts for the same validator */
 
-class MergeValidatorUnpermissionContractsTrigger(
+class MergeValidatorBlockedContractsTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
@@ -32,14 +32,14 @@ class MergeValidatorUnpermissionContractsTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[
-      ValidatorUnpermission.ContractId,
-      ValidatorUnpermission,
+      ValidatorBlocked.ContractId,
+      ValidatorBlocked,
     ](
       svTaskContext.dsoStore,
-      ValidatorUnpermission.COMPANION,
+      ValidatorBlocked.COMPANION,
     )
     with SvTaskBasedTrigger[
-      AssignedContract[ValidatorUnpermission.ContractId, ValidatorUnpermission]
+      AssignedContract[ValidatorBlocked.ContractId, ValidatorBlocked]
     ] {
 
   private val store = svTaskContext.dsoStore
@@ -47,14 +47,14 @@ class MergeValidatorUnpermissionContractsTrigger(
   private val MAX_VALIDATOR_UNPERMISSION_CONTRACTS = PageLimit.tryCreate(10)
 
   override def completeTaskAsDsoDelegate(
-      unpermission: AssignedContract[ValidatorUnpermission.ContractId, ValidatorUnpermission],
+      blocked: AssignedContract[ValidatorBlocked.ContractId, ValidatorBlocked],
       controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val participantId = unpermission.payload.participantId
+    val participantId = blocked.payload.participantId
 
     for {
-      supportsPermissionedSynchronizer <- svTaskContext.packageVersionSupport
-        .supportsPermissionedSynchronizer(
+      supportsTrafficBasedOnboarding <- svTaskContext.packageVersionSupport
+        .supportsTrafficBasedOnboarding(
           Seq(
             store.key.svParty,
             store.key.dsoParty,
@@ -62,9 +62,9 @@ class MergeValidatorUnpermissionContractsTrigger(
           context.clock.now.minus(context.config.clockSkewAutomationDelay.asJava),
         )
 
-      validatorUnpermissions <-
-        if (supportsPermissionedSynchronizer.supported) {
-          store.listValidatorUnpermissions(
+      validatorBlockeds <-
+        if (supportsTrafficBasedOnboarding.supported) {
+          store.listValidatorBlockeds(
             participantId,
             MAX_VALIDATOR_UNPERMISSION_CONTRACTS,
           )
@@ -73,52 +73,52 @@ class MergeValidatorUnpermissionContractsTrigger(
         }
 
       outcome <-
-        if (validatorUnpermissions.length > 1) {
+        if (validatorBlockeds.length > 1) {
           logger.info(
-            s"Participant $participantId has ${validatorUnpermissions.length} ValidatorUnpermission contracts, hence merging them"
+            s"Participant $participantId has ${validatorBlockeds.length} ValidatorBlocked contracts, hence merging them"
           )
-          mergeValidatorUnpermissionContracts(
+          mergeValidatorBlockedContracts(
             participantId,
-            validatorUnpermissions,
+            validatorBlockeds,
             controller,
           )
-        } else if (supportsPermissionedSynchronizer.supported) {
+        } else if (supportsTrafficBasedOnboarding.supported) {
           Future.successful(
             TaskSuccess(
-              s"Only one ValidatorUnpermission contract for $participantId, nothing to merge."
+              s"Only one ValidatorBlocked contract for $participantId, nothing to merge."
             )
           )
         } else {
           Future.successful(
             TaskSuccess(
-              s"Skipping merging ValidatorUnpermission contracts for $participantId as the package does not support it."
+              s"Skipping merging ValidatorBlocked contracts for $participantId as the package does not support it."
             )
           )
         }
     } yield outcome
   }
 
-  private def mergeValidatorUnpermissionContracts(
+  private def mergeValidatorBlockedContracts(
       participantId: String,
-      validatorUnpermissions: Seq[
-        Contract[ValidatorUnpermission.ContractId, ValidatorUnpermission]
+      validatorBlockeds: Seq[
+        Contract[ValidatorBlocked.ContractId, ValidatorBlocked]
       ],
       controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
-      arg = new DsoRules_MergeValidatorUnpermission(
-        validatorUnpermissions.map(_.contractId).asJava,
+      arg = new DsoRules_MergeValidatorBlocked(
+        validatorBlockeds.map(_.contractId).asJava,
         Optional.of(controller),
       )
-      cmd = dsoRules.exercise(_.exerciseDsoRules_MergeValidatorUnpermission(arg))
+      cmd = dsoRules.exercise(_.exerciseDsoRules_MergeValidatorBlocked(arg))
       _ <- svTaskContext
         .connection(SpliceLedgerConnectionPriority.Low)
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
         .yieldResult()
     } yield TaskSuccess(
-      s"Merged ${validatorUnpermissions.length} ValidatorUnpermission contracts for participant $participantId"
+      s"Merged ${validatorBlockeds.length} ValidatorBlocked contracts for participant $participantId"
     )
   }
 

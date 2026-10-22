@@ -100,7 +100,7 @@ class HttpSvPublicHandler(
       Codec.decode(Codec.Party)(body.partyId) match {
         case Right(partyId) =>
           dsoStore.getDsoRules().flatMap { dsoRules =>
-            if (SwitchOverTimes.permissionedSynchronizerEnabled(clock, dsoRules.payload)) {
+            if (SwitchOverTimes.trafficBasedOnboardingEnabled(clock, dsoRules.payload)) {
               Future.failed(
                 HttpErrorHandler.badRequest(
                   s"Endpoint is disabled: the network has migrated to traffic-based onboarding."
@@ -215,7 +215,7 @@ class HttpSvPublicHandler(
                 )
               } else if (
                 !isCandidatePartyHostedOnParticipant && !SwitchOverTimes
-                  .permissionedSynchronizerScheduled(dsoRules.payload)
+                  .trafficBasedOnboardingScheduled(dsoRules.payload)
               )
                 // Conflict instead of not authorized because this can happen if our participant just has not yet caught up
                 // and the client can just retry on that.
@@ -352,10 +352,10 @@ class HttpSvPublicHandler(
           dsoRules <- dsoStore.getDsoRules()
 
           res <-
-            if (!SwitchOverTimes.permissionedSynchronizerScheduled(dsoRules.payload)) {
+            if (!SwitchOverTimes.trafficBasedOnboardingScheduled(dsoRules.payload)) {
               Future.failed(
                 HttpErrorHandler.notImplemented(
-                  "Traffic purchasing self-service is only available when permissioned synchronizer is enabled."
+                  "Traffic purchasing self-service is only available when traffic based onboarding is enabled."
                 )
               )
             } else {

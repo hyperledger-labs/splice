@@ -84,7 +84,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
         stateHistory,
       )
       targetOnboardingRestriction =
-        if (SwitchOverTimes.permissionedSynchronizerEnabled(context.clock, dsoRules.payload)) {
+        if (SwitchOverTimes.trafficBasedOnboardingEnabled(context.clock, dsoRules.payload)) {
           OnboardingRestriction.RestrictedOpen
         } else {
           OnboardingRestriction.UnrestrictedOpen

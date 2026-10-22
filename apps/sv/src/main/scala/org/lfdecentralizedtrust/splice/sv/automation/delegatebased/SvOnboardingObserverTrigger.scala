@@ -48,7 +48,7 @@ class SvOnboardingObserverTrigger(
       readyTasks <- MonadUtil.sequentialTraverse(unobserved) { c =>
         val partyId = PartyId.tryFromProtoPrimitive(c.payload.svParty)
         for {
-          support <- svTaskContext.packageVersionSupport.supportsPermissionedSynchronizer(
+          support <- svTaskContext.packageVersionSupport.supportsTrafficBasedOnboarding(
             Seq(partyId),
             context.clock.now,
           )

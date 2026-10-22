@@ -66,8 +66,8 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorrepermission.ValidatorRepermission
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunblocked.ValidatorUnblocked
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorblocked.ValidatorBlocked
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import slick.jdbc.GetResult
@@ -145,11 +145,11 @@ class DbSvDsoStore(
 
   private def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
 
-  override def listValidatorRepermissions(
+  override def listValidatorUnblockeds(
       limit: Limit = defaultLimit
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[ValidatorRepermission.ContractId, ValidatorRepermission]]] =
+  ): Future[Seq[Contract[ValidatorUnblocked.ContractId, ValidatorUnblocked]]] =
     for {
       result <- storage
         .query(
@@ -157,19 +157,19 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            ValidatorRepermission.COMPANION,
+            ValidatorUnblocked.COMPANION,
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
-          "listValidatorRepermissions",
+          "listValidatorUnblockeds",
         )
-    } yield result.map(contractFromRow(ValidatorRepermission.COMPANION)(_))
+    } yield result.map(contractFromRow(ValidatorUnblocked.COMPANION)(_))
 
-  def listValidatorUnpermissions(
+  def listValidatorBlockeds(
       participantId: String,
       limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[ValidatorUnpermission.ContractId, ValidatorUnpermission]]] =
+  ): Future[Seq[Contract[ValidatorBlocked.ContractId, ValidatorBlocked]]] =
     for {
       result <- storage
         .query(
@@ -177,13 +177,13 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            ValidatorUnpermission.COMPANION,
+            ValidatorBlocked.COMPANION,
             where = sql"""participant_id = ${lengthLimited(participantId)}""",
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
-          "listValidatorUnpermissions",
+          "listValidatorBlockeds",
         )
-    } yield result.map(contractFromRow(ValidatorUnpermission.COMPANION)(_))
+    } yield result.map(contractFromRow(ValidatorBlocked.COMPANION)(_))
 
   override def listExpiredAnsSubscriptions(
       now: CantonTimestamp,

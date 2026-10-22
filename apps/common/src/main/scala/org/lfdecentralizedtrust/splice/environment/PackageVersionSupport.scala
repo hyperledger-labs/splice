@@ -39,7 +39,7 @@ trait PackageVersionSupport extends NamedLogging {
     )
   }
 
-  def supportsPermissionedSynchronizer(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+  def supportsTrafficBasedOnboarding(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[FeatureSupport] = {
     isDarSupported(

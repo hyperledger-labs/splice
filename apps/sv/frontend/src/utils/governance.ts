@@ -33,8 +33,8 @@ import type {
   UpdateFeatureAppProposal,
   UpdateSvRewardWeightProposal,
   YourVoteStatus,
-  UnpermissionValidatorProposal,
-  RepermissionValidatorProposal,
+  BlockValidatorProposal,
+  UnblockValidatorProposal,
 } from '../utils/types';
 import { buildAmuletConfigChanges } from './buildAmuletConfigChanges';
 import { buildDsoConfigChanges } from './buildDsoConfigChanges';
@@ -56,8 +56,8 @@ export const actionTagToTitle = (amuletName: string): Record<SupportedActionTag,
   SRARC_SetConfig: 'Set Decentralized Synchronizer Operations (DSO) Rules Configuration',
   SRARC_UpdateSvRewardWeight: 'Update Super Validator Reward Weight',
   SRARC_UpdateFeaturedAppRight: 'Update Featured Application',
-  SRARC_UnpermissionValidator: 'Unpermission Validator',
-  SRARC_RepermissionValidator: 'Repermission Validator',
+  SRARC_BlockValidator: 'Block Validator',
+  SRARC_UnblockValidator: 'Unblock Validator',
 });
 
 export const createProposalActions: {
@@ -78,8 +78,8 @@ export const createProposalActions: {
   },
   { name: 'Set Amulet Rules Configuration', value: 'CRARC_SetConfig' },
   { name: 'Update Super Validator Reward Weight', value: 'SRARC_UpdateSvRewardWeight' },
-  { name: 'Unpermission Validator', value: 'SRARC_UnpermissionValidator' },
-  { name: 'Repermission Validator', value: 'SRARC_RepermissionValidator' },
+  { name: 'Block Validator', value: 'SRARC_BlockValidator' },
+  { name: 'Unblock Validator', value: 'SRARC_UnblockValidator' },
 ];
 
 export const getVoteResultStatus = (
@@ -191,10 +191,10 @@ export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: Dso
   if (action.tag === 'ARC_DsoRules') {
     const dsoAction = action.value.dsoAction;
     switch (dsoAction.tag) {
-      case 'SRARC_RepermissionValidator':
-        return createRepermissionValidatorProposal(dsoAction.value.validatorUnpermissionCid);
-      case 'SRARC_UnpermissionValidator':
-        return createUnpermissionValidatorProposal(
+      case 'SRARC_UnblockValidator':
+        return createUnblockValidatorProposal(dsoAction.value.validatorBlockedCid);
+      case 'SRARC_BlockValidator':
+        return createBlockValidatorProposal(
           dsoAction.value.participantId,
           dsoAction.value.revoked,
           dsoAction.value.loginAfter
@@ -245,19 +245,17 @@ export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: Dso
   }
 }
 
-function createRepermissionValidatorProposal(
-  unpermissionCid: string
-): RepermissionValidatorProposal {
+function createUnblockValidatorProposal(blockedCid: string): UnblockValidatorProposal {
   return {
-    unpermissionCid,
+    blockedCid,
   };
 }
 
-function createUnpermissionValidatorProposal(
+function createBlockValidatorProposal(
   participantId: string,
   revoked: boolean,
   loginAfter: string | null
-): UnpermissionValidatorProposal {
+): BlockValidatorProposal {
   return {
     participantId,
     revoked,

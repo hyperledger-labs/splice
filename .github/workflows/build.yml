@@ -135,27 +135,27 @@ jobs:
       protocol_version: ${{ inputs.protocol_version }}
     secrets: inherit
 
-  scala_test_permissioned_canton:
+  scala_test_traffic_based_onboarding_1:
     uses: ./.github/workflows/build.scala_test.yml
     with:
       runs_on: self-hosted-k8s-medium
-      test_names_file: 'test-full-class-names-permissioned.log'
+      test_names_file: 'test-full-class-names-traffic-based-onboarding-1.log'
       start_canton_options: -w
       parallelism: 1
-      test_name: permissioned-synchronizer
+      test_name: traffic-based-onboarding
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
       protocol_version: ${{ inputs.protocol_version }}
     secrets: inherit
 
-  scala_test_permissioned_canton_migration:
+  scala_test_traffic_based_onboarding_2:
     uses: ./.github/workflows/build.scala_test.yml
     with:
       runs_on: self-hosted-k8s-medium
-      test_names_file: 'test-full-class-names-permissioned-migration.log'
+      test_names_file: 'test-full-class-names-traffic-based-onboarding-2.log'
       start_canton_options: -w
       parallelism: 1
-      test_name: permissioned-synchronizer
+      test_name: traffic-based-onboarding
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
       protocol_version: ${{ inputs.protocol_version }}
@@ -355,8 +355,8 @@ jobs:
     - scala_test_roll_forward_lsu
     - scala_test_signatures
     - scala_test_wall_clock_time
-    - scala_test_permissioned_canton
-    - scala_test_permissioned_canton_migration
+    - scala_test_traffic_based_onboarding_1
+    - scala_test_traffic_based_onboarding_2
     - scala_test_frontend_wall_clock_time
     - scala_test_frontend_simtime
     - scala_test_docker_compose

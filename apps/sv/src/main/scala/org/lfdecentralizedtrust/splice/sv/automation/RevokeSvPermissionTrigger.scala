@@ -40,7 +40,7 @@ class RevokeSvPermissionTrigger(
     for {
       dsoRules <- store.getDsoRules()
       tasks <-
-        if (!SwitchOverTimes.permissionedSynchronizerScheduled(dsoRules.payload)) {
+        if (!SwitchOverTimes.trafficBasedOnboardingScheduled(dsoRules.payload)) {
           Future.successful(Seq.empty)
         } else {
           val offboardedParticipants =

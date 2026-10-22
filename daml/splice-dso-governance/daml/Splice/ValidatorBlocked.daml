@@ -1,0 +1,36 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.ValidatorBlocked where
+
+import Splice.Util
+import Splice.Types (ForDso(..))
+
+data ValidatorBlocked_ArchiveResult = ValidatorBlocked_ArchiveResult
+  deriving (Serializable)
+
+-- | ValidatorBlocked contract is created to manage
+-- the validator's access on the synchronizer.
+-- It is created lazily when SVs successfully vote to restrict a validator's access.
+template ValidatorBlocked
+  with
+    dso : Party
+    participantId : Text
+    -- The timestamp after which the validator is allowed to log in again.
+    -- If set, this acts as a temporary suspension until the specified time.
+    loginAfter : Optional Time
+    -- A flag indicating whether the validator has been permanently banned.
+    -- If True, the validator's ParticipantSynchronizer topology is revoked.
+    revoked : Bool
+  where
+    signatory dso
+
+    choice ValidatorBlocked_Archive : ValidatorBlocked_ArchiveResult
+      controller dso
+      do return ValidatorBlocked_ArchiveResult
+
+-- instances
+------------
+
+instance HasCheckedFetch ValidatorBlocked ForDso where
+  contractGroupId ValidatorBlocked{..} = ForDso with dso

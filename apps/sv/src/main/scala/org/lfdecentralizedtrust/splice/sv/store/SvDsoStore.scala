@@ -52,8 +52,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunpermission.ValidatorUnpermission
-import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorrepermission.ValidatorRepermission
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorblocked.ValidatorBlocked
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorunblocked.ValidatorUnblocked
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
@@ -1204,18 +1204,18 @@ trait SvDsoStore
     splice.ans.amuletconversionratefeed.AmuletConversionRateFeed,
   ]]]
 
-  def listValidatorUnpermissions(
+  def listValidatorBlockeds(
       participantId: String,
       limit: Limit = defaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[ValidatorUnpermission.ContractId, ValidatorUnpermission]]]
+  ): Future[Seq[Contract[ValidatorBlocked.ContractId, ValidatorBlocked]]]
 
-  def listValidatorRepermissions(
+  def listValidatorUnblockeds(
       limit: Limit = defaultLimit
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[ValidatorRepermission.ContractId, ValidatorRepermission]]]
+  ): Future[Seq[Contract[ValidatorUnblocked.ContractId, ValidatorUnblocked]]]
 
 }
 
@@ -1690,7 +1690,7 @@ object SvDsoStore {
       mkFilter(vl.ValidatorLicenseRequest.COMPANION)(
         req => req.payload.dso == dso,
         versionGuard = { case (pkgVersionSupport, now) =>
-          (tc) => pkgVersionSupport.supportsPermissionedSynchronizer(Seq(dsoParty), now)(tc)
+          (tc) => pkgVersionSupport.supportsTrafficBasedOnboarding(Seq(dsoParty), now)(tc)
         },
       ) { contract =>
         DsoAcsStoreRowData(
@@ -1699,10 +1699,10 @@ object SvDsoStore {
           validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
         )
       },
-      mkFilter(ValidatorUnpermission.COMPANION)(
+      mkFilter(ValidatorBlocked.COMPANION)(
         co => co.payload.dso == dso,
         versionGuard = { case (pkgVersionSupport, now) =>
-          (tc) => pkgVersionSupport.supportsPermissionedSynchronizer(Seq(dsoParty), now)(tc)
+          (tc) => pkgVersionSupport.supportsTrafficBasedOnboarding(Seq(dsoParty), now)(tc)
         },
       ) { contract =>
         DsoAcsStoreRowData(
@@ -1710,10 +1710,10 @@ object SvDsoStore {
           participantId = Some(contract.payload.participantId),
         )
       },
-      mkFilter(ValidatorRepermission.COMPANION)(
+      mkFilter(ValidatorUnblocked.COMPANION)(
         co => co.payload.dso == dso,
         versionGuard = { case (pkgVersionSupport, now) =>
-          (tc) => pkgVersionSupport.supportsPermissionedSynchronizer(Seq(dsoParty), now)(tc)
+          (tc) => pkgVersionSupport.supportsTrafficBasedOnboarding(Seq(dsoParty), now)(tc)
         },
       ) { contract =>
         DsoAcsStoreRowData(

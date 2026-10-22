@@ -214,7 +214,7 @@ class ValidatorApp(
             // For now this seems acceptable.
             initialSynchronizerTime = Option.when(!domainAlreadyRegistered)(now)
 
-            // When the permissioned synchronizer is enabled, the domain operates in RestrictedOpen mode.
+            // When the traffic based onboarding is enabled, the domain operates in RestrictedOpen mode.
             // If we attempt to connect to the domain before our participant has been granted the
             // ParticipantSynchronizerPermission, the sequencer will immediately reject the connection
             // with an INITIAL_ONBOARDING_ERROR, crashing the node during startup.
@@ -227,16 +227,16 @@ class ValidatorApp(
                     dsoRules <- retryProvider.retry(
                       RetryFor.WaitingOnInitDependency,
                       "get_dso_rules",
-                      "get DSO rules to check permissioned synchronizer status",
+                      "get DSO rules to check traffic based onboarding status",
                       scanConnection.getDsoRules(),
                       logger,
                     )
-                    isPermissionedSynchronizer = SwitchOverTimes.permissionedSynchronizerEnabled(
+                    isTrafficBasedOnboarding = SwitchOverTimes.trafficBasedOnboardingEnabled(
                       clock,
                       dsoRules.payload,
                     )
                     _ <-
-                      if (isPermissionedSynchronizer) {
+                      if (isTrafficBasedOnboarding) {
                         for {
                           synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
                           _ <-
@@ -510,14 +510,14 @@ class ValidatorApp(
           case Some(oc) =>
             for {
               dsoRules <- scanConnection.getDsoRules()
-              isPermissionedSynchronizer = SwitchOverTimes.permissionedSynchronizerEnabled(
+              isTrafficBasedOnboarding = SwitchOverTimes.trafficBasedOnboardingEnabled(
                 clock,
                 dsoRules.payload,
               )
               _ <-
-                if (isPermissionedSynchronizer) {
+                if (isTrafficBasedOnboarding) {
                   logger.info(
-                    "ValidatorLicense not found, permissioned synchronizer is enabled. Submitting ValidatorLicenseRequest to the ledger."
+                    "ValidatorLicense not found, traffic based onboarding is enabled. Submitting ValidatorLicenseRequest to the ledger."
                   )
                   for {
                     _ <- submitValidatorLicenceRequest(

@@ -22,7 +22,7 @@ import {
   ListFeaturedAppRightsByProviderResponse,
   LookupFeaturedAppRightByContractIdResponse,
   ListValidatorLicensesResponse,
-  ListValidatorUnpermissionsResponse,
+  ListValidatorBlockedsResponse,
   ListVoteRequestByTrackingCidResponse,
   ListVoteResultsRequest,
   LookupDsoRulesVoteRequestResponse,
@@ -91,9 +91,7 @@ export interface SvAdminClient {
   ) => Promise<PrepareValidatorOnboardingResponse>;
   listOngoingValidatorOnboardings: () => Promise<ListOngoingValidatorOnboardingsResponse>;
   listValidatorLicenses: (limit: number, after?: number) => Promise<ListValidatorLicensesResponse>;
-  listValidatorUnpermissions: (
-    participantId: string
-  ) => Promise<ListValidatorUnpermissionsResponse>;
+  listValidatorBlockeds: (participantId: string) => Promise<ListValidatorBlockedsResponse>;
   listAmuletPriceVotes: () => Promise<ListAmuletPriceVotesResponse>;
   updateDesiredAmuletPrice: (amuletPrice: BigNumber) => Promise<void>;
   listOpenMiningRounds: () => Promise<ListOpenMiningRoundsResponse>;
@@ -228,10 +226,10 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       ): Promise<ListValidatorLicensesResponse> => {
         return await svAdminClient.listValidatorLicenses(after, limit);
       },
-      listValidatorUnpermissions: async (
+      listValidatorBlockeds: async (
         participantId: string
-      ): Promise<ListValidatorUnpermissionsResponse> => {
-        return await svAdminClient.listValidatorUnpermissions(participantId);
+      ): Promise<ListValidatorBlockedsResponse> => {
+        return await svAdminClient.listValidatorBlockeds(participantId);
       },
       listAmuletPriceVotes: async (): Promise<ListAmuletPriceVotesResponse> => {
         return await svAdminClient.listAmuletPriceVotes();

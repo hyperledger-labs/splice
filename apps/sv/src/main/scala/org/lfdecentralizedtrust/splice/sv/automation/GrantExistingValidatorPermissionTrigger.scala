@@ -39,10 +39,10 @@ class GrantExistingValidatorPermissionTrigger(
     for {
       dsoRules <- store.getDsoRules()
       tasks <-
-        if (!SwitchOverTimes.permissionedSynchronizerScheduled(dsoRules.payload)) {
+        if (!SwitchOverTimes.trafficBasedOnboardingScheduled(dsoRules.payload)) {
           Future.successful(Seq.empty)
         } else {
-          SwitchOverTimes.getPermissionedSynchronizerSwitchOverTime(dsoRules.payload) match {
+          SwitchOverTimes.getTrafficBasedOnboardingSwitchOverTime(dsoRules.payload) match {
             case None =>
               Future.successful(Seq.empty)
             case Some(switchOverInstant) =>
@@ -61,14 +61,13 @@ class GrantExistingValidatorPermissionTrigger(
 
                 allowedParticipants <- MonadUtil
                   .sequentialTraverse(onboardedParticipants.toList) { participantId =>
-                    store.listValidatorUnpermissions(participantId.toProtoPrimitive).map {
-                      unpermissions =>
-                        Option.when(unpermissions.isEmpty)(participantId)
+                    store.listValidatorBlockeds(participantId.toProtoPrimitive).map { blockeds =>
+                      Option.when(blockeds.isEmpty)(participantId)
                     }
                   }
                   .map(_.flatten)
 
-                unpermissionedParticipants <- MonadUtil
+                blockededParticipants <- MonadUtil
                   .sequentialTraverse(allowedParticipants) { participantId =>
                     participantAdminConnection
                       .listParticipantSynchronizerPermission(
@@ -82,7 +81,7 @@ class GrantExistingValidatorPermissionTrigger(
                       }
                   }
                   .map(_.flatten)
-              } yield unpermissionedParticipants.map(p =>
+              } yield blockededParticipants.map(p =>
                 GrantExistingValidatorPermissionTrigger.Task(p.toProtoPrimitive)
               )
           }

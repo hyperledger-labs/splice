@@ -1185,7 +1185,7 @@ function subcmd_no_illegal_daml_references() {
       currency founder founding leader collective consortium
       coin whitepaper
       domain global
-      DsoReward
+      DsoReward permission
       'google'
       )
     for word in "${illegal_words[@]}"; do

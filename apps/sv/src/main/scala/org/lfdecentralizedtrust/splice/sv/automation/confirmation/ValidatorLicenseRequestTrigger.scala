@@ -64,9 +64,9 @@ class ValidatorLicenseRequestTrigger(
 
       // Note: Receiving a ValidatorLicenseRequest implies that the corresponding PartyToParticipant mapping and the ParticipantSynchronizerPermission is already available in the Participant, so we avoid checking them again here.
       outcome <-
-        if (!SwitchOverTimes.permissionedSynchronizerScheduled(dsoRules.payload)) {
+        if (!SwitchOverTimes.trafficBasedOnboardingScheduled(dsoRules.payload)) {
           Future.successful(
-            TaskSuccess("Skipped because permissionedSynchronizer switchover has not occurred")
+            TaskSuccess("Skipped because trafficBasedOnboarding switchover has not occurred")
           )
         } else {
           confirm(reqCid, validatorParty, dsoRules)

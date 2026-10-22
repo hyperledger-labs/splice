@@ -40,7 +40,7 @@ class GrantSvPermissionTrigger(
     for {
       dsoRules <- store.getDsoRules()
       tasks <-
-        if (!SwitchOverTimes.permissionedSynchronizerScheduled(dsoRules.payload)) {
+        if (!SwitchOverTimes.trafficBasedOnboardingScheduled(dsoRules.payload)) {
           Future.successful(Seq.empty)
         } else {
           for {
@@ -48,7 +48,7 @@ class GrantSvPermissionTrigger(
             inFlightParticipants = confirmations.map(_.payload.svParticipantId)
             establishedParticipants = dsoRules.payload.svs.asScala.values.map(_.participantId).toSeq
             allTargetParticipants = (inFlightParticipants ++ establishedParticipants).distinct
-            unpermissionedParticipants <- allTargetParticipants.toList.parFilterA { participantId =>
+            blockededParticipants <- allTargetParticipants.toList.parFilterA { participantId =>
               participantAdminConnection
                 .listParticipantSynchronizerPermission(
                   SynchronizerId.tryFromString(
@@ -58,7 +58,7 @@ class GrantSvPermissionTrigger(
                 )
                 .map(permissions => !permissions.exists(_.mapping.permission == Submission))
             }
-          } yield unpermissionedParticipants.map(GrantSvPermissionTrigger.Task(_))
+          } yield blockededParticipants.map(GrantSvPermissionTrigger.Task(_))
         }
     } yield tasks
   }

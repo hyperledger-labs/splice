@@ -31,7 +31,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.concurrent.duration.*
 
-class PermissionedSynchronizerMigrationIntegrationTest
+class TrafficBasedOnboardingMigrationIntegrationTest
     extends IntegrationTest
     with ProcessTestUtil
     with WalletTestUtil
@@ -91,8 +91,8 @@ class PermissionedSynchronizerMigrationIntegrationTest
       aliceValidatorBackend.startSync()
     }
 
-    clue("Vote for a switch-over-time in the future for permissionedSynchronizer") {
-      setPermissionedSynchronizerSwitchOverTime()
+    clue("Vote for a switch-over-time in the future for trafficBasedOnboarding") {
+      setTrafficBasedOnboardingSwitchOverTime()
 
       eventually(40.seconds) {
         sv1ScanBackend
@@ -103,7 +103,7 @@ class PermissionedSynchronizerMigrationIntegrationTest
           .svOperationsSwitchOverTimes
           .toScala
           .map(_.asScala.toMap)
-          .value should contain key SwitchOverTimes.PermissionedSynchronizer
+          .value should contain key SwitchOverTimes.TrafficBasedOnboarding
       }
     }
 
@@ -182,7 +182,7 @@ class PermissionedSynchronizerMigrationIntegrationTest
     }
   }
 
-  private def setPermissionedSynchronizerSwitchOverTime(
+  private def setTrafficBasedOnboardingSwitchOverTime(
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     val config = sv1Backend.getDsoInfo().dsoRules.payload.config
     val newConfig = new DsoRulesConfig(
@@ -203,7 +203,7 @@ class PermissionedSynchronizerMigrationIntegrationTest
         (config.svOperationsSwitchOverTimes.toScala
           .map(_.asScala.toMap)
           .getOrElse(Map.empty[String, java.time.Instant]) +
-          (SwitchOverTimes.PermissionedSynchronizer -> env.environment.clock.now
+          (SwitchOverTimes.TrafficBasedOnboarding -> env.environment.clock.now
             .plusSeconds(10)
             .toInstant)).asJava
       ),
@@ -212,7 +212,7 @@ class PermissionedSynchronizerMigrationIntegrationTest
       sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
       new ARC_DsoRules(new SRARC_SetConfig(new DsoRules_SetConfig(newConfig, Optional.empty()))),
       "url",
-      "set the permissioned-synchronizer switch-over time",
+      "set the traffic-based-onboarding switch-over time",
       config.voteRequestTimeout,
       None,
     )

@@ -336,14 +336,14 @@ class SvDsoAutomationService(
       )
     )
     registerTrigger(
-      new ValidatorUnpermissionTrigger(
+      new ValidatorBlockedTrigger(
         triggerContext,
         dsoStore,
         participantAdminConnection,
       )
     )
     registerTrigger(
-      new ValidatorRepermissionTrigger(
+      new ValidatorUnblockedTrigger(
         triggerContext,
         dsoStore,
         participantAdminConnection,
@@ -849,8 +849,8 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ReconcileSequencingParametersTrigger],
       aTrigger[GrantValidatorPermissionTrigger],
       aTrigger[ValidatorLicenseRequestTrigger],
-      aTrigger[ValidatorUnpermissionTrigger],
-      aTrigger[ValidatorRepermissionTrigger],
+      aTrigger[ValidatorBlockedTrigger],
+      aTrigger[ValidatorUnblockedTrigger],
       aTrigger[GrantSvPermissionTrigger],
       aTrigger[GrantExistingValidatorPermissionTrigger],
       aTrigger[RevokeSvPermissionTrigger],

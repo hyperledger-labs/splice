@@ -10,7 +10,7 @@ import { svPartyId } from '../../mocks/constants';
 import { Wrapper } from '../../helpers';
 import { dateTimeFormatISO } from '@canton-network/splice-common-frontend-utils';
 import dayjs from 'dayjs';
-import { UnpermissionValidatorForm } from '../../../components/forms/UnpermissionValidatorForm';
+import { BlockValidatorForm } from '../../../components/forms/BlockValidatorForm';
 import { server, svUrl } from '../../setup/setup';
 import { http, HttpResponse } from 'msw';
 import {
@@ -41,22 +41,22 @@ describe('SV user can', () => {
   });
 });
 
-describe('Unpermission Validator Form', () => {
-  test('should render all Unpermission Validator Form components', () => {
+describe('Block Validator Form', () => {
+  test('should render all Block Validator Form components', () => {
     render(
       <Wrapper>
-        <UnpermissionValidatorForm />
+        <BlockValidatorForm />
       </Wrapper>
     );
 
-    expect(screen.getByTestId('unpermission-validator-form')).toBeInTheDocument();
+    expect(screen.getByTestId('block-validator-form')).toBeInTheDocument();
     expect(screen.getByText(CREATE_PROPOSAL_LABEL_PROPOSAL_TYPE)).toBeInTheDocument();
 
-    const actionInput = screen.getByTestId('unpermission-validator-action');
+    const actionInput = screen.getByTestId('block-validator-action');
     expect(actionInput).toBeInTheDocument();
-    expect(actionInput.textContent).toBe('Unpermission Validator');
+    expect(actionInput.textContent).toBe('Block Validator');
 
-    const participantInput = screen.getByTestId('unpermission-validator-participant-id');
+    const participantInput = screen.getByTestId('block-validator-participant-id');
     expect(participantInput).toBeInTheDocument();
     expect(participantInput.getAttribute('value')).toBe('');
 
@@ -64,18 +64,18 @@ describe('Unpermission Validator Form', () => {
     expect(revokedCheckbox).toBeInTheDocument();
     expect(revokedCheckbox).not.toBeChecked();
 
-    const loginAfterInput = screen.getByTestId('unpermission-validator-login-after-field');
+    const loginAfterInput = screen.getByTestId('block-validator-login-after-field');
     expect(loginAfterInput).toBeInTheDocument();
 
-    const summaryInput = screen.getByTestId('unpermission-validator-summary');
+    const summaryInput = screen.getByTestId('block-validator-summary');
     expect(summaryInput).toBeInTheDocument();
     expect(summaryInput.getAttribute('value')).toBeNull();
 
-    const summarySubtitle = screen.getByTestId('unpermission-validator-summary-subtitle');
+    const summarySubtitle = screen.getByTestId('block-validator-summary-subtitle');
     expect(summarySubtitle).toBeInTheDocument();
     expect(summarySubtitle.textContent).toBe(PROPOSAL_SUMMARY_SUBTITLE);
 
-    const urlInput = screen.getByTestId('unpermission-validator-url');
+    const urlInput = screen.getByTestId('block-validator-url');
     expect(urlInput).toBeInTheDocument();
     expect(urlInput.getAttribute('value')).toBe('');
     expect(urlInput).toHaveAttribute('placeholder', SUPPORTING_URL_PLACEHOLDER);
@@ -88,11 +88,11 @@ describe('Unpermission Validator Form', () => {
 
     render(
       <Wrapper>
-        <UnpermissionValidatorForm />
+        <BlockValidatorForm />
       </Wrapper>
     );
 
-    const actionInput = screen.getByTestId('unpermission-validator-action');
+    const actionInput = screen.getByTestId('block-validator-action');
     const submitButton = screen.getByTestId('submit-button');
     expect(submitButton).toBeInTheDocument();
     expect(screen.getByText('Review Proposal')).toBeInTheDocument();
@@ -108,13 +108,13 @@ describe('Unpermission Validator Form', () => {
     expect(screen.getByText('Invalid URL')).toBeInTheDocument();
 
     // completing the form should reenable the submit button
-    const participantInput = screen.getByTestId('unpermission-validator-participant-id');
+    const participantInput = screen.getByTestId('block-validator-participant-id');
     await user.type(participantInput, 'PAR::alice::1234567890');
 
-    const summaryInput = screen.getByTestId('unpermission-validator-summary');
+    const summaryInput = screen.getByTestId('block-validator-summary');
     await user.type(summaryInput, 'Summary of the proposal');
 
-    const urlInput = screen.getByTestId('unpermission-validator-url');
+    const urlInput = screen.getByTestId('block-validator-url');
     await user.type(urlInput, 'https://example.com');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
@@ -127,12 +127,12 @@ describe('Unpermission Validator Form', () => {
 
     render(
       <Wrapper>
-        <UnpermissionValidatorForm />
+        <BlockValidatorForm />
       </Wrapper>
     );
 
-    const participantInput = screen.getByTestId('unpermission-validator-participant-id');
-    const actionInput = screen.getByTestId('unpermission-validator-action');
+    const participantInput = screen.getByTestId('block-validator-participant-id');
+    const actionInput = screen.getByTestId('block-validator-action');
 
     await user.type(participantInput, 'invalid-participant-id');
     await user.click(actionInput); // trigger validation on blur
@@ -163,40 +163,38 @@ describe('Unpermission Validator Form', () => {
 
     render(
       <Wrapper>
-        <UnpermissionValidatorForm />
+        <BlockValidatorForm />
       </Wrapper>
     );
 
     const revokedCheckbox = screen.getByRole('checkbox');
 
     // Login after should be visible initially
-    expect(screen.getByTestId('unpermission-validator-login-after-field')).toBeInTheDocument();
+    expect(screen.getByTestId('block-validator-login-after-field')).toBeInTheDocument();
 
     // Click permanent revocation
     await user.click(revokedCheckbox);
 
     // Login after should disappear
     await waitFor(() => {
-      expect(
-        screen.queryByTestId('unpermission-validator-login-after-field')
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId('block-validator-login-after-field')).not.toBeInTheDocument();
     });
 
     // Uncheck and it should reappear
     await user.click(revokedCheckbox);
     await waitFor(() => {
-      expect(screen.getByTestId('unpermission-validator-login-after-field')).toBeInTheDocument();
+      expect(screen.getByTestId('block-validator-login-after-field')).toBeInTheDocument();
     });
   });
 
   test('expiry date must be in the future', async () => {
     render(
       <Wrapper>
-        <UnpermissionValidatorForm />
+        <BlockValidatorForm />
       </Wrapper>
     );
 
-    const expiryDateInput = screen.getByTestId('unpermission-validator-expiry-date-field');
+    const expiryDateInput = screen.getByTestId('block-validator-expiry-date-field');
     expect(expiryDateInput).toBeInTheDocument();
 
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
@@ -218,12 +216,12 @@ describe('Unpermission Validator Form', () => {
   test('effective date must be after expiry date', async () => {
     render(
       <Wrapper>
-        <UnpermissionValidatorForm />
+        <BlockValidatorForm />
       </Wrapper>
     );
 
-    const expiryDateInput = screen.getByTestId('unpermission-validator-expiry-date-field');
-    const effectiveDateInput = screen.getByTestId('unpermission-validator-effective-date-field');
+    const expiryDateInput = screen.getByTestId('block-validator-expiry-date-field');
+    const effectiveDateInput = screen.getByTestId('block-validator-effective-date-field');
 
     const expiryDate = dayjs().add(1, 'week');
     const effectiveDate = expiryDate.subtract(1, 'day');
@@ -255,19 +253,19 @@ describe('Unpermission Validator Form', () => {
 
     render(
       <Wrapper>
-        <UnpermissionValidatorForm />
+        <BlockValidatorForm />
       </Wrapper>
     );
 
-    const actionInput = screen.getByTestId('unpermission-validator-action');
+    const actionInput = screen.getByTestId('block-validator-action');
 
-    const participantInput = screen.getByTestId('unpermission-validator-participant-id');
+    const participantInput = screen.getByTestId('block-validator-participant-id');
     await user.type(participantInput, 'PAR::alice::1234567890');
 
-    const summaryInput = screen.getByTestId('unpermission-validator-summary');
+    const summaryInput = screen.getByTestId('block-validator-summary');
     await user.type(summaryInput, 'Summary of the proposal');
 
-    const urlInput = screen.getByTestId('unpermission-validator-url');
+    const urlInput = screen.getByTestId('block-validator-url');
     await user.type(urlInput, 'https://example.com');
 
     expect(screen.getByText('Review Proposal')).toBeInTheDocument();
@@ -301,19 +299,19 @@ describe('Unpermission Validator Form', () => {
 
     render(
       <Wrapper>
-        <UnpermissionValidatorForm />
+        <BlockValidatorForm />
       </Wrapper>
     );
 
-    const actionInput = screen.getByTestId('unpermission-validator-action');
+    const actionInput = screen.getByTestId('block-validator-action');
 
-    const participantInput = screen.getByTestId('unpermission-validator-participant-id');
+    const participantInput = screen.getByTestId('block-validator-participant-id');
     await user.type(participantInput, 'PAR::alice::1234567890');
 
-    const summaryInput = screen.getByTestId('unpermission-validator-summary');
+    const summaryInput = screen.getByTestId('block-validator-summary');
     await user.type(summaryInput, 'Summary of the proposal');
 
-    const urlInput = screen.getByTestId('unpermission-validator-url');
+    const urlInput = screen.getByTestId('block-validator-url');
     await user.type(urlInput, 'https://example.com');
 
     const submitButton = screen.getByTestId('submit-button');
@@ -348,19 +346,19 @@ describe('Unpermission Validator Form', () => {
 
     render(
       <Wrapper>
-        <UnpermissionValidatorForm />
+        <BlockValidatorForm />
       </Wrapper>
     );
 
-    const actionInput = screen.getByTestId('unpermission-validator-action');
+    const actionInput = screen.getByTestId('block-validator-action');
 
-    const participantInput = screen.getByTestId('unpermission-validator-participant-id');
+    const participantInput = screen.getByTestId('block-validator-participant-id');
     await user.type(participantInput, 'PAR::alice::1234567890');
 
-    const summaryInput = screen.getByTestId('unpermission-validator-summary');
+    const summaryInput = screen.getByTestId('block-validator-summary');
     await user.type(summaryInput, 'Summary of the proposal');
 
-    const urlInput = screen.getByTestId('unpermission-validator-url');
+    const urlInput = screen.getByTestId('block-validator-url');
     await user.type(urlInput, 'https://example.com');
 
     const revokedCheckbox = screen.getByRole('checkbox');
