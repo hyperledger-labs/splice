@@ -356,21 +356,13 @@ class DbScanAppRewardsStore(
     )
   }
 
-  /** DBIO action to read the total activity weight for a round. */
+  /** DBIO action to read the per-round `(appWeight, assetWeight)` for a round. */
   // .head is safe: only called after aggregateActivityTotalsAction in the same transaction.
-  private def getAppActivityRoundTotalWeightAction(roundNumber: Long) =
-    sql"""select total_round_app_activity_weight
+  private def getRoundActivityWeightsAction(roundNumber: Long) =
+    sql"""select total_round_app_activity_weight, total_round_asset_activity_weight
           from #${Tables.appActivityRoundTotals}
           where history_id = $historyId and round_number = $roundNumber
-    """.as[Long].head
-
-  /** DBIO action to read the total asset-activity weight (bytes) for a round. */
-  // .head is safe: only called after aggregateActivityTotalsAction in the same transaction.
-  private def getAssetActivityRoundTotalBytesAction(roundNumber: Long) =
-    sql"""select total_round_asset_activity_weight
-          from #${Tables.appActivityRoundTotals}
-          where history_id = $historyId and round_number = $roundNumber
-    """.as[Long].head
+    """.as[(Long, Long)].head
 
   // -- app_reward_party_totals ----------------------------------------------
 
@@ -695,9 +687,8 @@ class DbScanAppRewardsStore(
       _ <- runUpdate(
         (for {
           _ <- aggregateActivityTotalsAction(roundNumber)
-          appWeight <- getAppActivityRoundTotalWeightAction(roundNumber)
-          assetBytes <- getAssetActivityRoundTotalBytesAction(roundNumber)
-          params = inputs.deriveIssuanceParams(appWeight, assetBytes)
+          (appWeight, assetWeight) <- getRoundActivityWeightsAction(roundNumber)
+          params = inputs.deriveIssuanceParams(appWeight, assetWeight)
           _ <- computeRewardTotalsAction(roundNumber, params)
           _ <- assertCombinedMintingAllowanceWithinIssuanceBudget(roundNumber, params)
           _ <- computeRewardHashesAction(roundNumber, batchSize)
