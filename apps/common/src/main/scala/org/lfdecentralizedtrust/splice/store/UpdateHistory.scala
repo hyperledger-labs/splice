@@ -351,35 +351,37 @@ class UpdateHistory private (
     val start = startOf(firstDay)
     val end = startOf(firstDay.plusDays(1))
 
-    storage.queryAndUpdate(
-      // CREATE TABLE is transactional, so the partitions of all tables are created atomically.
-      // The lock makes concurrent callers wait for each other instead of failing.
-      AdvisoryLocks.withBlockingTransactionalLock(
-        profile,
-        AdvisoryLockIds.createUpdateHistoryPartitionStatement,
-        DBIO.seq(PartitionedTables.map { table =>
-          val partition = s"${table}_$tableSuffix"
-          // This is safe because withBlockingTransactionalLock ensures all 3 statements happen together.
-          sql"select exists (select 1 from pg_inherits where inhrelid = to_regclass('#$partition'))"
-            .as[Boolean]
-            .head
-            .flatMap { alreadyAttached =>
-              if (alreadyAttached) DBIO.unit
-              else {
-                for {
-                  _ <-
-                    sqlu"create table if not exists #$partition (like #$table including defaults including constraints)"
-                  _ <-
-                    sqlu"alter table #$table attach partition #$partition for values from (#${start.toMicros}) to (#${end.toMicros})"
-                } yield ()
+    storage
+      .queryAndUpdate(
+        // CREATE TABLE is transactional, so the partitions of all tables are created atomically.
+        // The lock makes concurrent callers wait for each other instead of failing.
+        AdvisoryLocks.withBlockingTransactionalLock(
+          profile,
+          AdvisoryLockIds.createUpdateHistoryPartitionStatement,
+          DBIO.seq(PartitionedTables.map { table =>
+            val partition = s"${table}_$tableSuffix"
+            // This is safe because withBlockingTransactionalLock ensures all 3 statements happen together.
+            sql"select exists (select 1 from pg_inherits where inhrelid = to_regclass('#$partition'))"
+              .as[Boolean]
+              .head
+              .flatMap { alreadyAttached =>
+                if (alreadyAttached) DBIO.unit
+                else {
+                  for {
+                    _ <-
+                      sqlu"create table if not exists #$partition (like #$table including defaults including constraints)"
+                    _ <-
+                      sqlu"alter table #$table attach partition #$partition for values from (#${start.toMicros}) to (#${end.toMicros})"
+                  } yield ()
+                }
               }
-            }
-        }*),
-      ),
-      "createPartitions",
-    ).map { _ =>
-      metrics.UpdateHistory.partitionRunwayEnd.updateValue(_.max(end))
-    }
+          }*),
+        ),
+        "createPartitions",
+      )
+      .map { _ =>
+        metrics.UpdateHistory.partitionRunwayEnd.updateValue(_.max(end))
+      }
   }
 
   def readLastIngestedRecordTime()(implicit
@@ -514,17 +516,21 @@ class UpdateHistory private (
   private def firstRecordTimeToIngest(connection: BaseLedgerConnection)(implicit
       tc: TraceContext,
       mat: Materializer,
-  ): Future[CantonTimestamp] =
-    connection
-      .updates(beginOffset = 0L, ingestionSink.ingestionFilter)
-      .map(_.updateOrCheckpoint)
-      .collect {
-        case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>
-          reassignment.recordTime
-        case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), _) =>
-          CantonTimestamp.assertFromInstant(tree.getRecordTime)
-      }
-      .runWith(Sink.head)
+  ): Future[CantonTimestamp] = {
+    for {
+      latestPrunedOffset <- connection.latestPrunedOffset()
+      first <- connection
+        .updates(beginOffset = latestPrunedOffset, ingestionSink.ingestionFilter)
+        .map(_.updateOrCheckpoint)
+        .collect {
+          case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>
+            reassignment.recordTime
+          case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), _) =>
+            CantonTimestamp.assertFromInstant(tree.getRecordTime)
+        }
+        .runWith(Sink.head)
+    } yield first
+  }
 
   private def dayOf(ts: CantonTimestamp): LocalDate =
     LocalDate.ofInstant(ts.toInstant, ZoneOffset.UTC)
