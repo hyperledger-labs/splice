@@ -849,14 +849,19 @@ class HttpScanHandler(
             val appActivityRecordEncoded = appActivityRecordO.map(
               ScanHttpEncodings.encodeAppActivityRecord
             )
+            // TODO(#7837): cover these fields in the integration test.
+            val assetActivityRecordEncoded = appActivityRecordO.map(
+              ScanHttpEncodings.encodeAssetActivityRecord
+            )
+            val submittingAppProviderEncoded = appActivityRecordO.flatMap(_.submittingAppProvider)
             Right(
               definitions.EventHistoryItem(
                 encodedUpdateV2,
                 verdictEncoded,
                 trafficSummaryEncoded,
                 appActivityRecordEncoded,
-                assetActivityRecords = None,
-                submittingAppProvider = None,
+                assetActivityRecords = assetActivityRecordEncoded,
+                submittingAppProvider = submittingAppProviderEncoded,
               )
             )
           }

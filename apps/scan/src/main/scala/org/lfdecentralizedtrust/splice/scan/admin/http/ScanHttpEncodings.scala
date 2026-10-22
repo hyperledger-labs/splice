@@ -636,6 +636,21 @@ object ScanHttpEncodings {
     )
   }
 
+  def encodeAssetActivityRecord(
+      record: AppActivityRecordT
+  ): definitions.EventHistoryActivityRecords = {
+    val records = record.assetActivityProviderParties
+      .zip(record.assetActivityWeights)
+      .map { case (party, weight) =>
+        definitions.ActivityRecord(party = party, weight = weight)
+      }
+      .toVector
+    definitions.EventHistoryActivityRecords(
+      roundNumber = record.roundNumber,
+      records = records,
+    )
+  }
+
   def fromDamlValueEncoding(encoding: definitions.DamlValueEncoding): ScanHttpEncodings =
     encoding match {
       case definitions.DamlValueEncoding.members.CompactJson => CompactJsonScanHttpEncodings()
