@@ -70,10 +70,7 @@ trait SerializationDeserializationTestHelpers extends BaseTest with ScalaCheckPr
 
   protected def testContext[F[
       _
-  ], T <: HasProtocolVersionedWrapperF[
-    F,
-    T,
-  ], DeserializedValueClass <: HasRepresentativeProtocolVersion, Context, Dependency](
+  ], T <: HasProtocolVersionedWrapperF[F, T], DeserializedValueClass <: HasRepresentativeProtocolVersion, Context, Dependency](
       companion: BaseVersioningCompanionF[F, T, Context, DeserializedValueClass, Dependency],
       context: Context,
       protocolVersion: ProtocolVersion,

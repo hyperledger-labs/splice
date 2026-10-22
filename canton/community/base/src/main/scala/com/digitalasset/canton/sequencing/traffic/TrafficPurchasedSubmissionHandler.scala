@@ -142,7 +142,7 @@ class TrafficPurchasedSubmissionHandler(
         threshold = sequencerGroup.threshold,
         protocolVersion = protocolVersion,
       )
-      setTrafficPurchasedMessage: SetTrafficPurchasedMessage = SetTrafficPurchasedMessage.apply(
+      setTrafficPurchasedMessage = SetTrafficPurchasedMessage.apply(
         member,
         serial,
         totalTrafficPurchased,

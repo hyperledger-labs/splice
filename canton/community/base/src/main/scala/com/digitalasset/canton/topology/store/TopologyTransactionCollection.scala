@@ -114,7 +114,7 @@ final case class StoredTopologyTransactions[+Op <: TopologyChangeOp, +M <: Topol
 
 object StoredTopologyTransactions
     extends HasVersionedMessageCompanion[
-      StoredTopologyTransactions[TopologyChangeOp, TopologyMapping]
+      StoredTopologyTransactions[TopologyChangeOp, TopologyMapping],
     ] {
 
   type GenericStoredTopologyTransactions =

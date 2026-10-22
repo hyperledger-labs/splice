@@ -18,7 +18,6 @@ import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{Fingerprint, Hash}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, BaseWriteRequest, TopologyStoreId}
@@ -34,12 +33,11 @@ import com.digitalasset.canton.topology.store.StoredTopologyTransactions.Generic
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransaction,
-  SignedTopologyTransactions,
   TopologyChangeOp,
   TopologyMapping,
   TopologyTransaction,
 }
-import com.digitalasset.canton.util.GrpcStreamingUtils
+import com.digitalasset.canton.util.{GrpcStreamingUtils, ResourceUtil}
 import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
 import com.digitalasset.canton.validation.ProtoValidation
 import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation, ReleaseVersion}
@@ -51,7 +49,7 @@ import io.grpc.{Context, ManagedChannel}
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.reflect.ClassTag
 
 object TopologyAdminCommands {
@@ -896,40 +894,6 @@ object TopologyAdminCommands {
       override def timeoutType: TimeoutType = DefaultUnboundedTimeout
     }
 
-    final case class GenerateOnboardingTopologyTransactions(
-        protocolVersion: ProtocolVersion,
-        temporaryStore: Option[TopologyStoreId.Temporary] = None,
-    ) extends BaseCommand[
-          v30.GenerateOnboardingTopologyTransactionsRequest,
-          v30.GenerateOnboardingTopologyTransactionsResponse,
-          SignedTopologyTransactions[TopologyChangeOp, TopologyMapping],
-        ] {
-      override protected def createRequest()
-          : Either[String, v30.GenerateOnboardingTopologyTransactionsRequest] =
-        Right(
-          v30.GenerateOnboardingTopologyTransactionsRequest(
-            protocolVersion = protocolVersion.toProtoPrimitive,
-            temporaryStore = temporaryStore.map(id => v30.StoreId.Temporary(id.name.unwrap)),
-          )
-        )
-
-      override protected def submitRequest(
-          service: TopologyManagerReadServiceStub,
-          request: v30.GenerateOnboardingTopologyTransactionsRequest,
-      ): Future[v30.GenerateOnboardingTopologyTransactionsResponse] =
-        service.generateOnboardingTopologyTransactions(request)
-
-      override protected def handleResponse(
-          response: v30.GenerateOnboardingTopologyTransactionsResponse
-      ) =
-        ProtoConverter
-          .parseRequired(
-            SignedTopologyTransactions.fromProtoV30(ProtocolVersionValidation.AlwaysValidation, _),
-            "result",
-            response.result,
-          )
-          .leftMap(_.toString)
-    }
   }
 
   object Aggregation {
@@ -1076,8 +1040,7 @@ object TopologyAdminCommands {
         topologySnapshot: ByteString,
         store: TopologyStoreId,
         waitToBecomeEffective: Option[NonNegativeDuration],
-    )(implicit ec: ExecutionContext, loggingContext: ErrorLoggingContext)
-        extends BaseWriteCommand[
+    ) extends BaseWriteCommand[
           ImportTopologySnapshotRequest,
           ImportTopologySnapshotResponse,
           Unit,
@@ -1102,7 +1065,7 @@ object TopologyAdminCommands {
           service.withDeadline(null).importTopologySnapshot,
           bytes =>
             ImportTopologySnapshotRequest(
-              bytes,
+              ByteString.copyFrom(bytes),
               Some(store.toProtoV30),
               waitToBecomeEffective.map(_.toProtoPrimitive),
             ),
@@ -1117,8 +1080,7 @@ object TopologyAdminCommands {
         topologySnapshotStream: InputStream,
         store: TopologyStoreId,
         waitToBecomeEffective: Option[NonNegativeDuration],
-    )(implicit ec: ExecutionContext, loggingContext: ErrorLoggingContext)
-        extends BaseWriteCommand[
+    ) extends BaseWriteCommand[
           Unit,
           ImportTopologySnapshotV2Response,
           Unit,
@@ -1130,16 +1092,18 @@ object TopologyAdminCommands {
           service: TopologyManagerWriteServiceStub,
           request: Unit,
       ): Future[ImportTopologySnapshotV2Response] =
-        GrpcStreamingUtils.streamToServer(
-          service.importTopologySnapshotV2,
-          bytes =>
-            ImportTopologySnapshotV2Request(
-              bytes,
-              Some(store.toProtoV30),
-              waitToBecomeEffective.map(_.toProtoPrimitive),
-            ),
-          topologySnapshotStream,
-        )
+        ResourceUtil.withResource(topologySnapshotStream) { inputStream =>
+          GrpcStreamingUtils.streamToServer(
+            service.importTopologySnapshotV2,
+            bytes =>
+              ImportTopologySnapshotV2Request(
+                ByteString.copyFrom(bytes),
+                Some(store.toProtoV30),
+                waitToBecomeEffective.map(_.toProtoPrimitive),
+              ),
+            inputStream,
+          )
+        }
 
       override protected def handleResponse(
           response: ImportTopologySnapshotV2Response
@@ -1484,7 +1448,7 @@ object TopologyAdminCommands {
     }
 
     final case class GetId()
-        extends BaseInitializationService[v30.GetIdRequest, v30.GetIdResponse, GetIdResult] {
+        extends BaseInitializationService[v30.GetIdRequest, v30.GetIdResponse, UniqueIdentifier] {
       override protected def createRequest(): Either[String, v30.GetIdRequest] =
         Right(v30.GetIdRequest())
 
@@ -1496,7 +1460,7 @@ object TopologyAdminCommands {
 
       override protected def handleResponse(
           response: v30.GetIdResponse
-      ): Either[String, GetIdResult] =
+      ): Either[String, UniqueIdentifier] =
         ProtoValidation
           .validate(
             response.uniqueIdentifier,
@@ -1506,18 +1470,12 @@ object TopologyAdminCommands {
           .leftMap(_.message)
           .flatMap { uniqueIdentifier =>
             if (uniqueIdentifier.nonEmpty)
-              UniqueIdentifier
-                .fromProtoPrimitive_(uniqueIdentifier)
-                .leftMap(_.message)
-                .map(id => GetIdResult(response.initialized, Some(id)))
+              UniqueIdentifier.fromProtoPrimitive_(uniqueIdentifier).leftMap(_.message)
             else
-              Right(GetIdResult(response.initialized, None))
+              Left(
+                s"Node is not initialized and therefore does not have an Id assigned yet."
+              )
           }
     }
-
-    final case class GetIdResult(
-        initialized: Boolean,
-        uniqueIdentifier: Option[UniqueIdentifier],
-    )
   }
 }

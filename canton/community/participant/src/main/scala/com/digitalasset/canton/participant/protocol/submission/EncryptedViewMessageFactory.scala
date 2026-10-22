@@ -204,7 +204,7 @@ object EncryptedViewMessageFactory {
   ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, NonEmpty[Seq[
     EncryptedSingleViewMessage[
       VT
-    ]
+    ],
   ]]] = {
     val viewEncryptionScheme = cryptoSnapshot.pureCrypto.defaultSymmetricKeyScheme
 

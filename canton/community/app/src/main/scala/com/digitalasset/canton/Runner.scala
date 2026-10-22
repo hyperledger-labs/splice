@@ -100,9 +100,7 @@ class ConsoleInteractiveRunner(
           },
         )
       } catch {
-        case NonFatal(e) =>
-          logger.error(e.getMessage)(TraceContext.empty)
-          false
+        case NonFatal(_) => false
       }
     sys.exit(if (success) 0 else 1)
   }

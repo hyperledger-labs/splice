@@ -99,7 +99,7 @@ final case class CommitmentContractMetadata(
 
 object CommitmentContractMetadata
     extends HasVersionedMessageCompanion[
-      CommitmentContractMetadata
+      CommitmentContractMetadata,
     ] {
   import JsonCodecs.*
   @SuppressWarnings(Array("org.wartremover.warts.Null", "org.wartremover.warts.Var"))

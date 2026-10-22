@@ -4,31 +4,17 @@
 package com.digitalasset.canton.integration
 
 import com.digitalasset.canton.CloseableTest
-import com.digitalasset.canton.admin.api.client.commands.{
-  GrpcAdminCommand,
-  ParticipantAdminCommands,
-}
-import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.{
-  CommandService,
-  CommandSubmissionService,
-}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{DefaultPorts, SharedCantonConfig, TestingConfigInternal}
 import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
-import com.digitalasset.canton.error.TransactionRoutingError
-import com.digitalasset.canton.integration.EnvironmentSetup.EnvironmentSetupException
 import com.digitalasset.canton.integration.plugins.{UseH2, UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.metrics.{MetricsFactoryType, ScopedInMemoryMetricsFactory}
-import com.digitalasset.canton.networking.grpc.GrpcError
-import com.digitalasset.canton.participant.sync.SyncServiceInjectionError
-import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{Assertion, BeforeAndAfterAll, Suite}
 
-import scala.util.Try
-import scala.util.control.{NonFatal, NoStackTrace}
+import scala.util.control.NonFatal
 
 /** Provides an ability to create a canton environment when needed for test. Include
   * [[IsolatedEnvironments]] or [[SharedEnvironment]] to determine when this happens. Uses
@@ -56,16 +42,25 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
   protected val enableAcsDigestConsistencyCheck: Boolean = false
   protected val acsDigestConsistencyCheckTimeout: Timeout = Timeout(Span(60, Seconds))
 
+  override protected def beforeAll(): Unit = {
+    plugins.foreach(_.beforeTests())
+    super.beforeAll()
+  }
+
+  override protected def afterAll(): Unit =
+    try super.afterAll()
+    finally plugins.foreach(_.afterTests())
+
   /** Provide an environment for an individual test either by reusing an existing one or creating a
     * new one depending on the approach being used.
     */
-  def provideEnvironment(testName: String): BaseTestConsoleEnvironment[C, E]
+  def provideEnvironment: BaseTestConsoleEnvironment[C, E]
 
   /** Optional hook for implementors to know when a test has finished and be provided the
     * environment instance. This is required over a afterEach hook as we need the environment
     * instance passed.
     */
-  def testFinished(testName: String, environment: BaseTestConsoleEnvironment[C, E]): Unit = {}
+  def testFinished(environment: BaseTestConsoleEnvironment[C, E]): Unit = {}
 
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
 
@@ -96,153 +91,76 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
       configTransform: C => C = identity,
       runPlugins: BaseEnvironmentSetupPlugin[C, E] => Boolean = _ => true,
       testConfigTransform: TestingConfigInternal => TestingConfigInternal = identity,
-      testName: Option[String],
-  ): BaseTestConsoleEnvironment[C, E] =
-    TraceContext.withNewTraceContext("manualCreateEnvironment") { tc =>
-      logger.debug(
-        s"Starting creating environment for $suiteName${testName.fold("")(n => s", test '$n'")}:"
-      )(tc)
-      import org.scalactic.source
-      def step[T](name: String)(expr: => T)(implicit pos: source.Position): T = {
-        logger.debug(s"Starting creating environment: $name")(tc)
-        Try(expr) match {
-          case scala.util.Success(value) =>
-            logger.debug(s"Finished creating environment: $name")(tc)
-            value
-          case scala.util.Failure(exception) =>
-            val loc = s"(${pos.fileName}:${pos.lineNumber})"
-            logger.error(s"Failed creating environment: $name $loc", exception)(tc)
-            throw EnvironmentSetupException(
-              s"Creating environment failed at step $name $loc",
-              exception,
-            )
-        }
-      }
-      val testConfig = initialConfig
-      // note: beforeEnvironmentCreate may well have side-effects (e.g. starting databases or docker containers)
-      val pluginConfig = step("Running plugins before") {
-        plugins.foldLeft(testConfig)((config, plugin) =>
-          if (runPlugins(plugin))
-            plugin.beforeEnvironmentCreated(config)
-          else
-            config
-        )
-      }
+  ): BaseTestConsoleEnvironment[C, E] = {
+    val testConfig = initialConfig
+    // note: beforeEnvironmentCreate may well have side-effects (e.g. starting databases or docker containers)
+    val pluginConfig =
+      plugins.foldLeft(testConfig)((config, plugin) =>
+        if (runPlugins(plugin))
+          plugin.beforeEnvironmentCreated(config)
+        else
+          config
+      )
 
-      // Once all the plugins and config transformation is done apply the defaults
-      val finalConfig =
-        configTransform(pluginConfig).withDefaults(Some(DefaultPorts.create()))
+    // Once all the plugins and config transformation is done apply the defaults
+    val finalConfig =
+      configTransform(pluginConfig).withDefaults(Some(DefaultPorts.create()))
 
-      val scopedMetricsFactory = new ScopedInMemoryMetricsFactory
-      val environmentFixture: E =
-        step("Creating fixture") {
-          environmentFactory.create(
-            finalConfig,
-            loggerFactory,
-            testConfigTransform(
-              envDef.testingConfig.copy(
-                metricsFactoryType =
-                  /* If metrics reporters were configured for the test then it's an externally observed test
-                   * therefore actual metrics have to be reported.
-                   * The in memory metrics are used when no reporters are configured and the metrics are
-                   * observed directly in the test scenarios.
-                   *
-                   * In this case, you can grab the metrics from the [[MetricsRegistry.generateMetricsFactory]] method,
-                   * which is accessible using env.environment.metricsRegistry
-                   *
-                   * */
-                  if (finalConfig.monitoring.metrics.reporters.isEmpty)
-                    MetricsFactoryType.InMemory(scopedMetricsFactory)
-                  else MetricsFactoryType.External,
-                initializeGlobalOpenTelemetry = false,
-                sequencerTransportSeed = Some(1L),
-              )
-            ),
+    val scopedMetricsFactory = new ScopedInMemoryMetricsFactory
+    val environmentFixture =
+      environmentFactory.create(
+        finalConfig,
+        loggerFactory,
+        testConfigTransform(
+          envDef.testingConfig.copy(
+            metricsFactoryType =
+              /* If metrics reporters were configured for the test then it's an externally observed test
+               * therefore actual metrics have to be reported.
+               * The in memory metrics are used when no reporters are configured and the metrics are
+               * observed directly in the test scenarios.
+               *
+               * In this case, you can grab the metrics from the [[MetricsRegistry.generateMetricsFactory]] method,
+               * which is accessible using env.environment.metricsRegistry
+               *
+               * */
+              if (finalConfig.monitoring.metrics.reporters.isEmpty)
+                MetricsFactoryType.InMemory(scopedMetricsFactory)
+              else MetricsFactoryType.External,
+            initializeGlobalOpenTelemetry = false,
+            sequencerTransportSeed = Some(1L),
           )
+        ),
+      )
+
+    try {
+      val testEnvironment =
+        envDef.createTestConsole(environmentFixture, loggerFactory)
+
+      plugins.foreach(plugin =>
+        if (runPlugins(plugin)) plugin.afterEnvironmentCreated(finalConfig, testEnvironment)
+      )
+
+      if (!finalConfig.parameters.manualStart)
+        handleStartupLogs(testEnvironment.startAll())
+
+      envDef.setups.foreach(setup => setup(testEnvironment))
+
+      testEnvironment
+    } catch {
+      case NonFatal(ex) =>
+        // attempt to ensure the environment is shutdown if anything in the startup of initialization fails
+        try {
+          environmentFixture.close()
+        } catch {
+          case NonFatal(shutdownException) =>
+            // we suppress the exception thrown by the shutdown as we want to propagate the original
+            // exception, however add it to the suppressed list on this thrown exception
+            ex.addSuppressed(shutdownException)
         }
-
-      try {
-        val testEnvironment = step("Creating test console") {
-          envDef.createTestConsole(environmentFixture, loggerFactory)
-        }
-
-        // In tests, we want to retry some commands to avoid flakiness
-        def commandRetryPolicy(command: GrpcAdminCommand[?, ?, ?])(error: GrpcError): Boolean = {
-          val decodedCantonError = command match {
-            // Command submissions are safe to retry - they are deduplicated by command ID
-            case _: CommandSubmissionService.BaseCommand[?, ?, ?] => error.decodedCantonError
-            case _: CommandService.BaseCommand[?, ?, ?] => error.decodedCantonError
-            // Package operations are idempotent so we can retry them
-            case _: ParticipantAdminCommands.Package.PackageCommand[?, ?, ?] =>
-              error.decodedCantonError
-            // Other commands might not be idempotent
-            case _ => None
-          }
-          // Ideally we would reuse the logic from RetryProvider.RetryableError but that produces a circular dependency
-          // so for now we go for an ad-hoc logic here.
-          val shouldRetry = decodedCantonError.exists { err =>
-            val retryableErrorCodes = Seq(
-              // Normally "not connected to synchronizer" errors are not retriable because they require operator intervention.
-              // In canton network, synchronizer connections are managed by the sv app automation
-              // and transient disconnects are normal.
-              SyncServiceInjectionError.NotConnectedToAnySynchronizer,
-              SyncServiceInjectionError.NotConnectedToSynchronizer,
-              TransactionRoutingError.TopologyErrors.UnknownContractSynchronizers,
-              TransactionRoutingError.TopologyErrors.UnknownInformees,
-            )
-            val forceRetry = retryableErrorCodes.exists(retryableErroCode =>
-              err.code == retryableErroCode.code || err.code.id == retryableErroCode.id // some errors are wrapped in a GenericErrorCode so they lose the type information
-            )
-            if (forceRetry) {
-              true
-            } else {
-              err.isRetryable
-            }
-          }
-
-          logger.debug(
-            s"Got canton error $decodedCantonError from command $command. Retrying: $shouldRetry"
-          )(tc)
-
-          shouldRetry
-        }
-
-        step("Updating retry policy") {
-          testEnvironment.grpcLedgerCommandRunner.setRetryPolicy(commandRetryPolicy)
-          testEnvironment.grpcAdminCommandRunner.setRetryPolicy(commandRetryPolicy)
-        }
-
-        step("Running plugins after") {
-          plugins.foreach(plugin =>
-            if (runPlugins(plugin)) plugin.afterEnvironmentCreated(finalConfig, testEnvironment)
-          )
-        }
-
-        if (!finalConfig.parameters.manualStart)
-          step("Starting all nodes") {
-            handleStartupLogs(testEnvironment.startAll())
-          }
-
-        step("Running setup") {
-          envDef.setups.foreach(setup => setup(testEnvironment))
-        }
-
-        testEnvironment
-      } catch {
-        case NonFatal(ex) =>
-          // attempt to ensure the environment is shutdown if anything in the startup of initialization fails
-          try {
-            environmentFixture.close()
-          } catch {
-            case NonFatal(shutdownException) =>
-              // we suppress the exception thrown by the shutdown as we want to propagate the original
-              // exception, however add it to the suppressed list on this thrown exception
-              ex.addSuppressed(shutdownException)
-          }
-          // rethrow exception
-          throw ex
-      }
+        // rethrow exception
+        throw ex
     }
+  }
 
   /** Creates a new environment manually for a test with the storage plugins disabled, so that we
     * can keep the persistent state from an old environment.
@@ -262,7 +180,6 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
       oldEnvConfig: C,
       configTransform: C => C = identity,
       runPlugins: BaseEnvironmentSetupPlugin[C, E] => Boolean = _ => true,
-      testName: Option[String],
   ): BaseTestConsoleEnvironment[C, E] =
     manualCreateEnvironment(
       oldEnvConfig,
@@ -275,12 +192,11 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
           false // to prevent creating a new fresh db, the db is only deleted when the old environment is destroyed.
         case plugin => runPlugins(plugin)
       },
-      testName = testName,
     )
 
-  protected def createEnvironment(testName: Option[String]): BaseTestConsoleEnvironment[C, E] =
+  protected def createEnvironment(): BaseTestConsoleEnvironment[C, E] =
     ConcurrentEnvironmentLimiter.create(getClass.getName, numPermits)(
-      manualCreateEnvironment(testName = testName)
+      manualCreateEnvironment()
     )
 
   protected def manualDestroyEnvironment(environment: BaseTestConsoleEnvironment[C, E]): Unit = {
@@ -294,10 +210,7 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
     }
   }
 
-  protected def destroyEnvironment(
-      testName: Option[String],
-      environment: BaseTestConsoleEnvironment[C, E],
-  ): Unit = {
+  protected def destroyEnvironment(environment: BaseTestConsoleEnvironment[C, E]): Unit = {
 
     // Run the Ledger API integrity check before destroying the environment
     val ledgerApiChecker = new LedgerApiStoreIntegrityChecker(loggerFactory)
@@ -321,12 +234,6 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
   protected def numPermits: PositiveInt = PositiveInt.one
 }
 
-object EnvironmentSetup {
-  final case class EnvironmentSetupException(message: String, cause: Throwable)
-      extends RuntimeException(message, cause)
-      with NoStackTrace // Stack trace is just a lot of scalatest and EnvironmentSetup
-}
-
 /** Starts an environment in a beforeAll test and uses it for all tests. Destroys it in an afterAll
   * hook.
   *
@@ -343,15 +250,15 @@ trait BaseSharedEnvironment[C <: SharedCantonConfig[C], E <: Environment[C]]
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    sharedEnvironment = Some(createEnvironment(None))
+    sharedEnvironment = Some(createEnvironment())
   }
 
   override def afterAll(): Unit =
     try {
-      sharedEnvironment.foreach(destroyEnvironment(None, _))
+      sharedEnvironment.foreach(destroyEnvironment)
     } finally super.afterAll()
 
-  override def provideEnvironment(testName: String): BaseTestConsoleEnvironment[C, E] =
+  override def provideEnvironment: BaseTestConsoleEnvironment[C, E] =
     sharedEnvironment.getOrElse(
       sys.error("beforeAll should have run before providing a shared environment")
     )
@@ -367,11 +274,9 @@ trait BaseIsolatedEnvironments[C <: SharedCantonConfig[C], E <: Environment[C]]
     extends EnvironmentSetup[C, E] {
   this: Suite with NamedLogging =>
 
-  override def provideEnvironment(testName: String): BaseTestConsoleEnvironment[C, E] =
-    createEnvironment(Some(testName))
-  override def testFinished(testName: String, environment: BaseTestConsoleEnvironment[C, E]): Unit =
+  override def provideEnvironment: BaseTestConsoleEnvironment[C, E] = createEnvironment()
+  override def testFinished(environment: BaseTestConsoleEnvironment[C, E]): Unit =
     destroyEnvironment(
-      Some(testName),
-      environment,
+      environment
     )
 }

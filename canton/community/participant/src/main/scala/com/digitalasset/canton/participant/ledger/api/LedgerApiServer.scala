@@ -90,7 +90,6 @@ class LedgerApiServer(
     with NamedLogging
 
 object LedgerApiServer {
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def initialize(
       ledgerApiIndexService: LedgerApiIndexService,
       adminParty: Party,
@@ -440,8 +439,6 @@ object LedgerApiServer {
         lookupTopologyClient = lookupTopologyClient,
         lookupSynchronizerCryptoClient = lookupSynchronizerCryptoClient,
         pureCryptoApi = syncService.pureCryptoApi,
-        // stubbed in splice
-        deprecatedApiGate = null,
       )
       _ <- startHttpApiIfEnabled(
         authInterceptor,

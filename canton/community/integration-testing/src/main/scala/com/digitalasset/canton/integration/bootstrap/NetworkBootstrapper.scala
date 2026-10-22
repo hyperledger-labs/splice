@@ -128,9 +128,7 @@ object NetworkTopologyDescription {
       ] = None,
       overrideStaticSynchronizerParameters: Option[StaticSynchronizerParameters] = None,
       mediatorThreshold: PositiveInt = PositiveInt.one,
-  )(implicit
-      env: TestConsoleEnvironment
-  ): NetworkTopologyDescription =
+  )(implicit env: TestConsoleEnvironment): NetworkTopologyDescription =
     NetworkTopologyDescription(
       synchronizerName = synchronizerAlias.unwrap,
       synchronizerOwners,

@@ -240,11 +240,6 @@ message ImportAcsRequest {
   // Any contract that is assigned to another synchronizer will be ignored.
   // Required in the first request, ignored in all subsequent request messages.
   optional string synchronizer_id = 6;
-
-
-  // When set, the topology transaction at the ledger end will not prevent this operation
-  // optional, default is `false`
-  bool force_repair_when_topology_transaction_at_ledger_end = 7;
 }
 
 message ImportAcsResponse {}

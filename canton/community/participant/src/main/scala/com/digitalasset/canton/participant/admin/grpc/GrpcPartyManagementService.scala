@@ -414,7 +414,8 @@ class GrpcPartyManagementService(
               topologyTransaction.events.exists { event =>
                 // Search for onboarding or added event and let caller decide whether we found the right event
                 (event.event.isParticipantAuthorizationOnboarding &&
-                  event.getParticipantAuthorizationOnboarding.participantId == targetParticipant.uid.toProtoPrimitive) || (event.event.isParticipantAuthorizationAdded &&
+                  event.getParticipantAuthorizationOnboarding.participantId == targetParticipant.uid.toProtoPrimitive)
+                || (event.event.isParticipantAuthorizationAdded &&
                   event.getParticipantAuthorizationAdded.participantId == targetParticipant.uid.toProtoPrimitive)
               }
             }

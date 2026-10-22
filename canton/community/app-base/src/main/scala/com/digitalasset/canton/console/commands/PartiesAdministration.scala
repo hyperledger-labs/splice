@@ -46,17 +46,14 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.BaseWriteRequest
 import com.digitalasset.canton.topology.transaction.*
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ReleaseVersion
 import com.digitalasset.canton.{LedgerParticipantId, SynchronizerAlias, config}
 import com.google.common.annotations.VisibleForTesting
 import io.grpc.Context
 
-import java.io.FileInputStream
 import java.time.Instant
 import java.util.UUID
-import scala.concurrent.ExecutionContext
 
 class PartiesAdministrationGroup(
     runner: AdminCommandRunner,
@@ -118,7 +115,6 @@ class ParticipantPartiesAdministrationGroup(
     with FeatureFlagFilter {
 
   private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
-  private implicit def ec: ExecutionContext = consoleEnvironment.environment.executionContext
 
   @Help.Summary("List parties hosted by this participant")
   @Help.Description(
@@ -539,19 +535,17 @@ class ParticipantPartiesAdministrationGroup(
       serial: PositiveInt,
       participantPermission: ParticipantPermission,
   ): String = check(FeatureFlag.Preview) {
-    TraceContext.withNewTraceContext("add_party_with_acs_async") { implicit traceContext =>
-      consoleEnvironment.run {
-        reference.adminCommand(
-          ParticipantAdminCommands.PartyManagement.AddPartyWithAcsAsync(
-            new java.io.File(importFilePath),
-            party,
-            synchronizerId,
-            sourceParticipant,
-            serial,
-            participantPermission,
-          )
+    consoleEnvironment.run {
+      reference.adminCommand(
+        ParticipantAdminCommands.PartyManagement.AddPartyWithAcsAsync(
+          new java.io.File(importFilePath),
+          party,
+          synchronizerId,
+          sourceParticipant,
+          serial,
+          participantPermission,
         )
-      }
+      )
     }
   }
 
@@ -901,19 +895,17 @@ class ParticipantPartiesAdministrationGroup(
       representativePackageIdOverride: RepresentativePackageIdOverride =
         RepresentativePackageIdOverride.NoOverride,
   ): Unit =
-    TraceContext.withNewTraceContext("import_party_acs") { implicit traceContext =>
-      consoleEnvironment.run {
-        reference.adminCommand(
-          ParticipantAdminCommands.PartyManagement.ImportPartyAcs(
-            new FileInputStream(new java.io.File(importFilePath)),
-            synchronizerId,
-            if (workflowIdPrefix.nonEmpty) workflowIdPrefix else s"import-${UUID.randomUUID}",
-            contractImportMode,
-            representativePackageIdOverride,
-            party,
-          )
+    consoleEnvironment.run {
+      reference.adminCommand(
+        ParticipantAdminCommands.PartyManagement.ImportPartyAcs(
+          new java.io.File(importFilePath),
+          synchronizerId,
+          if (workflowIdPrefix.nonEmpty) workflowIdPrefix else s"import-${UUID.randomUUID}",
+          contractImportMode,
+          representativePackageIdOverride,
+          party,
         )
-      }
+      )
     }
 
   @Help.Summary(

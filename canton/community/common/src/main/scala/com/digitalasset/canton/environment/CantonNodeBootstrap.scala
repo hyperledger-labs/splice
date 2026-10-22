@@ -1102,20 +1102,6 @@ abstract class CantonNodeBootstrapImpl[
       }
     }
 
-    private val generateOnboardingTransactions = GenerateOnboardingTransactions(
-      instanceName = name,
-      member = member(nodeId),
-      nodeId = nodeId,
-      crypto = crypto,
-      clock = clock,
-      batchingConfig = parameters.batchingConfig,
-      processingTimeout = parameters.processingTimeouts,
-      topologyConfig = config.topology,
-      futureSupervisor = futureSupervisor,
-      generateIntermediateKey = config.init.generateIntermediateKey,
-      loggerFactory = bootstrapStageCallback.loggerFactory,
-    )
-
     override def start()(implicit
         traceContext: TraceContext
     ): EitherT[FutureUnlessShutdown, String, Unit] = {
@@ -1137,8 +1123,7 @@ abstract class CantonNodeBootstrapImpl[
                     lookupSynchronizerTimeTracker,
                     lookupActivePsid,
                     processingTimeout = parameters.processingTimeouts,
-                    generateOnboardingTransactions = generateOnboardingTransactions,
-                    loggerFactory = bootstrapStageCallback.loggerFactory,
+                    bootstrapStageCallback.loggerFactory,
                   ),
                   executionContext,
                 )

@@ -104,9 +104,7 @@ final case class UseTinyProxy(tinyProxyConfig: TinyProxyConfig)
     backgroundProcessHandler.killAndRemove()
   }
 
-  override def beforeEnvironmentDestroyed(
-      environment: TestConsoleEnvironment
-  ): Unit =
+  override def beforeEnvironmentDestroyed(environment: TestConsoleEnvironment): Unit =
     externalPlugin.beforeEnvironmentDestroyed(environment)
 }
 

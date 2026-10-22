@@ -127,9 +127,8 @@ object TopologyStoreId {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def select[StoreId <: TopologyStoreId: ClassTag, TopologyStoreContainer[
-      +_ <: TopologyStoreId
-  ] <: HasTopologyStoreId[? <: TopologyStoreId]](
+  def select[StoreId <: TopologyStoreId: ClassTag, TopologyStoreContainer[+_ <: TopologyStoreId]
+    <: HasTopologyStoreId[? <: TopologyStoreId]](
       container: TopologyStoreContainer[TopologyStoreId]
   ): Option[TopologyStoreContainer[StoreId]] = container.storeId match {
     // this typecheck is safe to do, because we have a ClassTag in scope

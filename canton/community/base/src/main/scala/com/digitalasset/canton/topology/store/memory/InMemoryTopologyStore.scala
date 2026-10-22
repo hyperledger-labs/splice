@@ -116,9 +116,10 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
     lock.exclusive {
       topologyTransactionStore
         .filter(x =>
-          x.from.value < asOfExclusive.value && x.rejected.isEmpty && x.until.forall(
-            _.value >= asOfExclusive.value
-          ) && filter(x)
+          x.from.value < asOfExclusive.value
+            && x.rejected.isEmpty
+            && x.until.forall(_.value >= asOfExclusive.value)
+            && filter(x)
         )
         .map(_.transaction)
         .toSeq

@@ -136,10 +136,10 @@ object CantonGrpcUtil {
             Math.min(backoffMs, retryDeadline.timeRemaining(TimeUnit.MILLISECONDS)),
         )
       case Duration.Inf =>
-        (client.service, x => Predef.identity[Long](x))
+        (client.service, Predef.identity[Long])
       case _ =>
         logger.error(s"Ignoring unexpected timeout $timeout value.")
-        (client.service, x => Predef.identity[Long](x))
+        (client.service, Predef.identity[Long])
     }
 
     def go(backoffMs: Long): FutureUnlessShutdown[Either[GrpcError, Res]] =
