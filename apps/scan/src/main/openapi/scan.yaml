@@ -3746,6 +3746,13 @@ components:
         app_activity_records:
           $ref: "#/components/schemas/EventHistoryAppActivityRecords"
           nullable: true
+        asset_activity_records:
+          $ref: "#/components/schemas/EventHistoryActivityRecords"
+          nullable: true
+        submitting_app_provider:
+          description: |
+            The submitting app provider party identifier, present only when the submitter is a featured-app.
+          type: string
     EventLatestRecordTimeResponse:
       type: object
       required:
@@ -3920,8 +3927,11 @@ components:
     EventHistoryAppActivityRecords:
       type: object
       description: |
-        App activity record computed from verdicts and traffic summaries
+        App activity records computed from verdicts and traffic summaries
         as per [CIP-104](https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md).
+
+        Conceptually equal to `EventHistoryActivityRecords`, but kept
+        for backwards compatibility.
       required:
         - round_number
         - records
@@ -3933,28 +3943,41 @@ components:
           format: int64
         records:
           description: |
-            App activity records, one per app provider.
+            Activity records, one per provider.
           type: array
           items:
-            $ref: "#/components/schemas/AppActivityRecord"
-    AppActivityRecord:
+            $ref: "#/components/schemas/ActivityRecord"
+    EventHistoryActivityRecords:
       type: object
       description: |
-        ActivityRecord for an app.
+        Activity records computed from a single verdict and traffic summary.
+        The round the records belong to is carried by the enclosing envelope.
+      required:
+        - records
+      properties:
+        records:
+          description: |
+            Activity records, one per provider.
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityRecord"
+    ActivityRecord:
+      type: object
+      description: |
+        ActivityRecord for a provider.
       required:
         - party
         - weight
       properties:
         party:
           description: |
-            The app provider party identifier.
+            The provider party identifier.
           type: string
         weight:
           description: |
             Activity weight in bytes of traffic.
           type: integer
           format: int64
-
     ListUnclaimedDevelopmentFundCouponsResponse:
       type: object
       required: [ "unclaimed-development-fund-coupons" ]
@@ -4138,8 +4161,13 @@ components:
         - status
         - round_number
         - total_app_activity_weight
+        - total_asset_activity_weight
         - active_parties_count
         - activity_records_count
+        - total_app_reward_from_app_activity
+        - total_app_reward_from_asset_activity
+        - issuance_per_featured_app_activity
+        - issuance_per_featured_asset_activity
         - total_app_reward_minting_allowance
         - total_app_reward_thresholded
         - total_app_reward_unclaimed
@@ -4153,15 +4181,31 @@ components:
         total_app_activity_weight:
           type: integer
           format: int64
+        total_asset_activity_weight:
+          type: integer
+          format: int64
+          description: The total weight of asset activity (bytes) for this round.
         active_parties_count:
           type: integer
           format: int64
         activity_records_count:
           type: integer
           format: int64
+        total_app_reward_from_app_activity:
+          type: string
+          description: The total of all rewards from app activity for this round, including thresholded.
+        total_app_reward_from_asset_activity:
+          type: string
+          description: The total of all rewards from asset activity for this round, including thresholded.
+        issuance_per_featured_app_activity:
+          type: string
+          description: The ratio of Amulet minted per Amulet burned for app activity.
+        issuance_per_featured_asset_activity:
+          type: string
+          description: The ratio of Amulet minted per Amulet burned for asset activity.
         total_app_reward_minting_allowance:
           type: string
-          description: The total of all minting allowances granted to app providers in this round.
+          description: The total of all minting allowances granted to app providers in this round. Includes asset activity rewards.
         total_app_reward_thresholded:
           type: string
           description: Total amount of minting allowances that fell below the configured app reward threshold and was thus burned.

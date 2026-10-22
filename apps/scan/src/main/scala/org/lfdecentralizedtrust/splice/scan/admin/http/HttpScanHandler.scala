@@ -849,12 +849,19 @@ class HttpScanHandler(
             val appActivityRecordEncoded = appActivityRecordO.map(
               ScanHttpEncodings.encodeAppActivityRecord
             )
+            // TODO(#7837): cover these fields in the integration test.
+            val assetActivityRecordEncoded = appActivityRecordO.map(
+              ScanHttpEncodings.encodeAssetActivityRecord
+            )
+            val submittingAppProviderEncoded = appActivityRecordO.flatMap(_.submittingAppProvider)
             Right(
               definitions.EventHistoryItem(
                 encodedUpdateV2,
                 verdictEncoded,
                 trafficSummaryEncoded,
                 appActivityRecordEncoded,
+                assetActivityRecords = assetActivityRecordEncoded,
+                submittingAppProvider = submittingAppProviderEncoded,
               )
             )
           }
@@ -928,6 +935,8 @@ class HttpScanHandler(
           verdictEncoded,
           trafficSummaryEncoded,
           appActivityRecordEncoded,
+          assetActivityRecords = None,
+          submittingAppProvider = None,
         )
       }.toVector
     }
@@ -2867,8 +2876,17 @@ class HttpScanHandler(
                     status = "Ok",
                     roundNumber = activityTotal.roundNumber,
                     totalAppActivityWeight = activityTotal.totalRoundAppActivityWeight,
+                    totalAssetActivityWeight = activityTotal.totalRoundAssetActivityWeight,
                     activePartiesCount = activityTotal.activeAppProviderPartiesCount,
                     activityRecordsCount = activityTotal.activityRecordsCount,
+                    totalAppRewardFromAppActivity =
+                      rewardTotal.totalAppRewardFromAppActivity.toString,
+                    totalAppRewardFromAssetActivity =
+                      rewardTotal.totalAppRewardFromAssetActivity.toString,
+                    issuancePerFeaturedAppActivity =
+                      rewardTotal.issuancePerFeaturedAppActivity.toString,
+                    issuancePerFeaturedAssetActivity =
+                      rewardTotal.issuancePerFeaturedAssetActivity.toString,
                     totalAppRewardMintingAllowance =
                       rewardTotal.totalAppRewardMintingAllowance.toString,
                     totalAppRewardThresholded = rewardTotal.totalAppRewardThresholded.toString,

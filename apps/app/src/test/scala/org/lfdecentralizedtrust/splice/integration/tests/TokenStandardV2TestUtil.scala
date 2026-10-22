@@ -93,6 +93,8 @@ trait TokenStandardV2TestUtil extends TestCommon {
                     Some(_),
                     Some(_),
                     _,
+                    _,
+                    _,
                   )
                 ) =>
               item

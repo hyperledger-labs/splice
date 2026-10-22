@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.admin.http
 import com.digitalasset.canton.BaseTest
 import org.lfdecentralizedtrust.splice.http.OmitNullString
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
-  AppActivityRecord,
+  ActivityRecord,
   CreatedEvent,
   EnvelopeTrafficSummary,
   EventHistoryAppActivityRecords,
@@ -87,11 +87,16 @@ class UpdateHistoryOmitNullStringComplianceTest extends AnyWordSpec with BaseTes
   private def toSnakeCase(name: String): String =
     name.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase
 
-  /** Pre-existing `Option[_]` fields that are already part of the BFT consensus schema across
-    * all SVs.  These were present before the `OmitNullString` mechanism was introduced and are
-    * safe because every SV already knows about them.
+  /** `Option[_]` fields that are permitted despite not being `Option[OmitNullString]`. Two
+    * categories:
     *
-    * Do NOT add new entries here — new optional fields must use `Option[OmitNullString]`.
+    *  - Legacy BFT-active fields present before the `OmitNullString` mechanism was introduced,
+    *    safe because every SV already knows about them.
+    *  - Fields on `EventHistoryItem` and its sub-types, which the type-list below guards
+    *    conservatively but which are not actually routed through `BftScanConnection` — the
+    *    only BFT-compared Scan endpoints are under `/internal/reward-accounting-process` paths.
+    *
+    * For genuinely BFT-active types, do NOT add new entries here — use `Option[OmitNullString]`.
     */
   private val allowedLegacyOptionFields: Set[String] = Set(
     "ExercisedEvent.interfaceId",
@@ -99,6 +104,8 @@ class UpdateHistoryOmitNullStringComplianceTest extends AnyWordSpec with BaseTes
     "EventHistoryItem.verdict",
     "EventHistoryItem.trafficSummary",
     "EventHistoryItem.appActivityRecords",
+    "EventHistoryItem.assetActivityRecords",
+    "EventHistoryItem.submittingAppProvider",
   )
 
   /** All types that participate in BFT consensus via the update history JSON encoding. */
@@ -142,7 +149,7 @@ class UpdateHistoryOmitNullStringComplianceTest extends AnyWordSpec with BaseTes
           checkNoUnsafeOptions[TransactionView]("TransactionView") ++
           checkNoUnsafeOptions[Quorum]("Quorum") ++
           checkNoUnsafeOptions[EnvelopeTrafficSummary]("EnvelopeTrafficSummary") ++
-          checkNoUnsafeOptions[AppActivityRecord]("AppActivityRecord")
+          checkNoUnsafeOptions[ActivityRecord]("ActivityRecord")
 
       if (violations.nonEmpty) {
         fail(
