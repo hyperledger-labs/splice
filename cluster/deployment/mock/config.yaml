@@ -494,7 +494,7 @@ validators:
           value: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
       additionalJvmOptions: -Dparticipantoption
   extra-validator:
-    namespace: validator
+    namespace: extra-validator
     partyHint: 'extra-validator'
     walletGateway: !include(../../configs/shared/wallet_gateway.yaml) {}
 cloudArmor:

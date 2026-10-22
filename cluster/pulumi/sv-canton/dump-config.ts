@@ -32,14 +32,13 @@ async function writeMigration(migrationId: DomainMigrationIndex, svs: StaticSvCo
   const installNode = await import('./src/installNode');
   const secrets = new SecretsFixtureMap();
   for (const sv of svs) {
-    withDumpConfigStack(sv.nodeName, () =>
+    await withDumpConfigStack(sv.nodeName, () =>
       installNode.installNode(migrationId, sv.nodeName, {
         getSecrets: () => Promise.resolve(secrets),
-        /* eslint-disable @typescript-eslint/no-unused-vars */
+
         getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
           Promise.resolve('access_token'),
         getCfg: () => (sv.nodeName === 'sv' ? svRunbookAuth0Config : cantonNetworkAuth0Config),
-        reuseNamespaceConfig: (fromNamespace: string, toNamespace: string) => {},
       })
     );
   }
