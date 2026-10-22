@@ -100,6 +100,11 @@ jobs:
         with:
           cmd: ./scripts/check-trailing-whitespace.sh
 
+      - name: Check that git fetches are bounded
+        uses: ./.github/actions/nix/run
+        with:
+          cmd: ./scripts/check-git-fetch-depth.sh
+
       - name: Run Daml warts check
         uses: ./.github/actions/nix/run
         with:

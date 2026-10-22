@@ -5,6 +5,7 @@
   - [CI](#ci)
     - [Opting-in to CI](#opting-in-to-ci)
     - [Opting-out of CI](#opting-out-of-ci)
+    - [Git history in CI](#git-history-in-ci)
     - [Requesting Cluster Tests](#requesting-cluster-tests)
   - [Running Tests Locally](#running-tests-locally)
     - [Managing Canton for Tests](#managing-canton-for-tests)
@@ -73,6 +74,21 @@ in your last commit message, or add a "static" GitHub label to the PR.
 In certain cases, it may be valid to allow a PR to be merged without going through CI.
 While `[skip ci]` is supported, it does not allow the PR to be merged. To skip testing but
 still allow the PR to be merged, please include the text `[force]` in your last commit message.
+
+### Git history in CI
+
+To keep the data transferred per CI job small, jobs check out only the tested commit (depth 1)
+and fetch no other branches by default.
+- Don't rely on `git log`, `git rev-list --count`, `git merge-base` or `git describe` reaching beyond `HEAD`.
+- If a job needs `main` or the latest release line, set the `fetch_git_refs` input of
+  `.github/actions/tests/common_test_setup` to `shallow` (tips only) or `history`
+  (commit history without file contents). See `.github/actions/scripts/common_setup.sh`.
+- To diff against another branch, fetch just its tip with `git fetch --depth=1`; `git diff` compares trees,
+  so no shared history is needed.
+
+`scripts/check-git-fetch-depth.sh`, run in the static tests, rejects `fetch-depth: 0` and `git fetch`/`git clone`
+without `--depth`, `--deepen`, `--shallow-*` or `--filter`.
+If full history is really needed, add `# full-history-ok: <reason>` on that line or the line above.
 
 ### Requesting Cluster Tests
 
