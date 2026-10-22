@@ -18,15 +18,17 @@ import scala.jdk.OptionConverters.RichOptional
   * app or asset portion.
   */
 final case class RewardIssuanceParams(
-    issuancePerFeaturedAppTraffic_CCperMB: BigDecimal,
+    // Common
     threshold_CC: BigDecimal,
-    totalIssuanceForFeaturedAppRewards: BigDecimal,
     unclaimedAppRewardAmount: BigDecimal,
-    issuancePerFeaturedAssetBurnCC: BigDecimal,
-    issuancePerFeaturedAssetBurn_CCperMB: BigDecimal,
-    totalIssuanceForFeaturedAssetRewards: BigDecimal,
+    // App side
+    totalIssuanceForFeaturedAppRewards: BigDecimal,
+    issuancePerFeaturedAppTraffic_CCperMB: BigDecimal,
     issuancePerFeaturedAppBurnCC: BigDecimal,
-    featuredAppMintingAllowanceCC: BigDecimal,
+    // Asset side
+    totalIssuanceForFeaturedAssetRewards: BigDecimal,
+    issuancePerFeaturedAssetBurn_CCperMB: BigDecimal,
+    issuancePerFeaturedAssetBurnCC: BigDecimal,
 )
 
 /** Raw contract inputs for app reward CC computation.
@@ -90,19 +92,21 @@ final case class RewardComputationInputs(
         (rate, sub(appMintingAllowanceRemainder, remainder), remainder)
       }
 
-    // Convert Numeric → BigDecimal at the output boundary for SQL
+    // Convert Numeric → BigDecimal at the output boundary for SQL.
+    // Under TBAR v1.1, totalIssuanceForFeaturedAppRewards carries the app-source
+    // allocation (parallel to totalIssuanceForFeaturedAssetRewards for the asset
+    // side); the shared pot is implicit as app + asset + unclaimed.
     RewardIssuanceParams(
+      threshold_CC = BigDecimal(div(appRewardCouponThreshold, amuletPrice)),
+      unclaimedAppRewardAmount = BigDecimal(unclaimed),
+      totalIssuanceForFeaturedAppRewards = BigDecimal(featuredAppMintingAllowanceCC),
       issuancePerFeaturedAppTraffic_CCperMB =
         BigDecimal(mul(trafficPriceInCCperMB, issuancePerCoupon)),
-      threshold_CC = BigDecimal(div(appRewardCouponThreshold, amuletPrice)),
-      totalIssuanceForFeaturedAppRewards = BigDecimal(rewardsToIssue),
-      unclaimedAppRewardAmount = BigDecimal(unclaimed),
-      issuancePerFeaturedAssetBurnCC = BigDecimal(issuancePerFeaturedAssetBurnCC),
+      issuancePerFeaturedAppBurnCC = BigDecimal(issuancePerCoupon),
+      totalIssuanceForFeaturedAssetRewards = BigDecimal(featuredAssetMintingAllowanceCC),
       issuancePerFeaturedAssetBurn_CCperMB =
         BigDecimal(mul(trafficPriceInCCperMB, issuancePerFeaturedAssetBurnCC)),
-      totalIssuanceForFeaturedAssetRewards = BigDecimal(featuredAssetMintingAllowanceCC),
-      issuancePerFeaturedAppBurnCC = BigDecimal(issuancePerCoupon),
-      featuredAppMintingAllowanceCC = BigDecimal(featuredAppMintingAllowanceCC),
+      issuancePerFeaturedAssetBurnCC = BigDecimal(issuancePerFeaturedAssetBurnCC),
     )
   }
 

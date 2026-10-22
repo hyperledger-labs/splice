@@ -839,9 +839,8 @@ class DbScanAppRewardsStore(
     val assetBurnRate = params.issuancePerFeaturedAssetBurnCC
     val appBurnRate = params.issuancePerFeaturedAppBurnCC
     val threshold = params.threshold_CC
-    val totalIssuance = params.totalIssuanceForFeaturedAppRewards
     val unclaimed = params.unclaimedAppRewardAmount
-    val totalAppRewardFromAppActivity = params.featuredAppMintingAllowanceCC
+    val totalAppRewardFromAppActivity = params.totalIssuanceForFeaturedAppRewards
     val totalAppRewardFromAssetActivity = params.totalIssuanceForFeaturedAssetRewards
 
     (sql"""with combined as (
@@ -873,7 +872,8 @@ class DbScanAppRewardsStore(
               issuance_per_featured_app_activity, issuance_per_featured_asset_activity)
            select $historyId, $roundNumber,
              coalesce(sum(total_app_reward_amount), 0),
-             $totalIssuance - $unclaimed - coalesce(sum(total_app_reward_amount), 0),
+             $totalAppRewardFromAppActivity + $totalAppRewardFromAssetActivity
+               - coalesce(sum(total_app_reward_amount), 0),
              $unclaimed,
              count(*),
              $totalAppRewardFromAppActivity, $totalAppRewardFromAssetActivity,
@@ -882,11 +882,11 @@ class DbScanAppRewardsStore(
   }
 
   /** Assert that the combined app+asset minting allowance for a round does not
-    * exceed the shared featured-app issuance budget.
+    * exceed the sum of app-side and asset-side issuance allocations.
     *
     * Under TBAR v1.1 `total_app_reward_minting_allowance` holds the per-party
-    * sum from both app and asset activity; both are allocated out of the single
-    * `totalIssuanceForFeaturedAppRewards` budget.
+    * sum from both app and asset activity, bounded above by the combined
+    * `totalIssuanceForFeaturedAppRewards + totalIssuanceForFeaturedAssetRewards`.
     *
     * Called inside a transactional block which rolls back if it fails.
     */
@@ -900,11 +900,13 @@ class DbScanAppRewardsStore(
             and round_number = $roundNumber
     """.as[BigDecimal].head.map { totalRewardAmount =>
       val tolerance = rewardMintingAllowanceTolerance
-      if (totalRewardAmount > params.totalIssuanceForFeaturedAppRewards + tolerance) {
+      val combinedAllocation =
+        params.totalIssuanceForFeaturedAppRewards + params.totalIssuanceForFeaturedAssetRewards
+      if (totalRewardAmount > combinedAllocation + tolerance) {
         throw Status.INTERNAL
           .withDescription(
             s"Round $roundNumber: combined app+asset minting allowance ($totalRewardAmount) " +
-              s"exceeds the shared featured-app issuance budget (${params.totalIssuanceForFeaturedAppRewards}) " +
+              s"exceeds the sum of app-side and asset-side allocations ($combinedAllocation) " +
               s"by more than tolerance ($tolerance)"
           )
           .asRuntimeException()
