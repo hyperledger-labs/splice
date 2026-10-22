@@ -62,7 +62,6 @@ let
                                              doInstallCheck = false;
                                      }))
     python3Packages.dockerfile-parse
-    python3Packages.gitpython
     python3Packages.flask
     python3Packages.gitpython
     python3Packages.junit2html
