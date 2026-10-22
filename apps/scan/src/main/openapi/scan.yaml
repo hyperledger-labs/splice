@@ -4147,8 +4147,8 @@ components:
         - total_asset_activity_weight
         - active_parties_count
         - activity_records_count
-        - total_app_reward
-        - total_asset_reward
+        - total_app_reward_from_app_activity
+        - total_app_reward_from_asset_activity
         - issuance_per_featured_app_activity
         - issuance_per_featured_asset_activity
         - total_app_reward_minting_allowance
@@ -4174,10 +4174,10 @@ components:
         activity_records_count:
           type: integer
           format: int64
-        total_app_reward:
+        total_app_reward_from_app_activity:
           type: string
           description: The total of all rewards from app activity for this round, including thresholded.
-        total_asset_reward:
+        total_app_reward_from_asset_activity:
           type: string
           description: The total of all rewards from asset activity for this round, including thresholded.
         issuance_per_featured_app_activity:

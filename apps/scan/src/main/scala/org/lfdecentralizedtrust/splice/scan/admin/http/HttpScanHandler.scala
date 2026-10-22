@@ -2874,8 +2874,10 @@ class HttpScanHandler(
                     totalAssetActivityWeight = activityTotal.totalRoundAssetActivityWeight,
                     activePartiesCount = activityTotal.activeAppProviderPartiesCount,
                     activityRecordsCount = activityTotal.activityRecordsCount,
-                    totalAppReward = rewardTotal.totalAppRewardFromAppActivity.toString,
-                    totalAssetReward = rewardTotal.totalAppRewardFromAssetActivity.toString,
+                    totalAppRewardFromAppActivity =
+                      rewardTotal.totalAppRewardFromAppActivity.toString,
+                    totalAppRewardFromAssetActivity =
+                      rewardTotal.totalAppRewardFromAssetActivity.toString,
                     issuancePerFeaturedAppActivity =
                       rewardTotal.issuancePerFeaturedAppActivity.toString,
                     issuancePerFeaturedAssetActivity =
