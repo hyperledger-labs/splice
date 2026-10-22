@@ -22,10 +22,10 @@ final case class RewardIssuanceParams(
     threshold_CC: BigDecimal,
     totalIssuanceForFeaturedAppRewards: BigDecimal,
     unclaimedAppRewardAmount: BigDecimal,
-    issuancePerFeaturedAssetBurnCC: BigDecimal = BigDecimal(0),
-    totalIssuanceForFeaturedAssetRewards: BigDecimal = BigDecimal(0),
-    issuancePerFeaturedAppBurnCC: BigDecimal = BigDecimal(0),
-    featuredAppMintingAllowanceCC: BigDecimal = BigDecimal(0),
+    issuancePerFeaturedAssetBurnCC: BigDecimal,
+    totalIssuanceForFeaturedAssetRewards: BigDecimal,
+    issuancePerFeaturedAppBurnCC: BigDecimal,
+    featuredAppMintingAllowanceCC: BigDecimal,
 )
 
 /** Raw contract inputs for app reward CC computation.
