@@ -403,6 +403,8 @@ with the other splice maintainers.
 
 To bump the minimum version, go to `apps/dar-resources-generator/.../DarResourcesGenerator.scala`,
 edit the `minimumInitialization` map and run `sbt updateDarResources`.
+If you bump the minimum splitwell version, also bump `minDarVersion` in
+`cluster/pulumi/common-validator/src/splitwellDars.ts` and run `make update-expected`.
 After doing that you can trigger CI. All the
 version checks from from `PackageVersionSupport` will warn for checks
 that are now redundant because the version they are testing against is
