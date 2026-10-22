@@ -11,7 +11,8 @@ trap 'echo "total elapsed: $((SECONDS - start_time))s"' EXIT
 
 # FETCH_GIT_REFS selects which refs beyond the checked-out commit are fetched (#7831):
 #   none     no extra fetches (default)
-#   shallow  main and release-line-$LATEST_RELEASE tips, at depth 1
+#   shallow  main and release-line-$LATEST_RELEASE tips, at depth 1 and without blobs; missing blobs
+#            are fetched on demand. (A plain --depth=1 fetch makes git 2.43 resend the whole tree.)
 #   history  main, the PR head branch and release-line-$LATEST_RELEASE with their full
 #            commit history but no blobs (--filter=blob:none); missing blobs are fetched on demand.
 #            The todo checker needs this, because it uses `git log main..$BRANCH`.
@@ -19,7 +20,7 @@ trap 'echo "total elapsed: $((SECONDS - start_time))s"' EXIT
 FETCH_GIT_REFS=${FETCH_GIT_REFS:-none}
 case "$FETCH_GIT_REFS" in
   none) depth_args=() ;;
-  shallow) depth_args=(--depth=1) ;;
+  shallow) depth_args=(--depth=1 --filter=blob:none) ;;
   history) depth_args=(--filter=blob:none) ;;
   *)
     echo "Unknown FETCH_GIT_REFS value: $FETCH_GIT_REFS (expected none, shallow or history)"
