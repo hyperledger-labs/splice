@@ -41,8 +41,12 @@ if [[ $git_commit_message == *"[release]"* ]]; then
 fi
 
 commit_date=$(git log -n1 --format=%cd --date=format:%Y%m%d "$sha")
-# In a shallow clone, as on CI, this counts only the fetched commits (1 at depth 1),
-# so CI snapshot versions do not order by commit count; the date and sha still identify them.
+# In a shallow clone this counts only the fetched commits. On splice CI it has always been 1,
+# also before #7831: actions/checkout fetches HEAD at depth 1, which records HEAD in .git/shallow,
+# and later fetches without --deepen/--unshallow (like common_setup.sh's former unbounded fetch of
+# main) don't remove that entry, so rev-list stops at HEAD. E.g. main CI at 63fdd611 built
+# 0.10.0-ci-snapshot.20261022.1.0.v63fdd611. To get the full count in a shallow clone, first run
+# `git fetch --unshallow --filter=tree:0 origin "$sha"`: it fetches only the commits (~4 MB).
 number_of_commits=$(git rev-list --count "$sha")
 commit_sha_8=$(git log -n1 --format=%h --abbrev=8 "$sha")
 
