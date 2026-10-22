@@ -599,9 +599,6 @@ template AmuletRules
               miningRound.tickDuration miningRound.amuletPrice miningRound.issuanceConfig summary
 
         -- record unclaimed reward contract
-        -- In CIP-104, the issuance for app and asset rewards is calculated off-ledger
-        -- (both from the app rewards tranche) and hence the unclaimedAppRewards
-        -- is also obtained from summary
         let unclaimedAppRewards = fromOptional params.unclaimedAppRewards summary.optUnclaimedAppRewards
         let totalUnclaimedRewards = params.unclaimedValidatorRewards + unclaimedAppRewards + params.unclaimedSvRewards
         when (totalUnclaimedRewards > 0.0) $
