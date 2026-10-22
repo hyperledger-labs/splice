@@ -102,11 +102,12 @@ abstract class InStackDecentralizedSynchronizerNode
             port?: number;
             user?: string;
           };
-        peerEndpoints?: {
-          address: string;
-          port: number;
-        }[];
+          peerEndpoints?: {
+            address: string;
+            port: number;
+          }[];
         },
+    autoInit: boolean,
     version: CnChartVersion,
     logLevel?: LogLevel,
     logLevelStdout?: LogLevel,
@@ -129,6 +130,29 @@ abstract class InStackDecentralizedSynchronizerNode
     );
 
     const rateLimitConfig = getSequencerRateLimitConfig();
+
+    const autoInitSeqEnvVars = autoInit
+      ? [
+          {
+            name: 'ADDITIONAL_CONFIG_AUTO_INIT',
+            value: `
+        canton.sequencers.sequencer.init.identity.type = auto
+        canton.sequencers.sequencer.init.generate-topology-transactions-and-keys = true
+      `,
+          },
+        ]
+      : [];
+    const autoInitMedEnvVars = autoInit
+      ? [
+          {
+            name: 'ADDITIONAL_CONFIG_AUTO_INIT',
+            value: `
+        canton.mediators.mediator.init.identity.type = auto
+        canton.mediators.mediator.init.generate-topology-transactions-and-keys = true
+      `,
+          },
+        ]
+      : [];
 
     installSpliceHelmChart(
       this.xns,
@@ -155,7 +179,9 @@ abstract class InStackDecentralizedSynchronizerNode
             additionalEnvVars: (rateLimitConfig
               ? [{ name: 'ADDITIONAL_CONFIG_SEQUENCER_RATE_LIMITS', value: rateLimitConfig }]
               : []
-            ).concat(physicalSynchronizerConfig.sequencer.additionalEnvVars),
+            )
+              .concat(physicalSynchronizerConfig.sequencer.additionalEnvVars)
+              .concat(autoInitSeqEnvVars),
             resources: physicalSynchronizerConfig.sequencer.resources,
             additionalJvmOptions: getAdditionalJvmOptions(
               physicalSynchronizerConfig.sequencer.additionalJvmOptions
@@ -170,7 +196,8 @@ abstract class InStackDecentralizedSynchronizerNode
               postgresName: dbs.mediatorPostgres.instanceName,
               ...(dbs.setCoreDbNames ? { databaseName: mediatorDbName } : {}),
             },
-            additionalEnvVars: physicalSynchronizerConfig.mediator.additionalEnvVars,
+            additionalEnvVars:
+              physicalSynchronizerConfig.mediator.additionalEnvVars.concat(autoInitMedEnvVars),
             resources: physicalSynchronizerConfig.mediator.resources,
             additionalJvmOptions: getAdditionalJvmOptions(
               physicalSynchronizerConfig.mediator.additionalJvmOptions
@@ -291,6 +318,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
         host: pulumi.interpolate`${cometbftRelease.rpcServiceName}.${xns.logicalName}.svc.cluster.local`,
         port: 26657,
       },
+      false, // autoInit is used only in dSyncs, which do not support cometBFT
       version,
       svConfig.logging?.cantonLogLevel,
       svConfig.logging?.cantonStdoutLogLevel,
@@ -315,6 +343,7 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
       bftSequencerPostgres?: Postgres;
     },
     configuredPeerUrls: string[],
+    autoInit: boolean,
     version: CnChartVersion,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
@@ -346,6 +375,7 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
           };
         }),
       },
+      autoInit,
       version,
       svConfig.logging?.cantonLogLevel,
       svConfig.logging?.cantonStdoutLogLevel,

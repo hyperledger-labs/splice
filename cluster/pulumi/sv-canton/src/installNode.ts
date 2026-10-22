@@ -74,8 +74,8 @@ export async function installNode(
   const configuredPeerAddresses =
     nodeType === 'dsync'
       ? dSyncNodeNamesInSameDSync(nodeName)
-        .filter(dsyncNodeName => dsyncNodeName !== nodeName)
-        .map(peerName => `sequencer-p2p-${migrationId}.${peerName}.${clusterHostname}`)
+          .filter(dsyncNodeName => dsyncNodeName !== nodeName)
+          .map(peerName => `sequencer-p2p-${migrationId}.${peerName}.${clusterHostname}`)
       : [];
 
   return await installCantonComponents(
@@ -116,6 +116,7 @@ export async function installNode(
     },
     nodeType,
     configuredPeerAddresses,
+    nodeType === 'dsync', // autoInit is true for dsync nodes, false for sv nodes
     undefined,
     { dependsOn: imagePullDeps },
     supportsReset,
