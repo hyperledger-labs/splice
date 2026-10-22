@@ -44,8 +44,7 @@ while IFS=$'\t' read -r sv url; do
   host="${host%/}"
   out="$tmp/$sv.out"
   printf 'Checking %s (%s:443) ... ' "$sv" "$host"
-  if ! grpcurl "$host:443" com.digitalasset.canton.sequencer.api.v30.SequencerConnectService/GetSynchronizerParameters \
-    </dev/null >"$out" 2>&1; then
+  if ! grpcurl "$host:443" com.digitalasset.canton.sequencer.api.v30.SequencerConnectService/GetSynchronizerParameters >"$out" 2>&1; then
     echo "FAILED:"
     cat "$out"
     failed=$((failed + 1))
