@@ -67,6 +67,7 @@ export function installLoopback(
     { dependsOn: [namespace.ns] }
   );
 
+  // always explicitly include the runbook to avoid issues where the loopback will not work
   const svHosts = coreSvsToDeploy
     .concat([svRunbookConfig])
     .map(sv => [`${sv.ingressName}.${clusterHostname}`, `*.${sv.ingressName}.${clusterHostname}`])
