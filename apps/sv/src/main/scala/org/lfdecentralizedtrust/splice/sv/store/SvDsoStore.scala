@@ -52,6 +52,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.instruction.FeaturedAppConfigUpdateInstruction
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
@@ -601,6 +602,16 @@ trait SvDsoStore
     splice.amulet.RewardCouponV2,
   ]]]
 
+  /** Returns a random sample of up to `limit` `FeaturedAppConfigUpdateInstruction` contracts, drawn from an
+    * arbitrary (unordered) subset of up to 1000 contracts.
+    */
+  def listFeaturedAppConfigUpdateInstructionSample(
+      limit: Limit = defaultLimit
+  )(implicit tc: TraceContext): Future[Seq[AssignedContract[
+    FeaturedAppConfigUpdateInstruction.ContractId,
+    FeaturedAppConfigUpdateInstruction,
+  ]]]
+
   /** Returns the histogram for the remaining age (i.e., difference between now and the
     * contract creation time) of all active RewardCouponV2 contracts.
     *
@@ -800,6 +811,11 @@ trait SvDsoStore
     splice.amulet.RewardCouponV2.ContractId,
     splice.amulet.RewardCouponV2,
   ]
+
+  def listExpiredFeaturedAppConfigUpdateInstruction: ListExpiredContracts[
+    FeaturedAppConfigUpdateInstruction.ContractId,
+    FeaturedAppConfigUpdateInstruction,
+  ] = multiDomainAcsStore.listExpiredFromPayloadExpiry(FeaturedAppConfigUpdateInstruction.COMPANION)
 
   /** Does a random sample of coupon providers from the set of coupons where 'providerIsObserver' is false.
     * Returns only the parties, not the coupons, to keep the query index-only.
@@ -1297,6 +1313,13 @@ object SvDsoStore {
           voteRequestTrackingCid =
             Some(contract.payload.trackingCid.toScala.getOrElse(contract.contractId)),
         )
+      },
+      mkFilter(FeaturedAppConfigUpdateInstruction.COMPANION)(co => co.payload.dso == dso) {
+        contract =>
+          DsoAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
       },
       mkFilter(splice.dsorules.DsoRules.COMPANION)(co => co.payload.dso == dso)(
         DsoAcsStoreRowData(_)

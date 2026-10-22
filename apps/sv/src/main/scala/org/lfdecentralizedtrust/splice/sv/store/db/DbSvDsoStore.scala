@@ -66,6 +66,7 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.instruction.FeaturedAppConfigUpdateInstruction
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import slick.jdbc.GetResult
@@ -866,6 +867,42 @@ class DbSvDsoStore(
       limited = applyLimit("listRewardCouponsV2", limit, result)
     } yield limited.map(
       assignedContractFromRow(splice.amulet.RewardCouponV2.COMPANION)(_)
+    )
+
+  override def listFeaturedAppConfigUpdateInstructionSample(limit: Limit)(implicit
+      tc: TraceContext
+  ): Future[Seq[
+    AssignedContract[
+      FeaturedAppConfigUpdateInstruction.ContractId,
+      FeaturedAppConfigUpdateInstruction,
+    ]
+  ]] =
+    for {
+      result <- storage
+        .query(
+          (sql"""
+             select #${AcsQueries.SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated(
+              "sample."
+            )}
+             from (
+               select #${AcsQueries.SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()}
+               from #${DsoTables.acsTableName} acs
+               where acs.store_id = $acsStoreId
+                 and acs.migration_id = $domainMigrationId
+                 and acs.package_name = ${FeaturedAppConfigUpdateInstruction.PACKAGE_NAME}
+                 and acs.template_id_qualified_name = ${QualifiedName(
+              FeaturedAppConfigUpdateInstruction.TEMPLATE_ID_WITH_PACKAGE_ID
+            )}
+               limit 1000
+             ) sample
+             order by random()
+             limit ${sqlLimit(limit)}
+           """).as[AcsQueries.SelectFromAcsTableWithStateResult],
+          "listFeaturedAppConfigUpdateInstructionSample",
+        )
+      limited = applyLimit("listFeaturedAppConfigUpdateInstructionSample", limit, result)
+    } yield limited.map(
+      assignedContractFromRow(FeaturedAppConfigUpdateInstruction.COMPANION)(_)
     )
 
   override def getRewardCouponsV2AgeHistogram(
