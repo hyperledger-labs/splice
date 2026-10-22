@@ -55,9 +55,13 @@ final case class RewardComputationInputs(
 
   private val microsPerYear: Long = 365L * 24 * 3600 * 1000000L
   private val roundsPerYear: Numeric = div(fromLong(microsPerYear), fromLong(tickDurationMicros))
-  private val amuletsToIssueInRound: Numeric = div(amuletToIssuePerYear, roundsPerYear)
-  private val adjustedAmuletsToIssueInRound: Numeric =
-    sub(amuletsToIssueInRound, mul(amuletsToIssueInRound, developmentFundPercentage))
+  private val amuletsToIssueInRound_beforeDevFund: Numeric =
+    div(amuletToIssuePerYear, roundsPerYear)
+  private val amuletsToIssueInRound: Numeric =
+    sub(
+      amuletsToIssueInRound_beforeDevFund,
+      mul(amuletsToIssueInRound_beforeDevFund, developmentFundPercentage),
+    )
   private[scan] val trafficPriceInCCperMB: Numeric = div(trafficPrice, amuletPrice)
 
   def deriveIssuanceParams(
@@ -68,7 +72,7 @@ final case class RewardComputationInputs(
       div(fromLong(totalRoundAppActivityWeight), fromLong(1000000L)),
       trafficPriceInCCperMB,
     )
-    val rewardsToIssue = mul(adjustedAmuletsToIssueInRound, appRewardPercentage)
+    val rewardsToIssue = mul(amuletsToIssueInRound, appRewardPercentage)
     val issuancePerCoupon = computeIssuanceTranche(
       rewardsToIssue = rewardsToIssue,
       capPerCoupon = featuredAppRewardCap,

@@ -147,8 +147,8 @@ object RewardComputationInputsTest {
     *   optDevelopmentFundPercentage = None → default 0.05
     *   trafficPrice = 60 $/MB, amuletPrice = 0.14877 $/CC
     *
-    * Derived: amuletsToIssueInRound ≈ 190258.75
-    *          adjustedAmuletsToIssueInRound ≈ 180745.81 (after 5% devfund)
+    * Derived: amuletsToIssueInRound_beforeDevFund ≈ 190258.75
+    *          amuletsToIssueInRound ≈ 180745.81 (after 5% devfund)
     *          rewardsToIssue ≈ 112062.40, trafficPriceInCCperMB ≈ 403.30, threshold_CC ≈ 3.36
     */
   val mainNet = RewardComputationInputs(
@@ -168,8 +168,8 @@ object RewardComputationInputsTest {
 
   /** Baseline inputs: simple round numbers for easy manual verification.
     *
-    * amuletToIssuePerYear = 52560 → amuletsToIssueInRound = 1.0
-    * developmentFundPercentage = 0.1 → adjustedAmuletsToIssueInRound = 0.9
+    * amuletToIssuePerYear = 52560 → amuletsToIssueInRound_beforeDevFund = 1.0
+    * developmentFundPercentage = 0.1 → amuletsToIssueInRound = 0.9
     * appRewardPercentage = 0.5 → rewardsToIssue = 0.45
     * amuletPrice = 1.0, trafficPrice = 1.0 → trafficPriceInCCperMB = 1.0
     * featuredAppRewardCap = 100 (high, so cap doesn't bind)
