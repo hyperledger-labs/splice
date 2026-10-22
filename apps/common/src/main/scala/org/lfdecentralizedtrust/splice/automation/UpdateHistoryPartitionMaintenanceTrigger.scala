@@ -13,17 +13,17 @@ import java.time.LocalDate
 import scala.concurrent.{ExecutionContext, Future}
 
 class UpdateHistoryPartitionMaintenanceTrigger(
-  updateHistory: UpdateHistory,
-  override protected val context: TriggerContext,
+    updateHistory: UpdateHistory,
+    override protected val context: TriggerContext,
 )(implicit
-  ec: ExecutionContext,
-  override val tracer: Tracer,
-  mat: Materializer,
+    ec: ExecutionContext,
+    override val tracer: Tracer,
+    mat: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[UpdateHistoryPartitionMaintenanceTrigger.Task] {
   import UpdateHistoryPartitionMaintenanceTrigger.*
 
   override protected def retrieveTasks()(implicit
-    tc: TraceContext
+      tc: TraceContext
   ): Future[Seq[Task]] =
     if (!updateHistory.isReady) {
       Future.successful(Seq.empty)
@@ -32,7 +32,7 @@ class UpdateHistoryPartitionMaintenanceTrigger(
     }
 
   override protected def completeTask(task: Task)(implicit
-    tc: TraceContext
+      tc: TraceContext
   ): Future[TaskOutcome] =
     for {
       _ <- updateHistory.createPartitions(task.day)

@@ -15,7 +15,10 @@ class UpdateHistoryPartitionMaintenanceTriggerTest extends UpdateHistoryTestBase
 
   private def daysAfter(days: Long) = CantonTimestamp.Epoch.plus(Duration.ofDays(days))
 
-  private def mkTrigger(store: UpdateHistory, now: CantonTimestamp): UpdateHistoryPartitionMaintenanceTrigger = {
+  private def mkTrigger(
+      store: UpdateHistory,
+      now: CantonTimestamp,
+  ): UpdateHistoryPartitionMaintenanceTrigger = {
     val clock = new SimClock(loggerFactory = loggerFactory)
     clock.advanceTo(now)
     new UpdateHistoryPartitionMaintenanceTrigger(
