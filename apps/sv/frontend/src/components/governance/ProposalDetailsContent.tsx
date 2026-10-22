@@ -33,6 +33,7 @@ import { sanitizeUrl } from '@canton-network/splice-common-frontend-utils';
 import { Link as RouterLink } from 'react-router';
 import {
   ConfigChange,
+  FeatureAppConfigUpdateEntry,
   ProposalDetails,
   ProposalVote,
   ProposalVotingInformation,
@@ -40,6 +41,7 @@ import {
 } from '../../utils/types';
 import { ProposalVoteForm } from './ProposalVoteForm';
 import { ConfigValuesChanges } from './ConfigValuesChanges';
+import { OpsPartiesDiff, OpsPartiesDisplay } from './OpsPartiesDisplay';
 import { JsonDiffAccordion } from './JsonDiffAccordion';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { DetailItem } from './proposal-details/DetailItem';
@@ -236,6 +238,8 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             <FeatureAppSection
               provider={proposalDetails.proposal.provider}
               activityWeight={proposalDetails.proposal.activityWeight}
+              appKind={proposalDetails.proposal.appKind}
+              opsParties={proposalDetails.proposal.opsParties}
             />
           )}
 
@@ -248,6 +252,10 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               rightContractId={proposalDetails.proposal.rightContractId}
               newActivityWeight={proposalDetails.proposal.newActivityWeight}
             />
+          )}
+
+          {proposalDetails.action === 'SRARC_CreateFeaturedAppConfigUpdateInstruction' && (
+            <AmendFeatureAppSection updates={proposalDetails.proposal.updates} />
           )}
 
           {proposalDetails.action === 'SRARC_UpdateSvRewardWeight' && (
@@ -802,9 +810,16 @@ const OffboardMemberSection = ({ memberPartyId }: OffboardMemberSectionProps) =>
 interface FeatureAppSectionProps {
   provider: string;
   activityWeight: string;
+  appKind?: string;
+  opsParties?: string[];
 }
 
-const FeatureAppSection = ({ provider, activityWeight }: FeatureAppSectionProps) => {
+const FeatureAppSection = ({
+  provider,
+  activityWeight,
+  appKind,
+  opsParties,
+}: FeatureAppSectionProps) => {
   return (
     <Box
       id="proposal-details-feature-app-section"
@@ -827,6 +842,22 @@ const FeatureAppSection = ({ provider, activityWeight }: FeatureAppSectionProps)
         value={activityWeight}
         labelId="proposal-details-feature-app-activity-weight-label"
         valueId="proposal-details-feature-app-activity-weight-value"
+      />
+      <DetailItem
+        label="App Kind"
+        value={appKind || 'Default (General)'}
+        labelId="proposal-details-feature-app-kind-label"
+        valueId="proposal-details-feature-app-kind-value"
+      />
+      <DetailItem
+        label="Ops Parties"
+        value={
+          <OpsPartiesDisplay
+            parties={opsParties ?? []}
+            idPrefix="proposal-details-feature-app-ops"
+          />
+        }
+        labelId="proposal-details-feature-app-ops-label"
       />
     </Box>
   );
@@ -950,6 +981,56 @@ const UpdateFeatureAppSection = ({
           />
         }
       />
+    </Box>
+  );
+};
+
+interface AmendFeatureAppSectionProps {
+  updates: FeatureAppConfigUpdateEntry[];
+}
+
+// Amend details: one block per provider — provider id, scalar changes (appKind /
+// activityWeight) via ConfigValuesChanges, and opsParties as an added/removed diff. The amend
+// form authors a single provider; the list keeps details forward-compatible with multi-provider
+// instructions.
+const AmendFeatureAppSection = ({ updates }: AmendFeatureAppSectionProps) => {
+  return (
+    <Box
+      id="proposal-details-amend-feature-app-section"
+      data-testid="proposal-details-amend-feature-app-section"
+      sx={{ display: 'contents' }}
+    >
+      {updates.map((update, i) => (
+        <React.Fragment key={i}>
+          <DetailItem
+            label="Provider Party ID"
+            value={
+              <CopyableIdentifier
+                value={update.provider}
+                size="large"
+                data-testid={`proposal-details-amend-provider-${i}`}
+              />
+            }
+            labelId={`proposal-details-amend-provider-label-${i}`}
+          />
+          {update.scalarChanges.length > 0 && (
+            <DetailItem
+              label="Config Changes"
+              value={<ConfigValuesChanges changes={update.scalarChanges} />}
+            />
+          )}
+          <DetailItem
+            label="Ops Parties Changes"
+            value={
+              <OpsPartiesDiff
+                added={update.opsAdded}
+                removed={update.opsRemoved}
+                idPrefix={`proposal-details-amend-ops-${i}`}
+              />
+            }
+          />
+        </React.Fragment>
+      ))}
     </Box>
   );
 };

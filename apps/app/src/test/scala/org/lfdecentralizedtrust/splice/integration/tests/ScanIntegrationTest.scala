@@ -202,6 +202,7 @@ class ScanIntegrationTest
           openRound.payload.opensAt,
           openRound.payload.targetClosesAt,
           Optional.empty(),
+          Optional.empty(), // optIssuancePerFeaturedAssetRewardCoupon (CIP-0104)
         ),
         ByteString.EMPTY,
         openRound.contract.createdAt,

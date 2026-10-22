@@ -209,6 +209,29 @@ export const validatePartyId = (value: string): string | false => {
   return result.success ? false : result.error.issues[0].message;
 };
 
+// Array-level validator for the opsParties field (#7665 / #7674). Blank rows are
+// ignored (they are filtered out by opsPartiesToOptional on submit); the remaining
+// entries must each be a valid party id, be unique, and exclude the provider.
+// Mirrors the SV backend check (FeaturedAppRightValidator.checkOps).
+export const validateOpsParties = (parties: string[], provider: string): string | false => {
+  const cleaned = parties.map(p => p.trim()).filter(p => p !== '');
+
+  for (const p of cleaned) {
+    const result = partyIdSchema.safeParse(p);
+    if (!result.success) return result.error.issues[0].message;
+  }
+
+  if (new Set(cleaned).size !== cleaned.length) {
+    return 'Duplicate ops parties are not allowed';
+  }
+
+  if (provider && cleaned.includes(provider)) {
+    return 'Provider cannot be its own ops party';
+  }
+
+  return false;
+};
+
 export const validateNextScheduledSynchronizerUpgrade = (
   upgradeTime: string,
   migrationId: string,

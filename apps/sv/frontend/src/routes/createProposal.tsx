@@ -3,6 +3,7 @@
 
 import { useSearchParams } from 'react-router';
 import { Loading } from '@canton-network/splice-common-frontend';
+import { CreateFeaturedAppConfigUpdateForm } from '../components/forms/CreateFeaturedAppConfigUpdateForm';
 import { CreateUnallocatedUnclaimedActivityRecordForm } from '../components/forms/CreateUnallocatedUnclaimedActivityRecordForm';
 import { GrantRevokeFeaturedAppForm } from '../components/forms/GrantRevokeFeaturedAppForm';
 import { OffboardSvForm } from '../components/forms/OffboardSvForm';
@@ -38,6 +39,8 @@ const ProposalForm: React.FC<{ action: SupportedActionTag }> = ({ action }) => {
       return <SetAmuletConfigRulesForm />;
     case 'SRARC_UpdateFeaturedAppRight':
       return <UpdateFeaturedAppForm />;
+    case 'SRARC_CreateFeaturedAppConfigUpdateInstruction':
+      return <CreateFeaturedAppConfigUpdateForm />;
   }
 };
 

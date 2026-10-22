@@ -61,6 +61,15 @@ data OpenMiningRoundSummary = OpenMiningRoundSummary with
     totalSvRewardWeight : Int
     optTotalValidatorFaucetCoupons : Optional Int
       -- ^ Introduced as part of CIP-3.
+    optIssuancePerFeaturedAppRewardCoupon : Optional Decimal
+      -- ^ If specified, the off-ledger computed value is used as it is in IssuingMiningRound.
+    optUnclaimedAppRewards : Optional Decimal
+      -- ^ If specified, the off-ledger computed value is used for UnclaimedReward.
+    optTotalFeaturedAssetRewardCoupons : Optional Decimal
+      -- ^ Introduced as part of CIP-0104.
+    optIssuancePerFeaturedAssetRewardCoupon : Optional Decimal
+      -- ^ Introduced as part of CIP-0104; this is always computed off-ledger.
+      --   Denominated in amount of Amulet minted per Amulet burned.
   deriving (Eq, Show, Serializable)
 
 getTotalValidatorFaucetCoupons : OpenMiningRoundSummary -> Int

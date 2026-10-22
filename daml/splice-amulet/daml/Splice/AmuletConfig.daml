@@ -83,9 +83,20 @@ data RewardConfig = RewardConfig with
     dryRunVersion : Optional RewardVersion -- ^ What scheme to use for dry-running reward minting. If None, dry-runs are disabled.
     batchSize : Int -- ^ Batch size to use for building the Merkle-tree over minting allowances.
     rewardCouponTimeToLive : RelTime -- ^ Time to live for reward coupons, default 36h to support batching of collection across 12h with a 24h prepare-submission delay.
-    appRewardCouponThreshold : Decimal -- ^ Threshold for minting reward coupons, in USD.
-    -- This threshold is not enforced in daml, but it must be used while building the Merkle-tree
-    -- to ignore minting allowances lower than this value.
+    appRewardCouponThreshold : Decimal
+      -- ^ Threshold for minting reward coupons, in USD.
+      -- This threshold is not enforced in daml, but it must be used while
+      -- building the Merkle-tree to ignore minting allowances lower than this
+      -- value.
+    extraFeaturedAssetActivityWeight : Optional Decimal
+      -- ^ Extra weight for featured asset activity within a transaction by a
+      -- featured asset moving app. Default: 0.2.
+    maxExtraFeaturedAssetActivityWeightPerAsset : Optional Decimal
+      -- ^ Maximum extra weight for featured asset activity per asset within a
+      -- transaction by a featured asset moving app. Default: 0.1.
+    dsoAppActivityWeight : Optional Decimal
+      -- ^ Weight for DSO-level app activity records attributed to the submitting
+      -- featured asset moving app. Default: 0.5.
   deriving (Eq, Show, Serializable)
 
 
@@ -194,10 +205,17 @@ validRewardConfig (RewardConfig
   _dryRunVersion
   batchSize
   rewardCouponTimeToLive
-  appRewardCouponThreshold) =
+  appRewardCouponThreshold
+  extraFeaturedAssetActivityWeight
+  maxExtraFeaturedAssetActivityWeightPerAsset
+  dsoAppActivityWeight
+  ) =
     batchSize > 0 &&
     rewardCouponTimeToLive > hours 0 &&
-    appRewardCouponThreshold >= 0.0
+    appRewardCouponThreshold >= 0.0 &&
+    optional True (>= 0.0) extraFeaturedAssetActivityWeight &&
+    optional True (>= 0.0) maxExtraFeaturedAssetActivityWeightPerAsset &&
+    optional True (>= 0.0) dsoAppActivityWeight
 
 -- | The package config defines for each daml package (identified by name)
 -- the package version that should be used for command submissions
@@ -246,6 +264,9 @@ instance Patchable RewardConfig where
     batchSize = patch new.batchSize base.batchSize current.batchSize
     rewardCouponTimeToLive = patch new.rewardCouponTimeToLive base.rewardCouponTimeToLive current.rewardCouponTimeToLive
     appRewardCouponThreshold = patch new.appRewardCouponThreshold base.appRewardCouponThreshold current.appRewardCouponThreshold
+    extraFeaturedAssetActivityWeight = patch new.extraFeaturedAssetActivityWeight base.extraFeaturedAssetActivityWeight current.extraFeaturedAssetActivityWeight
+    maxExtraFeaturedAssetActivityWeightPerAsset = patch new.maxExtraFeaturedAssetActivityWeightPerAsset base.maxExtraFeaturedAssetActivityWeightPerAsset current.maxExtraFeaturedAssetActivityWeightPerAsset
+    dsoAppActivityWeight = patch new.dsoAppActivityWeight base.dsoAppActivityWeight current.dsoAppActivityWeight
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with

@@ -15,6 +15,7 @@ import {
 import type { ConfigChange } from '../../utils/types';
 import { formatDatetimeWithOffset } from '../../utils/dateFormat';
 import { ConfigValuesChanges } from './ConfigValuesChanges';
+import { OpsPartiesDiff, OpsPartiesDisplay } from './OpsPartiesDisplay';
 import { ProposalReviewField } from './ProposalReviewField';
 
 /** Figma review party IDs: Source Code Pro 14px + copy (node 4832:4323). */
@@ -57,6 +58,8 @@ type ProposalSummaryProps = BaseProposalSummaryProps &
         formType: 'grant-right';
         grantRight: string;
         activityWeight: string;
+        appKind: string;
+        opsParties: string[];
       }
     | {
         formType: 'revoke-right';
@@ -81,6 +84,14 @@ type ProposalSummaryProps = BaseProposalSummaryProps &
         rightCid: string;
         currentActivityWeight: string;
         newActivityWeight: string;
+      }
+    | {
+        formType: 'amend-featured-app';
+        providerPartyId: string;
+        rightCid: string;
+        scalarChanges: ConfigChange[];
+        opsAdded: string[];
+        opsRemoved: string[];
       }
   );
 
@@ -168,6 +179,21 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
               label="Activity Weight"
               value={props.activityWeight}
             />
+            <ProposalReviewField
+              id="grantRightAppKind"
+              label="App Kind"
+              value={props.appKind || 'Default (General)'}
+            />
+            <ProposalReviewField
+              id="grantRightOpsParties"
+              label="Ops Parties"
+              value={
+                <OpsPartiesDisplay
+                  parties={props.opsParties.filter(p => p.trim() !== '')}
+                  idPrefix="grant-review-ops"
+                />
+              }
+            />
           </>
         )}
 
@@ -222,6 +248,44 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
                       newValue: props.newActivityWeight,
                     },
                   ]}
+                />
+              }
+            />
+          </>
+        )}
+
+        {formType === 'amend-featured-app' && (
+          <>
+            <ProposalReviewField
+              id="amendProviderPartyId"
+              label="Provider Party ID"
+              value={
+                <ReviewPartyId
+                  partyId={props.providerPartyId}
+                  data-testid="amendProviderPartyId-party-id"
+                />
+              }
+            />
+            <ProposalReviewField
+              id="amendRight"
+              label="Featured Application Contract ID"
+              value={props.rightCid}
+            />
+            {props.scalarChanges.length > 0 && (
+              <ProposalReviewField
+                id="amendScalarChanges"
+                label="Proposed Changes"
+                value={<ConfigValuesChanges isSummaryView changes={props.scalarChanges} />}
+              />
+            )}
+            <ProposalReviewField
+              id="amendOpsParties"
+              label="Ops Parties Changes"
+              value={
+                <OpsPartiesDiff
+                  added={props.opsAdded}
+                  removed={props.opsRemoved}
+                  idPrefix="amend-review-ops"
                 />
               }
             />
