@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.automation
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -25,13 +26,19 @@ import scala.concurrent.{ExecutionContext, Future}
 class UpdateHistoryPartitionMaintenanceTrigger(
     updateHistory: UpdateHistory,
     runwayDays: Int,
-    override protected val context: TriggerContext,
+    baseContext: TriggerContext,
 )(implicit
     ec: ExecutionContext,
     override val tracer: Tracer,
     mat: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[UpdateHistoryPartitionMaintenanceTrigger.Task] {
   import UpdateHistoryPartitionMaintenanceTrigger.*
+
+  override protected lazy val context: TriggerContext =
+    baseContext.copy(config =
+      // New partitions are only needed daily, and UpdateHistory already creates any necessary partitions on startup.
+      baseContext.config.copy(pollingInterval = NonNegativeFiniteDuration.ofDays(1L))
+    )
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
