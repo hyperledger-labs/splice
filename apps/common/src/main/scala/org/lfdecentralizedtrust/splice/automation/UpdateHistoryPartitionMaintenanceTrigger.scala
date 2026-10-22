@@ -47,7 +47,13 @@ class UpdateHistoryPartitionMaintenanceTrigger(
       Future.successful(Seq.empty)
     } else {
       val now = context.clock.now
-      missingDays(updateHistory, runwayDays, now, Future.successful(now)).map { case (_, missing) =>
+      missingDays(
+        updateHistory,
+        runwayDays,
+        now,
+        // Any partition for record times before now should've already been created on startup
+        firstRecordTimeIfNothingIngested = Future.successful(now),
+      ).map { case (_, missing) =>
         missing.map(Task(_))
       }
     }
