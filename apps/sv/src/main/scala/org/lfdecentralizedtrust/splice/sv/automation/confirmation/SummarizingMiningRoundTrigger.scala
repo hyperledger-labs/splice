@@ -282,6 +282,10 @@ object SummarizingMiningRoundTrigger {
         unfeaturedAppRewardCoupons.bigDecimal,
         svRewardCouponsWeightSum,
         Optional.of(validatorLivenessActivityRecords),
+        Optional.empty(), // optIssuancePerFeaturedAppRewardCoupon
+        Optional.empty(), // optUnclaimedAppRewards
+        Optional.empty(), // optTotalFeaturedAssetRewardCoupons (CIP-0104)
+        Optional.empty(), // optIssuancePerFeaturedAssetRewardCoupon (CIP-0104)
       )
 
     override def pretty: Pretty[this.type] =

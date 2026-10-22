@@ -142,6 +142,8 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
               value: {
                 provider: formValues.idValue,
                 activityWeight: activityWeightToOptional(formValues.activityWeight),
+                appKind: null,
+                opsParties: null,
               },
             },
           },

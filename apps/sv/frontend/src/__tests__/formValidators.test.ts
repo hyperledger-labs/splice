@@ -11,11 +11,46 @@ import {
   switchOverConfigValueToDisplayEntries,
   switchOverEntriesToConfigValue,
   switchOverMapToConfigValue,
+  validateOpsParties,
   validateSwitchOverTimes,
   visibleSwitchOverRows,
 } from '../components/forms/formValidators';
 
 dayjs.extend(utc);
+
+describe('validateOpsParties', () => {
+  const provider = 'provider::1220aaaa';
+  const alice = 'alice::1220bbbb';
+  const bob = 'bob::1220cccc';
+
+  it('passes with an empty list', () => {
+    expect(validateOpsParties([], provider)).toBe(false);
+  });
+
+  it('ignores blank rows (filtered on submit)', () => {
+    expect(validateOpsParties(['', '   '], provider)).toBe(false);
+  });
+
+  it('passes with valid unique parties', () => {
+    expect(validateOpsParties([alice, bob], provider)).toBe(false);
+  });
+
+  it('rejects an invalid party id format', () => {
+    expect(validateOpsParties(['not-a-party-id'], provider)).toBeTruthy();
+  });
+
+  it('rejects duplicates', () => {
+    expect(validateOpsParties([alice, alice], provider)).toBeTruthy();
+  });
+
+  it('rejects the provider as its own ops party', () => {
+    expect(validateOpsParties([alice, provider], provider)).toBeTruthy();
+  });
+
+  it('trims before comparing against the provider', () => {
+    expect(validateOpsParties([`  ${provider}  `], provider)).toBeTruthy();
+  });
+});
 
 describe('validateSwitchOverTimes', () => {
   const eff = '2026-09-01T00:00:00Z';

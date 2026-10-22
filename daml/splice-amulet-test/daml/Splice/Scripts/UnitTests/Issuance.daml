@@ -55,6 +55,10 @@ summaryExample1 = OpenMiningRoundSummary with
   totalFeaturedAppRewardCoupons = 400.0
   totalUnfeaturedAppRewardCoupons = 9600.0
   optTotalValidatorFaucetCoupons = Some 50
+  optTotalFeaturedAssetRewardCoupons = None
+  optIssuancePerFeaturedAssetRewardCoupon = None
+  optIssuancePerFeaturedAppRewardCoupon = None
+  optUnclaimedAppRewards = None
   totalSvRewardWeight = 100
 
 expectedParameters_E1_0_0p5 : IssuingRoundParameters
@@ -195,6 +199,10 @@ summaryExampleNoActivity = OpenMiningRoundSummary with
   totalFeaturedAppRewardCoupons = 0.0
   totalUnfeaturedAppRewardCoupons = 0.0
   optTotalValidatorFaucetCoupons = Some 0
+  optTotalFeaturedAssetRewardCoupons = None
+  optIssuancePerFeaturedAssetRewardCoupon = None
+  optIssuancePerFeaturedAppRewardCoupon = None
+  optUnclaimedAppRewards = None
   totalSvRewardWeight = 0
 
 expectedParameters_NoActivity_0_0p5 : IssuingRoundParameters
@@ -240,6 +248,10 @@ summaryExample3 = OpenMiningRoundSummary with
   totalFeaturedAppRewardCoupons = 100.0
   totalUnfeaturedAppRewardCoupons = 100.0
   optTotalValidatorFaucetCoupons = Some 50
+  optTotalFeaturedAssetRewardCoupons = None
+  optIssuancePerFeaturedAssetRewardCoupon = None
+  optIssuancePerFeaturedAppRewardCoupon = None
+  optUnclaimedAppRewards = None
   totalSvRewardWeight = 2
 
 
@@ -284,6 +296,10 @@ summaryExampleLargeSvRewardWeight = OpenMiningRoundSummary with
   totalFeaturedAppRewardCoupons = 0.0
   totalUnfeaturedAppRewardCoupons = 0.0
   optTotalValidatorFaucetCoupons = Some 0
+  optTotalFeaturedAssetRewardCoupons = None
+  optIssuancePerFeaturedAssetRewardCoupon = None
+  optIssuancePerFeaturedAppRewardCoupon = None
+  optUnclaimedAppRewards = None
   totalSvRewardWeight = 240 * 10000  -- total weight is 240 and it is represented in basis points
 
 expectedParameters_LargeSvRewardWeight_10plus : IssuingRoundParameters

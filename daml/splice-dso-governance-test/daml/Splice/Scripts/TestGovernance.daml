@@ -23,11 +23,13 @@ import Splice.Issuance()
 
 import Splice.DsoRules
 import Splice.DSO.AmuletPrice
+import Splice.DSO.Instruction
 import Splice.AmuletConfig
 import Splice.CometBft
 import Splice.DecentralizedSynchronizer
 
 import Splice.Scripts.DsoTestUtils
+import Splice.Scripts.Util (AmuletApp(..))
 import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Testing.Utils
 
@@ -53,6 +55,8 @@ testVoteRequestAcceptanceWithoutEffectivity = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = Some 11.0
+        appKind = None
+        opsParties = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = None
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
@@ -91,7 +95,7 @@ testVoteRequestAcceptanceWithoutEffectivity = do
     sv = Some sv1
 
   [(rightCid, right)] <- query @FeaturedAppRight provider
-  right === FeaturedAppRight with dso; provider; activityWeight = Some 11.0
+  right === FeaturedAppRight with dso; provider; activityWeight = Some 11.0; appKind = None; opsParties = None
 
   -- the request has been archived
   [] <- query @VoteRequest dso
@@ -128,6 +132,8 @@ testVoteRequestAcceptanceWithEffectivity = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = None
+        appKind = None
+        opsParties = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = Some (effectiveTime) -- the right will be granted in 8 days
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote with the possibility to change their vote
@@ -186,7 +192,7 @@ testVoteRequestAcceptanceWithEffectivity = do
   result.outcome === VRO_Accepted with effectiveAt = effectiveTime
 
   [(rightCid, right)] <- query @FeaturedAppRight provider
-  right === FeaturedAppRight with dso; provider; activityWeight = None
+  right === FeaturedAppRight with dso; provider; activityWeight = None; appKind = None; opsParties = None
 
   -- the request has been archived
   [] <- query @VoteRequest dso
@@ -201,7 +207,7 @@ testVoteRequestAcceptanceWithEffectivity = do
           newActivityWeight = 1.5
 
   [(rightCid, right)] <- query @FeaturedAppRight provider
-  right === FeaturedAppRight with dso; provider; activityWeight = Some 1.5
+  right === FeaturedAppRight with dso; provider; activityWeight = Some 1.5; appKind = None; opsParties = None
 
   -- let's test updating the right back to the default
   initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
@@ -213,7 +219,7 @@ testVoteRequestAcceptanceWithEffectivity = do
           newActivityWeight = 1.0
 
   [(rightCid, right)] <- query @FeaturedAppRight provider
-  right === FeaturedAppRight with dso; provider; activityWeight = None
+  right === FeaturedAppRight with dso; provider; activityWeight = None; appKind = None; opsParties = None
 
   -- we can remove the granted right using a vote request, provided enough parties answer in time
   -- This uses early closure of the vote request, which is only possible if a super-majority of svs have voted
@@ -243,6 +249,8 @@ testVoteRequestRejectionWithoutEffectivity = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = Some 11.0
+        appKind = None
+        opsParties = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = None
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
@@ -289,6 +297,8 @@ testVoteRequestRejectionWithEffectivityBeforeExpiration = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = None
+        appKind = None
+        opsParties = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = Some (effectiveTime)
     voteRequestTimeout = Some (days 3) -- give everybody 3 days to vote
@@ -335,6 +345,8 @@ testVoteRequestRejectionWithEffectivityAfterExpiration = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = None
+        appKind = None
+        opsParties = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = Some (addRelTime now (days 1))
     voteRequestTimeout = Some (days 2)
@@ -346,6 +358,8 @@ testVoteRequestRejectionWithEffectivityAfterExpiration = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = None
+        appKind = None
+        opsParties = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = Some (effectiveTime)
     voteRequestTimeout = Some (days 3) -- give everybody 3 days to vote
@@ -947,6 +961,8 @@ testVoteRequestExpireWithoutEffectivity = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = None
+        appKind = None
+        opsParties = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = None
     voteRequestTimeout = None
@@ -990,6 +1006,8 @@ testVoteRequestExpireWithEffectivity = do
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
         activityWeight = None
+        appKind = None
+        opsParties = None
     reason = Reason with url = ""; body = "they are great!"
     targetEffectiveAt = Some (effectiveTime)
     voteRequestTimeout = None
@@ -1153,4 +1171,234 @@ testVoteCastingCooldown  = do
           reason = Reason with url = ""; body = "a better reason"
           optCastAt = None
 
+  pure ()
+
+grantFeaturedAppRightForConfigTest : AmuletApp -> [Party] -> Party -> Script (ContractId FeaturedAppRight, FeaturedAppRight)
+grantFeaturedAppRightForConfigTest app svs provider = do
+  initiateAndAcceptVote app svs $ ARC_DsoRules with
+    dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
+      provider
+      activityWeight = None
+      appKind = None
+      opsParties = None
+  [right] <- query @FeaturedAppRight provider
+  pure right
+
+voteFeaturedAppConfigUpdateInstruction : AmuletApp -> [Party] -> Party -> FeaturedAppConfig -> FeaturedAppConfig -> Script (ContractId FeaturedAppConfigUpdateInstruction)
+voteFeaturedAppConfigUpdateInstruction app svs provider baseConfig newConfig = do
+  existing <- map fst <$> query @FeaturedAppConfigUpdateInstruction app.dso
+  initiateAndAcceptVote app svs $ ARC_DsoRules with
+    dsoAction = SRARC_CreateFeaturedAppConfigUpdateInstruction DsoRules_CreateFeaturedAppConfigUpdateInstruction with
+      updates = [(provider, FeaturedAppRight_UpdateConfig with baseConfig; newConfig)]
+  instructions <-queryFilter @FeaturedAppConfigUpdateInstruction app.dso (\i -> i.provider == provider)
+  [(instructionCid, instruction)] <- pure $ filter (\(cid, _) -> cid `notElem` existing) instructions
+  instruction.update.newConfig === newConfig
+  pure instructionCid
+
+testFeaturedAppConfigUpdate : Script ()
+testFeaturedAppConfigUpdate = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+  let svs = [sv1, sv2, sv3, sv4]
+  provider <- allocateParty "provider"
+  otherProvider <- allocateParty "otherProvider"
+  ops1 <- allocateParty "ops1"
+  ops2 <- allocateParty "ops2"
+  (rightCid, right) <- grantFeaturedAppRightForConfigTest app svs provider
+  (otherRightCid, _) <- grantFeaturedAppRightForConfigTest app svs otherProvider
+
+  getFeaturedAppConfig right === FeaturedAppConfig with appKind = None; activityWeight = None; opsParties = None
+
+  let baseConfig = getFeaturedAppConfig right
+      newConfig = baseConfig with
+        appKind = Some FAK_AssetMoving
+        activityWeight = Some 2.5
+        opsParties = Some [ops1, ops2]
+  instructionCid <- voteFeaturedAppConfigUpdateInstruction app svs provider baseConfig newConfig
+
+  -- accepting the vote only records the instruction, the right is unchanged
+  [(rightCid', _)] <- query @FeaturedAppRight provider
+  rightCid' === rightCid
+
+  -- the instruction cannot be applied to another provider's right
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  submitMustFail (actAs sv1 <> readAs dso) $
+    exerciseCmd dsoRulesCid DsoRules_ExecuteFeaturedAppConfigUpdateInstruction with
+      instructionCid; rightCid = otherRightCid; sv = sv1
+
+  -- any SV can execute it
+  _ <- svSubmits app sv3 $ \dsoRulesCid ->
+    exerciseCmd dsoRulesCid DsoRules_ExecuteFeaturedAppConfigUpdateInstruction with
+      instructionCid; rightCid; sv = sv3
+
+  [(_, updatedRight)] <- query @FeaturedAppRight provider
+  getFeaturedAppConfig updatedRight === newConfig
+  updatedRight.activityWeight === Some 2.5
+
+  -- the instruction is consumed
+  [] <- queryFilter @FeaturedAppConfigUpdateInstruction dso (\i -> i.provider == provider)
+  pure ()
+
+testFeaturedAppConfigUpdateMultiple : Script ()
+testFeaturedAppConfigUpdateMultiple = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+  let svs = [sv1, sv2, sv3, sv4]
+  provider1 <- allocateParty "provider1"
+  provider2 <- allocateParty "provider2"
+  provider3 <- allocateParty "provider3"
+  (rightCid1, right1) <- grantFeaturedAppRightForConfigTest app svs provider1
+  (rightCid2, _) <- grantFeaturedAppRightForConfigTest app svs provider2
+  (rightCid3, _) <- grantFeaturedAppRightForConfigTest app svs provider3
+
+  -- a single vote creates one instruction per (provider, update) pair
+  let baseConfig = getFeaturedAppConfig right1
+      newConfig1 = baseConfig with appKind = Some FAK_Asset
+      newConfig2 = baseConfig with activityWeight = Some 2.0
+      newConfig3 = baseConfig with appKind = Some FAK_AssetMoving
+  initiateAndAcceptVote app svs $ ARC_DsoRules with
+    dsoAction = SRARC_CreateFeaturedAppConfigUpdateInstruction DsoRules_CreateFeaturedAppConfigUpdateInstruction with
+      updates =
+        [ (provider1, FeaturedAppRight_UpdateConfig with baseConfig; newConfig = newConfig1)
+        , (provider2, FeaturedAppRight_UpdateConfig with baseConfig; newConfig = newConfig2)
+        , (provider3, FeaturedAppRight_UpdateConfig with baseConfig; newConfig = newConfig3)
+        ]
+
+  let executeFor provider rightCid expectedConfig = do
+        [(instructionCid, _)] <- queryFilter @FeaturedAppConfigUpdateInstruction dso (\i -> i.provider == provider)
+        _ <- svSubmits app sv1 $ \dsoRulesCid ->
+          exerciseCmd dsoRulesCid DsoRules_ExecuteFeaturedAppConfigUpdateInstruction with
+            instructionCid; rightCid; sv = sv1
+        [(_, updatedRight)] <- query @FeaturedAppRight provider
+        getFeaturedAppConfig updatedRight === expectedConfig
+
+  -- each instruction may be executed in any order
+  executeFor provider3 rightCid3 newConfig3
+  executeFor provider1 rightCid1 newConfig1
+  executeFor provider2 rightCid2 newConfig2
+
+  [] <- query @FeaturedAppConfigUpdateInstruction dso
+  pure ()
+
+-- The instruction can be expired if SVs are not able to execute it
+testFeaturedAppConfigUpdateInstructionExpiry : Script ()
+testFeaturedAppConfigUpdateInstructionExpiry = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+  let svs = [sv1, sv2, sv3, sv4]
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+
+  -- Create wrong instruction where provider does not even have a featured app right
+  let baseConfig = FeaturedAppConfig with appKind = None; activityWeight = None; opsParties = None
+  instructionCid <- voteFeaturedAppConfigUpdateInstruction app svs dso
+    baseConfig (baseConfig with activityWeight = Some 2.0)
+  now <- getTime
+  Some instruction <- queryContractId dso instructionCid
+  instruction.expiresAt === now `addRelTime` dsoRules.config.voteRequestTimeout
+
+  -- cannot be expired before expiresAt
+  submitMustFail (actAs sv1 <> readAs dso) $
+    exerciseCmd dsoRulesCid DsoRules_ExpireFeaturedAppConfigUpdateInstruction with
+      instructionCid; sv = sv1
+
+  passTime dsoRules.config.voteRequestTimeout
+
+  -- only SVs can expire it
+  submitMustFail (actAs dso) $
+    exerciseCmd dsoRulesCid DsoRules_ExpireFeaturedAppConfigUpdateInstruction with
+      instructionCid; sv = dso
+  _ <- svSubmits app sv2 $ \dsoRulesCid ->
+    exerciseCmd dsoRulesCid DsoRules_ExpireFeaturedAppConfigUpdateInstruction with
+      instructionCid; sv = sv2
+
+  [] <- query @FeaturedAppConfigUpdateInstruction dso
+  pure ()
+
+testFeaturedAppConfigUpdatePatch : Script ()
+testFeaturedAppConfigUpdatePatch = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+  let svs = [sv1, sv2, sv3, sv4]
+  provider <- allocateParty "provider"
+  ops <- allocateParty "ops"
+  (rightCid, right) <- grantFeaturedAppRightForConfigTest app svs provider
+
+  -- two instructions drafted against the same base config, each changing a different field
+  let baseConfig = getFeaturedAppConfig right
+  kindInstructionCid <- voteFeaturedAppConfigUpdateInstruction app svs provider
+    baseConfig (baseConfig with appKind = Some FAK_Asset)
+  opsInstructionCid <- voteFeaturedAppConfigUpdateInstruction app svs provider
+    baseConfig (baseConfig with opsParties = Some [ops])
+
+  -- meanwhile the weight changes by another route, after the votes were drafted
+  initiateAndAcceptVote app svs $ ARC_DsoRules with
+    dsoAction = SRARC_UpdateFeaturedAppRight DsoRules_UpdateFeaturedAppRight with
+      rightCid
+      update = FeaturedAppRight_Update with reason = "tier 1"; newActivityWeight = 1.5
+
+  let executeInstruction instructionCid = do
+        [(currentCid, _)] <- query @FeaturedAppRight provider
+        svSubmits app sv1 $ \dsoRulesCid ->
+          exerciseCmd dsoRulesCid DsoRules_ExecuteFeaturedAppConfigUpdateInstruction with
+            instructionCid; rightCid = currentCid; sv = sv1
+
+  -- executing the instructions applies their changes without reverting each other or the weight
+  _ <- executeInstruction kindInstructionCid
+  _ <- executeInstruction opsInstructionCid
+
+  [(_, finalRight)] <- query @FeaturedAppRight provider
+  getFeaturedAppConfig finalRight === FeaturedAppConfig with
+    appKind = Some FAK_Asset
+    activityWeight = Some 1.5
+    opsParties = Some [ops]
+
+  -- an instruction that changes a field from `Some` to `None` resets it to the default
+  let resetBaseConfig = getFeaturedAppConfig finalRight
+  resetInstructionCid <- voteFeaturedAppConfigUpdateInstruction app svs provider
+    resetBaseConfig (resetBaseConfig with activityWeight = None)
+  _ <- executeInstruction resetInstructionCid
+
+  [(_, resetRight)] <- query @FeaturedAppRight provider
+  getFeaturedAppConfig resetRight === FeaturedAppConfig with
+    appKind = Some FAK_Asset
+    activityWeight = None
+    opsParties = Some [ops]
+  [] <- queryFilter @FeaturedAppConfigUpdateInstruction dso (\i -> i.provider == provider)
+  pure ()
+
+testGrantFeaturedAppRightWithConfig : Script ()
+testGrantFeaturedAppRightWithConfig = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+  provider <- allocateParty "provider"
+  ops <- allocateParty "ops"
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $ ARC_DsoRules with
+    dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
+      provider
+      activityWeight = Some 2.0
+      appKind = Some FAK_AssetMoving
+      opsParties = Some [ops]
+  [(_, right)] <- query @FeaturedAppRight provider
+  right === FeaturedAppRight with
+    dso
+    provider
+    activityWeight = Some 2.0
+    appKind = Some FAK_AssetMoving
+    opsParties = Some [ops]
+  getFeaturedAppConfig right === FeaturedAppConfig with
+    appKind = Some FAK_AssetMoving
+    activityWeight = Some 2.0
+    opsParties = Some [ops]
+
+  -- granting a right with an invalid config fails when the accepted vote is executed
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  [(amuletRulesCid, _)] <- query @AmuletRules dso
+  let invalidGrants =
+        [ (Some (-1.0), None)
+        , (None, Some [ops, ops])
+        , (None, Some [ops, provider])
+        ]
+  forA_ invalidGrants $ \(activityWeight, opsParties) -> do
+    requestCid <- initiateAndCastVote app [sv1, sv2, sv3, sv4] None $ ARC_DsoRules with
+      dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
+        provider; activityWeight; appKind = None; opsParties
+    submitMustFail'' (expectMessageContains "Template precondition violated") (actAs sv1 <> readAs dso) $
+      exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+        requestCid; amuletRulesCid = Some amuletRulesCid; sv = Some sv1
+  [_] <- query @FeaturedAppRight provider
   pure ()

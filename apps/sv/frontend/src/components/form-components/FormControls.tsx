@@ -14,10 +14,11 @@ import { CancelProposalDialog } from '../governance/CancelProposalDialog';
 export interface FormControlsProps {
   showConfirmation?: boolean;
   onEdit: () => void;
+  disabled?: boolean;
 }
 
 export const FormControls: React.FC<FormControlsProps> = props => {
-  const { showConfirmation, onEdit } = props;
+  const { showConfirmation, onEdit, disabled } = props;
   const form = useFormContext();
   const navigate = useNavigate();
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -66,7 +67,7 @@ export const FormControls: React.FC<FormControlsProps> = props => {
             <Button
               disableElevation
               type="submit"
-              disabled={!canSubmit || isSubmitting}
+              disabled={!canSubmit || isSubmitting || disabled}
               id="submit-button"
               data-testid="submit-button"
               sx={createProposalSubmitButtonSx}
