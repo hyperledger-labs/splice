@@ -690,8 +690,6 @@ class DbScanAppRewardsStore(
   )(implicit tc: TraceContext): Future[DbScanAppRewardsStore.RewardComputationSummary] = {
     import profile.api.jdbcActionExtensionMethods
 
-    val trafficPriceCCperMB = BigDecimal(inputs.trafficPriceInCCperMB)
-
     for {
       _ <- appActivityRecordStore.assertCompleteActivity(roundNumber)
       _ <- runUpdate(
@@ -699,9 +697,8 @@ class DbScanAppRewardsStore(
           _ <- aggregateActivityTotalsAction(roundNumber)
           appWeight <- getAppActivityRoundTotalWeightAction(roundNumber)
           assetBytes <- getAssetActivityRoundTotalBytesAction(roundNumber)
-          assetBurnCc = BigDecimal(assetBytes) / BigDecimal(1000000) * trafficPriceCCperMB
-          params = inputs.deriveIssuanceParams(appWeight, assetBurnCc)
-          _ <- computeRewardTotalsAction(roundNumber, params, trafficPriceCCperMB)
+          params = inputs.deriveIssuanceParams(appWeight, assetBytes)
+          _ <- computeRewardTotalsAction(roundNumber, params)
           _ <- assertCombinedMintingAllowanceWithinIssuanceBudget(roundNumber, params)
           _ <- computeRewardHashesAction(roundNumber, batchSize)
         } yield ())
@@ -813,12 +810,11 @@ class DbScanAppRewardsStore(
   private[store] def computeRewardTotals(
       roundNumber: Long,
       params: RewardIssuanceParams,
-      trafficPriceCCperMB: BigDecimal,
   )(implicit tc: TraceContext): Future[Unit] = {
     import profile.api.jdbcActionExtensionMethods
 
     runUpdate(
-      computeRewardTotalsAction(roundNumber, params, trafficPriceCCperMB)
+      computeRewardTotalsAction(roundNumber, params)
         .map(_ => logger.debug(s"Computed reward totals for round $roundNumber."))
         .transactionally,
       "appRewards.computeRewardTotals",
@@ -841,10 +837,10 @@ class DbScanAppRewardsStore(
   private def computeRewardTotalsAction(
       roundNumber: Long,
       params: RewardIssuanceParams,
-      trafficPriceCCperMB: BigDecimal,
   ) = {
     val appIssuance = params.issuancePerFeaturedAppTraffic_CCperMB
-    val assetIssuance = params.issuancePerFeaturedAssetBurnCC
+    val assetIssuance = params.issuancePerFeaturedAssetBurn_CCperMB
+    val assetBurnRate = params.issuancePerFeaturedAssetBurnCC
     val appBurnRate = params.issuancePerFeaturedAppBurnCC
     val threshold = params.threshold_CC
     val totalIssuance = params.totalIssuanceForFeaturedAppRewards
@@ -857,7 +853,7 @@ class DbScanAppRewardsStore(
                     (cast(total_app_activity_weight as decimal(38,10)) / 1000000.0)
                       * $appIssuance
                     + (cast(total_asset_activity_weight as decimal(38,10)) / 1000000.0)
-                      * $trafficPriceCCperMB * $assetIssuance
+                      * $assetIssuance
                       as combined_amount
              from #${Tables.appActivityPartyTotals}
              where history_id = $historyId and round_number = $roundNumber
@@ -885,7 +881,7 @@ class DbScanAppRewardsStore(
              $unclaimed,
              count(*),
              $totalAppRewardFromAppActivity, $totalAppRewardFromAssetActivity,
-             $appBurnRate, $assetIssuance
+             $appBurnRate, $assetBurnRate
            from inserted_parties""").asUpdate
   }
 

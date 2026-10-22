@@ -692,6 +692,7 @@ class DbScanAppRewardsStoreTest
         totalIssuanceForFeaturedAppRewards = totalIssuance,
         unclaimedAppRewardAmount = BigDecimal(0),
         issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+        issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
         totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
         issuancePerFeaturedAppBurnCC = BigDecimal(0),
         featuredAppMintingAllowanceCC = BigDecimal(0),
@@ -777,6 +778,7 @@ class DbScanAppRewardsStoreTest
           totalIssuanceForFeaturedAppRewards = BigDecimal("10.0"),
           unclaimedAppRewardAmount = BigDecimal("0"),
           issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
           totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
           issuancePerFeaturedAppBurnCC = BigDecimal(0),
           featuredAppMintingAllowanceCC = BigDecimal(0),
@@ -803,6 +805,7 @@ class DbScanAppRewardsStoreTest
           totalIssuanceForFeaturedAppRewards = BigDecimal("10.3"),
           unclaimedAppRewardAmount = BigDecimal("0"),
           issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
           totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
           issuancePerFeaturedAppBurnCC = BigDecimal(0),
           featuredAppMintingAllowanceCC = BigDecimal(0),
@@ -827,6 +830,7 @@ class DbScanAppRewardsStoreTest
           totalIssuanceForFeaturedAppRewards = BigDecimal("0.5"),
           unclaimedAppRewardAmount = BigDecimal("0"),
           issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
           totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
           issuancePerFeaturedAppBurnCC = BigDecimal(0),
           featuredAppMintingAllowanceCC = BigDecimal(0),
@@ -851,6 +855,7 @@ class DbScanAppRewardsStoreTest
           totalIssuanceForFeaturedAppRewards = BigDecimal("6.666666"),
           unclaimedAppRewardAmount = BigDecimal("0"),
           issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
           totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
           issuancePerFeaturedAppBurnCC = BigDecimal(0),
           featuredAppMintingAllowanceCC = BigDecimal(0),
@@ -873,6 +878,7 @@ class DbScanAppRewardsStoreTest
           totalIssuanceForFeaturedAppRewards = BigDecimal("2.0"),
           unclaimedAppRewardAmount = BigDecimal("0"),
           issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
           totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
           issuancePerFeaturedAppBurnCC = BigDecimal(0),
           featuredAppMintingAllowanceCC = BigDecimal(0),
@@ -897,6 +903,7 @@ class DbScanAppRewardsStoreTest
           totalIssuanceForFeaturedAppRewards = BigDecimal("0.3"),
           unclaimedAppRewardAmount = BigDecimal("0"),
           issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
           totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
           issuancePerFeaturedAppBurnCC = BigDecimal(0),
           featuredAppMintingAllowanceCC = BigDecimal(0),
@@ -1428,7 +1435,7 @@ class DbScanAppRewardsStoreTest
       for {
         (store, historyId) <- newStore()
         _ <- store.insertAppActivityPartyTotals(activities.map(_.copy(historyId = historyId)))
-        _ <- store.computeRewardTotals(roundNumber, params, BigDecimal(1))
+        _ <- store.computeRewardTotals(roundNumber, params)
         partyTotals <- store.getAppRewardPartyTotalsByRound(roundNumber)
         roundTotal <- store.getAppRewardRoundTotalByRound(roundNumber)
       } yield (partyTotals, roundTotal)

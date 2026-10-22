@@ -23,6 +23,7 @@ final case class RewardIssuanceParams(
     totalIssuanceForFeaturedAppRewards: BigDecimal,
     unclaimedAppRewardAmount: BigDecimal,
     issuancePerFeaturedAssetBurnCC: BigDecimal,
+    issuancePerFeaturedAssetBurn_CCperMB: BigDecimal,
     totalIssuanceForFeaturedAssetRewards: BigDecimal,
     issuancePerFeaturedAppBurnCC: BigDecimal,
     featuredAppMintingAllowanceCC: BigDecimal,
@@ -63,12 +64,9 @@ final case class RewardComputationInputs(
 
   def deriveIssuanceParams(
       totalRoundAppActivityWeight: Long,
-      totalFeaturedAssetBurnCc: BigDecimal,
+      totalFeaturedAssetWeight: Long,
   ): RewardIssuanceParams = {
-    val totalCouponsCC = mul(
-      div(fromLong(totalRoundAppActivityWeight), fromLong(1000000L)),
-      trafficPriceInCCperMB,
-    )
+    val totalCouponsCC = bytesToCC(totalRoundAppActivityWeight)
     val rewardsToIssue = mul(amuletsToIssueInRound, appRewardPercentage)
     val (issuancePerCoupon, appMintingAllowanceRemainder) = computeIssuanceTranche(
       rewardsToIssue = rewardsToIssue,
@@ -79,7 +77,7 @@ final case class RewardComputationInputs(
 
     // Asset side (CIP-104 amendment): same tranche formula with capPerCoupon=1,
     // consuming the app side's remainder as the asset budget.
-    val totalFeaturedAssetBurnCC = fromBigDecimal(totalFeaturedAssetBurnCc)
+    val totalFeaturedAssetBurnCC = bytesToCC(totalFeaturedAssetWeight)
     val (issuancePerFeaturedAssetBurnCC, featuredAssetMintingAllowanceCC, unclaimed) =
       if (totalFeaturedAssetBurnCC.compareTo(zero) <= 0) {
         (zero, zero, appMintingAllowanceRemainder)
@@ -100,11 +98,19 @@ final case class RewardComputationInputs(
       totalIssuanceForFeaturedAppRewards = BigDecimal(rewardsToIssue),
       unclaimedAppRewardAmount = BigDecimal(unclaimed),
       issuancePerFeaturedAssetBurnCC = BigDecimal(issuancePerFeaturedAssetBurnCC),
+      issuancePerFeaturedAssetBurn_CCperMB =
+        BigDecimal(mul(trafficPriceInCCperMB, issuancePerFeaturedAssetBurnCC)),
       totalIssuanceForFeaturedAssetRewards = BigDecimal(featuredAssetMintingAllowanceCC),
       issuancePerFeaturedAppBurnCC = BigDecimal(issuancePerCoupon),
       featuredAppMintingAllowanceCC = BigDecimal(featuredAppMintingAllowanceCC),
     )
   }
+
+  /** Convert a bytes-weight to CC via `trafficPriceInCCperMB`.
+    * Used symmetrically for app traffic and asset burn.
+    */
+  private def bytesToCC(bytesWeight: Long): Numeric =
+    mul(div(fromLong(bytesWeight), fromLong(1000000L)), trafficPriceInCCperMB)
 
   /** Replicates Daml `computeIssuanceTranche` for
     * `totalUnfeaturedAppRewardCoupons = 0`.
