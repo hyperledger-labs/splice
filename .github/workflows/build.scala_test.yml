@@ -85,9 +85,8 @@ jobs:
         with:
           # Checkout the PR head commit to get the commit message
           ref: ${{ github.event.pull_request.head.sha }}
-          # Checkout with full history to get all commit messages on the branch
-          fetch-depth: 0
-          submodules: "recursive"
+          # Default depth 1: only the head commit's message and tree are needed;
+          # pre_scala_test fetches the release-line tip it diffs against.
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Split tests
@@ -100,6 +99,11 @@ jobs:
           skip_if_files_changed: ${{ inputs.skip_if_files_changed }}
           run_if_commit_tag: ${{ inputs.run_if_commit_tag }}
           gh_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Report git size
+        if: always()
+        shell: bash
+        run: ./.github/actions/scripts/report_git_size.sh
 
   scala_test:
     runs-on: ${{ inputs.runs_on }}
