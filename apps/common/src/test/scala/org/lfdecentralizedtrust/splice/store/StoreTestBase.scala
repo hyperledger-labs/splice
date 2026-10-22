@@ -344,7 +344,6 @@ abstract class StoreTestBase
       numeric(1),
       numeric(1),
       None.toJava,
-      Optional.empty(), // optIssuancePerFeaturedAssetRewardCoupon (CIP-0104)
     )
 
     contract(
