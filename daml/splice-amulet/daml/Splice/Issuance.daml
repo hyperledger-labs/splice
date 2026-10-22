@@ -69,6 +69,7 @@ data OpenMiningRoundSummary = OpenMiningRoundSummary with
       -- ^ Introduced as part of CIP-0104.
     optIssuancePerFeaturedAssetRewardCoupon : Optional Decimal
       -- ^ Introduced as part of CIP-0104; this is always computed off-ledger.
+      --   Denominated in amount of Amulet minted per Amulet burned.
   deriving (Eq, Show, Serializable)
 
 getTotalValidatorFaucetCoupons : OpenMiningRoundSummary -> Int

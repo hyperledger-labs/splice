@@ -652,7 +652,6 @@ template AmuletRules
           issuancePerUnfeaturedAppRewardCoupon = issuingRound.issuancePerUnfeaturedAppRewardCoupon
           issuancePerSvRewardCoupon = issuingRound.issuancePerSvRewardCoupon
           optIssuancePerValidatorFaucetCoupon = issuingRound.optIssuancePerValidatorFaucetCoupon
-          optIssuancePerFeaturedAssetRewardCoupon = issuingRound.optIssuancePerFeaturedAssetRewardCoupon
           round = issuingRound.round
 
         return AmuletRules_MiningRound_CloseResult with ..

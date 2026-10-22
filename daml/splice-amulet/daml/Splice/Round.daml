@@ -73,7 +73,11 @@ template IssuingMiningRound
     optIssuancePerValidatorFaucetCoupon : Optional Decimal
       -- ^ Introduced in CIP-3
     optIssuancePerFeaturedAssetRewardCoupon : Optional Decimal
-      -- ^ Introduced in CIP-0104
+      -- ^ The amount of Amulet minted per amount of Amulet recorded for asset activity.
+      --   This value was introduced as part of CIP-0104.
+      --   It is never read directly in the Daml code, but serves for
+      --   explorers and other third-party apps to learn about the
+      --   round's mint/burn ratio for asset activity.
   where
     signatory dso
     ensure isDefinedRound round
@@ -95,8 +99,6 @@ template ClosedMiningRound
     issuancePerSvRewardCoupon : Decimal
     optIssuancePerValidatorFaucetCoupon : Optional Decimal
       -- ^ Introduced in CIP-3
-    optIssuancePerFeaturedAssetRewardCoupon : Optional Decimal
-      -- ^ Introduced in CIP-0104
   where
     signatory dso
     ensure isDefinedRound round
