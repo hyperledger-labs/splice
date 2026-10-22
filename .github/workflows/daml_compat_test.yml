@@ -36,6 +36,6 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       daml_base_version: ${{ needs.get_mainnet_version.outputs.version }}
-      # TODO(#7766) - remove after adopted on mainnet
+      # remove after adopted on mainnet
       protocol_version: "36"
     secrets: inherit
