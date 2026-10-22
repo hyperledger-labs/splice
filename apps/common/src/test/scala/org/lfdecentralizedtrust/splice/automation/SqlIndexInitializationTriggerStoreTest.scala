@@ -9,7 +9,6 @@ import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{FutureHelpers, HasActorSystem, HasExecutionContext}
@@ -442,7 +441,6 @@ class SqlIndexInitializationTriggerStoreTest
     trigger.remainingActionsEmpty.future
   }
 
-  private lazy val clock = new SimClock(loggerFactory = loggerFactory)
   private lazy val triggerContext: TriggerContext = TriggerContext(
     AutomationConfig(),
     clock,

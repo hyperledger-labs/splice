@@ -114,7 +114,6 @@ class ScanAutomationService(
   registerTrigger(
     new UpdateHistoryPartitionMaintenanceTrigger(
       updateHistory,
-      config.updateHistoryPartitionRunwayDays,
       triggerContext,
     )
   )

@@ -1073,8 +1073,9 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
         loggerFactory,
         enableImportUpdateBackfill = true,
         HistoryMetrics(NoOpMetricsFactory, migrationId),
+        clock,
       )
-      _ <- updateHistory.ingestionSink.initialize()
+      _ <- updateHistory.ingestionSink.initialize(mockLedgerConnection())
       _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
         updateHistory,
         timeStart,

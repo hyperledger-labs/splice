@@ -991,7 +991,10 @@ final class DbMultiDomainAcsStore[TXE](
       }
     }
 
-    override def initialize()(implicit traceContext: TraceContext): Future[IngestionStart] = {
+    override def initialize(connection: BaseLedgerConnection)(implicit
+        traceContext: TraceContext,
+        mat: Materializer,
+    ): Future[IngestionStart] = {
       for {
         acsInitResult <- initializeDescriptor(acsStoreDescriptor).map(AcsStoreId.subst)
         txLogInitResult <- txLogStoreDescriptor match {

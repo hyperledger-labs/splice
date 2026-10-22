@@ -60,7 +60,7 @@ class UpdateIngestionService(
       traceContext: TraceContext
   ): Future[ServiceWithGuaranteedShutdown[?]] =
     for {
-      ingestionStart <- ingestionSink.initialize()
+      ingestionStart <- ingestionSink.initialize(connection)
       subscribeFrom <- ingestionStart match {
         case IngestionStart.ResumeAtOffset(offset) =>
           logger.debug(s"Resuming ingestion from offset $offset")
