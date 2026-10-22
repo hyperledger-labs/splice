@@ -20,10 +20,16 @@ paths:
               schema:
                 "$ref": "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/GetDsoPartyIdResponse"
   /v0/scan-proxy/dso:
+    # TODO (#7882): remove
     get:
-      tags: [ scan-proxy ]
+      deprecated: true
+      tags: [ deprecated ]
       x-jvm-package: scanproxy
       operationId: "getDsoInfo"
+      description: |
+        Deprecated. Please use /v1/scan-proxy/dso instead. This endpoint fails when the validator
+        is connected to more than one Scan instance, as the `sv_user` and `sv_party_id` fields
+        differ between Scan instances.
       responses:
         "200":
           description: ok
@@ -31,6 +37,18 @@ paths:
             application/json:
               schema:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponse"
+  /v1/scan-proxy/dso:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "getDsoInfoV1"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponseV1"
   /v0/scan-proxy/featured-apps/{provider_party_id}:
     get:
       tags: [ scan-proxy ]

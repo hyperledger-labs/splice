@@ -11,7 +11,7 @@ import { ContractId } from '@daml/types';
 
 import { Contract } from '../../../utils';
 import { AmuletPriceVote, SvVote } from '../../models';
-import { DsoInfo } from '../Dso';
+import { DsoInfo, SvInfo } from '../Dso';
 
 export const VotesHooksContext = React.createContext<VotesHooks | undefined>(undefined);
 
@@ -30,6 +30,7 @@ export interface BaseVotesHooks {
   useListVotes: (contractIds: ContractId<VoteRequest>[]) => UseQueryResult<SvVote[]>;
   useAmuletPriceVotes: () => UseQueryResult<AmuletPriceVote[]>;
   useDsoInfos: () => UseQueryResult<DsoInfo>;
+  useSvInfo: () => UseQueryResult<SvInfo>;
   useVoteRequest: (contractId: ContractId<VoteRequest>) => UseQueryResult<Contract<VoteRequest>>;
 }
 
