@@ -18,19 +18,24 @@ final case class AssetActivityParams(
 
 object AssetActivityParams {
 
+  val DefaultExtraFeaturedAssetActivityWeight: BigDecimal = BigDecimal("0.2")
+  val DefaultMaxExtraFeaturedAssetActivityWeightPerAsset: BigDecimal = BigDecimal("0.1")
+  val DefaultDsoAppActivityWeight: BigDecimal = BigDecimal("0.1")
+
   /** Get the params from the reward config of a round.
-    * Returns `Some` only if all of the params are set.
+    * The defaults are used for any of the params that are not set,
+    * or for all of them if the round has no reward config.
     */
-  def fromRewardConfig(rewardConfig: RewardConfig): Option[AssetActivityParams] =
-    for {
-      extraFeaturedAssetActivityWeight <- rewardConfig.extraFeaturedAssetActivityWeight.toScala
-      maxExtraFeaturedAssetActivityWeightPerAsset <-
-        rewardConfig.maxExtraFeaturedAssetActivityWeightPerAsset.toScala
-      dsoAppActivityWeight <- rewardConfig.dsoAppActivityWeight.toScala
-    } yield AssetActivityParams(
-      extraFeaturedAssetActivityWeight = BigDecimal(extraFeaturedAssetActivityWeight),
-      maxExtraFeaturedAssetActivityWeightPerAsset =
-        BigDecimal(maxExtraFeaturedAssetActivityWeightPerAsset),
-      dsoAppActivityWeight = BigDecimal(dsoAppActivityWeight),
+  def fromRewardConfig(rewardConfig: Option[RewardConfig]): AssetActivityParams =
+    AssetActivityParams(
+      extraFeaturedAssetActivityWeight = rewardConfig
+        .flatMap(_.extraFeaturedAssetActivityWeight.toScala)
+        .fold(DefaultExtraFeaturedAssetActivityWeight)(BigDecimal(_)),
+      maxExtraFeaturedAssetActivityWeightPerAsset = rewardConfig
+        .flatMap(_.maxExtraFeaturedAssetActivityWeightPerAsset.toScala)
+        .fold(DefaultMaxExtraFeaturedAssetActivityWeightPerAsset)(BigDecimal(_)),
+      dsoAppActivityWeight = rewardConfig
+        .flatMap(_.dsoAppActivityWeight.toScala)
+        .fold(DefaultDsoAppActivityWeight)(BigDecimal(_)),
     )
 }

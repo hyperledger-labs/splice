@@ -260,12 +260,12 @@ object ScanRewardsReferenceStore {
   /** The info we need from OpenMiningRound for activity-record calcs
     *
     * @param assetActivityParams the params from the round's reward config,
-    *                            None if they are not all set.
+    *                            with defaults for the params that are not set.
     */
   final case class ActiveRoundInfo(
       roundNumber: Long,
       opensAt: CantonTimestamp,
-      assetActivityParams: Option[AssetActivityParams],
+      assetActivityParams: AssetActivityParams,
   )
 
   /** The featured apps active as of a given time, see `lookupFeaturedAppPartiesAsOf`.

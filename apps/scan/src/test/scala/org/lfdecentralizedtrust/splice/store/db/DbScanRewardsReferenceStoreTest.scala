@@ -1073,7 +1073,7 @@ class DbScanRewardsReferenceStoreTest
             )
           ),
         ).copy(createdAt = ts(300).toInstant)
-      // round6 does not set all the asset activity params
+      // round6 does not set all the asset activity params, the default is used for the missing one
       val round6 =
         openMiningRound(
           dsoParty,
@@ -1091,12 +1091,10 @@ class DbScanRewardsReferenceStoreTest
       val round5Info = ScanRewardsReferenceStore.ActiveRoundInfo(
         5L,
         ts(400),
-        Some(
-          AssetActivityParams(
-            extraFeaturedAssetActivityWeight = BigDecimal("0.2"),
-            maxExtraFeaturedAssetActivityWeightPerAsset = BigDecimal("0.1"),
-            dsoAppActivityWeight = BigDecimal("0.5"),
-          )
+        AssetActivityParams(
+          extraFeaturedAssetActivityWeight = BigDecimal("0.2"),
+          maxExtraFeaturedAssetActivityWeightPerAsset = BigDecimal("0.1"),
+          dsoAppActivityWeight = BigDecimal("0.5"),
         ),
       )
       for {
@@ -1145,7 +1143,15 @@ class DbScanRewardsReferenceStoreTest
         result(ts(450)) shouldBe round5Info // round5 open, round6 not yet open
         result(ts(550)) shouldBe round5Info // both open, lowest round selected
         afterRound5Archived shouldBe Map(
-          ts(650) -> ScanRewardsReferenceStore.ActiveRoundInfo(6L, ts(500), None)
+          ts(650) -> ScanRewardsReferenceStore.ActiveRoundInfo(
+            6L,
+            ts(500),
+            AssetActivityParams(
+              extraFeaturedAssetActivityWeight = BigDecimal("0.2"),
+              maxExtraFeaturedAssetActivityWeightPerAsset = BigDecimal("0.1"),
+              dsoAppActivityWeight = BigDecimal("0.1"),
+            ),
+          )
         )
       }
     }
@@ -1156,7 +1162,15 @@ class DbScanRewardsReferenceStoreTest
 
   // The info of a round without a reward config
   private def roundInfo(roundNumber: Long, opensAt: CantonTimestamp) =
-    ScanRewardsReferenceStore.ActiveRoundInfo(roundNumber, opensAt, None)
+    ScanRewardsReferenceStore.ActiveRoundInfo(
+      roundNumber,
+      opensAt,
+      AssetActivityParams(
+        extraFeaturedAssetActivityWeight = BigDecimal("0.2"),
+        maxExtraFeaturedAssetActivityWeightPerAsset = BigDecimal("0.1"),
+        dsoAppActivityWeight = BigDecimal("0.1"),
+      ),
+    )
 
   private def rewardConfig(
       extraFeaturedAssetActivityWeight: Option[String],

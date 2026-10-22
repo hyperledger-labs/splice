@@ -214,20 +214,6 @@ class AppActivityComputationTest extends AnyWordSpec with BaseTest {
         result.head.assetActivityWeights shouldBe Seq(100L, 10L)
       }
 
-      "not compute asset activity if the round does not set the asset activity params" in {
-        val resultWithoutParams = computeWithFeaturedAppParties(
-          featuredAppParties,
-          Seq((summary, verdict)),
-          assetActivityParams = None,
-        )
-        resultWithoutParams should have size 1
-        resultWithoutParams.head.submittingAppProvider shouldBe Some("mover")
-        resultWithoutParams.head.appProviderParties shouldBe Seq("mover")
-        resultWithoutParams.head.appActivityWeights shouldBe Seq(1000L)
-        resultWithoutParams.head.assetActivityProviderParties shouldBe empty
-        resultWithoutParams.head.assetActivityWeights shouldBe empty
-      }
-
       "not attribute the confirmations of an asset's ops party to the asset" in {
         val result =
           computeWithFeaturedAppParties(featuredAppParties, Seq((summary, verdictWithAssetOps)))
@@ -599,7 +585,7 @@ class AppActivityComputationTest extends AnyWordSpec with BaseTest {
       "Bob",
       featuredAppProviders,
       dsoParty,
-      Some(params),
+      params,
     )
 
   private val roundOpensAt = CantonTimestamp.ofEpochSecond(0)
@@ -635,9 +621,7 @@ class AppActivityComputationTest extends AnyWordSpec with BaseTest {
       featuredAppParties: ScanRewardsReferenceStore.FeaturedAppParties,
       input: Seq[(DbScanVerdictStore.TrafficSummaryT, v30.Verdict)],
       svParticipantIds: Set[String] = Set("someSvParticipant"),
-      assetActivityParams: Option[AssetActivityParams] = Some(
-        defaultAssetParams
-      ),
+      assetActivityParams: AssetActivityParams = defaultAssetParams,
       amuletVersion: Option[String] = Some(DarResources.amulet.latest.metadata.version.toString),
   ): Seq[DbAppActivityRecordStore.AppActivityRecordT] = {
     val store = mock[ScanRewardsReferenceStore]

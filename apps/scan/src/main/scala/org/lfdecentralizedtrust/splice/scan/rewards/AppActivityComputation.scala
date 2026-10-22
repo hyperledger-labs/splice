@@ -224,7 +224,7 @@ class AppActivityComputation(
       verdict: v30.Verdict,
       roundNumber: Long,
       featuredAppParties: ScanRewardsReferenceStore.FeaturedAppParties,
-      assetActivityParams: Option[AssetActivityParams],
+      assetActivityParams: AssetActivityParams,
       computeFASubmitted: Boolean,
   ): Option[DbAppActivityRecordStore.AppActivityRecordT] = {
     val confirmers = verdict.getTransactionViews.views.values
@@ -297,8 +297,7 @@ class AppActivityComputation(
     *
     * The total burn is always attributed to the submitting app as app-activity.
     *
-    * Additionally if the submitting app is a featured asset mover and the
-    * round's reward config sets the asset activity params, then the extra
+    * Additionally if the submitting app is a featured asset mover, then the extra
     * burn is split among the asset confirmers as described in the
     * "Splitting Extra Burn Among Assets" section of CIP-104.
     * The asset confirmers are the dso party and the providers of featured assets.
@@ -310,13 +309,10 @@ class AppActivityComputation(
       submittingApp: String,
       featuredAppProviders: Map[String, (FeaturedAppKind, BigDecimal)],
       dsoParty: String,
-      paramsO: Option[AssetActivityParams],
+      params: AssetActivityParams,
   ): DbAppActivityRecordStore.AppActivityRecordT = {
-    val assetActivity = (featuredAppProviders.get(submittingApp), paramsO) match {
-      case (
-            Some((FeaturedAppKind.FAK_ASSETMOVING, submittingAppWeight)),
-            Some(params),
-          ) =>
+    val assetActivity = featuredAppProviders.get(submittingApp) match {
+      case Some((FeaturedAppKind.FAK_ASSETMOVING, submittingAppWeight)) =>
         computeAssetActivity(
           summary,
           verdict,
