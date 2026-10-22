@@ -1718,6 +1718,9 @@ object StoreTestBase {
   ): BaseLedgerConnection = {
     val connection = org.mockito.Mockito.mock(classOf[BaseLedgerConnection])
     org.mockito.Mockito
+      .when(connection.latestPrunedOffset()(org.mockito.ArgumentMatchers.any[TraceContext]()))
+      .thenReturn(Future.successful(0L))
+    org.mockito.Mockito
       .when(
         connection.updates(
           org.mockito.ArgumentMatchers.anyLong(),
