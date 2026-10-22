@@ -48,7 +48,7 @@
 
     - Traffic purchases, including those made through `AmuletRules_BuyMemberTraffic`, now include the purchased
       traffic in bytes and the memo in the `splice.lfdecentralizedtrust.org/reason` of their burn and transaction metadata:
-      `purchased traffic: <int> bytes for member-id=<member>&synchronizer-id=<synchronizer>&migration-id=<int>`
+      `cip-128/memo:purchased-traffic-bytes=<int>&member-id=<member>&synchronizer-id=<synchronizer>&migration-id=<int>`
 
     - Added three new fields: `trafficPrice`, `supportedSynchronizerIds` and
       `minTrafficTopupAmount` to `ExternalPartyConfigState`.

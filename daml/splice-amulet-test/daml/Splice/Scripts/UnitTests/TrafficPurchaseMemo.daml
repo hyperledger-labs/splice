@@ -60,7 +60,7 @@ test_trafficPurchaseReason_includesPurchasedTraffic = script do
         migrationId = 3
         trafficAmount = 1_000_000
   trafficPurchaseReason purchase ===
-    "purchased traffic: 1000000 bytes for " <> memoParams
+    "cip-128/memo:purchased-traffic-bytes=1000000&" <> memoParams
 
 test_parseMemo_keyOrderIrrelevant : Script ()
 test_parseMemo_keyOrderIrrelevant = script do

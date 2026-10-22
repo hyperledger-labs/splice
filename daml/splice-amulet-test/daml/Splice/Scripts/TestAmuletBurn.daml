@@ -104,7 +104,7 @@ testBuyMemberTraffic_burnReasonIsMemoTag = do
         "member-id=" <> memberId <>
         "&synchronizer-id=" <> syncConfig.activeSynchronizer <>
         "&migration-id=0"
-  let reason = "purchased traffic: " <> show trafficAmount <> " bytes for " <> memoTag
+  let reason = "cip-128/memo:purchased-traffic-bytes=" <> show trafficAmount <> "&" <> memoTag
   context <- getTransferContext app alice None
   amuletCid <- tap app alice 50.0
 
