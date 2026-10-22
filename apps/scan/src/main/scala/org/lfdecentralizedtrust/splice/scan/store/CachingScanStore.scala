@@ -32,6 +32,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.config.{CacheConfig, ScanCacheConfig}
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanStoreMetrics
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
+import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import org.lfdecentralizedtrust.splice.store.{
   Limit,
   MiningRoundsStore,
@@ -279,6 +280,8 @@ class CachingScanStore(
   override def domains: SynchronizerStore = store.domains
 
   override def multiDomainAcsStore: MultiDomainAcsStore = store.multiDomainAcsStore
+
+  override private[splice] def txLogStoreId: TxLogStoreId = store.txLogStoreId
 
   @SuppressWarnings(
     Array("org.wartremover.warts.AsInstanceOf", "com.digitalasset.canton.RequireBlocking")

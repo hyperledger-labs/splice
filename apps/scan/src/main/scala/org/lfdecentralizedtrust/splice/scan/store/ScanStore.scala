@@ -25,7 +25,9 @@ import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanStore, DbScanStoreMe
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes}
+import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import org.lfdecentralizedtrust.splice.store.{
+  AdditionalIngestionSink,
   ActiveVotesStore,
   AppStore,
   DsoRulesStore,
@@ -58,6 +60,9 @@ trait ScanStore
   override def dsoPartyId = key.dsoParty
 
   def key: ScanStore.Key
+
+  /** The id of the TxLog store, which is also the id under which the votes are stored by [[db.DbVotesStore]]. */
+  private[splice] def txLogStoreId: TxLogStoreId
 
   protected[store] def domainMigrationId: Long
 
@@ -259,6 +264,7 @@ object ScanStore {
       defaultLimit: Limit,
       acsStoreDescriptorUserVersion: Option[Long] = None,
       txLogStoreDescriptorUserVersion: Option[Long] = None,
+      additionalIngestionSinks: Seq[AdditionalIngestionSink] = Seq.empty,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -278,6 +284,7 @@ object ScanStore {
         defaultLimit,
         acsStoreDescriptorUserVersion,
         txLogStoreDescriptorUserVersion,
+        additionalIngestionSinks,
       )
       .map { dbStore =>
         new CachingScanStore(

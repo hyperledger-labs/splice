@@ -28,6 +28,7 @@ abstract class DbTxLogAppStore[TXE](
     migrationId: Long,
     ingestionConfig: IngestionConfig,
     acsArchiveConfigOpt: Option[AcsArchiveConfig] = None,
+    additionalIngestionSinks: Seq[AdditionalIngestionSink] = Seq.empty,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -62,6 +63,7 @@ abstract class DbTxLogAppStore[TXE](
       handleIngestionSummary,
       defaultLimit = defaultLimit,
       acsArchiveConfigOpt = acsArchiveConfigOpt,
+      additionalIngestionSinks = additionalIngestionSinks,
     )
 }
 
