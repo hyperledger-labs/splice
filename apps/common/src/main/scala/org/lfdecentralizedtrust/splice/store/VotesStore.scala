@@ -132,11 +132,11 @@ final case class VoteResultsFilters(
     effectiveTo: Option[String] = None,
 )
 
-trait VotesStore extends ActiveVotesStore {
+trait HistoricalVotesStore {
 
   def listVoteRequestResults(
       filters: VoteResultsFilters,
-      limit: Limit = defaultLimit,
+      limit: Limit,
       after: Option[Long] = None,
   )(implicit
       tc: TraceContext

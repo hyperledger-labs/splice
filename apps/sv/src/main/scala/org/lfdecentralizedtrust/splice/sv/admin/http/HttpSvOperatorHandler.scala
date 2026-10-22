@@ -85,7 +85,7 @@ class HttpSvOperatorHandler(
   private val svStore = svStoreWithIngestion.store
   private val dsoStore = dsoStoreWithIngestion.store
   private val mutex = Mutex()
-  override protected val votesStore: ActiveVotesStore = dsoStore
+  override protected val activeVotesStore: ActiveVotesStore = dsoStore
   override protected val validatorLicensesStore: AppStore = dsoStore
 
   // Similar to PublishScanConfigTrigger, this class creates its own scan connection

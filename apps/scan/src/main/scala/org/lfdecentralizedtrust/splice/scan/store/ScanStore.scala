@@ -26,15 +26,16 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompani
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes}
 import org.lfdecentralizedtrust.splice.store.{
+  ActiveVotesStore,
   AppStore,
   DsoRulesStore,
   ExternalPartyConfigStateStore,
+  HistoricalVotesStore,
   Limit,
   MiningRoundsStore,
   MultiDomainAcsStore,
   TxLogAppStore,
   UpdateHistory,
-  VotesStore,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
 
@@ -50,7 +51,8 @@ trait ScanStore
     with PackageIdResolver.HasAmuletRules
     with DsoRulesStore
     with MiningRoundsStore
-    with VotesStore
+    with ActiveVotesStore
+    with HistoricalVotesStore
     with ExternalPartyConfigStateStore {
 
   override def dsoPartyId = key.dsoParty
