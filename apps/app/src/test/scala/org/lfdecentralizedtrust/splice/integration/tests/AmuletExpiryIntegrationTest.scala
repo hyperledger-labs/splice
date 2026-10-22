@@ -83,7 +83,7 @@ class AmuletExpiryIntegrationTest
     )(
       actAndCheck(
         "Create locked and unlocked dust amulet", {
-          for (i <- 1 to numAmulets) {
+          for (_ <- 1 to numAmulets) {
             createAmulet(
               sv1ValidatorBackend.participantClientWithAdminToken,
               sv1UserId,

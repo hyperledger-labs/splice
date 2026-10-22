@@ -4,14 +4,10 @@
 package org.lfdecentralizedtrust.splice.store
 
 import cats.implicits.showInterpolator
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
 trait StoreErrors {
-  def roundNotAggregated(): StatusRuntimeException = {
-    Status.NOT_FOUND.withDescription("Round has not been aggregated yet").asRuntimeException
-  }
-
   def txLogNotFound() = {
     Status.NOT_FOUND.withDescription("No matching log indices found").asRuntimeException
   }

@@ -568,11 +568,6 @@ object UserWalletStore {
       paymentInterval: RelTime,
       paymentDuration: RelTime,
   )
-  final case class EntryWithSubscriptionContext(
-      entry: Contract[ansCodegen.AnsEntry.ContractId, ansCodegen.AnsEntry],
-      subscriptionReference: subsCodegen.SubscriptionRequest.ContractId,
-  )
-
   def apply(
       key: Key,
       storage: DbStorage,

@@ -2842,7 +2842,7 @@ object HttpScanAppClient {
     ] = {
       case metadata.v1.GetInstrumentResponse.OK(response) =>
         Right(Some(response))
-      case metadata.v1.GetInstrumentResponse.NotFound(response) =>
+      case metadata.v1.GetInstrumentResponse.NotFound(_) =>
         Right(None)
     }
   }

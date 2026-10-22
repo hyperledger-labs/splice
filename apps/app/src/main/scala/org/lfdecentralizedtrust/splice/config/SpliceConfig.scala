@@ -403,10 +403,7 @@ object SpliceConfig {
 
   private val cantonConfigReaders = new CantonConfig.ConfigReaders()(elc)
 
-  class ConfigReaders(implicit
-      private val
-      elc: ErrorLoggingContext
-  ) {
+  class ConfigReaders() {
     // TODO(#7525) Fail on unknown keys.
     import BaseCantonConfig.Readers.{preventAllUnknownKeys as _, *}
 
@@ -1309,10 +1306,8 @@ object SpliceConfig {
       deriveWriter[SpliceConfig]
   }
 
-  private implicit def configReader(implicit
-      elc: ErrorLoggingContext
-  ): ConfigReader[SpliceConfig] = {
-    val readers = new ConfigReaders()(elc)
+  private implicit def configReader: ConfigReader[SpliceConfig] = {
+    val readers = new ConfigReaders()
     readers.spliceConfigReader
   }
 

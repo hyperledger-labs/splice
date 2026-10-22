@@ -123,7 +123,7 @@ class TokenStandardV2TransferIntegrationTest
         }
       }
 
-      inside(cids.toList) { case toReject :: toWithdraw :: toAccept :: _toIgnore :: Nil =>
+      inside(cids.toList) { case toReject :: toWithdraw :: toAccept :: _ :: Nil =>
         actAndCheck(
           "Bob rejects one transfer offer",
           bobWalletClient.rejectTokenStandardTransferV2(toReject),
@@ -167,7 +167,7 @@ class TokenStandardV2TransferIntegrationTest
         )
       }
 
-      val (aliceTxs, bobTxs) = clue("Alice and Bob parse all tx log entries") {
+      clue("Alice and Bob parse all tx log entries") {
         eventually() {
           val aliceTxs = aliceWalletClient.listTransactions(None, 1000)
           // tap + 4 transfer instructions + accept + withdraw + reject
@@ -315,7 +315,7 @@ class TokenStandardV2TransferIntegrationTest
       )
       aliceWalletClient.withdrawTokenStandardTransferV2(offer)
 
-      val (aliceTxs, bobTxs) = clue("Alice and Bob parse all tx log entries") {
+      clue("Alice and Bob parse all tx log entries") {
         eventually() {
           val aliceTxs = aliceWalletClient.listTransactions(None, 1000)
           // tap + transfer instruction + unlock + withdraw
