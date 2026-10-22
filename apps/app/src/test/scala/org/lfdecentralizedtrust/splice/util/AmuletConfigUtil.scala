@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.util
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, PackageConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   AmuletRules_SetConfig,
@@ -71,6 +71,27 @@ trait AmuletConfigUtil extends TestCommon {
       existingAmuletConfig.amuletSwitchOverTimes,
     )
   }
+
+  protected def withPackageConfig(
+      config: AmuletConfig[USD],
+      packageConfig: PackageConfig,
+  ): AmuletConfig[USD] =
+    new AmuletConfig(
+      config.transferConfig,
+      config.issuanceCurve,
+      config.decentralizedSynchronizer,
+      config.tickDuration,
+      packageConfig,
+      config.transferPreapprovalFee,
+      config.featuredAppActivityMarkerAmount,
+      config.optDevelopmentFundManager,
+      config.externalPartyConfigStateTickDuration,
+      config.rewardConfig,
+      config.transferPreapprovalBaseDuration,
+      config.developmentFundManagerBlacklist,
+      config.minDevelopmentFundMintingDelay,
+      config.amuletSwitchOverTimes,
+    )
 
   def setAmuletConfig(
       configs: Seq[(Option[Duration], AmuletConfig[USD], AmuletConfig[USD])],

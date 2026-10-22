@@ -300,4 +300,89 @@ class UnsupportedPackageVettingIntegrationTest
       }
 
   }
+
+  "Package versions of an accepted, not yet effective config stay vetted after a validator restart" in {
+    implicit env =>
+      val synchronizerId =
+        sv1Backend.participantClient.synchronizers.list_connected().head.synchronizerId
+
+      def aliceParticipant = aliceValidatorBackend.appState.participantAdminConnection
+
+      def aliceVettingTrigger =
+        aliceValidatorBackend.validatorAutomation.trigger[ValidatorPackageVettingTrigger]
+
+      def currentAmuletConfig() =
+        AmuletConfigSchedule(sv1ScanBackend.getAmuletRules())
+          .getConfigAsOf(env.environment.clock.now)
+
+      val scheduledValidatorDars = Seq(
+        DarResources.amulet_0_1_20,
+        DarResources.amuletNameService_0_1_21,
+        DarResources.wallet_0_1_21,
+        DarResources.walletPayments_0_1_20,
+      )
+
+      actAndCheck(
+        "sv1 sets the package config below the latest versions", {
+          val config = currentAmuletConfig()
+          val olderPackageConfig = new PackageConfig(
+            DarResources.amulet_0_1_19.metadata.version.toString(),
+            DarResources.amuletNameService_0_1_20.metadata.version.toString(),
+            DarResources.dsoGovernance_0_1_25.metadata.version.toString(),
+            config.packageConfig.validatorLifecycle,
+            DarResources.wallet_0_1_20.metadata.version.toString(),
+            DarResources.walletPayments_0_1_19.metadata.version.toString(),
+          )
+          setAmuletConfig(Seq((None, withPackageConfig(config, olderPackageConfig), config)))
+        },
+      )(
+        "the older package config is effective",
+        _ =>
+          currentAmuletConfig().packageConfig.amulet shouldBe
+            DarResources.amulet_0_1_19.metadata.version.toString(),
+      )
+
+      aliceVettingTrigger.resume()
+
+      actAndCheck(
+        "sv1 schedules newer package versions to become effective in one hour", {
+          val config = currentAmuletConfig()
+          val newerPackageConfig = new PackageConfig(
+            DarResources.amulet_0_1_20.metadata.version.toString(),
+            DarResources.amuletNameService_0_1_21.metadata.version.toString(),
+            DarResources.dsoGovernance_0_1_26.metadata.version.toString(),
+            config.packageConfig.validatorLifecycle,
+            DarResources.wallet_0_1_21.metadata.version.toString(),
+            DarResources.walletPayments_0_1_20.metadata.version.toString(),
+          )
+          setAmuletConfig(
+            Seq(
+              (
+                Some(java.time.Duration.ofHours(1)),
+                withPackageConfig(config, newerPackageConfig),
+                config,
+              )
+            )
+          )
+        },
+      )(
+        "alice's validator vets the scheduled package versions",
+        _ =>
+          getVettedPackageIds(aliceParticipant, synchronizerId) should contain allElementsOf
+            scheduledValidatorDars.map(_.packageId),
+      )
+
+      clue("alice's validator restarts and its vetting trigger runs once") {
+        aliceValidatorBackend.stop()
+        aliceValidatorBackend.startSync()
+        aliceVettingTrigger
+          .runOnce()
+          .futureValue(timeout = PatienceConfiguration.Timeout(FiniteDuration(60, "seconds")))
+      }
+
+      clue("the scheduled package versions are still vetted") {
+        getVettedPackageIds(aliceParticipant, synchronizerId) should contain allElementsOf
+          scheduledValidatorDars.map(_.packageId)
+      }
+  }
 }
