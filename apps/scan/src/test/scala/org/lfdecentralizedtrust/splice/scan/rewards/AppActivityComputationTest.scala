@@ -94,6 +94,7 @@ class AppActivityComputationTest extends AnyWordSpec with BaseTest {
       result.head.appActivityWeights shouldBe Seq(200L)
       // no featured asset movers in this tx
       result.head.assetActivityProviderParties shouldBe empty
+      result.head.assetActivityWeights shouldBe empty
     }
 
     // This probably cannot happen, nevertheless we can handle it
