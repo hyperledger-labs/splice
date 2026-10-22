@@ -4185,7 +4185,7 @@ components:
           description: The issuance of rewards for a unit of app activity in this round.
         issuance_per_featured_asset_activity:
           type: string
-          description: The issuance of rewards for a unit of asset activity in this round.
+          description: The ratio of Amulet minted per Amulet burned for asset activity.
         total_app_reward_minting_allowance:
           type: string
           description: The total of all minting allowances granted to app providers in this round. Includes asset activity rewards.
