@@ -1336,8 +1336,9 @@ class DbAppActivityRecordStoreTest
         loggerFactory,
         enableImportUpdateBackfill = false,
         HistoryMetrics(NoOpMetricsFactory, migrationId),
+        clock,
       )
-      _ <- updateHistory.ingestionSink.initialize()
+      _ <- updateHistory.ingestionSink.initialize(mockLedgerConnection())
     } yield {
       val store = new DbAppActivityRecordStore(
         storage,
@@ -1371,8 +1372,9 @@ class DbAppActivityRecordStoreTest
         loggerFactory,
         enableImportUpdateBackfill = false,
         HistoryMetrics(NoOpMetricsFactory, migrationId),
+        clock,
       )
-      _ <- updateHistory.ingestionSink.initialize()
+      _ <- updateHistory.ingestionSink.initialize(mockLedgerConnection())
     } yield {
       val appStore = new DbAppActivityRecordStore(
         storage.underlying,

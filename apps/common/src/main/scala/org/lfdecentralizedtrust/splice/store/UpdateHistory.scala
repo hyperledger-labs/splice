@@ -51,6 +51,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.pretty.Pretty.{param, prettyOfClass}
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -78,7 +79,7 @@ import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.util.MonadUtil
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
-import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
 
 import scala.util.Try
@@ -113,6 +114,8 @@ class UpdateHistory private (
     override protected val loggerFactory: NamedLoggerFactory,
     enableImportUpdateBackfill: Boolean,
     metrics: HistoryMetrics,
+    clock: Clock,
+    partitionRunwayDays: Int,
 )(implicit
     ec: ExecutionContext,
     closeContext: CloseContext,
@@ -168,12 +171,16 @@ class UpdateHistory private (
         includeCreatedEventBlob = false,
       )
 
-      override def initialize()(implicit
-          traceContext: TraceContext
+      override def initialize(connection: BaseLedgerConnection)(implicit
+          traceContext: TraceContext,
+          mat: Materializer,
       ): Future[IngestionStart] = {
         logger.info(s"Initializing update history ingestion sink for party $updateStreamParty")
 
         for {
+          // We have to create partitions on initialization because
+          // otherwise ingestion will fail until UpdateHistoryPartitionMaintenanceTrigger creates them.
+          _ <- createMissingPartitions(connection, clock.now)
           _ <- storage
             .update(
               sql"""
@@ -442,11 +449,70 @@ class UpdateHistory private (
       }
   }
 
+  // Requires Postgres 18 to run. Therefore, all Scan operators must be running said version of Postgres.
   def analyzePartitionedTables()(implicit tc: TraceContext): Future[Unit] =
     storage.update(
-      DBIO.sequence(PartitionedTables.map(table => sqlu"analyze #$table")).map(_ => ()),
+      DBIO.sequence(PartitionedTables.map(table => sqlu"analyze only #$table")).map(_ => ()),
       "analyzePartitionedTables",
     )
+
+  def missingPartitionDays(now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[Seq[LocalDate]] =
+    missingPartitionDays(now, Future.successful(now))
+
+  def createMissingPartitions(connection: BaseLedgerConnection, now: CantonTimestamp)(implicit
+      tc: TraceContext,
+      mat: Materializer,
+  ): Future[Seq[LocalDate]] =
+    for {
+      missing <- missingPartitionDays(now, firstRecordTimeToIngest(connection))
+      _ <- MonadUtil.sequentialTraverse(missing)(createPartitions)
+      _ <-
+        if (missing.isEmpty) Future.unit
+        else {
+          logger.info(s"Created update history partitions for ${missing.mkString(", ")}")
+          analyzePartitionedTables()
+        }
+    } yield missing
+
+  private def missingPartitionDays(
+      now: CantonTimestamp,
+      firstRecordTimeIfNothingIngested: => Future[CantonTimestamp],
+  )(implicit tc: TraceContext): Future[Seq[LocalDate]] =
+    for {
+      lastRecordTimeIngested <- readLastIngestedRecordTime()
+      existing <- listDatesWithAllPartitions()
+      firstRecordTime <- lastRecordTimeIngested match {
+        case Some(last) => Future.successful(last)
+        case None => firstRecordTimeIfNothingIngested
+      }
+    } yield {
+      val lastDay = dayOf(now.plus(java.time.Duration.ofDays(partitionRunwayDays.toLong)))
+      Iterator
+        .iterate(dayOf(firstRecordTime))(_.plusDays(1))
+        .takeWhile(!_.isAfter(lastDay))
+        .filterNot(existing.contains)
+        .toSeq
+    }
+
+  private def firstRecordTimeToIngest(connection: BaseLedgerConnection)(implicit
+      tc: TraceContext,
+      mat: Materializer,
+  ): Future[CantonTimestamp] =
+    connection
+      .updates(beginOffset = 0L, ingestionSink.ingestionFilter)
+      .map(_.updateOrCheckpoint)
+      .collect {
+        case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>
+          reassignment.recordTime
+        case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), _) =>
+          CantonTimestamp.assertFromInstant(tree.getRecordTime)
+      }
+      .runWith(Sink.head)
+
+  private def dayOf(ts: CantonTimestamp): LocalDate =
+    LocalDate.ofInstant(ts.toInstant, ZoneOffset.UTC)
 
   private def ingestUpdateOrCheckpoint_(
       updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint,
@@ -2425,6 +2491,8 @@ object UpdateHistory {
       loggerFactory: NamedLoggerFactory,
       enableImportUpdateBackfill: Boolean,
       metrics: HistoryMetrics,
+      clock: Clock,
+      partitionRunwayDays: Int = 7,
   )(implicit
       initTraceContext: TraceContext,
       ec: ExecutionContext,
@@ -2471,6 +2539,8 @@ object UpdateHistory {
       loggerFactory,
       enableImportUpdateBackfill,
       metrics,
+      clock,
+      partitionRunwayDays,
     )
   }
 

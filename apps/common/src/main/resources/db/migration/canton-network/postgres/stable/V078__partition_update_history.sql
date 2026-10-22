@@ -125,11 +125,7 @@ create table update_history_creates
     partition by range (record_time);
 select setval(pg_get_serial_sequence('update_history_creates', 'row_id'), last_value, is_called)
 from update_history_creates_legacy_row_id_seq;
-create index contract_create_lookup on update_history_creates (contract_id);
 create index updt_hist_crea_hi_mi_rt on update_history_creates (history_id, migration_id, record_time);
-create index updt_hist_crea_hi_tidmn_tiden_pn_rid on update_history_creates (history_id, template_id_module_name,
-                                                                             template_id_entity_name, package_name,
-                                                                             row_id);
 create index updt_hist_crea_uri on update_history_creates (update_row_id);
 
 create table update_history_exercises
@@ -171,7 +167,6 @@ create table update_history_exercises
 select setval(pg_get_serial_sequence('update_history_exercises', 'row_id'), last_value, is_called)
 from update_history_exercises_legacy_row_id_seq;
 create index updt_hist_exer_hi_mi_rt_co on update_history_exercises (history_id, migration_id, record_time, consuming);
-create unique index updt_hist_exer_unique on update_history_exercises (update_row_id, event_id, migration_id, record_time);
 
 create table update_history_assignments
 (

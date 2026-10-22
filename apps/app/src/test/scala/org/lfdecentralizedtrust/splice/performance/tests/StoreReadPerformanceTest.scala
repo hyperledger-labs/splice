@@ -1,5 +1,10 @@
 package org.lfdecentralizedtrust.splice.performance.tests
 
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
+  LedgerClient,
+  TreeUpdateOrOffsetCheckpoint,
+}
+import org.lfdecentralizedtrust.splice.store.StoreTestBase.mockLedgerConnectionWithUpdates
 import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
@@ -61,8 +66,16 @@ abstract class StoreReadPerformanceTest(
       .withNewTraceContext(this.getClass.getName) { implicit tc =>
         for {
           store <- mkStore(storage)
-          _ <- store.ingestionSink.initialize()
           txs = loadTxsFromDump()
+          _ <- store.ingestionSink.initialize(
+            mockLedgerConnectionWithUpdates(
+              txs.map(tx =>
+                LedgerClient.GetTreeUpdatesResponse(
+                  TreeUpdateOrOffsetCheckpoint.Update(tx.update.update, tx.update.synchronizerId)
+                )
+              )
+            )
+          )
           _ <- ingestAll(store, txs)
 
           /** TODO(#4790): We need to address the temporal locality here,

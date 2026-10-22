@@ -15,7 +15,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, Amulet_ExpireResult}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
-  AmuletRules,
   AmuletRules_BuyMemberTrafficResult,
   AmuletRules_MintResult,
 }
@@ -1076,88 +1075,6 @@ abstract class ScanStoreTest
       }
     }
 
-    "lookupContractByRecordTime" should {
-
-      "find the DsoRules contract at a given time" in {
-        val now = CantonTimestamp.now()
-        val firstDsoRules = dsoRules(dsoParty, epoch = 1)
-        val secondDsoRules = dsoRules(dsoParty, epoch = 2)
-        val thirdDsoRules = dsoRules(dsoParty, epoch = 3)
-        val recordTimeFirst = now.plusSeconds(1).toInstant
-        val recordTimeSecond = now.plusSeconds(5).toInstant
-        val recordTimeThird = now.plusSeconds(9).toInstant
-        for {
-          store <- mkStore()
-          updateHistory <- mkUpdateHistory(domainMigrationId, now)
-          _ <- updateHistory.ingestionSink.initialize()
-          first <- dummyDomain.create(
-            firstDsoRules,
-            recordTime = recordTimeFirst,
-          )(
-            updateHistory
-          )
-          firstRecordTime = CantonTimestamp.fromInstant(first.getRecordTime).getOrElse(now)
-          _ <- dummyDomain.create(
-            secondDsoRules,
-            recordTime = recordTimeSecond,
-          )(updateHistory)
-          _ <- dummyDomain.create(
-            thirdDsoRules,
-            recordTime = recordTimeThird,
-          )(updateHistory)
-          result <- store.lookupContractByRecordTime(
-            DsoRules.COMPANION,
-            updateHistory,
-            firstRecordTime.plusSeconds(1),
-          )
-        } yield {
-          result.value should not be firstDsoRules
-          result.value shouldBe secondDsoRules
-          result.value should not be thirdDsoRules
-        }
-      }
-
-      "find the AmuletRules contract at a given time" in {
-        val now = CantonTimestamp.now()
-        val firstAmuletRules = amuletRules(10)
-        val secondAmuletRules = amuletRules(20)
-        val thirdAmuletRules = amuletRules(30)
-        val recordTimeFirst = now.plusSeconds(1).toInstant
-        val recordTimeSecond = now.plusSeconds(5).toInstant
-        val recordTimeThird = now.plusSeconds(9).toInstant
-        for {
-          store <- mkStore()
-          updateHistory <- mkUpdateHistory(domainMigrationId, now)
-          _ <- updateHistory.ingestionSink.initialize()
-          first <- dummyDomain.create(
-            firstAmuletRules,
-            recordTime = recordTimeFirst,
-          )(
-            updateHistory
-          )
-          firstRecordTime = CantonTimestamp.fromInstant(first.getRecordTime).getOrElse(now)
-          _ <- dummyDomain.create(
-            secondAmuletRules,
-            recordTime = recordTimeSecond,
-          )(
-            updateHistory
-          )
-          _ <- dummyDomain.create(
-            thirdAmuletRules,
-            recordTime = recordTimeThird,
-          )(updateHistory)
-          result <- store.lookupContractByRecordTime(
-            AmuletRules.COMPANION,
-            updateHistory,
-            firstRecordTime.plusSeconds(1),
-          )
-        } yield {
-          result.value should not be firstAmuletRules
-          result.value shouldBe secondAmuletRules
-          result.value should not be thirdAmuletRules
-        }
-      }
-    }
   }
   def mkVoteRequests(): Vector[Contract[VoteRequest.ContractId, VoteRequest]] = {
     val voteRequestContract1 = voteRequest(
@@ -1726,7 +1643,9 @@ class DbScanStoreTest
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {
-      initializeResult <- store.multiDomainAcsStore.testIngestionSink.initialize()
+      initializeResult <- store.multiDomainAcsStore.testIngestionSink.initialize(
+        mockLedgerConnection()
+      )
       _ <- initializeResult match {
         case ResumeAtOffset(_) | UpdateHistoryInitAtLatestPrunedOffset => Future.unit
         case InitializeAcsAtLatestOffset =>
@@ -1768,8 +1687,9 @@ class DbScanStoreTest
         loggerFactory,
         enableImportUpdateBackfill = true,
         HistoryMetrics(NoOpMetricsFactory, migrationId),
+        clock,
       )
-      _ <- updateHistory.ingestionSink.initialize()
+      _ <- updateHistory.ingestionSink.initialize(mockLedgerConnection())
       _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
         updateHistory,
         timeStart,

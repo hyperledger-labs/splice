@@ -305,8 +305,8 @@ abstract class MultiDomainAcsStoreTest[
     "ingestion initialization is idempotent" in {
       implicit val store = mkStore()
       for {
-        _ <- store.ingestionSink.initialize()
-        _ <- store.ingestionSink.initialize()
+        _ <- store.ingestionSink.initialize(mockLedgerConnection())
+        _ <- store.ingestionSink.initialize(mockLedgerConnection())
       } yield succeed
     }
     "initial store is empty" in {
@@ -360,7 +360,7 @@ abstract class MultiDomainAcsStoreTest[
       }
       for {
         _ <- initWithAcs()
-        _ <- store.ingestionSink.initialize()
+        _ <- store.ingestionSink.initialize(mockLedgerConnection())
         _ <- MonadUtil.sequentialTraverse(contracts)(d1.create(_))
         paginatedResultsAsc <- paginate(None, Seq.empty, SortOrder.Ascending)
         paginatedResultsDesc <- paginate(None, Seq.empty, SortOrder.Descending)
@@ -383,9 +383,9 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       for {
         _ <- initWithAcs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))
-        _ <- store.ingestionSink.initialize()
+        _ <- store.ingestionSink.initialize(mockLedgerConnection())
         _ <- d1.create(c(2))
-        _ <- store.ingestionSink.initialize()
+        _ <- store.ingestionSink.initialize(mockLedgerConnection())
         _ <- assertList(c(1) -> Some(d1), c(2) -> Some(d1))
       } yield succeed
     }
@@ -735,9 +735,9 @@ abstract class MultiDomainAcsStoreTest[
         _ <- initWithAcs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
-        _ <- store.ingestionSink.initialize()
+        _ <- store.ingestionSink.initialize(mockLedgerConnection())
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2)))
-        _ <- store.ingestionSink.initialize()
+        _ <- store.ingestionSink.initialize(mockLedgerConnection())
         _ <- d1.create(c(3))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2), r(3)))
         _ <- streamF
