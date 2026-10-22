@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import org.lfdecentralizedtrust.splice.store.StoreTestBase.mockLedgerConnection
+
 import com.daml.ledger.javaapi.data.{
   CreateCommand,
   CreatedEvent,
@@ -126,7 +128,7 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
   "Batch hash equivalence (DB Merkle tree == Daml)" should {
 
     "set up rewards store and allocate parties" in { implicit env =>
-      import env.executionContext
+      import env.{actorSystem, executionContext}
       val storage = sv1Backend.appState.storage match {
         case db: DbStorage => db
         case other => fail(s"Expected DbStorage but got ${other.getClass.getSimpleName}")
@@ -152,9 +154,12 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
           loggerFactory,
           enableImportUpdateBackfill = false,
           HistoryMetrics(NoOpMetricsFactory, 0L),
+          env.environment.clock,
         )
         .futureValue
-      updateHistory.ingestionSink.initialize().futureValue
+      updateHistory.ingestionSink
+        .initialize(mockLedgerConnection(env.environment.clock.now))
+        .futureValue
       val appActivityRecordStore = new DbAppActivityRecordStore(
         storage,
         updateHistory,

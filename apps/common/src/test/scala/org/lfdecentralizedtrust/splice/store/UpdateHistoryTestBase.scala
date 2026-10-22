@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.store
 
+import com.digitalasset.canton.time.Clock
+
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Transaction}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
@@ -241,7 +243,7 @@ abstract class UpdateHistoryTestBase
       timeStart,
       partitionRunwayDays,
     )
-    _ <- store.testIngestionSink.initialize()
+    _ <- store.testIngestionSink.initialize(mockLedgerConnection(timeStart))
   } yield ()
 
   protected def mkStore(
@@ -252,6 +254,7 @@ abstract class UpdateHistoryTestBase
       backfillingRequired: BackfillingRequirement = BackfillingRequirement.NeedsBackfilling,
       analyzableTimeWindowDuration: NonNegativeDuration =
         NonNegativeDuration.tryFromDuration(scala.concurrent.duration.Duration.Inf),
+      clock: Clock = this.clock,
   ): UpdateHistory = {
     UpdateHistory
       .create(
@@ -266,6 +269,7 @@ abstract class UpdateHistoryTestBase
         loggerFactory,
         enableImportUpdateBackfill = true,
         HistoryMetrics.apply(NoOpMetricsFactory, domainMigrationId),
+        clock,
       )
       .futureValue
   }
