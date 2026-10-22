@@ -3927,11 +3927,11 @@ components:
     EventHistoryAppActivityRecords:
       type: object
       description: |
-        Activity records computed from verdicts and traffic summaries
+        App activity records computed from verdicts and traffic summaries
         as per [CIP-104](https://github.com/canton-foundation/cips/blob/main/cip-0104/cip-0104.md).
 
-        Semantically `EventHistoryActivityRecords`; the extra wrapping and
-        the `round_number` field are retained for backwards compatibility.
+        Conceptually equal to `EventHistoryActivityRecords`, but kept
+        for backwards compatibility.
       required:
         - round_number
         - records
