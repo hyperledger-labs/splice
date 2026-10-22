@@ -386,6 +386,99 @@ class DbScanAppRewardsStoreTest
       }
     }
 
+    "asset-only party aggregates on the asset side" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- markRoundComplete(historyId, roundNumber)
+        _ <- insertActivityRecord(
+          historyId,
+          roundNumber,
+          parties = Seq.empty,
+          weights = Seq.empty,
+          assetParties = Seq("alice::provider"),
+          assetWeights = Seq(2000L),
+        )
+        _ <- store.aggregateActivityTotals(roundNumber)
+        partyTotals <- store.getAppActivityPartyTotalsByRound(roundNumber)
+        roundTotal <- store.getAppActivityRoundTotalByRound(roundNumber)
+      } yield {
+        partyTotals should have size 1
+        partyTotals.head.appProviderParty shouldBe "alice::provider"
+        partyTotals.head.totalAppActivityWeight shouldBe 0L
+        partyTotals.head.numAppActivityRecords shouldBe 0L
+        partyTotals.head.totalAssetActivityWeight shouldBe 2000L
+        partyTotals.head.numAssetActivityRecords shouldBe 1L
+
+        roundTotal.value.totalRoundAppActivityWeight shouldBe 0L
+        roundTotal.value.totalRoundAssetActivityWeight shouldBe 2000L
+        // Filter excludes asset-only parties: alice has zero app weight.
+        roundTotal.value.activeAppProviderPartiesCount shouldBe 0L
+        roundTotal.value.activityRecordsCount shouldBe 0L
+      }
+    }
+
+    "party with both app and asset weight aggregates both sides" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- markRoundComplete(historyId, roundNumber)
+        _ <- insertActivityRecord(
+          historyId,
+          roundNumber,
+          parties = Seq("alice::provider"),
+          weights = Seq(100L),
+          assetParties = Seq("alice::provider"),
+          assetWeights = Seq(3000L),
+        )
+        _ <- store.aggregateActivityTotals(roundNumber)
+        partyTotals <- store.getAppActivityPartyTotalsByRound(roundNumber)
+        roundTotal <- store.getAppActivityRoundTotalByRound(roundNumber)
+      } yield {
+        partyTotals should have size 1
+        partyTotals.head.appProviderParty shouldBe "alice::provider"
+        partyTotals.head.totalAppActivityWeight shouldBe 100L
+        partyTotals.head.numAppActivityRecords shouldBe 1L
+        partyTotals.head.totalAssetActivityWeight shouldBe 3000L
+        partyTotals.head.numAssetActivityRecords shouldBe 1L
+
+        roundTotal.value.totalRoundAppActivityWeight shouldBe 100L
+        roundTotal.value.totalRoundAssetActivityWeight shouldBe 3000L
+        roundTotal.value.activeAppProviderPartiesCount shouldBe 1L
+        roundTotal.value.activityRecordsCount shouldBe 1L
+      }
+    }
+
+    "app-only and asset-only parties both appear in party totals" in {
+      for {
+        (store, historyId) <- newStore()
+        _ <- markRoundComplete(historyId, roundNumber)
+        _ <- insertActivityRecord(
+          historyId,
+          roundNumber,
+          parties = Seq("alice::provider"),
+          weights = Seq(500L),
+          assetParties = Seq("bob::provider"),
+          assetWeights = Seq(2000L),
+        )
+        _ <- store.aggregateActivityTotals(roundNumber)
+        partyTotals <- store.getAppActivityPartyTotalsByRound(roundNumber)
+        roundTotal <- store.getAppActivityRoundTotalByRound(roundNumber)
+      } yield {
+        partyTotals should have size 2
+        // Sorted alphabetically: alice (app-only) first, bob (asset-only) second
+        partyTotals(0).appProviderParty shouldBe "alice::provider"
+        partyTotals(0).totalAppActivityWeight shouldBe 500L
+        partyTotals(0).totalAssetActivityWeight shouldBe 0L
+        partyTotals(1).appProviderParty shouldBe "bob::provider"
+        partyTotals(1).totalAppActivityWeight shouldBe 0L
+        partyTotals(1).totalAssetActivityWeight shouldBe 2000L
+
+        roundTotal.value.totalRoundAppActivityWeight shouldBe 500L
+        roundTotal.value.totalRoundAssetActivityWeight shouldBe 2000L
+        // Filter excludes bob (asset-only): only alice is "active" on the app side.
+        roundTotal.value.activeAppProviderPartiesCount shouldBe 1L
+      }
+    }
+
     "empty round produces zero totals" in {
       for {
         (store, historyId) <- newStore()
@@ -675,7 +768,7 @@ class DbScanAppRewardsStoreTest
           .computeAndStoreRewards(roundNumber, batchSize = 100, inputs = testInputs)
           .failed
       } yield {
-        result.getMessage should include("exceeds minting curve allowance")
+        result.getMessage should include("exceeds the sum of app-side and asset-side allocations")
       }
     }
   }
@@ -683,7 +776,7 @@ class DbScanAppRewardsStoreTest
   // Tested directly with fake round totals because normal computation
   // cannot trigger the assertion — the tranche formula guarantees
   // totalReward <= totalIssuance. This check is a safety net for bugs.
-  "assertMintingAllowanceWithinMintingCurve" should {
+  "assertCombinedMintingAllowanceWithinIssuanceBudget" should {
 
     def mkParams(totalIssuance: BigDecimal): RewardIssuanceParams =
       RewardIssuanceParams(
@@ -691,6 +784,10 @@ class DbScanAppRewardsStoreTest
         threshold_CC = BigDecimal(0),
         totalIssuanceForFeaturedAppRewards = totalIssuance,
         unclaimedAppRewardAmount = BigDecimal(0),
+        issuancePerFeaturedAppBurnCC = BigDecimal(0),
+        issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+        issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
+        totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
       )
 
     def insertRoundTotal(historyId: Long, round: Long, amount: BigDecimal): Future[Unit] =
@@ -712,8 +809,11 @@ class DbScanAppRewardsStoreTest
         _ <- futureUnlessShutdownToFuture(
           storage.queryAndUpdate(
             store
-              .assertMintingAllowanceWithinMintingCurve(roundNumber, mkParams(BigDecimal(10.0))),
-            "test.assertMintingAllowanceWithinMintingCurve",
+              .assertCombinedMintingAllowanceWithinIssuanceBudget(
+                roundNumber,
+                mkParams(BigDecimal(10.0)),
+              ),
+            "test.assertCombinedMintingAllowanceWithinIssuanceBudget",
           )
         )
       } yield succeed
@@ -726,15 +826,15 @@ class DbScanAppRewardsStoreTest
         _ <- insertRoundTotal(historyId, roundNumber, BigDecimal(10.002))
         result <- futureUnlessShutdownToFuture(
           storage.queryAndUpdate(
-            store.assertMintingAllowanceWithinMintingCurve(
+            store.assertCombinedMintingAllowanceWithinIssuanceBudget(
               roundNumber,
               mkParams(BigDecimal(10.0)),
             ),
-            "test.assertMintingAllowanceWithinMintingCurve",
+            "test.assertCombinedMintingAllowanceWithinIssuanceBudget",
           )
         ).failed
       } yield {
-        result.getMessage should include("exceeds minting curve allowance")
+        result.getMessage should include("exceeds the sum of app-side and asset-side allocations")
       }
     }
 
@@ -745,8 +845,11 @@ class DbScanAppRewardsStoreTest
         _ <- futureUnlessShutdownToFuture(
           storage.queryAndUpdate(
             store
-              .assertMintingAllowanceWithinMintingCurve(roundNumber, mkParams(BigDecimal(10.0))),
-            "test.assertMintingAllowanceWithinMintingCurve",
+              .assertCombinedMintingAllowanceWithinIssuanceBudget(
+                roundNumber,
+                mkParams(BigDecimal(10.0)),
+              ),
+            "test.assertCombinedMintingAllowanceWithinIssuanceBudget",
           )
         )
       } yield succeed
@@ -766,6 +869,10 @@ class DbScanAppRewardsStoreTest
           threshold_CC = Threshold.Half,
           totalIssuanceForFeaturedAppRewards = BigDecimal("10.0"),
           unclaimedAppRewardAmount = BigDecimal("0"),
+          issuancePerFeaturedAppBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
+          totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
         ),
         expected = RewardTotalsTests.Expected(
           partyTotalCount = 1,
@@ -788,6 +895,10 @@ class DbScanAppRewardsStoreTest
           threshold_CC = Threshold.Half,
           totalIssuanceForFeaturedAppRewards = BigDecimal("10.3"),
           unclaimedAppRewardAmount = BigDecimal("0"),
+          issuancePerFeaturedAppBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
+          totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
         ),
         expected = RewardTotalsTests.Expected(
           partyTotalCount = 1,
@@ -808,6 +919,10 @@ class DbScanAppRewardsStoreTest
           threshold_CC = Threshold.Half,
           totalIssuanceForFeaturedAppRewards = BigDecimal("0.5"),
           unclaimedAppRewardAmount = BigDecimal("0"),
+          issuancePerFeaturedAppBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
+          totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
         ),
         expected = RewardTotalsTests.Expected(
           partyTotalCount = 1,
@@ -828,6 +943,10 @@ class DbScanAppRewardsStoreTest
           threshold_CC = Threshold.Zero,
           totalIssuanceForFeaturedAppRewards = BigDecimal("6.666666"),
           unclaimedAppRewardAmount = BigDecimal("0"),
+          issuancePerFeaturedAppBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
+          totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
         ),
         expected = RewardTotalsTests.Expected(
           partyTotalCount = 1,
@@ -846,6 +965,10 @@ class DbScanAppRewardsStoreTest
           threshold_CC = Threshold.Half,
           totalIssuanceForFeaturedAppRewards = BigDecimal("2.0"),
           unclaimedAppRewardAmount = BigDecimal("0"),
+          issuancePerFeaturedAppBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
+          totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
         ),
         expected = RewardTotalsTests.Expected(
           partyTotalCount = 1,
@@ -866,6 +989,10 @@ class DbScanAppRewardsStoreTest
           threshold_CC = Threshold.One,
           totalIssuanceForFeaturedAppRewards = BigDecimal("0.3"),
           unclaimedAppRewardAmount = BigDecimal("0"),
+          issuancePerFeaturedAppBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal(0),
+          totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
         ),
         expected = RewardTotalsTests.Expected(
           partyTotalCount = 0,
@@ -873,6 +1000,86 @@ class DbScanAppRewardsStoreTest
           thresholded = Some(BigDecimal("0.3000000000")),
           unclaimed = Some(BigDecimal("0E-10")),
           rewardedCount = Some(0L),
+        ),
+      ),
+      // Asset-only party crossing threshold via asset-side alone.
+      // 5 MB asset * 2.0 CC/MB = 10 CC; app side has no activity.
+      // totalIssuance = 10, unclaimed = 0, featuredApp = 0, featuredAsset = 10.
+      RewardTotalsTests.TestCase(
+        description = "asset-only party crosses threshold via asset side",
+        activities = Seq(Activity.aliceAsset5M),
+        params = RewardIssuanceParams(
+          issuancePerFeaturedAppTraffic_CCperMB = BigDecimal(0),
+          threshold_CC = Threshold.Half,
+          totalIssuanceForFeaturedAppRewards = BigDecimal("0"),
+          unclaimedAppRewardAmount = BigDecimal("0"),
+          issuancePerFeaturedAppBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal("2.0"),
+          totalIssuanceForFeaturedAssetRewards = BigDecimal("10.0"),
+        ),
+        expected = RewardTotalsTests.Expected(
+          partyTotalCount = 1,
+          headPartySeqNum = Some(0),
+          headRewardAmount = Some(BigDecimal("10.0000000000")),
+          mintingAllowance = Some(BigDecimal("10.0000000000")),
+          thresholded = Some(BigDecimal("0E-10")),
+          unclaimed = Some(BigDecimal("0E-10")),
+          rewardedCount = Some(1L),
+          fromAppActivity = Some(BigDecimal("0E-10")),
+          fromAssetActivity = Some(BigDecimal("10.0000000000")),
+        ),
+      ),
+      // Mixed-source party: 1 MB app * 2.0 + 2 MB asset * 3.0 = 2 + 6 = 8 CC.
+      // totalIssuance = 10, unclaimed = 2, featuredApp = 2, featuredAsset = 6.
+      RewardTotalsTests.TestCase(
+        description = "party with both app and asset weight combines sources",
+        activities = Seq(Activity.aliceBoth),
+        params = RewardIssuanceParams(
+          issuancePerFeaturedAppTraffic_CCperMB = IssuanceRate.Two,
+          threshold_CC = Threshold.Half,
+          totalIssuanceForFeaturedAppRewards = BigDecimal("2.0"),
+          unclaimedAppRewardAmount = BigDecimal("2.0"),
+          issuancePerFeaturedAppBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal("3.0"),
+          totalIssuanceForFeaturedAssetRewards = BigDecimal("6.0"),
+        ),
+        expected = RewardTotalsTests.Expected(
+          partyTotalCount = 1,
+          headPartySeqNum = Some(0),
+          headRewardAmount = Some(BigDecimal("8.0000000000")),
+          mintingAllowance = Some(BigDecimal("8.0000000000")),
+          thresholded = Some(BigDecimal("0E-10")),
+          unclaimed = Some(BigDecimal("2.0000000000")),
+          rewardedCount = Some(1L),
+          fromAppActivity = Some(BigDecimal("2.0000000000")),
+          fromAssetActivity = Some(BigDecimal("6.0000000000")),
+        ),
+      ),
+      // Asset-only party below threshold: 5 MB asset * 0.05 CC/MB = 0.25 CC,
+      // below threshold 0.5 → excluded. Whole budget falls into thresholded.
+      RewardTotalsTests.TestCase(
+        description = "asset-only party below threshold is excluded",
+        activities = Seq(Activity.aliceAsset5M),
+        params = RewardIssuanceParams(
+          issuancePerFeaturedAppTraffic_CCperMB = BigDecimal(0),
+          threshold_CC = Threshold.Half,
+          totalIssuanceForFeaturedAppRewards = BigDecimal("0"),
+          unclaimedAppRewardAmount = BigDecimal("0"),
+          issuancePerFeaturedAppBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurnCC = BigDecimal(0),
+          issuancePerFeaturedAssetBurn_CCperMB = BigDecimal("0.05"),
+          totalIssuanceForFeaturedAssetRewards = BigDecimal("0.25"),
+        ),
+        expected = RewardTotalsTests.Expected(
+          partyTotalCount = 0,
+          mintingAllowance = Some(BigDecimal("0E-10")),
+          thresholded = Some(BigDecimal("0.2500000000")),
+          unclaimed = Some(BigDecimal("0E-10")),
+          rewardedCount = Some(0L),
+          fromAppActivity = Some(BigDecimal("0E-10")),
+          fromAssetActivity = Some(BigDecimal("0.2500000000")),
         ),
       ),
     )
@@ -1198,10 +1405,14 @@ class DbScanAppRewardsStoreTest
       round: Long,
       parties: Seq[String],
       weights: Seq[Long],
+      assetParties: Seq[String] = Nil,
+      assetWeights: Seq[Long] = Nil,
   ): Future[Unit] = {
     val verdictId = verdictCounter.getAndIncrement()
     val partiesArray = parties.mkString("{", ",", "}")
     val weightsArray = weights.mkString("{", ",", "}")
+    val assetPartiesArray = assetParties.mkString("{", ",", "}")
+    val assetWeightsArray = assetWeights.mkString("{", ",", "}")
     futureUnlessShutdownToFuture(
       storage.underlying.queryAndUpdate(
         sqlu"""insert into scan_verdict_store
@@ -1217,10 +1428,14 @@ class DbScanAppRewardsStoreTest
       futureUnlessShutdownToFuture(
         storage.underlying.queryAndUpdate(
           sqlu"""insert into app_activity_record_store
-                 (history_id, verdict_row_id, round_number, app_provider_parties, app_activity_weights)
+                 (history_id, verdict_row_id, round_number,
+                  app_provider_parties, app_activity_weights,
+                  asset_activity_provider_parties, asset_activity_weights)
                  values ($historyId, $verdictId, $round,
                          #${"'" + partiesArray + "'"},
-                         #${"'" + weightsArray + "'"})""",
+                         #${"'" + weightsArray + "'"},
+                         #${"'" + assetPartiesArray + "'"},
+                         #${"'" + assetWeightsArray + "'"})""",
           "test.insertActivityRecord",
         )
       )
@@ -1377,6 +1592,8 @@ class DbScanAppRewardsStoreTest
         thresholded: Option[BigDecimal] = None,
         unclaimed: Option[BigDecimal] = None,
         rewardedCount: Option[Long] = None,
+        fromAppActivity: Option[BigDecimal] = None,
+        fromAssetActivity: Option[BigDecimal] = None,
     )
 
     def run(tc: TestCase): Future[org.scalatest.Assertion] =
@@ -1423,6 +1640,18 @@ class DbScanAppRewardsStoreTest
       expected.rewardedCount.foreach { v =>
         roundTotal.value.rewardedAppProviderPartiesCount shouldBe v
       }
+      expected.fromAppActivity.foreach { v =>
+        roundTotal.value.totalAppRewardFromAppActivity shouldBe v
+      }
+      expected.fromAssetActivity.foreach { v =>
+        roundTotal.value.totalAppRewardFromAssetActivity shouldBe v
+      }
+      // Reward conservation: fromApp + fromAsset == allowance + thresholded.
+      if (expected.fromAppActivity.isDefined && expected.fromAssetActivity.isDefined) {
+        val rt = roundTotal.value
+        (rt.totalAppRewardFromAppActivity + rt.totalAppRewardFromAssetActivity) shouldBe
+          (rt.totalAppRewardMintingAllowance + rt.totalAppRewardThresholded)
+      }
       succeed
     }
   }
@@ -1440,6 +1669,12 @@ object DbScanAppRewardsStoreTest {
     val alice1M = AppActivityPartyTotalT(0L, roundNumber, 1000000L, "alice::provider", 1L, 0L, 0L)
     val alice100K = AppActivityPartyTotalT(0L, roundNumber, 100000L, "alice::provider", 1L, 0L, 0L)
     val bob50K = AppActivityPartyTotalT(0L, roundNumber, 50000L, "bob::provider", 1L, 0L, 0L)
+    // Asset-only: 5 MB of asset burn, no app traffic.
+    val aliceAsset5M =
+      AppActivityPartyTotalT(0L, roundNumber, 0L, "alice::provider", 0L, 1L, 5000000L)
+    // Mixed: 1 MB app traffic + 2 MB asset burn.
+    val aliceBoth =
+      AppActivityPartyTotalT(0L, roundNumber, 1000000L, "alice::provider", 1L, 1L, 2000000L)
   }
 
   object IssuanceRate {
