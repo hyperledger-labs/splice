@@ -725,7 +725,9 @@ class DbScanAppRewardsStore(
       ++ insertPartyTotals(historyId, roundNumber) ++ sql" "
       ++ insertRoundTotals(historyId, roundNumber)).asUpdate
 
-  /** Unnest per-verdict activity arrays and aggregate weights by party. */
+  /** Unnest per-verdict activity arrays and aggregate weights by party.
+    * TBAR v1.1 attribution is pre-applied in `app_provider_parties`.
+    */
   private def unnestAndAggregate(historyId: Long, roundNumber: Long) =
     sql"""app_unnested as (
             select party, weight
