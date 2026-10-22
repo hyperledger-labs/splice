@@ -167,6 +167,13 @@ object DbScanStore {
       ),
       userVersion = acsStoreDescriptorUserVersion,
     )
+
+  // WARNING: Do not change the txlog store descriptor.
+  //
+  // The TxLog store id identifies the ingestion sinks that store historical data and must witness
+  // every single update: the TxLog and the votes store. Unlike the ACS, their content cannot be rebuilt
+  // from the current state of the ledger. A new descriptor yields a new store id, and the history
+  // ingested under the old one is lost.
   def txLogStoreDescriptor(
       key: ScanStore.Key,
       participantId: ParticipantId,
