@@ -40,7 +40,7 @@
       },
       "failOnAppVersionMismatch": true,
       "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-      "maxDarVersion": "0.1.8",
+      "maxDarVersion": "0.1.24",
       "metrics": {
         "enable": true
       },
