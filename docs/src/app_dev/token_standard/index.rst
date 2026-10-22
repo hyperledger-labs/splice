@@ -104,6 +104,24 @@ Allocation Request
     Daml reference for V2 <../api/splice-api-token-allocation-request-v2/index>
 
 
+Conditional Lock
+----------------
+
+An optional API that lets an authorizer attach a release policy to their
+holdings: rules pairing alternative conjunctions of guards (hash preimage,
+ledger time, party threshold), checked by the lock contract's signatories,
+with an outcome that unlocks or releases fixed legs plus enactor-supplied
+legs within a receiver set. At expiry the remainder returns to the
+authorizer. It provides a standard HTLC leg for cross-chain swaps, DvP
+between registries, escrow, vesting, and collateral. Specified in the
+Conditional Holding Lock CIP (draft).
+
+  .. toctree::
+    :maxdepth: 1
+
+    Daml reference for V1 <../api/splice-api-token-conditional-lock-v1/index>
+
+
 Implementation Utilities
 ------------------------
 

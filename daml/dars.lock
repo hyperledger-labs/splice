@@ -61,6 +61,7 @@ splice-api-token-allocation-request-v2 1.0.0 adc16315a8943a8433886694720a2a000ae
 splice-api-token-allocation-v1 1.0.0 93c942ae2b4c2ba674fb152fe38473c507bda4e82b4e4c5da55a552a9d8cce1d
 splice-api-token-allocation-v2 1.0.0 051a3b0563a6fa4df4cb34448081e48b061e555aa1a265abf6ae8f3f4cafe439
 splice-api-token-burn-mint-v1 1.0.0 9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e
+splice-api-token-conditional-lock-v1 0.2.0 ff9cd0184bcd2f3a88b0c8c1c74bcff94e49c7ff00c04e144b33f26f7266811e
 splice-api-token-holding-v1 1.0.0 718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b
 splice-api-token-holding-v2 1.0.0 4b7ecfc366d79ccc5ed07c80f26fe489cf2dfd43ce2856c06a78e6a048db7032
 splice-api-token-metadata-v1 1.0.0 4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f

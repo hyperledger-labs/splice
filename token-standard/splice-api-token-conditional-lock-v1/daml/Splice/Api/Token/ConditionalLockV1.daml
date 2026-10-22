@@ -1,0 +1,561 @@
+-- Copyright (c) 2026 Long Run Advisory. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | V1 API to attach a release policy to a Holding.
+--
+-- A conditional lock is a set of rules. Each rule pairs guards, checked by the
+-- lock contract's signatories, with an outcome the registry enacts. Rules fire
+-- at most once. Every lock has an expiry, at or after which the remaining
+-- amount returns to the authorizer, unlocked.
+module Splice.Api.Token.ConditionalLockV1 where
+
+import DA.Map qualified as Map
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV2
+
+
+-- | Hash function for a hashlock. Digests and preimages are hex-encoded byte strings.
+data HashAlgorithm
+  = Sha256
+    -- ^ SHA-256 over the raw preimage bytes. Registries MUST support this algorithm.
+  | Keccak256
+    -- ^ Keccak-256 over the raw preimage bytes. Registries MUST support this algorithm.
+  deriving (Eq, Ord, Show, Serializable)
+
+-- | A condition checked by the lock contract's signatories when a rule is enacted.
+-- Not recursive: a guard is always a single leaf condition.
+data Guard
+  = Guard_Preimage with
+      algorithm : HashAlgorithm
+      digest : Text
+        -- ^ Digest of the 32-byte preimage under `algorithm`, as exactly 64 lowercase
+        -- hexadecimal characters. Satisfied by a preimage in the witness whose digest
+        -- under `algorithm` equals this value. Registries MUST reject terms whose
+        -- digest is not of this form.
+  | Guard_After with
+      time : Time
+        -- ^ Satisfied when ledger time is at or after `time`.
+  | Guard_Before with
+      time : Time
+        -- ^ Satisfied when ledger time is strictly before `time`.
+  | Guard_Parties with
+      parties : [Party]
+        -- ^ Unique list of parties.
+      threshold : Int
+        -- ^ Satisfied when at least `threshold` of `parties` are among the acting parties
+        -- of `ConditionalLock_Enact`: its `actors` and the approvers recorded for the
+        -- enacted rule and legs (`ConditionalLockView.approvals`). MUST satisfy
+        -- 1 <= threshold <= length parties. A `threshold` of 1 expresses any one of
+        -- these parties.
+  deriving (Eq, Ord, Show, Serializable)
+
+-- | One way a rule can become enactable. Satisfied when every guard in `allOf` is satisfied.
+data Alternative = Alternative with
+    allOf : [Guard]
+      -- ^ Conjunction. MUST be non-empty. Registries advertise the maximum length
+      -- as `max-guards-per-alternative` (CIP section 3.8).
+  deriving (Eq, Ord, Show, Serializable)
+
+-- | Evidence supplied when enacting a rule.
+data Witness = Witness with
+    preimages : [Text]
+      -- ^ Hex-encoded 32-byte preimages. Each `Guard_Preimage` is satisfied if any
+      -- listed preimage hashes to its digest. Registries advertise the maximum
+      -- length as `max-preimages` (CIP section 3.8). Every choice observer of
+      -- `ConditionalLock_Enact` learns every listed preimage; see
+      -- `conditionalLock_enactExtraObservers`.
+  deriving (Eq, Ord, Show, Serializable)
+
+-- | A destination for locked funds.
+data Leg = Leg with
+    legId : Text
+      -- ^ Identifies this leg in transfer events. MUST be non-empty and MUST NOT
+      -- contain `/`. MUST be unique among the legs released by a single enactment,
+      -- i.e. across `Outcome_Release.fixedLegs` and `ConditionalLock_Enact.legs`
+      -- taken together.
+    receiver : Account
+      -- ^ A leg whose receiver is `terms.authorizer` returns that amount unlocked
+      -- and is reported as a holdings change with no transfer leg.
+    amount : Decimal
+      -- ^ MUST be positive.
+    meta : Metadata
+      -- ^ Metadata for extensibility, reported on both `TransferLegSide`s of this
+      -- leg. MUST NOT set any key the registry is required to set (CIP section 3.7).
+  deriving (Eq, Ord, Show, Serializable)
+
+-- | What happens to the locked funds when a rule fires.
+data Outcome
+  = Outcome_Unlock
+    -- ^ The full remaining amount returns to the authorizer, unlocked. Terminates the lock.
+  | Outcome_Release with
+      fixedLegs : [Leg]
+        -- ^ Legs fixed by the terms. Released in full whenever the rule fires.
+      receivers : [Account]
+        -- ^ Receiver set bounding the enactor-supplied `ConditionalLock_Enact.legs`.
+        -- Every supplied leg MUST name a receiver here. MUST be duplicate-free.
+        -- MUST NOT be longer than `max-legs` (CIP section 3.8). An empty list admits
+        -- no enactor-supplied legs. `fixedLegs` and `receivers` MUST NOT both be
+        -- empty.
+        --
+        -- The total released, `fixedLegs` plus the supplied legs, MUST be positive
+        -- and MUST be at most the remaining amount. If less, the remainder stays
+        -- locked and the lock continues without this rule.
+  deriving (Eq, Ord, Show, Serializable)
+
+-- | One release path.
+data Rule = Rule with
+    id : Text
+      -- ^ Unique within the terms. Reported in events. MUST be non-empty and MUST NOT
+      -- contain `/`; it is a component of transfer leg identifiers (CIP section 3.7).
+      -- A rule id that has been enacted under a `lockId` MUST NOT be reused in later
+      -- terms for that lock, including after an amendment.
+    enactors : [Party]
+      -- ^ Parties entitled to enact this rule. At least one MUST be among the acting
+      -- parties of `ConditionalLock_Enact`. MUST be non-empty and duplicate-free.
+    anyOf : [Alternative]
+      -- ^ Disjunction: the rule is enactable when at least one alternative is
+      -- satisfied. MUST be non-empty. Registries advertise the maximum length as
+      -- `max-alternatives-per-rule` (CIP section 3.8).
+    outcome : Outcome
+  deriving (Eq, Ord, Show, Serializable)
+
+-- | Approval of one enactment of a rule, recorded under a lock by
+-- `ConditionalLock_Approve`.
+data Approval = Approval with
+    ruleId : Text
+      -- ^ The approved rule.
+    legs : [Leg]
+      -- ^ The approved enactor-supplied legs, in the order they are supplied to
+      -- `ConditionalLock_Enact.legs`. The approval counts only for an enactment of
+      -- `ruleId` with exactly these legs.
+    approvers : [Party]
+      -- ^ Non-empty, duplicate-free list of parties that approved, each in the rule's
+      -- `enactors` or in a `Guard_Parties` of its `anyOf`.
+  deriving (Eq, Ord, Show, Serializable)
+
+-- | The release policy, provided by the authorizer's wallet.
+--
+-- The **receivers** of terms are the accounts other than `authorizer` that appear as
+-- `Leg.receiver` in any `fixedLegs` or in any `Outcome_Release.receivers`. The
+-- **named parties** of terms are the parties of every receiver account, every party
+-- in any `Rule.enactors`, and every party in any `Guard_Parties.parties`, excluding
+-- the parties of `authorizer`. Registries advertise the maximum number of named
+-- parties as `max-named-parties` (CIP section 3.8).
+data LockTerms = LockTerms with
+    authorizer : Account
+      -- ^ Account that funds the lock and receives unlocked funds.
+    instrumentId : InstrumentId
+    amount : Decimal
+      -- ^ Locked amount. On a continuation, the remaining amount.
+    rules : [Rule]
+      -- ^ Enactable strictly before `expiresAt`. Each fires at most once for the
+      -- lifetime of the `lockId`; registries MUST retain the set of enacted rule ids
+      -- across continuations and amendments to enforce this.
+    expiresAt : Time
+      -- ^ Absolute, inclusive ledger time at which the rules stop being enactable and
+      -- `ConditionalLock_Expire` becomes enactable. MUST be in the future when the
+      -- terms are validated, and within the registry's advertised `min-duration` and
+      -- `max-duration` (CIP section 3.8).
+    requestedAt : Time
+      -- ^ Wallet-provided creation timestamp. MUST be in the past when locking.
+    meta : Metadata
+      -- ^ Metadata for extensibility. SHOULD carry
+      -- `splice.lfdecentralizedtrust.org/lock-context`.
+  deriving (Eq, Show, Serializable)
+
+-- | Result of instructing, enacting, approving, expiring, cancelling, or amending a lock.
+data ConditionalLockResult = ConditionalLockResult with
+    output : ConditionalLockResult_Output
+    authorizerChangeCids : [ContractId Holding]
+      -- ^ Change holdings created for the authorizer from the input holdings, if
+      -- any, reported here rather than in `output`.
+    meta : Metadata
+      -- ^ Implementation-specific metadata, e.g. fees charged.
+  deriving (Eq, Show, Serializable)
+
+data ConditionalLockResult_Output
+  = ConditionalLockResult_Pending with
+      instructionCid : ContractId ConditionalLockInstruction
+        -- ^ One or more approvals are required before the lock becomes active.
+        -- Returned by `ConditionalLockFactory_Lock`, and by
+        -- `ConditionalLockInstruction_Accept` while approvals remain outstanding;
+        -- never by `ConditionalLock_Amend`.
+  | ConditionalLockResult_Locked with
+      lockCid : ContractId ConditionalLock
+        -- ^ The active lock. For `ConditionalLock_Approve`, the lock carrying the
+        -- recorded approval, under the same `lockId`.
+      holdingCids : [ContractId Holding]
+        -- ^ The locked holdings backing the lock. MAY be empty for registries that do
+        -- not represent their holdings on-ledger.
+  | ConditionalLockResult_Enacted with
+      receiverHoldingCids : [ContractId Holding]
+        -- ^ Holdings created for receivers other than the authorizer.
+      authorizerHoldingCids : [ContractId Holding]
+        -- ^ Unlocked holdings returned to the authorizer.
+      continuationCid : Optional (ContractId ConditionalLock)
+        -- ^ The continuing lock, when funds remain. Its stakeholders follow from the
+        -- remaining terms, so an enactor named only by the rule just fired MAY be
+        -- unable to fetch it.
+  | ConditionalLockResult_Failed with
+      authorizerHoldingCids : [ContractId Holding]
+        -- ^ Instruction rejected or withdrawn. The unlocked holdings returned to the
+        -- authorizer. MAY be empty for registries that do not represent their
+        -- holdings on-ledger.
+  deriving (Eq, Show, Serializable)
+
+data ConditionalLockFactoryView = ConditionalLockFactoryView with
+    admin : Party
+      -- ^ Registry admin for the instruments this factory serves.
+    meta : Metadata
+      -- ^ MUST carry the registry's limits (CIP section 3.8).
+  deriving (Eq, Show, Serializable)
+
+interface ConditionalLockFactory where
+  viewtype ConditionalLockFactoryView
+
+  conditionalLockFactory_lockExtraObservers : ConditionalLockFactory_Lock -> [Party]
+  conditionalLockFactory_lockImpl : ContractId ConditionalLockFactory -> ConditionalLockFactory_Lock -> Update ConditionalLockResult
+  conditionalLockFactory_publicFetchImpl : ContractId ConditionalLockFactory -> ConditionalLockFactory_PublicFetch -> Update ConditionalLockFactoryView
+
+  nonconsuming choice ConditionalLockFactory_Lock : ConditionalLockResult
+    -- ^ Lock `terms.amount` of the authorizer's holdings under `terms`.
+    with
+      terms : LockTerms
+        -- ^ Implementations MUST validate the terms before locking, and MUST fail
+        -- otherwise: `instrumentId.admin` equals the factory `admin`; `amount` is
+        -- positive; `requestedAt` is in the past; `expiresAt` is in the future and
+        -- within the advertised duration bounds; every rule has non-empty,
+        -- duplicate-free `enactors`, a unique non-empty `/`-free `id`, non-empty
+        -- `anyOf` whose alternatives have non-empty `allOf`; every `Guard_Parties`
+        -- has unique `parties` and a threshold in range; every `Guard_Preimage`
+        -- digest is well-formed; every `Outcome_Release` satisfies its own
+        -- constraints with `fixedLegs` summing to at most `amount`; no `Leg.meta`
+        -- sets a key the registry is required to set (CIP section 3.7); rule,
+        -- alternative, guard, leg, and named-party counts are within the advertised
+        -- limits (CIP section 3.8).
+      inputHoldingCids : [ContractId Holding]
+        -- ^ Holdings funding the lock. Same rules as `Transfer.inputHoldingCids` in CIP-0112.
+      actors : [Party]
+        -- ^ MUST include the parties the registry requires to move funds out of
+        -- `terms.authorizer`. Implementations MUST check these parties to avoid
+        -- unauthorized locking.
+      extraArgs : ExtraArgs
+    observer conditionalLockFactory_lockExtraObservers this arg
+    controller actors
+    do conditionalLockFactory_lockImpl this self arg
+
+  nonconsuming choice ConditionalLockFactory_PublicFetch : ConditionalLockFactoryView
+    with
+      actors : [Party]
+    controller actors
+    do conditionalLockFactory_publicFetchImpl this self arg
+
+-- | Actions to advance the state of a conditional lock instruction.
+data ConditionalLockInstructionAction
+  = CLIA_Accept
+  | CLIA_Reject
+  | CLIA_Withdraw
+  | -- | Used to represent registry-specific actions that need to happen
+    -- for the lock instruction to advance.
+    CLIA_Custom with
+      id : Text
+        -- ^ Identifier of the action. Namespaced analogously to metadata keys.
+  deriving (Eq, Ord, Show, Serializable)
+
+data ConditionalLockInstructionView = ConditionalLockInstructionView with
+    lockId : Text
+      -- ^ Assigned by the registry when the lock is instructed and carried unchanged
+      -- into `ConditionalLockView.lockId` once the lock is active, so that wallets can
+      -- correlate an instruction across approvals. MUST NOT contain `/`.
+    terms : LockTerms
+    pendingApprovals : [Account]
+      -- ^ Accounts whose approval is still required before the lock becomes active.
+      -- The registry decides whether an account's owner, its provider, or both must
+      -- act; see `availableActions`.
+    availableActions : Map.Map ConditionalLockInstructionAction [[Party]]
+      -- ^ What actions are available to which groups of parties. The list of lists
+      -- is interpreted as a set of sets and represents a disjunction of
+      -- conjunctions of parties, i.e., each inner list represents a group of
+      -- parties that can act jointly to execute the action.
+      --
+      -- This field can be used to inform wallet users whether they can take an action or not;
+      -- and which other parties they might be waiting on to take their action.
+      --
+      -- Supports multiple parties for actions that require joint authorization. Executing them
+      -- will require appropriate, registry-specific delegation contracts to be in place.
+    meta : Metadata
+  deriving (Eq, Show, Serializable)
+
+interface ConditionalLockInstruction where
+  viewtype ConditionalLockInstructionView
+
+  conditionalLockInstruction_acceptImpl : ContractId ConditionalLockInstruction -> ConditionalLockInstruction_Accept -> Update ConditionalLockResult
+  conditionalLockInstruction_rejectImpl : ContractId ConditionalLockInstruction -> ConditionalLockInstruction_Reject -> Update ConditionalLockResult
+  conditionalLockInstruction_withdrawImpl : ContractId ConditionalLockInstruction -> ConditionalLockInstruction_Withdraw -> Update ConditionalLockResult
+
+  -- | Choice observers for `ConditionalLockInstruction_Accept`, so that approving
+  -- the lock generates a single view. Usually the parties of `terms.authorizer`
+  -- and of the accounts still in `pendingApprovals`. See CIP-0112, "Guidelines &
+  -- Interfaces for Performance Optimization".
+  conditionalLockInstruction_acceptExtraObservers : ConditionalLockInstruction_Accept -> [Party]
+  conditionalLockInstruction_rejectExtraObservers : ConditionalLockInstruction_Reject -> [Party]
+  conditionalLockInstruction_withdrawExtraObservers : ConditionalLockInstruction_Withdraw -> [Party]
+
+  nonconsuming choice ConditionalLockInstruction_Accept : ConditionalLockResult
+    -- ^ An approver accepts. The approver is the account whose approval is pending;
+    -- the parties that must act for it are registry-defined and reported in
+    -- `availableActions`. Result is `Locked` once every pending approval is given,
+    -- otherwise `Pending`. Implementations MUST fail at or after `terms.expiresAt`;
+    -- the authorizer's remedy is then `ConditionalLockInstruction_Withdraw`.
+    with
+      approver : Account
+        -- ^ The account whose approval this exercise gives. MUST be in `pendingApprovals`.
+      actors : [Party]
+        -- ^ MUST be the parties the registry requires to act for `approver`, as
+        -- reported in `availableActions`. Implementations MUST check these parties to
+        -- avoid unauthorized acceptance.
+      extraArgs : ExtraArgs
+    observer conditionalLockInstruction_acceptExtraObservers this arg
+    controller actors
+    do conditionalLockInstruction_acceptImpl this self arg
+
+  nonconsuming choice ConditionalLockInstruction_Reject : ConditionalLockResult
+    -- ^ An approver declines. Result is `Failed`; input holdings return to the
+    -- authorizer unlocked.
+    with
+      approver : Account
+        -- ^ The account declining. MUST be in `pendingApprovals`.
+      actors : [Party]
+        -- ^ MUST be the parties the registry requires to act for `approver`, as
+        -- reported in `availableActions`. Implementations MUST check these parties to
+        -- avoid unauthorized rejection.
+      extraArgs : ExtraArgs
+    observer conditionalLockInstruction_rejectExtraObservers this arg
+    controller actors
+    do conditionalLockInstruction_rejectImpl this self arg
+
+  nonconsuming choice ConditionalLockInstruction_Withdraw : ConditionalLockResult
+    -- ^ The authorizer withdraws before every approval is given. Result is `Failed`.
+    -- MUST be permitted at or after `terms.expiresAt` regardless of approver action.
+    with
+      actors : [Party]
+        -- ^ MUST include the parties the registry requires to move funds out of
+        -- `terms.authorizer`. Implementations MUST check these parties to avoid
+        -- unauthorized withdrawal. Registries MAY additionally permit the admin
+        -- alone at or after `terms.expiresAt` for cleanup; funds return only to the
+        -- authorizer.
+      extraArgs : ExtraArgs
+    observer conditionalLockInstruction_withdrawExtraObservers this arg
+    controller actors
+    do conditionalLockInstruction_withdrawImpl this self arg
+
+-- | Actions available on a conditional lock.
+data ConditionalLockAction
+  = CLA_Enact with
+      ruleId : Text
+        -- ^ The rule that can be enacted.
+  | CLA_Approve with
+      ruleId : Text
+        -- ^ The rule whose enactment can be approved.
+  | CLA_Expire
+  | CLA_Cancel
+  | CLA_Amend
+  | -- | Used to represent registry-specific actions on conditional locks.
+    CLA_Custom with
+      id : Text
+        -- ^ Identifier of the action. Namespaced analogously to metadata keys.
+  deriving (Eq, Ord, Show, Serializable)
+
+data ConditionalLockView = ConditionalLockView with
+    lockId : Text
+      -- ^ Stable across continuations and amendments. Reported in events. MUST NOT
+      -- contain `/`.
+    terms : LockTerms
+      -- ^ Current terms: remaining amount and remaining rules.
+    enactedRuleIds : [Text]
+      -- ^ Ids of the rules already enacted under this `lockId`, across continuations
+      -- and amendments. Wallets use it to validate a `ConditionalLock_Amend` before
+      -- submitting; registries use it to enforce fire-once.
+    approvals : [Approval]
+      -- ^ Approvals recorded by `ConditionalLock_Approve`, at most one entry per
+      -- `(ruleId, legs)` and each party in at most one entry per rule. Registries MUST
+      -- retain the approvals of rules still in `terms.rules` across continuations, MUST
+      -- drop those of a rule when it fires, and MUST clear all of them on
+      -- `ConditionalLock_Amend`.
+    holdingCids : [ContractId Holding]
+      -- ^ The locked holdings backing this lock. MAY be empty for registries that do
+      -- not represent their holdings on-ledger.
+    availableActions : Map.Map ConditionalLockAction [[Party]]
+      -- ^ What actions are available to which groups of parties. The list of lists
+      -- is interpreted as a set of sets and represents a disjunction of
+      -- conjunctions of parties, i.e., each inner list represents a group of
+      -- parties that can act jointly to execute the action.
+      --
+      -- This field can be used to inform wallet users whether they can take an action or not;
+      -- and which other parties they might be waiting on to take their action.
+      --
+      -- Supports multiple parties for actions that require joint authorization. Executing them
+      -- will require appropriate, registry-specific delegation contracts to be in place.
+      --
+      -- `CLA_Enact` has one entry per rule in `terms.rules`. Presence means the rule
+      -- exists and the listed groups are entitled to enact it, not that any of its
+      -- alternatives is currently satisfied; wallets evaluate `anyOf` themselves
+      -- against ledger time and the witness they hold. `CLA_Approve` has one entry per
+      -- rule with a `Guard_Parties` in its `anyOf`, one group per party entitled
+      -- to approve it.
+    meta : Metadata
+  deriving (Eq, Show, Serializable)
+
+interface ConditionalLock where
+  viewtype ConditionalLockView
+
+  conditionalLock_enactImpl : ContractId ConditionalLock -> ConditionalLock_Enact -> Update ConditionalLockResult
+  conditionalLock_expireImpl : ContractId ConditionalLock -> ConditionalLock_Expire -> Update ConditionalLockResult
+  conditionalLock_cancelImpl : ContractId ConditionalLock -> ConditionalLock_Cancel -> Update ConditionalLockResult
+  conditionalLock_amendImpl : ContractId ConditionalLock -> ConditionalLock_Amend -> Update ConditionalLockResult
+  conditionalLock_approveImpl : ContractId ConditionalLock -> ConditionalLock_Approve -> Update ConditionalLockResult
+
+  -- | Choice observers for `ConditionalLock_Enact`. `ConditionalLock_Enact`'s
+  -- arguments include `witness.preimages`, so every choice observer learns every
+  -- revealed preimage. Implementations MUST NOT return parties beyond those of the
+  -- accounts the enacted outcome pays unless the instrument is public: none for
+  -- `Outcome_Unlock`, the parties of the receiver accounts of the released legs for
+  -- `Outcome_Release`.
+  --
+  -- This function is evaluated before the choice body. It MUST be total and MUST
+  -- NOT fail. A `ruleId` that is not in `terms.rules`, because it is unknown or
+  -- already fired, MUST yield the empty list and let the body reject the exercise.
+  conditionalLock_enactExtraObservers : ConditionalLock_Enact -> [Party]
+
+  -- | Choice observers for `ConditionalLock_Expire`. None, as for `Outcome_Unlock`
+  -- under `ConditionalLock_Enact`.
+  conditionalLock_expireExtraObservers : ConditionalLock_Expire -> [Party]
+
+  -- | Choice observers for `ConditionalLock_Cancel`. Usually the named parties of
+  -- the current terms, whose consent the choice already requires.
+  conditionalLock_cancelExtraObservers : ConditionalLock_Cancel -> [Party]
+
+  -- | Choice observers for `ConditionalLock_Amend`. Usually the named parties of
+  -- the current terms together with those introduced by `newTerms`.
+  conditionalLock_amendExtraObservers : ConditionalLock_Amend -> [Party]
+
+  -- | Choice observers for `ConditionalLock_Approve`. Usually the named parties of
+  -- the current terms, which observe the lock the choice replaces. It MUST be total
+  -- and MUST NOT fail; a `ruleId` that is not in `terms.rules` MUST yield the empty
+  -- list and let the body reject the exercise.
+  conditionalLock_approveExtraObservers : ConditionalLock_Approve -> [Party]
+
+  nonconsuming choice ConditionalLock_Enact : ConditionalLockResult
+    -- ^ Fire one rule. The acting parties are `actors` together with the approvers
+    -- recorded in `approvals` for exactly this `ruleId` and `legs`. Implementations
+    -- MUST fail if ledger time is at or after `terms.expiresAt`; if no party in the
+    -- rule's `enactors` is among the acting parties; if no alternative in the rule's
+    -- `anyOf` is satisfied (CIP section 3.5); or if `legs` are not valid for the
+    -- outcome (CIP section 3.6).
+    with
+      ruleId : Text
+      actors : [Party]
+        -- ^ Together with the recorded approvers, MUST include at least one of the
+        -- rule's `enactors`. Implementations MUST check these parties to avoid
+        -- unauthorized enactment.
+      witness : Witness
+      legs : [Leg]
+        -- ^ Enactor-supplied legs. MUST be empty unless the rule's outcome is an
+        -- `Outcome_Release` with a non-empty `receivers`, and each supplied leg's
+        -- receiver MUST then be in that list. The number of supplied legs plus
+        -- `fixedLegs` MUST be within the advertised `max-legs`.
+      extraArgs : ExtraArgs
+    observer conditionalLock_enactExtraObservers this arg
+    controller actors
+    do conditionalLock_enactImpl this self arg
+
+  nonconsuming choice ConditionalLock_Expire : ConditionalLockResult
+    -- ^ Return the full remaining amount to `terms.authorizer`, unlocked, and
+    -- terminate the lock. MUST fail before `terms.expiresAt`. No continuation is
+    -- created.
+    with
+      actors : [Party]
+        -- ^ MUST include either the parties the registry requires to unlock funds in
+        -- the authorizer account, or, where the registry permits admin-only cleanup,
+        -- the admin alone; funds return only to the authorizer either way.
+        -- Implementations MUST check these parties to avoid unauthorized expiry.
+      extraArgs : ExtraArgs
+    observer conditionalLock_expireExtraObservers this arg
+    controller actors
+    do conditionalLock_expireImpl this self arg
+
+  nonconsuming choice ConditionalLock_Cancel : ConditionalLockResult
+    -- ^ Return the full remaining amount to the authorizer unlocked, including after expiry, with the
+    -- consent of every named party.
+    with
+      actors : [Party]
+        -- ^ MUST include the parties the registry requires to move funds out of
+        -- `terms.authorizer` and every named party of the current terms.
+        -- Implementations MUST check these parties to avoid unauthorized
+        -- cancellation.
+      extraArgs : ExtraArgs
+    observer conditionalLock_cancelExtraObservers this arg
+    controller actors
+    do conditionalLock_cancelImpl this self arg
+
+  nonconsuming choice ConditionalLock_Amend : ConditionalLockResult
+    -- ^ Replace the terms, optionally adding funds, with the consent of every named
+    -- party of the current terms and the authorizer. Result is `Locked` with the new
+    -- lock, which retains `lockId` and carries no `approvals`. Implementations MUST
+    -- fail at or after the current `terms.expiresAt`.
+    --
+    -- An amendment MUST NOT return `Pending`: every approval that `newTerms`
+    -- introduces MUST be given in the amending transaction, so `actors` MUST also
+    -- include the parties the registry requires for each receiver account that
+    -- `newTerms` introduces.
+    with
+      newTerms : LockTerms
+        -- ^ `authorizer` and `instrumentId` MUST equal the current ones. `amount` MUST
+        -- NOT be less than the current `terms.amount`; the increase MUST be funded by
+        -- `additionalInputHoldingCids` net of any fee the registry charges for the
+        -- amendment, with the remainder returned as change in
+        -- `ConditionalLockResult.authorizerChangeCids` and the fee reported in
+        -- `ConditionalLockResult.meta`. `expiresAt` MAY move in either direction
+        -- subject to the same bounds as at creation. `rules` MAY be added, removed,
+        -- or replaced, but MUST NOT reuse an id in `enactedRuleIds`. Otherwise
+        -- validated as `ConditionalLockFactory_Lock.terms`.
+      additionalInputHoldingCids : [ContractId Holding]
+        -- ^ Holdings topping up the lock. Same rules as
+        -- `ConditionalLockFactory_Lock.inputHoldingCids`. MAY be empty, for an
+        -- amendment that changes only the terms.
+      actors : [Party]
+        -- ^ MUST include the parties the registry requires to move funds out of
+        -- `terms.authorizer` and every named party of the current terms and the
+        -- parties required for every receiver account `newTerms` introduces.
+        -- Implementations MUST check these parties to avoid unauthorized amendment.
+      extraArgs : ExtraArgs
+    observer conditionalLock_amendExtraObservers this arg
+    controller actors
+    do conditionalLock_amendImpl this self arg
+
+  nonconsuming choice ConditionalLock_Approve : ConditionalLockResult
+    -- ^ Record an approval of one enactment of a rule, counted by
+    -- `ConditionalLock_Enact`. Result is `Locked`, with a new `lockCid` under the same
+    -- `lockId`. The recorded approvers are the parties in `actors` that are in the rule's
+    -- `enactors` or in a `Guard_Parties` of its `anyOf`; approving the same
+    -- `(ruleId, legs)` again adds them to that approval. Approvals are irrevocable, and
+    -- a party approves at most one list of legs per rule. Implementations MUST fail if
+    -- ledger time is at or after `terms.expiresAt`; if `ruleId` is not in
+    -- `terms.rules`; if the rule has no `Guard_Parties`; if no party in `actors` would
+    -- be recorded that is not already recorded for `(ruleId, legs)`; if a party to be
+    -- recorded has approved the rule with other legs; or if `legs` are not valid for
+    -- the outcome (CIP section 3.6).
+    with
+      ruleId : Text
+      legs : [Leg]
+        -- ^ The enactor-supplied legs approved, under the same constraints as
+        -- `ConditionalLock_Enact.legs`; so empty for an `Outcome_Unlock` and for an
+        -- `Outcome_Release` with empty `receivers`.
+      actors : [Party]
+        -- ^ The parties approving. Implementations MUST check these parties to avoid
+        -- unauthorized approval.
+      extraArgs : ExtraArgs
+    observer conditionalLock_approveExtraObservers this arg
+    controller actors
+    do conditionalLock_approveImpl this self arg

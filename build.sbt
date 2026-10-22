@@ -106,6 +106,7 @@ lazy val root: Project = (project in file("."))
     `splice-api-token-transfer-events-v2-daml`,
     `splice-api-token-transfer-instruction-v1-daml`,
     `splice-api-token-transfer-instruction-v2-daml`,
+    `splice-api-token-conditional-lock-v1-daml`,
     `splice-api-token-allocation-v1-daml`,
     `splice-api-token-allocation-v2-daml`,
     `splice-api-token-allocation-request-v1-daml`,
@@ -454,6 +455,33 @@ lazy val `splice-api-token-transfer-instruction-v2-daml` =
             unscopedNpmName = "transfer-instruction-openapi",
             openApiSpec = "transfer-instruction-v2.yaml",
             cacheFileDependencies = Set(transferInstructionOpenApiFile),
+            directory = "openapi-ts-client",
+            subPath = "openapi",
+          )
+        },
+      cleanFiles += { baseDirectory.value / "openapi-ts-client" },
+    )
+
+
+lazy val `splice-api-token-conditional-lock-v1-daml` =
+  project
+    .in(file("token-standard/splice-api-token-conditional-lock-v1"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-holding-v2-daml` / Compile / damlBuild).value,
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
+      Compile / sourceGenerators +=
+        Def.taskDyn {
+          val conditionalLockOpenApiFile =
+            baseDirectory.value / "openapi/conditional-lock-v1.yaml"
+
+          BuildCommon.TS.generateOpenApiClient(
+            unscopedNpmName = "conditional-lock-openapi",
+            openApiSpec = "conditional-lock-v1.yaml",
+            cacheFileDependencies = Set(conditionalLockOpenApiFile),
             directory = "openapi-ts-client",
             subPath = "openapi",
           )
@@ -1258,6 +1286,7 @@ lazy val `apps-common` =
       `splice-api-token-holding-v2-daml`,
       `splice-api-token-transfer-instruction-v1-daml`,
       `splice-api-token-transfer-instruction-v2-daml`,
+      `splice-api-token-conditional-lock-v1-daml`,
       `splice-api-token-allocation-v1-daml`,
       `splice-api-token-allocation-v2-daml`,
       `splice-api-token-allocation-request-v1-daml`,
@@ -2429,6 +2458,7 @@ lazy val `apps-dar-resources-generator` =
       `splice-api-token-holding-v2-daml`,
       `splice-api-token-transfer-instruction-v1-daml`,
       `splice-api-token-transfer-instruction-v2-daml`,
+      `splice-api-token-conditional-lock-v1-daml`,
       `splice-api-token-allocation-v1-daml`,
       `splice-api-token-allocation-v2-daml`,
       `splice-api-token-allocation-request-v1-daml`,

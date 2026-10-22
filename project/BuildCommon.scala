@@ -271,6 +271,7 @@ object BuildCommon {
             "splice-token-standard-v1-test-daml/clean",
             "splice-api-token-holding-v2-daml/clean",
             "splice-api-token-transfer-instruction-v2-daml/clean",
+            "splice-api-token-conditional-lock-v1-daml/clean",
             "splice-api-token-allocation-v2-daml/clean",
             "splice-api-token-allocation-request-v2-daml/clean",
             "splice-api-token-allocation-instruction-v2-daml/clean",
