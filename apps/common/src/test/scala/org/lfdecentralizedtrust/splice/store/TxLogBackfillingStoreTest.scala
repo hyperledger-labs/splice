@@ -52,7 +52,7 @@ class TxLogBackfillingStoreTest
       val store = mkStore(acsId = 1, txLogId = Some(1), migrationId = migrationId)
       val history = mkUpdateHistory(dsoParty, migrationId = migrationId)
       for {
-        _ <- store.testIngestionSink.initialize()
+        _ <- store.testIngestionSink.initialize(mockLedgerConnection())
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
 
         // At this point some ingestion service should call `history.ingestionSink.initialize()`
@@ -93,7 +93,7 @@ class TxLogBackfillingStoreTest
       val history =
         mkUpdateHistory(dsoParty, migrationId = migrationId, backfillingRequired = NeedsBackfilling)
       for {
-        _ <- store.testIngestionSink.initialize()
+        _ <- store.testIngestionSink.initialize(mockLedgerConnection())
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
         _ <- initHistory(history)
 
@@ -116,7 +116,7 @@ class TxLogBackfillingStoreTest
       val store = mkStore(acsId = 1, txLogId = Some(1), migrationId = migrationId)
       val history = mkUpdateHistory(dsoParty, migrationId = migrationId)
       for {
-        _ <- store.testIngestionSink.initialize()
+        _ <- store.testIngestionSink.initialize(mockLedgerConnection())
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
         _ <- initHistory(history)
 
@@ -137,7 +137,7 @@ class TxLogBackfillingStoreTest
       val store = mkStore(acsId = 1, txLogId = Some(1), migrationId = migrationId)
       val history = mkUpdateHistory(dsoParty, migrationId = migrationId)
       for {
-        _ <- store.testIngestionSink.initialize()
+        _ <- store.testIngestionSink.initialize(mockLedgerConnection())
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
         _ <- initHistory(history)
 
@@ -159,7 +159,7 @@ class TxLogBackfillingStoreTest
       val store = mkStore(acsId = 1, txLogId = Some(1), migrationId = migrationId)
       val history = mkUpdateHistory(dsoParty, migrationId = migrationId)
       for {
-        _ <- store.testIngestionSink.initialize()
+        _ <- store.testIngestionSink.initialize(mockLedgerConnection())
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
         _ <- initHistory(history)
 
@@ -184,7 +184,7 @@ class TxLogBackfillingStoreTest
       val store = mkStore(acsId = 1, txLogId = Some(1), migrationId = migrationId)
       val history = mkUpdateHistory(dsoParty, migrationId = migrationId)
       for {
-        _ <- store.testIngestionSink.initialize()
+        _ <- store.testIngestionSink.initialize(mockLedgerConnection())
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
         _ <- initHistory(history)
 
@@ -225,7 +225,7 @@ class TxLogBackfillingStoreTest
         _ <- sync1.createMulti(c(2), recordTime = t(2))(Seq(history1))
 
         // Migration 2
-        _ <- store2.testIngestionSink.initialize()
+        _ <- store2.testIngestionSink.initialize(mockLedgerConnection())
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store2)
         _ <- initHistory(history2)
 
@@ -274,7 +274,7 @@ class TxLogBackfillingStoreTest
         _ <- sync1.createMulti(c(2), recordTime = t(2))(Seq(history1))
 
         // Migration 2
-        _ <- store2.testIngestionSink.initialize()
+        _ <- store2.testIngestionSink.initialize(mockLedgerConnection())
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store2)
         _ <- initHistory(history2)
 
@@ -322,7 +322,7 @@ class TxLogBackfillingStoreTest
       val store = mkStore(acsId = 1, txLogId = Some(1), migrationId = migrationId)
       val history = mkUpdateHistory(dsoParty, migrationId = migrationId)
       for {
-        _ <- store.testIngestionSink.initialize()
+        _ <- store.testIngestionSink.initialize(mockLedgerConnection())
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
         _ <- initHistory(history)
 
@@ -357,7 +357,7 @@ class TxLogBackfillingStoreTest
         _ <- sync1.createMulti(c(2), recordTime = t(2))(Seq(history1))
 
         // Migration 2
-        _ <- store2.testIngestionSink.initialize()
+        _ <- store2.testIngestionSink.initialize(mockLedgerConnection())
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store2)
         _ <- initHistory(history2)
 
@@ -406,7 +406,7 @@ class TxLogBackfillingStoreTest
       val store = mkStore(acsId = 1, txLogId = Some(1), migrationId = migrationId)
       val history = mkUpdateHistory(dsoParty, migrationId = migrationId)
       for {
-        _ <- store.testIngestionSink.initialize()
+        _ <- store.testIngestionSink.initialize(mockLedgerConnection())
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
         _ <- initHistory(history)
 
@@ -446,7 +446,7 @@ class TxLogBackfillingStoreTest
         CantonTimestamp.Epoch,
         partitionRunwayDays = 1,
       )
-      _ <- history.ingestionSink.initialize()
+      _ <- history.ingestionSink.initialize(mockLedgerConnection())
     } yield ()
 
   private def assertEntries(store: DbMultiDomainAcsStore[TestTxLogEntry], expected: Seq[Int]) = {
@@ -580,6 +580,7 @@ class TxLogBackfillingStoreTest
         loggerFactory,
         enableImportUpdateBackfill = true,
         HistoryMetrics.apply(NoOpMetricsFactory, migrationId),
+        clock,
       )
       .futureValue
   }

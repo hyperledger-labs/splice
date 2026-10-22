@@ -16,6 +16,7 @@ import com.digitalasset.daml.lf.data.Bytes
 import com.google.rpc.status.Status
 import com.google.rpc.status.Status.toJavaProto
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, AppRewardCoupon}
+import com.digitalasset.canton.time.SimClock
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
@@ -24,7 +25,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 import com.daml.ledger.javaapi.data.Transaction
 
-import java.time.Instant
+import java.time.{Instant, LocalDate, ZoneOffset}
 import java.util.Collections
 import scala.concurrent.Future
 import scala.concurrent.duration.*
@@ -63,6 +64,46 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           _ <- create(domain1, cid1, offset1, party1, store, time(10))
           result <- updates(store)
         } yield result should have size 1
+      }
+    }
+
+    "initialize with a connection" should {
+
+      def daysAfter(days: Long) = CantonTimestamp.Epoch.plus(java.time.Duration.ofDays(days))
+      val day0 = LocalDate.ofInstant(CantonTimestamp.Epoch.toInstant, ZoneOffset.UTC)
+
+      def mkClock(now: CantonTimestamp) = {
+        val clock = new SimClock(loggerFactory = loggerFactory)
+        clock.advanceTo(now)
+        clock
+      }
+
+      "create partitions from the first update to ingest if nothing was ingested" in {
+        val store = mkStore(clock = mkClock(daysAfter(20)))
+        for {
+          _ <- store.ingestionSink.initialize(mockLedgerConnection(daysAfter(3)))
+          days <- store.listDatesWithAllPartitions()
+        } yield {
+          store.isReady shouldBe true
+          days shouldBe (3L to 27L).map(day0.plusDays).toSet
+        }
+      }
+
+      "extend the runway from the last ingested record time after a downtime" in {
+        val clock = mkClock(CantonTimestamp.Epoch)
+        val store = mkStore(clock = clock)
+        for {
+          _ <- initStore(store, timeStart = time(0), partitionRunwayDays = 1)
+          _ <- create(domain1, cid1, offset1, party1, store, time(10))
+          _ = clock.advanceTo(daysAfter(20))
+          _ <- store.ingestionSink.initialize(mockLedgerConnection())
+          _ <- create(domain1, cid2, offset2, party1, store, daysAfter(15))
+          days <- store.listDatesWithAllPartitions()
+          result <- updates(store)
+        } yield {
+          days.filterNot(_.isBefore(day0)) shouldBe (0L to 27L).map(day0.plusDays).toSet
+          result should have size 2
+        }
       }
     }
 

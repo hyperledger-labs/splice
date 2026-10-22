@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.performance.tests
 
+import com.digitalasset.canton.time.WallClock
+
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
@@ -64,6 +66,7 @@ class UpdateHistoryIngestionPerformanceTest(
       loggerFactory = loggerFactory,
       enableImportUpdateBackfill = false,
       metrics = HistoryMetrics.apply(NoOpMetricsFactory, migrationId),
+      new WallClock(timeouts, loggerFactory),
     )
   }
 
