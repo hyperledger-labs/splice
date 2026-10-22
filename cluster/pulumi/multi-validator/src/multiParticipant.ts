@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { generatePortSequence, numNodesPerInstance } from '@canton-network/splice-pulumi-common';
+import { generatePortSequence } from '@canton-network/splice-pulumi-common';
+import { numNodesPerInstance } from '@canton-network/splice-pulumi-common/src/config/multiValidatorConfig';
 
-import { multiValidatorConfig } from './config';
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
 
 export class MultiParticipant extends MultiNodeDeployment {
@@ -41,15 +41,15 @@ export class MultiParticipant extends MultiNodeDeployment {
             },
             {
               name: 'LOG_LEVEL_CANTON',
-              value: multiValidatorConfig?.logLevel,
+              value: args.config.logLevel,
             },
             {
               name: 'LOG_LEVEL_API_REQUEST',
-              value: multiValidatorConfig?.apiRequestLogLevel,
+              value: args.config.apiRequestLogLevel,
             },
             {
               name: 'LOG_LEVEL_STDOUT',
-              value: multiValidatorConfig?.logLevel,
+              value: args.config.logLevel,
             },
           ],
           ports: ports.map(port => ({
@@ -57,7 +57,7 @@ export class MultiParticipant extends MultiNodeDeployment {
             containerPort: port.port,
             protocol: 'TCP',
           })),
-          resources: multiValidatorConfig?.resources
+          resources: args.config.resources
             ?.participant as k8s.types.input.core.v1.ResourceRequirements,
           readinessProbe: {
             grpc: {
@@ -93,7 +93,7 @@ export class MultiParticipant extends MultiNodeDeployment {
        * GCTimeRatio - dedicate more cpi time to GC compared to default usage to keep heap low (~16% vs default 8%)
        * */
       '-XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6',
-      multiValidatorConfig?.extraParticipantEnvVars
+      args.config.extraParticipantEnvVars
     );
   }
 }

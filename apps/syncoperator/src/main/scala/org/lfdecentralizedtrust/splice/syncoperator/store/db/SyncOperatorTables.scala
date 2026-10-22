@@ -3,8 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.syncoperator.store.db
 
-import com.digitalasset.canton.topology.{Member, SynchronizerId}
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 import org.lfdecentralizedtrust.splice.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import org.lfdecentralizedtrust.splice.util.Contract
@@ -14,7 +15,7 @@ object SyncOperatorTables extends AcsTables {
   case class SyncOperatorAcsStoreRowData(
       contract: Contract[?, ?],
       contractExpiresAt: Option[Timestamp] = None,
-      memberTrafficMember: Option[Member] = None,
+      memberTrafficMember: Option[StoreMemberId] = None,
       memberTrafficDomain: Option[SynchronizerId] = None,
       totalTrafficPurchased: Option[Long] = None,
   ) extends AcsRowData.AcsRowDataFromContract {

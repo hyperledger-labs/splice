@@ -10,6 +10,7 @@ import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsInterfaceViewRowData,
@@ -90,7 +91,7 @@ class DbSyncOperatorStore(
       SyncOperatorTables.acsTableName,
       acsStoreId,
       domainMigrationId,
-      memberId,
+      StoreMemberId(memberId),
       key.synchronizerId,
     )
   }

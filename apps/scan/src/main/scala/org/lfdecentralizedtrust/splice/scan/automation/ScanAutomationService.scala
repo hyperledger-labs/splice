@@ -28,7 +28,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
 }
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanAppRewardsStore, DbScanVerdictStore}
-import org.lfdecentralizedtrust.splice.scan.store.historystart.ScanHistoryStart
+import org.lfdecentralizedtrust.splice.scan.store.historystart.{HistoryReadiness, ScanHistoryStart}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
@@ -56,6 +56,7 @@ class ScanAutomationService(
     svName: String,
     upgradesConfig: UpgradesConfig,
     packageVersionSupport: PackageVersionSupport,
+    historyReadiness: HistoryReadiness,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -148,6 +149,7 @@ class ScanAutomationService(
       updateHistory,
       scanStorageConfigV1,
       config.perAcsSnapshotTablesEnabled,
+      historyReadiness,
       triggerContext,
     )
   )

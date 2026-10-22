@@ -7,8 +7,15 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.HasExecutionContext
-import org.lfdecentralizedtrust.splice.store.db.{SplicePostgresTest, StoreDescriptor}
+import org.lfdecentralizedtrust.splice.store.db.{
+  DbKeyValueStore,
+  SplicePostgresTest,
+  StoreDescriptor,
+}
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import org.scalatest.matchers.should.Matchers
+import slick.dbio.DBIO
+import slick.jdbc.PostgresProfile.api.jdbcActionExtensionMethods
 
 class KeyValueStoreTest
     extends StoreTestBase
@@ -33,6 +40,12 @@ class KeyValueStoreTest
     )
 
   private def mkStore(descriptor: StoreDescriptor) = KeyValueStore(
+    descriptor,
+    storage,
+    loggerFactory,
+  )
+
+  private def mkDbStore(descriptor: StoreDescriptor) = DbKeyValueStore(
     descriptor,
     storage,
     loggerFactory,
@@ -99,6 +112,52 @@ class KeyValueStoreTest
         configKeyValue <- store.getValue[String](configKey).value
         otherKeyValue <- store.getValue[String](otherKey).value
       } yield {
+        configKeyValue shouldBe None
+        otherKeyValue.value.value shouldBe otherValue
+      }
+    }
+
+    "compose writes into a SQL transaction" in {
+      for {
+        store <- mkDbStore(storeDescriptor)
+        inserted <- futureUnlessShutdownToFuture(
+          storage.queryAndUpdate(
+            store
+              .setValueAction(configKey, configValue)
+              .andThen(store.setValueIfNotExistsAction(otherKey, otherValue))
+              .transactionally,
+            "test-compose",
+          )
+        )
+        again <- store.setValueIfNotExists(otherKey, "ignored")
+        configKeyValue <- store.getValue[String](configKey).value
+        otherKeyValue <- store.getValue[String](otherKey).value
+      } yield {
+        inserted shouldBe true
+        again shouldBe false
+        configKeyValue.value.value shouldBe configValue
+        otherKeyValue.value.value shouldBe otherValue
+      }
+    }
+
+    "roll back composed writes together with the surrounding transaction" in {
+      for {
+        store <- mkDbStore(storeDescriptor)
+        _ <- store.setValue(otherKey, otherValue)
+        failure <- futureUnlessShutdownToFuture(
+          storage.queryAndUpdate(
+            store
+              .setValueAction(configKey, configValue)
+              .andThen(store.deleteKeyAction(otherKey))
+              .andThen(DBIO.failed(new RuntimeException("rollback")))
+              .transactionally,
+            "test-rollback",
+          )
+        ).failed
+        configKeyValue <- store.getValue[String](configKey).value
+        otherKeyValue <- store.getValue[String](otherKey).value
+      } yield {
+        failure.getMessage should include("rollback")
         configKeyValue shouldBe None
         otherKeyValue.value.value shouldBe otherValue
       }

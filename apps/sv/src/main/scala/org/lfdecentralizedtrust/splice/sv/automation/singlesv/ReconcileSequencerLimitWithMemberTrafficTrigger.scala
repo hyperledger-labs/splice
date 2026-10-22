@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SequencerAdminConnection,
   SynchronizerNodeService,
 }
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 
@@ -48,7 +49,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
   override protected def getTotalPurchasedMemberTraffic(memberId: Member)(implicit
       tc: TraceContext
   ): Future[Long] =
-    store.getTotalPurchasedMemberTraffic(memberId, synchronizerId)
+    store.getTotalPurchasedMemberTraffic(StoreMemberId(memberId), synchronizerId)
 
   override protected def trafficLimitOffset(memberId: Member)(implicit
       tc: TraceContext

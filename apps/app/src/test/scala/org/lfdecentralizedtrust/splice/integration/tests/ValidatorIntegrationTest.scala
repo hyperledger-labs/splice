@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, DarResources}
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
+import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplificationAccess.*
 import com.digitalasset.canton.metrics.MetricValue
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment

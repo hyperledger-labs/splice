@@ -1,6 +1,8 @@
 # Docs
 
-Documentation for all CC functionality.
+Docs are maintained in https://github.com/canton-network/cf-docs. The
+docs in this repository only serve to test compilation of
+auto-generated references docs.
 
 ## Development Builds
 

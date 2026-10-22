@@ -129,7 +129,7 @@ groups:
               refId: No new round
               type: threshold
         dashboardUid: ed94a332-4fa7-47f8-982b-fc997381175b
-        panelId: 1
+        panelId: 2
         noDataState: $NODATA
         execErrState: OK
         for: 1m

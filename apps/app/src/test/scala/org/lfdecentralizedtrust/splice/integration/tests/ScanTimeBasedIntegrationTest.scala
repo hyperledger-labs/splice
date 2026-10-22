@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp

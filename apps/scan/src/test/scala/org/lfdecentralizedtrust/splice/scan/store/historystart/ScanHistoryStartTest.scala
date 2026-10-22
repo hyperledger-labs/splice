@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.historystart
 
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import io.circe.syntax.*

@@ -1,8 +1,8 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-nginxImage: nginxinc/nginx-unprivileged:1.31.1-alpine-slim@sha256:762e8e4e5e103817c4158400fc3753c8e713ff8153b8c3afbb458ae4572bc9a3
-updaterImage: registry.gitlab.com/gitlab-ci-utils/curl-jq:4.0.3@sha256:bd2cc4f9c880d277f8a42d87102d46e67ebce0f1d3a19b21b0125da9a4a44aa0
+nginxImage: nginxinc/nginx-unprivileged:1.31.6-alpine-slim@sha256:ac4d9c7e457c6510b95ac72dd84b27f7cc68ecb9a83fbd44f05a6460cf08aba4
+updaterImage: registry.gitlab.com/gitlab-ci-utils/curl-jq:5.0.3@sha256:eaf99ecea8b7e4fbbe161db8ba6fa2099a1d53b4e108926492d3c6577135b1f0
 contentType: "application/json"
 
 # runtimeDetails:  # Optional, exposes the runtime configuration under path /runtime/

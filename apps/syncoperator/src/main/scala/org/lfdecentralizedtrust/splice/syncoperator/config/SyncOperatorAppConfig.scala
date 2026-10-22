@@ -51,9 +51,7 @@ case class SyncOperatorMediatorConfig(
 case class SyncOperatorSynchronizerNodeConfig(
     sequencer: SyncOperatorSequencerConfig,
     mediator: Option[SyncOperatorMediatorConfig] = None,
-    // A dedicated synchronizer is bootstrapped at the latest protocol version, not at the version
-    // the decentralized synchronizer is pinned to.
-    protocolVersion: ProtocolVersion = ProtocolVersion.latest,
+    protocolVersion: ProtocolVersion = ProtocolVersion.v37,
     serial: Option[NonNegativeInt] = None,
     // We want to be able to override this for simtime tests
     topologyChangeDelayDuration: NonNegativeFiniteDuration =

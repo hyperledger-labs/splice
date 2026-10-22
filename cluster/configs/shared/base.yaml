@@ -16,6 +16,9 @@ infra:
     retentionDuration: "1y"
     retentionSize: "1500GB"
     storageSize: "2Ti"
+    # Expose pushgateway through the cluster ingress
+    # pushgatewayExternalAccess:
+    #   enabled: true
   gkeGateway:
     # swapping this comes with ~5min of downtime
     # note: if you want to use cloud armor, you need to set this to true
@@ -69,6 +72,7 @@ pulumiProjectConfig:
 pulumiStacks:
   default:
     parallelism: 64
+    retryMaxBackoffDurationSeconds: 60
     resources:
       requests:
         memory: '2Gi'
@@ -303,26 +307,6 @@ cloudArmor:
   wafRules:
     excludedHostPrefixes:
       - 'grafana'
-multiValidator:
-  postgresPvcSize: '100Gi'
-  resources:
-    participant:
-      requests:
-        cpu: '1'
-        memory: '8Gi'
-      limits:
-        memory: '16Gi'
-    validator:
-      requests:
-        cpu: '0.5'
-        memory: '2400Mi'
-      limits:
-        memory: '8Gi'
-    postgres:
-      requests:
-        memory: '5Gi'
-      limits:
-        memory: '12Gi'
 sv:
   scan:
     externalRateLimits:

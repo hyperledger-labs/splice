@@ -10,6 +10,7 @@ import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{SuppressingLogger, SuppressionRule}
 import com.digitalasset.canton.protocol.LfContractId
@@ -80,10 +81,7 @@ class UpdateHistoryBulkStorageTest
       val toTimestamp =
         CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp + segmentSize))
 
-      val segment = UpdatesSegment(
-        TimestampWithMigrationId(fromTimestamp, 0),
-        TimestampWithMigrationId(toTimestamp, 0),
-      )
+      val segment = UpdatesSegment(fromTimestamp, toTimestamp)
       val metricsFactory = new InMemoryMetricsFactory
       val probe = UpdateHistorySegmentBulkStorage
         .asSource(
@@ -221,10 +219,7 @@ class UpdateHistoryBulkStorageTest
       val toTimestamp =
         CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(200L))
 
-      val segment = UpdatesSegment(
-        TimestampWithMigrationId(fromTimestamp, 0),
-        TimestampWithMigrationId(toTimestamp, 0),
-      )
+      val segment = UpdatesSegment(fromTimestamp, toTimestamp)
       val metricsFactory = new InMemoryMetricsFactory
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
@@ -267,10 +262,7 @@ class UpdateHistoryBulkStorageTest
         CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp))
       val toTimestamp =
         CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp + segmentSize))
-      val segment = UpdatesSegment(
-        TimestampWithMigrationId(fromTimestamp, 0),
-        TimestampWithMigrationId(toTimestamp, 0),
-      )
+      val segment = UpdatesSegment(fromTimestamp, toTimestamp)
       val dbReadChunkSize1 = 30
       val dbReadChunkSize2 = 4
 
@@ -341,7 +333,7 @@ class UpdateHistoryBulkStorageTest
       )
       val kvProvider = mkProvider.futureValue
 
-      def newRetryProviderAndUpdatesBulkStorageService(migrationId: Long) = {
+      def newRetryProviderAndUpdatesBulkStorageService() = {
 
         val retryProvider =
           RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)
@@ -352,7 +344,6 @@ class UpdateHistoryBulkStorageTest
           mockStore.store,
           bucketConnection,
           metrics,
-          migrationId,
           loggerFactory,
         )
         val progress = new UpdateHistoryBulkStoragePersistentProgress(
@@ -384,22 +375,14 @@ class UpdateHistoryBulkStorageTest
       def assertLatestSegmentInDb(
           progress: UpdateHistoryBulkStoragePersistentProgress,
           fromHour: Int,
-          fromMigration: Int,
           toHour: Int,
-          toMigration: Int,
       ) = {
         val segment = UpdatesSegment(
-          TimestampWithMigrationId(
-            CantonTimestamp.tryFromInstant(
-              genesisDate.atTime(fromHour, 0).toInstant(ZoneOffset.UTC)
-            ),
-            fromMigration.toLong,
+          CantonTimestamp.tryFromInstant(
+            genesisDate.atTime(fromHour, 0).toInstant(ZoneOffset.UTC)
           ),
-          TimestampWithMigrationId(
-            CantonTimestamp.tryFromInstant(
-              genesisDate.atTime(toHour, 0).toInstant(ZoneOffset.UTC)
-            ),
-            toMigration.toLong,
+          CantonTimestamp.tryFromInstant(
+            genesisDate.atTime(toHour, 0).toInstant(ZoneOffset.UTC)
           ),
         )
         progress.readLatestProcessedSegment.futureValue.value shouldBe segment
@@ -412,14 +395,14 @@ class UpdateHistoryBulkStorageTest
           .toEpochMilli * 1000
 
       val (retryProvider, bulkStorage, svc, progress) =
-        newRetryProviderAndUpdatesBulkStorageService(0L)
+        newRetryProviderAndUpdatesBulkStorageService()
       Using.resources(
         svc,
         retryProvider,
       ) { (_, _) =>
         clue("First 2000 events end at 08:07:10, so expecting segments up to 08:00") {
           eventually() {
-            assertLatestSegmentInDb(progress, 6, 0, 8, 0)
+            assertLatestSegmentInDb(progress, 6, 8)
 
             assertLatestSegmentInMetrics(8)
           }
@@ -428,7 +411,7 @@ class UpdateHistoryBulkStorageTest
         clue("Ingest 2000 more updates, up to 13:14, expecting segments up to 12:00") {
           mockStore.mockIngestion(2000)
           eventually() {
-            assertLatestSegmentInDb(progress, 10, 0, 12, 0)
+            assertLatestSegmentInDb(progress, 10, 12)
             assertLatestSegmentInMetrics(12)
           }
 
@@ -440,12 +423,12 @@ class UpdateHistoryBulkStorageTest
 
       mockStore.mockMigration()
       val (retryProvider1, bulkStorage1, svc1, progress1) =
-        newRetryProviderAndUpdatesBulkStorageService(1L)
+        newRetryProviderAndUpdatesBulkStorageService()
       Using.resources(svc1, retryProvider1) { (_, _) =>
         clue("500 more updates in the new migration, up to 15:03") {
           mockStore.mockIngestion(500)
           eventually() {
-            assertLatestSegmentInDb(progress1, 12, 0, 14, 1)
+            assertLatestSegmentInDb(progress1, 12, 14)
             assertLatestSegmentInMetrics(14)
           }
         }
@@ -468,14 +451,8 @@ class UpdateHistoryBulkStorageTest
           Future(
             Some(
               UpdatesSegment(
-                TimestampWithMigrationId(
-                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-23T00:00:00Z")),
-                  1L,
-                ),
-                TimestampWithMigrationId(
-                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-24T00:00:00Z")),
-                  1L,
-                ),
+                CantonTimestamp.tryFromInstant(Instant.parse("2015-10-23T00:00:00Z")),
+                CantonTimestamp.tryFromInstant(Instant.parse("2015-10-24T00:00:00Z")),
               )
             )
           )
@@ -603,14 +580,8 @@ class UpdateHistoryBulkStorageTest
           Future(
             Some(
               UpdatesSegment(
-                TimestampWithMigrationId(
-                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-26T00:00:00Z")),
-                  1L,
-                ),
-                TimestampWithMigrationId(
-                  CantonTimestamp.tryFromInstant(Instant.parse("2015-10-27T00:00:00Z")),
-                  1L,
-                ),
+                CantonTimestamp.tryFromInstant(Instant.parse("2015-10-26T00:00:00Z")),
+                CantonTimestamp.tryFromInstant(Instant.parse("2015-10-27T00:00:00Z")),
               )
             )
           )

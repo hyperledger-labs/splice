@@ -50,7 +50,7 @@ export const InfraConfigSchema = z.object({
         }),
       })
       .strict(),
-    enableSweetSecurity: z.boolean().default(false),
+    enableSweetSecurity: z.boolean().default(true),
     extraCustomResources: z.object({}).catchall(z.any()).default({}),
     supportDsync: z.boolean().default(false),
   }),
