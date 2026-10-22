@@ -377,7 +377,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
         MetricInfo(
           name = updateHistoryPrefix :+ "partition-runway-end",
           summary =
-            "The end of the consecutive daily update history partitions starting today. Ingestion fails once the record time reaches it.",
+            "The end of the consecutive daily update history partitions. Ingestion fails once the record time reaches it.",
           Errors,
         ),
         initial = CantonTimestamp.MinValue,

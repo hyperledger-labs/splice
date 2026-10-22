@@ -350,21 +350,24 @@ class UpdateHistory private (
     val tableSuffix = firstDay.format(DateTimeFormatter.BASIC_ISO_DATE)
     val start = startOf(firstDay)
     val end = startOf(firstDay.plusDays(1))
-    metrics.UpdateHistory.partitionRunwayEnd.updateValue(_.max(end))
 
     // TODO(#6313): compare CREATE TABLE ... PARTITION OF with separate CREATE and ATTACH PARTITION
-    storage.queryAndUpdate(
-      // CREATE TABLE is transactional, so the partitions of all tables are created atomically.
-      // The lock makes concurrent callers wait for each other instead of failing.
-      AdvisoryLocks.withBlockingTransactionalLock(
-        profile,
-        AdvisoryLockIds.createUpdateHistoryPartitionStatement,
-        DBIO.seq(PartitionedTables.map { table =>
-          sqlu"create table if not exists #${table}_#$tableSuffix partition of #$table for values from (#${start.toMicros}) to (#${end.toMicros})"
-        }*),
-      ),
-      "createPartitions",
-    )
+    storage
+      .queryAndUpdate(
+        // CREATE TABLE is transactional, so the partitions of all tables are created atomically.
+        // The lock makes concurrent callers wait for each other instead of failing.
+        AdvisoryLocks.withBlockingTransactionalLock(
+          profile,
+          AdvisoryLockIds.createUpdateHistoryPartitionStatement,
+          DBIO.seq(PartitionedTables.map { table =>
+            sqlu"create table if not exists #${table}_#$tableSuffix partition of #$table for values from (#${start.toMicros}) to (#${end.toMicros})"
+          }*),
+        ),
+        "createPartitions",
+      )
+      .map { _ =>
+        metrics.UpdateHistory.partitionRunwayEnd.updateValue(_.max(end))
+      }
   }
 
   def readLastIngestedRecordTime()(implicit
