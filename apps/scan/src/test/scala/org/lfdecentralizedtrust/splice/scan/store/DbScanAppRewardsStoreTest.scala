@@ -675,7 +675,7 @@ class DbScanAppRewardsStoreTest
           .computeAndStoreRewards(roundNumber, batchSize = 100, inputs = testInputs)
           .failed
       } yield {
-        result.getMessage should include("exceeds minting curve allowance")
+        result.getMessage should include("exceeds the shared featured-app issuance budget")
       }
     }
   }
@@ -683,7 +683,7 @@ class DbScanAppRewardsStoreTest
   // Tested directly with fake round totals because normal computation
   // cannot trigger the assertion — the tranche formula guarantees
   // totalReward <= totalIssuance. This check is a safety net for bugs.
-  "assertMintingAllowanceWithinMintingCurve" should {
+  "assertCombinedMintingAllowanceWithinIssuanceBudget" should {
 
     def mkParams(totalIssuance: BigDecimal): RewardIssuanceParams =
       RewardIssuanceParams(
@@ -716,8 +716,11 @@ class DbScanAppRewardsStoreTest
         _ <- futureUnlessShutdownToFuture(
           storage.queryAndUpdate(
             store
-              .assertMintingAllowanceWithinMintingCurve(roundNumber, mkParams(BigDecimal(10.0))),
-            "test.assertMintingAllowanceWithinMintingCurve",
+              .assertCombinedMintingAllowanceWithinIssuanceBudget(
+                roundNumber,
+                mkParams(BigDecimal(10.0)),
+              ),
+            "test.assertCombinedMintingAllowanceWithinIssuanceBudget",
           )
         )
       } yield succeed
@@ -730,15 +733,15 @@ class DbScanAppRewardsStoreTest
         _ <- insertRoundTotal(historyId, roundNumber, BigDecimal(10.002))
         result <- futureUnlessShutdownToFuture(
           storage.queryAndUpdate(
-            store.assertMintingAllowanceWithinMintingCurve(
+            store.assertCombinedMintingAllowanceWithinIssuanceBudget(
               roundNumber,
               mkParams(BigDecimal(10.0)),
             ),
-            "test.assertMintingAllowanceWithinMintingCurve",
+            "test.assertCombinedMintingAllowanceWithinIssuanceBudget",
           )
         ).failed
       } yield {
-        result.getMessage should include("exceeds minting curve allowance")
+        result.getMessage should include("exceeds the shared featured-app issuance budget")
       }
     }
 
@@ -749,8 +752,11 @@ class DbScanAppRewardsStoreTest
         _ <- futureUnlessShutdownToFuture(
           storage.queryAndUpdate(
             store
-              .assertMintingAllowanceWithinMintingCurve(roundNumber, mkParams(BigDecimal(10.0))),
-            "test.assertMintingAllowanceWithinMintingCurve",
+              .assertCombinedMintingAllowanceWithinIssuanceBudget(
+                roundNumber,
+                mkParams(BigDecimal(10.0)),
+              ),
+            "test.assertCombinedMintingAllowanceWithinIssuanceBudget",
           )
         )
       } yield succeed

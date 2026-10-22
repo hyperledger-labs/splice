@@ -702,7 +702,7 @@ class DbScanAppRewardsStore(
           assetBurnCc = BigDecimal(assetBytes) / BigDecimal(1000000) * trafficPriceCCperMB
           params = inputs.deriveIssuanceParams(appWeight, assetBurnCc)
           _ <- computeRewardTotalsAction(roundNumber, params, trafficPriceCCperMB)
-          _ <- assertMintingAllowanceWithinMintingCurve(roundNumber, params)
+          _ <- assertCombinedMintingAllowanceWithinIssuanceBudget(roundNumber, params)
           _ <- computeRewardHashesAction(roundNumber, batchSize)
         } yield ())
           .map(_ => logger.debug(s"Computed and stored rewards for round $roundNumber."))
@@ -889,12 +889,16 @@ class DbScanAppRewardsStore(
            from inserted_parties""").asUpdate
   }
 
-  /** Assert that the total reward minting allowance for a round does not exceed
-    * the total issuance.
+  /** Assert that the combined app+asset minting allowance for a round does not
+    * exceed the shared featured-app issuance budget.
+    *
+    * Under TBAR v1.1 `total_app_reward_minting_allowance` holds the per-party
+    * sum from both app and asset activity; both are allocated out of the single
+    * `totalIssuanceForFeaturedAppRewards` budget.
     *
     * Called inside a transactional block which rolls back if it fails.
     */
-  private[store] def assertMintingAllowanceWithinMintingCurve(
+  private[store] def assertCombinedMintingAllowanceWithinIssuanceBudget(
       roundNumber: Long,
       params: RewardIssuanceParams,
   ) = {
@@ -907,8 +911,8 @@ class DbScanAppRewardsStore(
       if (totalRewardAmount > params.totalIssuanceForFeaturedAppRewards + tolerance) {
         throw Status.INTERNAL
           .withDescription(
-            s"Round $roundNumber: actual total app reward minting allowance ($totalRewardAmount) " +
-              s"exceeds minting curve allowance (${params.totalIssuanceForFeaturedAppRewards}) " +
+            s"Round $roundNumber: combined app+asset minting allowance ($totalRewardAmount) " +
+              s"exceeds the shared featured-app issuance budget (${params.totalIssuanceForFeaturedAppRewards}) " +
               s"by more than tolerance ($tolerance)"
           )
           .asRuntimeException()
