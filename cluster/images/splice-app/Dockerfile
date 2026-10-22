@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # full-1.0.14@sha256:89a281f5e0949de5053ab9f92181edbb7102a70d6a14e5401b4cf3bcffe0b093
-FROM europe-docker.pkg.dev/da-images/public/docker/da-base-image@sha256:89a281f5e0949de5053ab9f92181edbb7102a70d6a14e5401b4cf3bcffe0b093
+FROM europe-docker.pkg.dev/da-images/public/docker/da-base-image@sha256:61d41e5cd9ea35dd386b05251b8b8d7362736821d542cd6c07d76c7317e817f3
 
 WORKDIR /app
 
