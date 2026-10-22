@@ -41,21 +41,23 @@ while IFS=$'\t' read -r sv url; do
   host="${url#*://}"
   host="${host%/}"
   out="$tmp/$sv.out"
+  printf 'Checking %s (%s:443) ... ' "$sv" "$host"
   if ! grpcurl "$host:443" com.digitalasset.canton.sequencer.api.v30.SequencerConnectService/GetSynchronizerParameters \
     </dev/null >"$out" 2>&1; then
-    echo "=== FAILED: $sv ($host) ==="
+    echo "FAILED:"
     cat "$out"
     failed=$((failed + 1))
   elif [ -z "$reference" ]; then
     reference="$sv"
-    echo "=== Parameters from $sv ($host) ==="
+    echo "OK, parameters:"
     cat "$out"
     ok=$((ok + 1))
   elif ! diff -q "$tmp/$reference.out" "$out" >/dev/null; then
-    echo "=== DIFFERS: $sv ($host), compared to $reference ==="
+    echo "DIFFERS from $reference:"
     diff "$tmp/$reference.out" "$out" || true
     differ=$((differ + 1))
   else
+    echo "OK"
     ok=$((ok + 1))
   fi
 done <"$tmp/sequencers"
