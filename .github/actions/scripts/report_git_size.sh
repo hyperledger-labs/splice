@@ -8,6 +8,8 @@
 
 set -uo pipefail
 
+# TODO(#7831): deliberate left-over TODO to test the todo checker under FETCH_GIT_REFS=history; do not merge
+
 git config --global --add safe.directory "$(pwd)" || true
 
 echo "git dir size: $(du -sh "$(git rev-parse --git-common-dir)" | cut -f1)"
