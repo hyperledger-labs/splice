@@ -178,6 +178,8 @@ class UpdateHistory private (
         logger.info(s"Initializing update history ingestion sink for party $updateStreamParty")
 
         for {
+          // We have to create partitions on initialization because
+          // otherwise ingestion will fail until UpdateHistoryPartitionMaintenanceTrigger creates them.
           _ <- createMissingPartitions(connection, clock.now)
           _ <- storage
             .update(
