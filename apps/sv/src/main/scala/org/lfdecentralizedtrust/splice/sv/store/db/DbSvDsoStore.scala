@@ -2286,6 +2286,37 @@ class DbSvDsoStore(
     } yield result.map(contractFromRow(FeaturedAppActivityMarker.COMPANION)(_))
   }
 
+  override def findConflictingOpsParties(
+      proposed: Seq[PartyId],
+      excludeRightCid: Option[String],
+  )(implicit tc: TraceContext): Future[Seq[PartyId]] = {
+    if (proposed.isEmpty) Future.successful(Seq.empty)
+    else {
+      val arr = proposed.map(_.toProtoPrimitive).toArray
+      val exclude = excludeRightCid.fold(sql"")(cid => sql" and acs.contract_id <> $cid ")
+      val q = (sql"""
+      select distinct e
+      from #${DsoTables.acsTableName} acs,
+            jsonb_array_elements_text(
+             case when jsonb_typeof(acs.create_arguments->'opsParties') = 'array'
+                  then acs.create_arguments->'opsParties'
+                  else '[]'::jsonb
+             end
+           ) e
+      where acs.store_id = $acsStoreId
+        and acs.migration_id = $domainMigrationId
+        and acs.package_name = ${FeaturedAppRight.PACKAGE_NAME}
+        and acs.template_id_qualified_name = ${QualifiedName(
+          FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
+        )}
+        and e = any($arr)
+      """ ++ exclude).toActionBuilder.as[String]
+      waitUntilAcsIngested {
+        storage.query(q, "findConflictingOpsParties").map(_.map(PartyId.tryFromProtoPrimitive))
+      }
+    }
+  }
+
   override def close(): Unit = {
     dsoStoreMetrics.close()
     super.close()

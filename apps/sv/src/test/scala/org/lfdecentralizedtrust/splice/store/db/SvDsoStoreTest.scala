@@ -39,8 +39,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.ansentrycont
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_AddSv,
+  SRARC_CreateFeaturedAppConfigUpdateInstruction,
+  SRARC_GrantFeaturedAppRight,
   SRARC_OffboardSv,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,
@@ -64,7 +67,7 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore.{IdleAnsSubscription, RoundBatch}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore}
-import org.lfdecentralizedtrust.splice.sv.util.SvUtil
+import org.lfdecentralizedtrust.splice.sv.util.{FeaturedAppRightValidator, SvUtil}
 import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
   Contract,
@@ -209,6 +212,319 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
     )(
       _.lookupFeaturedAppRightWithOffset(userParty(1))
     )
+
+    "findConflictingOpsParties" should {
+      def ops(ps: PartyId*): Option[Seq[PartyId]] = Some(ps.toSeq)
+
+      "return empty when the proposed set is empty" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), opsParties = ops(userParty(1)))
+          )(store.multiDomainAcsStore)
+          result <- store.findConflictingOpsParties(Seq.empty, None)
+        } yield result shouldBe empty
+      }
+
+      "return the parties that overlap with another right" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), opsParties = ops(userParty(1), userParty(2)))
+          )(store.multiDomainAcsStore)
+          result <- store.findConflictingOpsParties(Seq(userParty(2), userParty(3)), None)
+        } yield result.toSet shouldBe Set(userParty(2))
+      }
+
+      "return empty when there is no overlap" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), opsParties = ops(userParty(1)))
+          )(store.multiDomainAcsStore)
+          result <- store.findConflictingOpsParties(Seq(userParty(3)), None)
+        } yield result shouldBe empty
+      }
+
+      "exclude the amended right itself" in {
+        val cid = nextCid()
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), contractId = cid, opsParties = ops(userParty(1)))
+          )(store.multiDomainAcsStore)
+          result <- store.findConflictingOpsParties(Seq(userParty(1)), Some(cid))
+        } yield result shouldBe empty
+      }
+
+      "deduplicate a party shared across multiple rights" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), opsParties = ops(userParty(1)))
+          )(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(2), opsParties = ops(userParty(1)))
+          )(store.multiDomainAcsStore)
+          result <- store.findConflictingOpsParties(Seq(userParty(1)), None)
+        } yield result shouldBe Seq(userParty(1))
+      }
+
+      "ignore rights with None or empty opsParties" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), opsParties = None)
+          )(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(2), opsParties = Some(Seq.empty))
+          )(store.multiDomainAcsStore)
+          result <- store.findConflictingOpsParties(Seq(userParty(1)), None)
+        } yield result shouldBe empty
+      }
+    }
+
+    "validateFeaturedAppRightAction" should {
+      def opsList(ps: Seq[PartyId]): Optional[java.util.List[String]] =
+        Optional.of(ps.map(_.toProtoPrimitive).asJava)
+
+      def grantAction(provider: PartyId, opsParties: Seq[PartyId]): ARC_DsoRules =
+        new ARC_DsoRules(
+          new SRARC_GrantFeaturedAppRight(
+            new DsoRules_GrantFeaturedAppRight(
+              provider.toProtoPrimitive,
+              Optional.empty(),
+              Optional.empty(),
+              opsList(opsParties),
+            )
+          )
+        )
+
+      def config(opsParties: Seq[PartyId]): splice.amulet.FeaturedAppConfig =
+        new splice.amulet.FeaturedAppConfig(
+          Optional.empty(),
+          Optional.empty(),
+          opsList(opsParties),
+        )
+
+      def amendAction(
+          provider: PartyId,
+          baseOps: Seq[PartyId],
+          newOps: Seq[PartyId],
+      ): ARC_DsoRules =
+        new ARC_DsoRules(
+          new SRARC_CreateFeaturedAppConfigUpdateInstruction(
+            new DsoRules_CreateFeaturedAppConfigUpdateInstruction(
+              Collections.singletonList(
+                new Tuple2(
+                  provider.toProtoPrimitive,
+                  new splice.amulet.FeaturedAppRight_UpdateConfig(config(baseOps), config(newOps)),
+                )
+              )
+            )
+          )
+        )
+
+      def updateConfig(
+          baseOps: Seq[PartyId],
+          newOps: Seq[PartyId],
+      ): splice.amulet.FeaturedAppRight_UpdateConfig =
+        new splice.amulet.FeaturedAppRight_UpdateConfig(config(baseOps), config(newOps))
+
+      // all entries (primary + additional) go into a single `updates` list.
+      def amendActionMulti(
+          primary: (PartyId, Seq[PartyId], Seq[PartyId]),
+          additional: Seq[(PartyId, Seq[PartyId], Seq[PartyId])],
+      ): ARC_DsoRules =
+        new ARC_DsoRules(
+          new SRARC_CreateFeaturedAppConfigUpdateInstruction(
+            new DsoRules_CreateFeaturedAppConfigUpdateInstruction(
+              (new Tuple2(primary._1.toProtoPrimitive, updateConfig(primary._2, primary._3)) +:
+                additional.map { case (p, b, n) =>
+                  new Tuple2(p.toProtoPrimitive, updateConfig(b, n))
+                }).asJava
+            )
+          )
+        )
+
+      "reject a grant when the provider already has a right" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(featuredAppRight(providerParty(1)))(store.multiDomainAcsStore)
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            grantAction(providerParty(1), Seq(userParty(1))),
+            store,
+          )
+        } yield result.isLeft shouldBe true
+      }
+
+      "accept a clean grant with no conflicts" in {
+        for {
+          store <- mkStore()
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            grantAction(providerParty(2), Seq(userParty(5))),
+            store,
+          )
+        } yield result shouldBe Right(())
+      }
+
+      "reject a grant whose opsParties are already in use by another right" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), opsParties = Some(Seq(userParty(1))))
+          )(store.multiDomainAcsStore)
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            grantAction(providerParty(2), Seq(userParty(1))),
+            store,
+          )
+        } yield result.isLeft shouldBe true
+      }
+
+      "reject a grant with duplicate opsParties in the request" in {
+        for {
+          store <- mkStore()
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            grantAction(providerParty(2), Seq(userParty(1), userParty(1))),
+            store,
+          )
+        } yield result shouldBe Left("duplicate opsParties in request")
+      }
+
+      "reject a grant where the provider is its own opsParty" in {
+        for {
+          store <- mkStore()
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            grantAction(providerParty(2), Seq(providerParty(2))),
+            store,
+          )
+        } yield result shouldBe Left("provider cannot be its own opsParty")
+      }
+
+      "reject an amend when no right exists for the provider" in {
+        for {
+          store <- mkStore()
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            amendAction(providerParty(9), Seq.empty, Seq(userParty(1))),
+            store,
+          )
+        } yield result.isLeft shouldBe true
+      }
+
+      "reject an amend whose changed opsParties conflict with another right" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), opsParties = Some(Seq(userParty(1))))
+          )(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(2), opsParties = Some(Seq(userParty(2))))
+          )(store.multiDomainAcsStore)
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            amendAction(providerParty(1), Seq(userParty(1)), Seq(userParty(2))),
+            store,
+          )
+        } yield result.isLeft shouldBe true
+      }
+
+      "accept an amend that keeps the current opsParties (new == base)" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), opsParties = Some(Seq(userParty(1))))
+          )(store.multiDomainAcsStore)
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            amendAction(providerParty(1), Seq(userParty(1)), Seq(userParty(1))),
+            store,
+          )
+        } yield result shouldBe Right(())
+      }
+
+      "reject an amend whose additionalUpdates conflict with another right" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), opsParties = Some(Seq(userParty(1))))
+          )(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(2), opsParties = Some(Seq(userParty(2))))
+          )(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(3), opsParties = Some(Seq(userParty(3))))
+          )(store.multiDomainAcsStore)
+          // primary (provider1) keeps [u1]; additionalUpdates moves provider2 to [u3],
+          // which collides with provider3's existing [u3].
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            amendActionMulti(
+              (providerParty(1), Seq(userParty(1)), Seq(userParty(1))),
+              Seq((providerParty(2), Seq(userParty(2)), Seq(userParty(3)))),
+            ),
+            store,
+          )
+        } yield result.isLeft shouldBe true
+      }
+
+      "accept an amend whose primary and additionalUpdates are all conflict-free" in {
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(1), opsParties = Some(Seq(userParty(1))))
+          )(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(
+            featuredAppRight(providerParty(2), opsParties = Some(Seq(userParty(2))))
+          )(store.multiDomainAcsStore)
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            amendActionMulti(
+              (providerParty(1), Seq(userParty(1)), Seq(userParty(1))),
+              Seq((providerParty(2), Seq(userParty(2)), Seq(userParty(2)))),
+            ),
+            store,
+          )
+        } yield result shouldBe Right(())
+      }
+
+      "accept a non-featured-app action" in {
+        for {
+          store <- mkStore()
+          result <- FeaturedAppRightValidator.validateFeaturedAppRightAction(
+            removeUserAction,
+            store,
+          )
+        } yield result shouldBe Right(())
+      }
+    }
+
+    "resolveOps" should {
+      "keep the current parties when new == base" in {
+        Future.successful(
+          FeaturedAppRightValidator.resolveOps(
+            baseParties = Seq(userParty(1)),
+            currentParties = Seq(userParty(1), userParty(2)),
+            proposedParties = Seq(userParty(1)),
+          ) shouldBe Seq(userParty(1), userParty(2))
+        )
+      }
+
+      "use the proposed parties when new != base" in {
+        Future.successful(
+          FeaturedAppRightValidator.resolveOps(
+            baseParties = Seq(userParty(1)),
+            currentParties = Seq(userParty(1)),
+            proposedParties = Seq(userParty(2)),
+          ) shouldBe Seq(userParty(2))
+        )
+      }
+
+      "treat None and empty as equal, keeping current" in {
+        Future.successful(
+          FeaturedAppRightValidator.resolveOps(
+            baseParties = Seq.empty,
+            currentParties = Seq(userParty(1)),
+            proposedParties = Seq.empty,
+          ) shouldBe Seq(userParty(1))
+        )
+      }
+    }
 
     "getOpenMiningRoundTriple" should {
 

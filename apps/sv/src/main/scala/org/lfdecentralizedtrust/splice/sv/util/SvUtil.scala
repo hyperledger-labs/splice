@@ -366,4 +366,8 @@ object SvUtil {
   def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
     duration.toInternal.toScala.toMicros
   )
+
+  def optionalJavaListToSeq[A](
+      javaList: java.util.Optional[java.util.List[A]]
+  ): Seq[A] = javaList.toScala.map(_.asScala.toSeq).getOrElse(Nil)
 }
