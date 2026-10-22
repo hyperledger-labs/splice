@@ -24,7 +24,7 @@ serial="$2"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-# One line per sequencer: "<sv name><TAB><sequencer url>"
+# One line per sequencer: "<sv name>\t<sequencer url>"
 curl -sSf "$scan_url/api/scan/v0/dso-sequencers" |
   jq -r --argjson serial "$serial" \
     '.domainSequencers[].sequencers[] | select(.synchronizerSerial == $serial) | "\(.svName)\t\(.url)"' \
