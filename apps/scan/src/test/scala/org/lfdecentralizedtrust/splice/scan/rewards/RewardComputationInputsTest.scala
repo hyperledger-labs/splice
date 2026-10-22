@@ -250,7 +250,7 @@ object RewardComputationInputsTest {
         totalIssuanceForFeaturedAppRewards = BigDecimal("112062.4048706240"),
         unclaimedAppRewardAmount = BigDecimal("0E-10"),
         issuancePerFeaturedAppBurnCC = BigDecimal("1.4604254993"),
-        featuredAppMintingAllowanceCC = BigDecimal("112062.4048742900"),
+        featuredAppMintingAllowanceCC = BigDecimal("112062.4048706240"),
         issuancePerFeaturedAssetBurnCC = BigDecimal(0),
         totalIssuanceForFeaturedAssetRewards = BigDecimal(0),
       ),
@@ -496,7 +496,7 @@ object RewardComputationInputsTest {
 
     // 7c. Cap not binding → asset arm vanishes
 
-    // MainNet: doubled traffic $120/MB — drift ≈ 3.7e-6 triggers clamp.
+    // MainNet: doubled traffic $120/MB — cap doesn't bind, asset arm vanishes.
     TestCase(
       label = "MainNet+asset: cap not binding, asset arm vanishes",
       inputs = mainNet.copy(trafficPrice = n(BigDecimal("120"))),
@@ -510,10 +510,10 @@ object RewardComputationInputsTest {
         issuancePerFeaturedAssetBurnCC = BigDecimal("0"),
         totalIssuanceForFeaturedAssetRewards = BigDecimal("0"),
         issuancePerFeaturedAppBurnCC = BigDecimal("1.4604254993"),
-        featuredAppMintingAllowanceCC = BigDecimal("112062.4048742900"),
+        featuredAppMintingAllowanceCC = BigDecimal("112062.4048706240"),
       ),
     ),
-    // Simple: cap=100 doesn't bind; exact arithmetic → assetBudget = 0, no drift.
+    // Simple: cap=100 doesn't bind; assetBudget = 0.
     TestCase(
       label = "simple+asset: cap not binding, asset arm vanishes",
       inputs = simpleArithmetic,
@@ -531,10 +531,11 @@ object RewardComputationInputsTest {
       ),
     ),
 
-    // 7d. Drift-clamp witness at simple magnitudes
-    // 7 MB → 45/700 = 0.0642857143 × 7 = 0.4500000001 (1 ULP above 0.45).
+    // 7d. Non-terminating issuance at simple magnitudes
+    // 7 MB → 45/700 = 0.0642857143 (non-terminating in scale-10); the allowance
+    // equals rewardsToIssue exactly.
     TestCase(
-      label = "simple+asset: drift-clamp witness (7 MB, cap not binding)",
+      label = "simple+asset: non-terminating issuance (7 MB, cap not binding)",
       inputs = simpleArithmetic,
       totalRoundAppActivityWeight = 7000000L,
       totalFeaturedAssetBurnCc = BigDecimal("0.1"),
@@ -546,7 +547,7 @@ object RewardComputationInputsTest {
         issuancePerFeaturedAssetBurnCC = BigDecimal("0"),
         totalIssuanceForFeaturedAssetRewards = BigDecimal("0"),
         issuancePerFeaturedAppBurnCC = BigDecimal("0.0642857143"),
-        featuredAppMintingAllowanceCC = BigDecimal("0.4500000001"),
+        featuredAppMintingAllowanceCC = BigDecimal("0.45"),
       ),
     ),
 
