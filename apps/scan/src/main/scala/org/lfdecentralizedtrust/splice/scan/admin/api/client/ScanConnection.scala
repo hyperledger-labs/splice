@@ -78,6 +78,8 @@ trait ScanConnection
 
   def getDsoInfo()(implicit ec: ExecutionContext, tc: TraceContext): Future[DsoInfo]
 
+  def getDsoInfoV1()(implicit ec: ExecutionContext, tc: TraceContext): Future[DsoInfoV1]
+
   /** Query for the DSO party id, retrying until it succeeds.
     *
     * Intended to be used for app init.

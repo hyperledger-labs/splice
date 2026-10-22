@@ -3,6 +3,7 @@
 import {
   AmuletPriceVote,
   DsoInfo,
+  SvInfo,
   SvVote,
   theme,
   VotesHooks,
@@ -40,13 +41,22 @@ const provider: VotesHooks = {
       queryKey: ['useDsoInfos', DsoRules, AmuletRules, dsoInfo],
       queryFn: async () => {
         return {
-          svUser: dsoInfo.sv_user,
-          svPartyId: dsoInfo.sv_party_id,
           dsoPartyId: dsoInfo.dso_party_id,
           votingThreshold: BigInt(dsoInfo.voting_threshold),
           amuletRules: Contract.decodeOpenAPI(dsoInfo.amulet_rules.contract, AmuletRules),
           dsoRules: Contract.decodeOpenAPI(dsoInfo.dso_rules.contract, DsoRules),
           nodeStates: [],
+        };
+      },
+    });
+  },
+  useSvInfo(): UseQueryResult<SvInfo> {
+    return useQuery({
+      queryKey: ['useSvInfo', dsoInfo],
+      queryFn: async () => {
+        return {
+          svUser: dsoInfo.sv_user,
+          svPartyId: dsoInfo.sv_party_id,
         };
       },
     });

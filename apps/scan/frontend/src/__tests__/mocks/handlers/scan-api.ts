@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   validatorLicensesHandler,
+  dsoInfo,
   dsoInfoHandler,
 } from '@canton-network/splice-common-test-handlers';
 import { http, HttpHandler, HttpResponse } from 'msw';
@@ -28,6 +29,12 @@ export const buildScanMock = (baseScanUrl: string): HttpHandler[] => {
     }),
 
     dsoInfoHandler(scanUrl),
+    http.get(`${scanUrl}/v0/sv-info`, () => {
+      return HttpResponse.json({
+        sv_user: dsoInfo.sv_user,
+        sv_party_id: dsoInfo.sv_party_id,
+      });
+    }),
     http.get(`${scanUrl}/v0/dso-party-id`, () => {
       return HttpResponse.json<GetDsoPartyIdResponse>({
         dso_party_id: 'DSO::1220809612f787469c92b924ad1d32f1cbc0bdbd4eeda55a50469250bcf64b8becf2',

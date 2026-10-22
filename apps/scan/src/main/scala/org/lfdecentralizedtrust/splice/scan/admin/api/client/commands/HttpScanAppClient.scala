@@ -64,6 +64,7 @@ import org.lfdecentralizedtrust.splice.util.{
   ContractWithState,
   DomainRecordTimeRange,
   DsoInfo,
+  DsoInfoV1,
   FactoryChoiceWithDisclosures,
   PackageQualifiedName,
   TemplateJsonDecoder,
@@ -185,6 +186,24 @@ object HttpScanAppClient {
     }
   }
 
+  final case class SvInfo(svUser: String, svParty: PartyId)
+
+  case class GetSvInfo(headers: List[HttpHeader])
+      extends InternalBaseCommand[http.GetSvInfoResponse, SvInfo] {
+
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSvInfoResponse] =
+      client.getSvInfo(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetSvInfoResponse.OK(response) =>
+      Codec.decode(Codec.Party)(response.svPartyId).map(SvInfo(response.svUser, _))
+    }
+  }
+
   case class ListDsoRulesVoteRequests()
       extends InternalBaseCommand[http.ListDsoRulesVoteRequestsResponse, Seq[
         Contract[VoteRequest.ContractId, VoteRequest]
@@ -218,6 +237,22 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.GetDsoInfoResponse.OK(response) =>
       DsoInfo.fromHttp(response)
+    }
+  }
+
+  case class GetDsoInfoV1(headers: List[HttpHeader])
+      extends InternalBaseCommand[http.GetDsoInfoV1Response, DsoInfoV1] {
+
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetDsoInfoV1Response] =
+      client.getDsoInfoV1(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetDsoInfoV1Response.OK(response) =>
+      DsoInfoV1.fromHttp(response)
     }
   }
 
