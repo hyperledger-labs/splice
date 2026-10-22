@@ -161,9 +161,6 @@ object RewardComputationInputsTest {
     amuletPrice = n(BigDecimal("0.14877")),
     trafficPrice = n(BigDecimal("60")),
     appRewardCouponThreshold = n(BigDecimal("0.5")),
-    extraFeaturedAssetActivityWeight = n(BigDecimal("0.2")),
-    maxExtraFeaturedAssetActivityWeightPerAsset = n(BigDecimal("0.1")),
-    dsoAppActivityWeight = n(BigDecimal("0.1")),
   )
 
   /** Baseline inputs: simple round numbers for easy manual verification.
@@ -185,9 +182,6 @@ object RewardComputationInputsTest {
     amuletPrice = n(BigDecimal("1.0")),
     trafficPrice = n(BigDecimal("1.0")),
     appRewardCouponThreshold = n(BigDecimal("0.5")),
-    extraFeaturedAssetActivityWeight = n(BigDecimal("0.2")),
-    maxExtraFeaturedAssetActivityWeightPerAsset = n(BigDecimal("0.1")),
-    dsoAppActivityWeight = n(BigDecimal("0.1")),
   )
 
   case class TestCase(
