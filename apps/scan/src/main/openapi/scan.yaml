@@ -4162,6 +4162,7 @@ components:
         total_asset_activity_weight:
           type: integer
           format: int64
+          description: The total weight of asset activity (bytes) for this round.
         active_parties_count:
           type: integer
           format: int64
