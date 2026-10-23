@@ -36,6 +36,13 @@ inputs:
   cache_version:
     description: "Cache version"
     required: true
+  fetch_git_refs:
+    description: |
+      Which git refs to fetch beyond the checked-out commit (see common_setup.sh):
+      none (default), shallow (main and latest release-line tips, depth 1, no blobs) or
+      history (main, PR head branch and latest release line, full commit history without blobs)
+    required: false
+    default: "none"
 
 outputs:
   sbt_cache_hits:
@@ -54,6 +61,12 @@ runs:
     - name: Setup
       shell: bash
       run: ./.github/actions/scripts/common_setup.sh
+      env:
+        FETCH_GIT_REFS: ${{ inputs.fetch_git_refs }}
+
+    - name: Report git size
+      shell: bash
+      run: ./.github/actions/scripts/report_git_size.sh
 
     - name: Set up Nix (Self hosted)
       uses: ./.github/actions/nix/setup_nix

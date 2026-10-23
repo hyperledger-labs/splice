@@ -87,6 +87,8 @@ jobs:
           cache_version: 10
           test_name: static_tests
           target: 'static_tests'
+          # The todo checker runs `git log main..$BRANCH`
+          fetch_git_refs: history
 
       - name: Check Grafana Dashboards
         uses: ./.github/actions/nix/run
