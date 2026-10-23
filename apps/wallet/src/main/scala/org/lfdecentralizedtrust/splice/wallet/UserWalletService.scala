@@ -8,7 +8,7 @@ import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.DomainTimeSynchronization
-import org.lfdecentralizedtrust.splice.util.{HasHealth, SpliceCircuitBreaker, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{HasHealth, SpliceCircuitBreaker}
 import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService
 import org.lfdecentralizedtrust.splice.wallet.config.{
   AutoAcceptTransfersConfig,
@@ -19,11 +19,9 @@ import org.lfdecentralizedtrust.splice.wallet.config.{
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
-import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable, LifeCycle}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.ParticipantId
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.stream.Materializer
@@ -35,19 +33,16 @@ import scala.util.control.NonFatal
 /** A service managing the treasury, automation, and store for an end-user's wallet. */
 class UserWalletService(
     ledgerClient: SpliceLedgerClient,
-    key: UserWalletStore.Key,
+    val store: UserWalletStore,
     walletManager: UserWalletManager,
     automationConfig: AutomationConfig,
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
     treasuryConfig: TreasuryConfig,
-    storage: DbStorage,
     override protected[this] val retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
     scanConnection: BftScanConnection,
     packageVersionSupport: PackageVersionSupport,
-    migrationId: Long,
-    participantId: ParticipantId,
     validatorTopupConfigO: Option[ValidatorTopupConfig],
     walletSweep: Option[WalletSweepConfig],
     autoAcceptTransfers: Option[AutoAcceptTransfersConfig],
@@ -58,26 +53,12 @@ class UserWalletService(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-    templateJsonDecoder: TemplateJsonDecoder,
-    close: CloseContext,
 ) extends RetryProvider.Has
     with FlagCloseable
     with NamedLogging
     with HasHealth {
 
   private implicit val scheduler: Scheduler = mat.system.scheduler
-
-  val store: UserWalletStore =
-    UserWalletStore(
-      key,
-      storage,
-      loggerFactory,
-      retryProvider,
-      migrationId,
-      participantId,
-      automationConfig.ingestion,
-      params.defaultLimit,
-    )
 
   val treasury: TreasuryService =
     try {

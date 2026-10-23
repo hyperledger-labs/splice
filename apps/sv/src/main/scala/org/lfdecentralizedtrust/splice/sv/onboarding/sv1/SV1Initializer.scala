@@ -251,13 +251,13 @@ class SV1Initializer(
       ).tupled
       storeKey = SvStore.Key(svParty, dsoParty)
       domainMigrationId <- resolveDomainMigrationId(Future.successful(0L))
-      svStore = newSvStore(
+      svStore <- newSvStore(
         storeKey,
         domainMigrationId,
         participantId,
         svAcsStoreDescriptorUserVersion,
       )
-      dsoStore = newDsoStore(
+      dsoStore <- newDsoStore(
         svStore.key,
         domainMigrationId,
         participantId,

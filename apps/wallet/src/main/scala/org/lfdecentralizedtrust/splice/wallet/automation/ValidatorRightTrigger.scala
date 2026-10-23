@@ -17,7 +17,6 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import org.lfdecentralizedtrust.splice.wallet.ExternalPartyWalletManager
-import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
@@ -65,18 +64,21 @@ class ValidatorRightTrigger(
           for {
             // actAs rights for the validator user might have gotten lost during a hard migration or a disaster recovery
             _ <- ensureActAsRight(party)
-          } yield walletManager.getOrCreateWallet(party) match {
-            case UnlessShutdown.AbortedDueToShutdown =>
-              TaskSuccess(
-                s"skipped or aborted starting wallet automation for end-user party '$party', as we are shutting down."
+            outcome <- walletManager
+              .getOrCreateWallet(party)
+              .map[TaskOutcome] {
+                case true => TaskSuccess(show"started wallet automation for end-user party $party")
+                case false =>
+                  TaskSuccess(
+                    show"skipped starting wallet automation for end-user party '$party', as it is already running."
+                  )
+              }
+              .onShutdown(
+                TaskSuccess(
+                  s"skipped or aborted starting wallet automation for end-user party '$party', as we are shutting down."
+                )
               )
-            case UnlessShutdown.Outcome(true) =>
-              TaskSuccess(show"started wallet automation for end-user party $party")
-            case UnlessShutdown.Outcome(false) =>
-              TaskSuccess(
-                show"skipped starting wallet automation for end-user party '$party', as it is already running."
-              )
-          }
+          } yield outcome
         }
     } yield r
   }

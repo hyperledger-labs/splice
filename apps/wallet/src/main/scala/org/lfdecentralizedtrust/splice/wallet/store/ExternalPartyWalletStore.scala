@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.wallet.store
 
+import com.digitalasset.canton.tracing.TraceContext
+
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   Amulet,
   AppRewardCoupon,
@@ -31,7 +33,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
@@ -140,8 +141,9 @@ object ExternalPartyWalletStore {
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       close: CloseContext,
-  ): ExternalPartyWalletStore = {
-    new DbExternalPartyWalletStore(
+      tc: TraceContext,
+  ): Future[ExternalPartyWalletStore] = {
+    DbExternalPartyWalletStore.create(
       key,
       storage,
       loggerFactory,
