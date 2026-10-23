@@ -11,7 +11,7 @@ import cats.{Eval, Monad}
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.{CantonTimestamp, ReassignmentSubmitterMetadata}
@@ -229,46 +229,7 @@ class ConnectedSynchronizer(
       parameters.loggingConfig,
       testingConfig.useLegacyContractIdVersionV11,
       loggerFactory,
-    )
-
-  private val trafficCostEstimation = {
-    val trafficStateController: TrafficStateController =
-      sequencerClient.trafficStateController.getOrElse {
-        ErrorUtil.invalidState(
-          s"Sequencer client of the participant node $participantId does not have a traffic state controller"
-        )(ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty))
-      }
-
-    new TrafficCostEstimator(
-      requestGenerator,
-      topologyClient,
-      synchronizerCrypto,
-      ephemeral.contractStore,
-      ephemeral.sessionKeyStore,
-      psid,
-      participantId,
-      trafficStateController,
-      parameters.sequencerClient.defaultMaxSequencingTimeOffset,
-      clock,
-      loggerFactory,
-    )
-  }
-
-  def estimateTrafficCost(
-      transaction: LfVersionedTransaction,
-      transactionMeta: TransactionMeta,
-      submitterInfo: SubmitterInfo,
-      disclosedContracts: Map[LfContractId, LfFatContractInst],
-      costHints: CostEstimationHints,
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, SubmissionCostEstimation] =
-    trafficCostEstimation.estimateTrafficCost(
-      transaction,
-      transactionMeta,
-      submitterInfo,
-      disclosedContracts,
-      costHints,
+      metrics.transactionProcessing.transactionViewMetrics,
     )
 
   private val damle =
@@ -319,6 +280,8 @@ class ConnectedSynchronizer(
     clock,
     timeouts,
     Source(staticSynchronizerParameters.protocolVersion),
+    metrics.reassignments,
+    parameters,
     loggerFactory,
     futureSupervisor,
     testingConfig = testingConfig,
@@ -339,11 +302,94 @@ class ConnectedSynchronizer(
     clock,
     timeouts,
     Target(staticSynchronizerParameters.protocolVersion),
+    metrics.reassignments,
+    parameters,
     loggerFactory,
     futureSupervisor,
-    testingConfig = testingConfig,
+    testingConfig,
     promiseUSFactory,
   )
+
+  private val trafficCostEstimation = {
+    val trafficStateController: TrafficStateController =
+      sequencerClient.trafficStateController.getOrElse {
+        ErrorUtil.invalidState(
+          s"Sequencer client of the participant node $participantId does not have a traffic state controller"
+        )(ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty))
+      }
+
+    new TrafficCostEstimator(
+      requestGenerator,
+      topologyClient,
+      synchronizerCrypto,
+      ephemeral.contractStore,
+      ephemeral.sessionKeyStore,
+      psid,
+      participantId,
+      trafficStateController,
+      parameters.sequencerClient.defaultMaxSequencingTimeOffset,
+      clock,
+      unassignmentProcessor,
+      assignmentProcessor,
+      loggerFactory,
+    )
+  }
+
+  def estimateTrafficCost(
+      transaction: LfVersionedTransaction,
+      transactionMeta: TransactionMeta,
+      submitterInfo: SubmitterInfo,
+      disclosedContracts: Map[LfContractId, LfFatContractInst],
+      costHints: CostEstimationHints,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, SubmissionCostEstimation] =
+    trafficCostEstimation.estimateTrafficCost(
+      transaction,
+      transactionMeta,
+      submitterInfo,
+      disclosedContracts,
+      costHints,
+    )
+
+  /** Estimate the traffic cost of unassigning `contractIds` from this synchronizer towards
+    * `targetSynchronizer`. Charged against THIS synchronizer's traffic balance.
+    */
+  def estimateUnassignmentCost(
+      submitter: LfPartyId,
+      contractIds: Seq[LfContractId],
+      targetSynchronizer: Target[PhysicalSynchronizerId],
+      submitterInfo: SubmitterInfo,
+      signatories: Seq[LfPartyId],
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, (NonNegativeLong, NonNegativeLong)] =
+    trafficCostEstimation.estimateUnassignmentCost(
+      submitter,
+      contractIds,
+      targetSynchronizer,
+      submitterInfo,
+      signatories,
+    )
+
+  def estimateAssignmentCost(
+      submitter: LfPartyId,
+      contracts: Seq[ContractInstance],
+      sourceSynchronizer: Source[PhysicalSynchronizerId],
+      sourceSnapshot: Source[TopologySnapshot],
+      submitterInfo: SubmitterInfo,
+      signatories: Seq[LfPartyId],
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, (NonNegativeLong, NonNegativeLong)] =
+    trafficCostEstimation.estimateAssignmentCost(
+      submitter,
+      contracts,
+      sourceSynchronizer,
+      sourceSnapshot,
+      submitterInfo,
+      signatories,
+    )
 
   private val trafficProcessor =
     new TrafficControlProcessor(
@@ -383,7 +429,7 @@ class ConnectedSynchronizer(
 
   private val messageDispatcher: MessageDispatcher = {
     val receivedAcsCommitmentValidator =
-      if (staticSynchronizerParameters.protocolVersion >= ProtocolVersion.acsCommitmentRedesign)
+      if (staticSynchronizerParameters.protocolVersion >= ProtocolVersion.v36)
         new ReceivedAcsCommitmentValidatorImpl(
           psid,
           participantId,
@@ -912,23 +958,22 @@ class ConnectedSynchronizer(
         logger.debug(s"Started synchronizer for $psid")(initializationTraceContext)
         ephemeral.markAsRecovered()
         logger.debug("Sync synchronizer is ready.")(initializationTraceContext)
-        if (psid.protocolVersion >= ProtocolVersion.v35) {
-          FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-            schedulePendingOnboardingClearances(
-              ephemeral.onboardingClearanceScheduler,
-              persistent.pendingOnboardingClearanceStore,
-            )(
-              initializationTraceContext
-            ),
-            "Pending onboarding flag clearances scheduling",
-          )
-        }
+
+        FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
+          schedulePendingOnboardingClearances(
+            ephemeral.onboardingClearanceScheduler,
+            persistent.pendingOnboardingClearanceStore,
+          )(
+            initializationTraceContext
+          ),
+          "Pending onboarding flag clearances scheduling",
+        )
+
         FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
           completeAssignment,
           "Failed to complete outstanding assignments on startup. " +
             "You may have to complete the assignments manually.",
         )
-        ()
       }).value
     }
 
@@ -1021,6 +1066,9 @@ class ConnectedSynchronizer(
                 data.submitterMetadata,
                 participantId,
                 data.targetTimestamp,
+                data.unassignmentTs,
+                parameters.reassignmentsConfig,
+                clock,
               )
             )
             eitherF.leftMap(err => data.reassignmentId -> err).value
@@ -1123,6 +1171,8 @@ class ConnectedSynchronizer(
       contractIds: Seq[LfContractId],
       targetSynchronizer: Target[PhysicalSynchronizerId],
       sourceTopology: Source[TopologySnapshot],
+      overrideSourceValidationPkgIds: Map[LfContractId, LfPackageId],
+      overrideTargetValidationPkgIds: Map[LfContractId, LfPackageId],
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, ReassignmentProcessorError, FutureUnlessShutdown[
@@ -1151,8 +1201,8 @@ class ConnectedSynchronizer(
                 submitterMetadata,
                 contractIds,
                 targetSynchronizer,
-                overrideSourceValidationPkgIds = Map.empty,
-                overrideTargetValidationPkgIds = Map.empty,
+                overrideSourceValidationPkgIds = overrideSourceValidationPkgIds,
+                overrideTargetValidationPkgIds = overrideTargetValidationPkgIds,
               ),
             sourceTopology.unwrap,
           )

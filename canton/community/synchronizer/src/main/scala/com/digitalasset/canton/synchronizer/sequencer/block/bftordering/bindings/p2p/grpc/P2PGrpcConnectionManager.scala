@@ -15,9 +15,14 @@ import com.digitalasset.canton.lifecycle.{
   FlagCloseableAsync,
   FutureUnlessShutdown,
   PromiseUnlessShutdown,
+  SyncCloseable,
   UnlessShutdown,
 }
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
@@ -36,8 +41,16 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings
   P2PAddEndpointHeaderGrpcClientInterceptor,
   P2PCheckAuthenticationGrpcClientInterceptor,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.transport.{
+  P2PNettyChannelInstrumentation,
+  P2PTransportMetricsPublisher,
+  P2PTransportMetricsServerInterceptor,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.pekko.PekkoModuleSystem.PekkoEnv
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PConnectionManagementConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.{
+  P2PConnectionManagementConfig,
+  P2PTransportMetricsConfig,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p.P2PConnectionState.Error
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p.P2PMetrics.emitIdentityEquivocation
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p.data.P2PEndpointsStore
@@ -61,7 +74,7 @@ import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30
   BftOrderingServiceGrpc,
   ConnectionOpened,
 }
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.collection.BoundedQueue
@@ -78,6 +91,7 @@ import io.grpc.stub.{
 import io.grpc.{Channel, ClientInterceptors, ManagedChannel}
 import org.slf4j.event.Level
 
+import java.net.SocketAddress
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ExecutorService, ThreadLocalRandom}
@@ -99,6 +113,8 @@ private[bftordering] final class P2PGrpcConnectionManager(
     p2pConnectionEventListener: P2PConnectionEventListener,
     p2pNetworkIn: ModuleRef[BftOrderingMessage],
     metrics: BftOrderingMetrics,
+    clock: Clock,
+    transportMetricsConfig: P2PTransportMetricsConfig,
     longRunningExecutor: ExecutorService,
     override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
@@ -118,6 +134,25 @@ private[bftordering] final class P2PGrpcConnectionManager(
   private val stateRef = new AtomicReference[State](State())
 
   private val clientChannelBuilder = ClientChannelBuilder(loggerFactory)
+
+  // Optional HTTP/2- and TCP-level transport instrumentation and metrics publishing.
+  //  Both are only created when transport metrics are enabled in the configuration.
+  private val transportInstrumentationO: Option[P2PNettyChannelInstrumentation] =
+    Option.when(transportMetricsConfig.enabled)(
+      new P2PNettyChannelInstrumentation(transportMetricsConfig.preferEpoll, loggerFactory)
+    )
+
+  private val transportMetricsPublisherO: Option[P2PTransportMetricsPublisher] =
+    Option.when(transportMetricsConfig.enabled)(
+      new P2PTransportMetricsPublisher(
+        transportMetricsConfig.pollInterval.toInternal,
+        transportInstrumentationO,
+        metrics,
+        clock,
+        timeouts,
+        loggerFactory,
+      )
+    )
 
   // Called by the connection-managing actor when establishing a connection to an endpoint
   def getPeerSenderOrStartConnection(
@@ -200,7 +235,10 @@ private[bftordering] final class P2PGrpcConnectionManager(
           clearNetworkRefAssociations,
           closeNetworkRefs,
         )
-    peerSenderO.foreach(completeGrpcStreamObserver(_, logger))
+    peerSenderO.foreach { peerSender =>
+      completeGrpcStreamObserver(peerSender, logger)
+      unregisterServerPeerTransportMetrics(peerSender)
+    }
     // Notify the disconnection of every endpoint that shared the torn-down sender/network ref,
     //  not just of the requesting endpoint ID: a single sender can back several endpoints via
     //  `consolidateNetworkRefs`, and all of them are effectively disconnected once it is torn
@@ -245,10 +283,21 @@ private[bftordering] final class P2PGrpcConnectionManager(
       s"Shutting down (active or duplicate) incoming connection with peer sender $peerSender"
     )
     completeGrpcStreamObserver(peerSender, logger)
+    unregisterServerPeerTransportMetrics(peerSender)
     p2pGrpcConnectionState
       .shutdownAndCleanupActiveConnectionAndReturnEndpointIds(peerSender)
       .foreach(notifyEndpointDisconnection)
   }
+
+  // Incoming connections are registered for transport metrics in a server registry keyed by the
+  //  peer's BFT node ID (see `targetBftNodeIdRef`). This must be undone on every incoming sender
+  //  teardown path, else the peer lingers in the registry and its gauges are kept indefinitely.
+  //  The removal is tied to this specific sender: it is a no-op both for outgoing senders (never
+  //  registered) and for a losing duplicate incoming sender whose entry was won by another sender.
+  private def unregisterServerPeerTransportMetrics(peerSender: PeerSender): Unit =
+    peerSender.targetBftNodeIdRef
+      .get()
+      .foreach(peer => transportMetricsPublisherO.foreach(_.unregisterServerPeer(peer, peerSender)))
 
   private def cleanupPeerSender(
       peerSender: PeerSender
@@ -266,12 +315,12 @@ private[bftordering] final class P2PGrpcConnectionManager(
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     import TraceContext.Implicits.Empty.*
-    AsyncCloseable(
-      "bft-ordering-grpc-networking-connection-manager-connection-state-close",
-      closeConnectionState(),
-      timeouts.closing,
-    ) +:
-      (stateRef
+    // Stop the metrics publisher first, but keep the transport instrumentation (which owns the
+    //  client epoll event-loop group shared by all instrumented channels) alive until every
+    //  managed channel has finished shutting down. Closing the event-loop group too early makes
+    //  channel shutdown run against an already-terminating executor, which can fail or time out.
+    val perChannelCloseables =
+      stateRef
         .getAndUpdate(_ => State(UnlessShutdown.AbortedDueToShutdown)) match {
 
         case State(UnlessShutdown.Outcome(state)) =>
@@ -317,7 +366,29 @@ private[bftordering] final class P2PGrpcConnectionManager(
 
         case State(UnlessShutdown.AbortedDueToShutdown) =>
           Seq.empty
-      })
+      }
+
+    SyncCloseable(
+      "bft-ordering-p2p-transport-metrics-publisher",
+      transportMetricsPublisherO.foreach(_.close()),
+    ) +:
+      AsyncCloseable(
+        "bft-ordering-grpc-networking-connection-manager-connection-state-close",
+        closeConnectionState(),
+        timeouts.closing,
+      ) +:
+      (perChannelCloseables :+
+        SyncCloseable(
+          "bft-ordering-p2p-transport-instrumentation",
+          transportInstrumentationO.foreach(_.close()),
+        ) :+
+        // Clear the publisher's dynamically-registered per-peer gauges last, after all channels have
+        //  been torn down (their final samples re-create gauges), so no stale gauge values remain
+        //  exported after the orderer stops or conflict with a fresh publisher after a restart.
+        SyncCloseable(
+          "bft-ordering-p2p-transport-metrics-gauges-clear",
+          transportMetricsPublisherO.foreach(_.clearGauges()),
+        ))
   }
 
   private def closeConnectionState()(implicit traceContext: TraceContext): Future[Unit] =
@@ -458,6 +529,7 @@ private[bftordering] final class P2PGrpcConnectionManager(
                   sequencerId,
                   peerSender,
                   Some(p2pEndpoint),
+                  maybeOutgoingChannel = Some(channel),
                 )
               )
             }
@@ -494,6 +566,12 @@ private[bftordering] final class P2PGrpcConnectionManager(
       peerSender: PeerSender,
       // It may be None if the peer is connecting to us and did not communicate its endpoint
       maybeP2PEndpoint: Option[P2PEndpoint],
+      // Set only for incoming connections: the peer's remote socket address, used to register the
+      //  winning connection for server-side transport metrics (correlated by remote address).
+      maybeServerRemoteAddress: Option[SocketAddress] = None,
+      // Set only for outgoing connections: the client channel, used to register the winning
+      //  connection for client-side transport metrics (correlated by channel identity).
+      maybeOutgoingChannel: Option[ManagedChannel] = None,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val bftNodeId = SequencerNodeId.toBftNodeId(sequencerId)
     peerSender.targetBftNodeIdRef.set(Some(bftNodeId))
@@ -512,6 +590,20 @@ private[bftordering] final class P2PGrpcConnectionManager(
               "because one already exists"
           )
           completeGrpcStreamObserver(peerSender, logger)
+        } else {
+          // This sender won the connection race. Only now do we register it for transport metrics,
+          //  tying the registration to this specific winning connection (its channel for outgoing,
+          //  its remote address for incoming). Registering here rather than before `addSenderIfMissing`
+          //  prevents a losing duplicate connection to the same peer from overwriting the active
+          //  peer's metrics entry.
+          maybeOutgoingChannel.foreach(channel =>
+            transportMetricsPublisherO.foreach(_.register(bftNodeId, channel))
+          )
+          maybeServerRemoteAddress.foreach(remoteAddress =>
+            transportMetricsPublisherO.foreach(
+              _.registerServerPeer(bftNodeId, remoteAddress, peerSender)
+            )
+          )
         }
 
         // Prevents a stuck "sender present, network ref missing" state by ensuring a network ref is
@@ -629,7 +721,12 @@ private[bftordering] final class P2PGrpcConnectionManager(
     logger.info(s"Creating a gRPC channel to $p2pEndpointId")
 
     val channel =
-      createNettyClientChannelBuilder(clientChannelBuilder, p2pEndpoint.endpointConfig).build()
+      createNettyClientChannelBuilder(
+        clientChannelBuilder,
+        p2pEndpoint.endpointConfig,
+        channelCustomizer =
+          builder => transportInstrumentationO.foreach(_.customize(builder).discard),
+      ).build()
     val channelId = channel.toString
 
     val authenticationContextO =
@@ -707,9 +804,9 @@ private[bftordering] final class P2PGrpcConnectionManager(
             authenticationContextO,
             maybeSequencerIdFromAuthenticationPromiseUS,
             maybeAuthenticateStub(
-              BftOrderingServiceGrpc
-                .stub(potentiallyCheckedChannel)
-                .withOption(TraceContextGrpc.TraceContextOptionsKey, traceContext)
+              TraceContextGrpc.addTraceContextToCallOptions(
+                BftOrderingServiceGrpc.stub(potentiallyCheckedChannel)
+              )
             ),
           )
         )
@@ -899,6 +996,15 @@ private[bftordering] final class P2PGrpcConnectionManager(
           sequencerIdPromiseUS,
           isAuthenticationEnabled,
           metrics,
+          p2pConnectionManagementConfig.rttProbeInterval.underlying,
+          // Route RTT probes through the normal flow-controlled send path (not `immediateOnNext`),
+          //  so they are subject to backpressure and never jump ahead of or block real traffic under
+          //  load; a probe dropped by a full send queue simply yields no sample for that interval.
+          //  The sender is completed into the promise slightly later (see below); by the time RTT
+          //  probing starts (after authentication) it is available, so routing through the promise
+          //  is safe.
+          sendToPeer = msg => peerSenderPromiseUS.futureUS.map(_.onNext(msg)).discard,
+          makeConnectionOpener = () => createConnectionOpener(thisNode),
           loggerFactory,
         ) with ClientResponseObserver[BftOrderingMessage, BftOrderingMessage] {
           override def beforeStart(
@@ -962,6 +1068,7 @@ private[bftordering] final class P2PGrpcConnectionManager(
                 val peerSender =
                   new PeerSender(
                     callSendingStreamObserver,
+                    isOutgoingConnection = true,
                     p2pConnectionManagementConfig.flowControlEnabled,
                     p2pConnectionManagementConfig.flowControlBuffer,
                     p2pConnectionManagementConfig.flowControlBufferDropNewest,
@@ -1130,6 +1237,7 @@ private[bftordering] final class P2PGrpcConnectionManager(
       authenticationContextO: Option[GrpcSequencerClientAuth],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val channelId = channel.toString
+    transportMetricsPublisherO.foreach(_.unregisterChannel(channel))
     if (!channel.isShutdown) {
       val authenticationContextId = authenticationContextO.map(objId)
       FutureUnlessShutdown.outcomeF(Future {
@@ -1180,6 +1288,10 @@ private[bftordering] final class P2PGrpcConnectionManager(
   ): Option[UnlessShutdown[StreamObserver[BftOrderingMessage]]] = {
     val maybeCommunicatedEndpoint =
       P2PAddAuthTokenHeaderGrpcServerInterceptor.peerEndpointContextKey.get()
+    // Captured by the transport metrics server interceptor (if installed); used to correlate the
+    //  authenticated peer with its server socket for transport metrics.
+    val maybeRemoteAddress =
+      Option(P2PTransportMetricsServerInterceptor.remoteAddressContextKey.get()).flatten
 
     // Notify the new connection for observability purposes
     p2pConnectionEventListener.onConnect(maybeCommunicatedEndpoint.map(_.id))
@@ -1191,6 +1303,7 @@ private[bftordering] final class P2PGrpcConnectionManager(
       val peerSender =
         new PeerSender(
           callSendingStreamObserver,
+          isOutgoingConnection = false,
           p2pConnectionManagementConfig.flowControlEnabled,
           p2pConnectionManagementConfig.flowControlBuffer,
           p2pConnectionManagementConfig.flowControlBufferDropNewest,
@@ -1232,6 +1345,13 @@ private[bftordering] final class P2PGrpcConnectionManager(
                 sequencerIdPromiseUS,
                 isAuthenticationEnabled,
                 metrics,
+                p2pConnectionManagementConfig.rttProbeInterval.underlying,
+                // Incoming connections are RTT reflectors, not probers, but the sender is still needed
+                //  to echo received probes back. Route reflections through the normal flow-controlled
+                //  send path (not `immediateOnNext`), so echoing on the gRPC inbound thread is subject
+                //  to backpressure and never jumps ahead of or blocks real traffic under load.
+                sendToPeer = msg => peerSender.onNext(msg),
+                makeConnectionOpener = () => createConnectionOpener(thisNode),
                 loggerFactory,
               ) {
                 override def shutdown(): Unit =
@@ -1259,13 +1379,17 @@ private[bftordering] final class P2PGrpcConnectionManager(
             //  by the connection state and shut down.
             //  This also protects against potentially malicious peers that try to establish more than one connection.
             sequencerIdPromiseUS.futureUS
-              .flatMap(
+              .flatMap { sequencerId =>
+                // Registration for server-side transport metrics happens inside connectivity setup,
+                //  tied to the winning sender (see `completeConnectivitySetupAfterSuccessfulAuthentication`),
+                //  so a losing duplicate cannot overwrite the active peer's entry.
                 completeConnectivitySetupAfterSuccessfulAuthentication(
-                  _,
+                  sequencerId,
                   peerSender,
                   maybeCommunicatedEndpoint,
+                  maybeServerRemoteAddress = maybeRemoteAddress,
                 )
-              )
+              }
               .transform(
                 identity,
                 { exception =>
@@ -1276,6 +1400,10 @@ private[bftordering] final class P2PGrpcConnectionManager(
                   // Close the connection by failing the sender; no need to close the receiver as it will be
                   //  uninstalled by closing the connection and no state has been updated yet.
                   failGrpcStreamObserver(peerSender, exception, logger)
+                  // If this sender had already won and been registered for transport metrics before
+                  //  connectivity setup failed, make sure its entry does not linger; the removal is
+                  //  tied to this sender, so it is a no-op if it never won (and thus never registered).
+                  unregisterServerPeerTransportMetrics(peerSender)
                   exception
                 },
               )
@@ -1400,6 +1528,7 @@ private[bftordering] object P2PGrpcConnectionManager {
   // Non-final for mocking in tests
   class PeerSender(
       val grpcStreamObserver: CallStreamObserver[BftOrderingMessage],
+      val isOutgoingConnection: Boolean,
       flowControlEnabled: Boolean,
       maxSendQueueSize: PositiveInt,
       dropNewest: Boolean,
@@ -1832,7 +1961,7 @@ private[bftordering] object P2PGrpcConnectionManager {
 
             case Some(status) =>
               // Shut down the channel whenever it's associated to this connect worker that failed
-              // and transition to Disconnected
+              //  and transition to Disconnected
 
               status match {
 
@@ -1989,7 +2118,10 @@ private[bftordering] object P2PGrpcConnectionManager {
       }
   }
 
-  sealed trait P2POutgoingConnectionStatus extends Product with Serializable with PrettyPrinting {
+  sealed trait P2POutgoingConnectionStatus
+      extends Product
+      with Serializable
+      with PrettyPrintingFromCompanion {
     val channelO: Option[(ManagedChannel, Option[GrpcSequencerClientAuth])] = None
     val connectWorkerO: Option[FutureUnlessShutdown[Unit]] = None
   }
@@ -1997,7 +2129,13 @@ private[bftordering] object P2PGrpcConnectionManager {
   object P2POutgoingConnectionStatus {
 
     final case object Connecting extends P2POutgoingConnectionStatus {
-      override protected def pretty: Pretty[Connecting.type] = prettyOfObject[Connecting.type]
+      override def prettyCompanion: PrettyPrintingCompanion[Connecting.this.type] =
+        ConnectingPrettyPrintingCompanion
+    }
+
+    private object ConnectingPrettyPrintingCompanion
+        extends PrettyPrintingCompanion[Connecting.type] {
+      override protected val pretty: Pretty[Connecting.type] = prettyOfObject[Connecting.type]
     }
 
     final case class ConnectingOnChannel(
@@ -2009,7 +2147,13 @@ private[bftordering] object P2PGrpcConnectionManager {
       override val channelO: Option[(ManagedChannel, Option[GrpcSequencerClientAuth])] =
         Some(channel -> authenticationContextO)
 
-      override protected def pretty: Pretty[ConnectingOnChannel] =
+      override def prettyCompanion: PrettyPrintingCompanion[ConnectingOnChannel] =
+        ConnectingOnChannel
+    }
+
+    object ConnectingOnChannel extends PrettyPrintingCompanion[ConnectingOnChannel] {
+
+      override protected val pretty: Pretty[ConnectingOnChannel] =
         prettyOfClass(
           param("ch", _.channel.toString.unquoted),
           param("cwO", _.connectWorkerO.map(objId)),
@@ -2025,7 +2169,13 @@ private[bftordering] object P2PGrpcConnectionManager {
       override val channelO: Option[(ManagedChannel, Option[GrpcSequencerClientAuth])] =
         Some(channel -> authenticationContextO)
 
-      override protected def pretty: Pretty[ConnectedOnChannel] =
+      override def prettyCompanion: PrettyPrintingCompanion[ConnectedOnChannel] =
+        ConnectedOnChannel
+    }
+
+    object ConnectedOnChannel extends PrettyPrintingCompanion[ConnectedOnChannel] {
+
+      override protected val pretty: Pretty[ConnectedOnChannel] =
         prettyOfClass(
           param("ch", _.channel.toString.unquoted),
           param("acO", _.authenticationContextO.map(objId)),
@@ -2043,7 +2193,13 @@ private[bftordering] object P2PGrpcConnectionManager {
 
       override val connectWorkerO: Option[FutureUnlessShutdown[Unit]] = Some(connectWorker)
 
-      override protected def pretty: Pretty[DisconnectingFromChannel] =
+      override def prettyCompanion: PrettyPrintingCompanion[DisconnectingFromChannel] =
+        DisconnectingFromChannel
+    }
+
+    object DisconnectingFromChannel extends PrettyPrintingCompanion[DisconnectingFromChannel] {
+
+      override protected val pretty: Pretty[DisconnectingFromChannel] =
         prettyOfClass(
           param("ch", _.channel.toString.unquoted),
           param("cw", objId(_)),

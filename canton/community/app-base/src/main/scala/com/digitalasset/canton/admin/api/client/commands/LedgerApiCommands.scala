@@ -94,14 +94,11 @@ import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   ExecuteSubmissionAndWaitResponse,
   ExecuteSubmissionRequest,
   ExecuteSubmissionResponse,
-  GetPreferredPackageVersionRequest,
-  GetPreferredPackageVersionResponse,
   GetPreferredPackagesRequest,
   GetPreferredPackagesResponse,
   HashingSchemeVersion,
   InteractiveSubmissionServiceGrpc,
   MinLedgerTime,
-  PackagePreference,
   PackageVettingRequirement,
   PartySignatures,
   PrepareSubmissionRequest,
@@ -132,6 +129,8 @@ import com.daml.ledger.api.v2.reassignment_commands.{
 }
 import com.daml.ledger.api.v2.state_service.StateServiceGrpc.StateServiceStub
 import com.daml.ledger.api.v2.state_service.{
+  ConvertRecordTimeToOffsetRequest,
+  ConvertRecordTimeToOffsetResponse,
   GetActiveContractsRequest,
   GetActiveContractsResponse,
   GetConnectedSynchronizersRequest,
@@ -195,10 +194,15 @@ import com.digitalasset.canton.admin.api.client.data.{
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{Signature, SigningPublicKey}
-import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
+import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod, Offset}
 import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrinting,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.networking.grpc.ForwardingStreamObserver
 import com.digitalasset.canton.platform.apiserver.execution.CommandStatus
 import com.digitalasset.canton.protocol.LfContractId
@@ -212,13 +216,15 @@ import com.digitalasset.canton.tea.v1.{
   TrafficServiceGrpc,
   UpdateAccountRequest,
   UpdateAccountResponse,
+  PruneRequest as TeaPruneRequest,
+  PruneResponse as TeaPruneResponse,
 }
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.GenericTopologyTransaction
 import com.digitalasset.canton.topology.{ParticipantId, Party, PartyId, SynchronizerId}
 import com.digitalasset.canton.user.{
-  IdentityProviderConfig as ApiIdentityProviderConfig,
   IdentityProviderId,
+  IdentityProviderConfig as ApiIdentityProviderConfig,
 }
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.{
@@ -238,6 +244,7 @@ import io.scalaland.chimney.dsl.*
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ScheduledExecutorService
+import scala.annotation.nowarn
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -1392,7 +1399,10 @@ object LedgerApiCommands {
   object UpdateService {
 
     sealed trait UpdateWrapper {
+      def commandId: Option[String]
       def updateId: String
+      def paidTrafficCost: Option[Long]
+
       def isUnassignment = this match {
         case _: UnassignedWrapper => true
         case _ => false
@@ -1409,12 +1419,18 @@ object LedgerApiCommands {
     }
     final case class TransactionWrapper(transaction: Transaction) extends UpdateWrapper {
       override def updateId: String = transaction.updateId
+      override def commandId: Option[String] = Some(transaction.commandId)
+
+      override def paidTrafficCost: Option[Long] = transaction.paidTrafficCost
 
       override def synchronizerId: String = transaction.synchronizerId
     }
     final case class TopologyTransactionWrapper(topologyTransaction: TopologyTransaction)
         extends UpdateWrapper {
       override def updateId: String = topologyTransaction.updateId
+      override def commandId: Option[String] = None
+
+      override def paidTrafficCost: Option[Long] = None
 
       override def synchronizerId: String = topologyTransaction.synchronizerId
 
@@ -1425,6 +1441,9 @@ object LedgerApiCommands {
     }
     sealed trait ReassignmentWrapper extends UpdateWrapper {
       override def updateId: String = reassignment.updateId
+      override def commandId: Option[String] = Some(reassignment.commandId)
+
+      override def paidTrafficCost: Option[Long] = reassignment.paidTrafficCost
 
       def reassignment: Reassignment
     }
@@ -1709,7 +1728,9 @@ object LedgerApiCommands {
 
   }
 
-  private[commands] trait SubmitCommand extends PrettyPrinting {
+  private[commands] trait SubmitCommand extends PrettyPrintingFromCompanion {
+    override def prettyCompanion: PrettyPrintingCompanion[SubmitCommand] = SubmitCommand
+
     def actAs: Seq[LfPartyId]
     def readAs: Seq[LfPartyId]
     def commands: Seq[Command]
@@ -1753,7 +1774,10 @@ object LedgerApiCommands {
       tapsMaxPasses = tapsMaxPasses,
     )
 
-    override protected def pretty: Pretty[this.type] =
+  }
+
+  private[commands] object SubmitCommand extends PrettyPrintingCompanion[SubmitCommand] {
+    override protected val pretty: Pretty[SubmitCommand] =
       prettyOfClass(
         param("actAs", _.actAs),
         param("readAs", _.readAs),
@@ -1861,6 +1885,8 @@ object LedgerApiCommands {
         submitter: LfPartyId,
         submissionId: String,
         contractIds: Seq[LfContractId],
+        overrideSourceValidationPackageIds: Map[LfContractId, LfPackageId],
+        overrideTargetValidationPackageIds: Map[LfContractId, LfPackageId],
         source: SynchronizerId,
         target: SynchronizerId,
     ) extends BaseCommand[SubmitReassignmentRequest, SubmitReassignmentResponse, Unit] {
@@ -1871,14 +1897,18 @@ object LedgerApiCommands {
               workflowId = workflowId,
               userId = userId,
               commandId = commandId,
-              submitter = submitter.toString,
+              submitter = submitter,
               commands = contractIds.map(contractId =>
                 ReassignmentCommand(
                   ReassignmentCommand.Command.UnassignCommand(
                     UnassignCommand(
-                      contractId = contractId.coid.toString,
+                      contractId = contractId.coid,
                       source = source.toProtoPrimitive,
                       target = target.toProtoPrimitive,
+                      overrideSourceValidationPackageId =
+                        overrideSourceValidationPackageIds.get(contractId),
+                      overrideTargetValidationPackageId =
+                        overrideTargetValidationPackageIds.get(contractId),
                     )
                   )
                 )
@@ -2158,38 +2188,6 @@ object LedgerApiCommands {
         optTimeout.map(CustomClientTimeout(_)).getOrElse(DefaultUnboundedTimeout)
     }
 
-    final case class PreferredPackageVersion(
-        parties: Set[LfPartyId],
-        packageName: LfPackageName,
-        synchronizerIdO: Option[SynchronizerId],
-        vettingValidAt: Option[CantonTimestamp],
-    ) extends BaseCommand[
-          GetPreferredPackageVersionRequest,
-          GetPreferredPackageVersionResponse,
-          Option[PackagePreference],
-        ] {
-
-      override protected def submitRequest(
-          service: InteractiveSubmissionServiceStub,
-          request: GetPreferredPackageVersionRequest,
-      ): Future[GetPreferredPackageVersionResponse] =
-        service.getPreferredPackageVersion(request)
-
-      override protected def createRequest(): Either[String, GetPreferredPackageVersionRequest] =
-        Right(
-          GetPreferredPackageVersionRequest(
-            parties = parties.toSeq,
-            packageName = packageName,
-            synchronizerId = synchronizerIdO.map(_.toProtoPrimitive).getOrElse(""),
-            vettingValidAt = vettingValidAt.map(_.toProtoTimestamp),
-          )
-        )
-
-      override protected def handleResponse(
-          response: GetPreferredPackageVersionResponse
-      ): Either[String, Option[PackagePreference]] = Right(response.packagePreference)
-    }
-
     final case class PreferredPackages(
         packageVettingRequirements: Map[LfPackageName, Set[LfPartyId]],
         synchronizerIdO: Option[SynchronizerId],
@@ -2378,6 +2376,8 @@ object LedgerApiCommands {
         source: SynchronizerId,
         target: SynchronizerId,
         eventFormat: Option[EventFormat],
+        overrideSourceValidationPackageIds: Map[LfContractId, LfPackageId],
+        overrideTargetValidationPackageIds: Map[LfContractId, LfPackageId],
     ) extends BaseCommand[
           SubmitAndWaitForReassignmentRequest,
           SubmitAndWaitForReassignmentResponse,
@@ -2399,6 +2399,10 @@ object LedgerApiCommands {
                         contractId = contractId.coid.toString,
                         source = source.toProtoPrimitive,
                         target = target.toProtoPrimitive,
+                        overrideSourceValidationPackageId =
+                          overrideSourceValidationPackageIds.get(contractId),
+                        overrideTargetValidationPackageId =
+                          overrideTargetValidationPackageIds.get(contractId),
                       )
                     )
                   )
@@ -2453,6 +2457,30 @@ object LedgerApiCommands {
         Right(response.offset)
     }
 
+    final case class ConvertRecordTimeToOffset(
+        synchronizerId: SynchronizerId,
+        recordTime: CantonTimestamp,
+    ) extends BaseCommand[
+          ConvertRecordTimeToOffsetRequest,
+          ConvertRecordTimeToOffsetResponse,
+          Offset,
+        ] {
+      override protected def submitRequest(
+          service: StateServiceStub,
+          request: ConvertRecordTimeToOffsetRequest,
+      ): Future[ConvertRecordTimeToOffsetResponse] = service.convertRecordTimeToOffset(request)
+      override protected def createRequest(): Either[String, ConvertRecordTimeToOffsetRequest] =
+        Right(
+          ConvertRecordTimeToOffsetRequest(
+            Some(recordTime.toProtoTimestamp),
+            synchronizerId.toProtoPrimitive,
+          )
+        )
+      override protected def handleResponse(
+          response: ConvertRecordTimeToOffsetResponse
+      ): Either[String, Offset] = Right(Offset.tryFromLong(response.offset))
+    }
+
     final case class GetConnectedSynchronizers(partyId: Option[LfPartyId])
         extends BaseCommand[
           GetConnectedSynchronizersRequest,
@@ -2491,6 +2519,7 @@ object LedgerApiCommands {
         verbose: Boolean = true,
         timeout: FiniteDuration,
         includeCreatedEventBlob: Boolean = false,
+        includeIncompleteReassignments: Boolean,
     )(override implicit val loggingContext: ErrorLoggingContext)
         extends BaseCommand[GetActiveContractsRequest, AutoCloseable, AutoCloseable]
         with SubscribeBase[
@@ -2527,6 +2556,7 @@ object LedgerApiCommands {
             activeAtOffset = activeAtOffset,
             eventFormat = Some(EventFormat(parties.map((_, filter)).toMap, None, verbose)),
             streamContinuationToken = None,
+            includeIncompleteReassignments = includeIncompleteReassignments,
           )
         )
       }
@@ -2799,6 +2829,22 @@ object LedgerApiCommands {
         service.updateAccount(request)
     }
 
+    final case class Prune(
+        beforeInclusive: CantonTimestamp
+    ) extends BaseCommand[
+          TeaPruneRequest,
+          TeaPruneResponse,
+        ] {
+      override protected def createRequest(): Either[String, TeaPruneRequest] =
+        Right(TeaPruneRequest(beforeInclusive.toProtoTimestamp.some))
+
+      override protected def submitRequest(
+          service: TrafficServiceStub,
+          request: TeaPruneRequest,
+      ): Future[TeaPruneResponse] =
+        service.prune(request)
+    }
+
     final case class PruneEvents(
         beforeInclusive: CantonTimestamp
     ) extends BaseCommand[
@@ -2808,6 +2854,7 @@ object LedgerApiCommands {
       override protected def createRequest(): Either[String, PruneEventsRequest] =
         Right(PruneEventsRequest(beforeInclusive.toProtoTimestamp.some))
 
+      @nowarn("cat=deprecation")
       override protected def submitRequest(
           service: TrafficServiceStub,
           request: PruneEventsRequest,

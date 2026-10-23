@@ -124,6 +124,7 @@ class BaseLedgerConnection(
               activeAtOffset = offset,
               eventFormat = Some(eventFormat),
               streamContinuationToken = restartItem.map(_.streamContinuationToken),
+              includeIncompleteReassignments = true,
             )
           )
           .map { item =>

@@ -17,7 +17,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   SequencerNode,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{Env, ModuleRef}
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Miscellaneous.dequeueN
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import io.opentelemetry.api.trace.{StatusCode, Tracer}
 
@@ -72,10 +71,9 @@ class MempoolModule[E <: Env[E]](
             // Reject in order to avoid dissemination failing due to insufficient quorum, which
             //  shortens the client retry cycle and leverages sequencer client amplification.
             //  This is especially convenient for automation of topology change submissions.
-            val rejectionMessage =
-              s"P2P connectivity is not ready (authenticated = $authenticatedCount < dissemination quorum = $weakQuorum), rejecting"
-            logger.info(rejectionMessage)
-            from.foreach(_.asyncSend(SequencerNode.RequestRejected(rejectionMessage)))
+            val reason = SequencerNode.RequestRejected.P2PNotReady(authenticatedCount, weakQuorum)
+            logger.info(reason.rejectionMessage)
+            from.foreach(_.asyncSend(SequencerNode.RequestRejected(reason)))
             span.setStatus(StatusCode.ERROR, "p2p_not_ready"); span.end()
             metrics.ingress.labels.outcome.values.P2PNotReady
           } else if (isBlacklisted) {
@@ -83,42 +81,39 @@ class MempoolModule[E <: Env[E]](
             //  received submissions yet, due to it being blacklisted, which leverages sequencer
             //  client amplification and avoids that submitters are stuck on submitting to
             //  sequencers currently unable to propose.
-            val rejectionMessage =
-              s"Mempool received client request but this node is currently blacklisted, rejecting"
-            logger.info(rejectionMessage)
-            from.foreach(_.asyncSend(SequencerNode.RequestRejected(rejectionMessage)))
+            val reason = SequencerNode.RequestRejected.Blacklisted
+            logger.info(reason.rejectionMessage)
+            from.foreach(_.asyncSend(SequencerNode.RequestRejected(reason)))
             span.setStatus(StatusCode.ERROR, "blacklisted"); span.end()
             metrics.ingress.labels.outcome.values.BlackListed
           } else if (mempoolState.receivedOrderRequests.sizeIs == config.maxQueueSize) {
-            val rejectionMessage =
-              s"Mempool received client request but the queue is full (${config.maxQueueSize}), rejecting"
-            logger.info(rejectionMessage)
-            from.foreach(_.asyncSend(SequencerNode.RequestRejected(rejectionMessage)))
+            val reason = SequencerNode.RequestRejected.QueueFull(config.maxQueueSize)
+            logger.info(reason.rejectionMessage)
+            from.foreach(_.asyncSend(SequencerNode.RequestRejected(reason)))
             span.setStatus(StatusCode.ERROR, "queue_full"); span.end()
             metrics.ingress.labels.outcome.values.QueueFull
           } else if (config.checkTags && !orderingRequest.isTagValid) {
-            val rejectionMessage =
-              s"Mempool received a client request with an invalid tag '${orderingRequest.tag}', " +
-                s"valid tags are: (${OrderingRequest.ValidTags.mkString(", ")}), rejecting"
-            logger.warn(rejectionMessage)
-            from.foreach(_.asyncSend(SequencerNode.RequestRejected(rejectionMessage)))
+            val reason = SequencerNode.RequestRejected.InvalidTag(orderingRequest.tag)
+            logger.warn(reason.rejectionMessage)
+            from.foreach(_.asyncSend(SequencerNode.RequestRejected(reason)))
             span.setStatus(StatusCode.ERROR, "invalid_tag"); span.end()
             metrics.ingress.labels.outcome.values.InvalidTag
           } else {
             val payloadSize = orderingRequest.payload.size()
             if (payloadSize > currentOrderingTopology.maxRequestPayloadBytes.value) {
-              val rejectionMessage =
-                s"Mempool received client request of size $payloadSize " +
-                  s"but it exceeds the maximum (${currentOrderingTopology.maxRequestPayloadBytes.value}), rejecting"
-              logger.warn(rejectionMessage)
-              from.foreach(_.asyncSend(SequencerNode.RequestRejected(rejectionMessage)))
+              val reason = SequencerNode.RequestRejected.MaxRequestSizeExceeded(
+                payloadSize,
+                currentOrderingTopology.maxRequestPayloadBytes.value,
+              )
+              logger.warn(reason.rejectionMessage)
+              from.foreach(_.asyncSend(SequencerNode.RequestRejected(reason)))
               span.setStatus(StatusCode.ERROR, "max_request_size_exceeded"); span.end()
               metrics.ingress.labels.outcome.values.RequestTooBig
             } else {
               logger.debug(
                 s"Mempool accepting client request with tag '${orderingRequest.tag}' of size $payloadSize"
               )
-              mempoolState.receivedOrderRequests.enqueue((r, span))
+              mempoolState.enqueueRequest(r, span)
               from.foreach(_.asyncSend(SequencerNode.RequestAccepted))
               if (mempoolState.receivedOrderRequests.sizeIs >= config.minRequestsInBatch.toInt) {
                 // every time we receive a new transaction we only try to create new batches if we've reached
@@ -145,9 +140,9 @@ class MempoolModule[E <: Env[E]](
 
         createAndSendBatches()
 
-      // From local output module
-      // TODO(#34672): discard queued requests whose max sequencing time has passed
-      case Mempool.LatestKnownSequencingTimeUpdate(_) => ()
+      // From the local output module
+      case Mempool.LatestKnownSequencingTimeUpdate(latestKnownSequencingTime) =>
+        mempoolState.updateLatestKnownSequencingTime(latestKnownSequencingTime)
 
       // From P2P output module
       case upd @ Mempool.P2PConnectivityUpdate(membership, authenticatedCountIncludingSelf) =>
@@ -198,22 +193,21 @@ class MempoolModule[E <: Env[E]](
   }
 
   private def createAndSendBatch()(implicit context: E#ActorContextT[Mempool.Message]): Unit = {
-    val requestsAndSpans =
-      dequeueN(
-        mempoolState.receivedOrderRequests,
-        currentOrderingTopology.sequencingParameters.maxRequestsInBatch,
-        maxCombinedWeight = currentOrderingTopology.maxRequestPayloadBytes,
-      )(
-        _._1.tx.value.payload.size()
+    val queuedRequests =
+      mempoolState.dequeueForBatch(
+        currentOrderingTopology.sequencingParameters.maxRequestsInBatch.toInt,
+        currentOrderingTopology.maxRequestPayloadBytes,
       )
-    val batchCreationInstant = Instant.now
-    locally {
-      val requests = requestsAndSpans.map(_._1.tx)
-      implicit val tc: TraceContext = context.traceContextOfBatch(requests)
-      emitRequestsQueuedForBatchInclusionLatencies(requests, batchCreationInstant)
-      availability.asyncSend(Availability.LocalDissemination.LocalBatchCreated(requests))
+    if (queuedRequests.nonEmpty) {
+      val batchCreationInstant = Instant.now
+      locally {
+        val requests = queuedRequests.map(_.orderRequest.tx)
+        implicit val tc: TraceContext = context.traceContextOfBatch(requests)
+        emitRequestsQueuedForBatchInclusionLatencies(requests, batchCreationInstant)
+        availability.asyncSend(Availability.LocalDissemination.LocalBatchCreated(requests))
+      }
+      queuedRequests.foreach(_.span.end())
     }
-    requestsAndSpans.foreach(_._2.end())
   }
 
   private def emitRequestsQueuedForBatchInclusionLatencies(

@@ -6,6 +6,7 @@ package com.digitalasset.canton.synchronizer.block.update
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.protocol.SubmissionRequestType
+import com.digitalasset.canton.sequencing.protocol.SubmissionRequestType.TopUpPreOnboarding
 import com.digitalasset.canton.synchronizer.block.LedgerBlockEvent
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
@@ -30,13 +31,6 @@ trait BlockReorderer {
 }
 
 object BlockReorderer {
-  lazy val NoOp: BlockReorderer = new BlockReorderer {
-    override def reordered(events: Seq[Traced[LedgerBlockEvent]])(implicit
-        traceContext: TraceContext
-    ): Seq[Traced[LedgerBlockEvent]] =
-      events
-  }
-
   class Impl(consistencyChecks: Boolean, val loggerFactory: NamedLoggerFactory)
       extends BlockReorderer
       with NamedLogging {
@@ -94,8 +88,7 @@ object BlockReorderer {
         case SubmissionRequestType.ConfirmationRequest => 2
         case SubmissionRequestType.Verdict => 0
         case SubmissionRequestType.Commitment => 3
-        case SubmissionRequestType.TopUp => 6
-        case SubmissionRequestType.TopUpMed => 6
+        case SubmissionRequestType.TopUp | SubmissionRequestType.TopUpMed | TopUpPreOnboarding => 6
         case SubmissionRequestType.TopologyTransaction => 4
         case SubmissionRequestType.TimeProof => 5
         case SubmissionRequestType.Unexpected(err) =>

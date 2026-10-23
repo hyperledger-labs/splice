@@ -46,6 +46,7 @@ final case class ParticipantNodeParameters(
     crashAfterFailedValidation: Boolean,
     validateLegacyContractsV11: Boolean,
     acsCommitments: AcsCommitmentConfig,
+    deprecatedApis: DeprecatedApiConfig,
 ) extends CantonNodeParameters
     with HasGeneralCantonNodeParameters {
   override def dontWarnOnDeprecatedPV: Boolean = protocolConfig.dontWarnOnDeprecatedPV
@@ -56,7 +57,9 @@ final case class ParticipantNodeParameters(
 
   // Indexing of party onboarding events is deferred if OnPR indexer pausing is off.
   def deferPartyOnboardingIndexing: Boolean =
-    alphaOnlinePartyReplicationSupport.exists(!_.pauseSynchronizerIndexingDuringPartyReplication)
+    alphaOnlinePartyReplicationSupport.exists(
+      !_.target.pauseSynchronizerIndexingDuringPartyReplication
+    )
 }
 
 object ParticipantNodeParameters {
@@ -121,5 +124,6 @@ object ParticipantNodeParameters {
     crashAfterFailedValidation = false,
     validateLegacyContractsV11 = true,
     acsCommitments = AcsCommitmentConfig(),
+    deprecatedApis = DeprecatedApiConfig(),
   )
 }

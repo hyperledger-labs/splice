@@ -20,7 +20,12 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{LoggingConfig, ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
-import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoApi, SyncCryptoClient}
+import com.digitalasset.canton.crypto.{
+  HashPurpose,
+  SyncCryptoApi,
+  SyncCryptoClient,
+  SynchronizerSnapshotSyncCryptoApi,
+}
 import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime, SynchronizerPredecessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.FatalError
@@ -73,9 +78,9 @@ import com.digitalasset.canton.sequencing.client.pool.{
   SequencerConnection,
   SequencerConnectionPool,
   SequencerConnectionWithPekkoSubscribe,
-  SequencerSubscriptionFactoryImpl,
   SequencerSubscriptionPool,
   SequencerSubscriptionPoolFactoryImpl,
+  SequencerSubscriptionWrapperFactoryImpl,
   SubscriptionHandlerFactoryImpl,
 }
 import com.digitalasset.canton.sequencing.client.time.fetcher.SequencingTimeFetcher.TimeSourcesPool
@@ -85,8 +90,8 @@ import com.digitalasset.canton.sequencing.client.time.fetcher.{
   SequencingTimeFetcher,
 }
 import com.digitalasset.canton.sequencing.client.transports.replay.{
-  NullSequencerSubscriptionFactory,
-  ReplaySequencerSubscriptionFactory,
+  NoOpSequencerSubscriptionWrapperFactory,
+  ReplaySequencerSubscriptionWrapperFactory,
 }
 import com.digitalasset.canton.sequencing.handlers.{
   CleanSequencerCounterTracker,
@@ -101,7 +106,7 @@ import com.digitalasset.canton.store.CursorPrehead.SequencerCounterCursorPrehead
 import com.digitalasset.canton.store.SequencedEventStore.ProcessingSequencedEvent
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
+import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
 import com.digitalasset.canton.tracing.{HasTraceContext, Spanning, TraceContext, Traced}
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.FutureInstances.*
@@ -124,7 +129,7 @@ import org.apache.pekko.{Done, NotUsed}
 import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.annotation.{nowarn, unused}
+import scala.annotation.unused
 import scala.compat.java8.DurationConverters.FiniteDurationops
 import scala.concurrent.*
 import scala.concurrent.duration.*
@@ -210,10 +215,10 @@ trait SequencerClient extends SequencerClientSend with FlagCloseable {
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Boolean]
 
-  /** Download the topology state for initializing the member */
-  def downloadTopologyStateForInit(maxRetries: Int, retryLogLevel: Option[Level])(implicit
+  /** Download the topology state for initializing the member (streaming version) */
+  def streamTopologyStateForInit(maxRetries: Int, retryLogLevel: Option[Level])(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, GenericStoredTopologyTransactions]
+  ): EitherT[FutureUnlessShutdown, String, Source[GenericStoredTopologyTransaction, NotUsed]]
 
   /** Functionality to performing current sequencing time interrogations efficiently */
   def timeFetcher: SequencingTimeFetcher
@@ -273,6 +278,7 @@ abstract class SequencerClientImpl(
     recorderO: Option[SequencerClientRecorder],
     replayEnabled: Boolean,
     syncCryptoClient: SyncCryptoClient[SyncCryptoApi],
+    bftTopologyForInitDownloader: BftTopologyForInitDownloader,
     loggingConfig: LoggingConfig,
     exitOnTimeout: Boolean,
     val loggerFactory: NamedLoggerFactory,
@@ -290,7 +296,6 @@ abstract class SequencerClientImpl(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Status, Unit] =
     connectionPool.getAllConnections.parTraverse_(_.logout())
-
   protected val sequencersTransportState: SequencersTransportState =
     new SequencersTransportState(sequencerTransports)
 
@@ -299,6 +304,7 @@ abstract class SequencerClientImpl(
 
   override def sendAsync(
       batch: Batch[DefaultOpenEnvelope],
+      currentSnapshotApproximation: Option[SynchronizerSnapshotSyncCryptoApi],
       timestamps: SendRequestTimestamps,
       messageId: MessageId,
       aggregationRule: Option[AggregationRule],
@@ -312,6 +318,7 @@ abstract class SequencerClientImpl(
   ): SendAsyncResult =
     sendAsyncInternal(
       batch,
+      currentSnapshotApproximation,
       timestamps,
       messageId,
       aggregationRule,
@@ -350,7 +357,7 @@ abstract class SequencerClientImpl(
       request: SubmissionRequest,
       maxRequestSize: MaxRequestSize,
   ): Either[SendAsyncClientError, Unit] =
-    if (protocolVersion <= ProtocolVersion.v35) Either.unit
+    if (protocolVersion == ProtocolVersion.v35) Either.unit
     else
       for {
         uncompressedBatch <- request.batch.toClosedUncompressedBatchResult.leftMap(err =>
@@ -365,9 +372,10 @@ abstract class SequencerClientImpl(
           ),
         )
       } yield ()
-  @nowarn("cat=deprecation")
+
   private def sendAsyncInternal(
       batch: Batch[DefaultOpenEnvelope],
+      currentSnapshotApproximation: Option[SynchronizerSnapshotSyncCryptoApi],
       timestamps: SendRequestTimestamps,
       messageId: MessageId,
       aggregationRule: Option[AggregationRule],
@@ -379,7 +387,7 @@ abstract class SequencerClientImpl(
   )(implicit
       traceContext: TraceContext
   ): SendAsyncResult = {
-    implicit val metricsContextImplicit =
+    implicit val metricsContextImplicit: MetricsContext =
       metricsContext.withExtraLabels("synchronizer" -> psid.toString)
     withSpan("SequencerClient.sendAsync") { implicit traceContext => span =>
       def mkRequestE(
@@ -391,7 +399,6 @@ abstract class SequencerClientImpl(
             messageId,
             Batch.closeEnvelopes(batch),
             timestamps.maxSequencingTime,
-            timestamps.topologyTimestamp,
             aggregationRule,
             cost,
             SubmissionRequest.protocolVersionRepresentativeFor(protocolVersion),
@@ -427,12 +434,17 @@ abstract class SequencerClientImpl(
         synchronizerParametersLookup.getApproximateOrDefaultValue(warnOnUsingDefaults)
       )
 
+      // Snapshot used both for cost computation and signing the submission request
+      val snapshotF = currentSnapshotApproximation.fold(
+        syncCryptoClient.currentSnapshotApproximation
+      )(FutureUnlessShutdown.pure)
+
       if (replayEnabled) {
         logger.debug(s"$messageId shortcut due to replay")
         val resF = for {
-          syncCryptoApi <- EitherT.liftF(syncCryptoClient.currentSnapshotApproximation)
+          snapshot <- EitherT.liftF(snapshotF)
           costO <- EitherT.liftF(
-            trafficStateController.flatTraverse(_.computeCost(batch, syncCryptoApi.ipsSnapshot))
+            trafficStateController.flatTraverse(_.computeCost(batch, snapshot.ipsSnapshot))
           )
           requestE = mkRequestE(costO)
           request <- EitherT.fromEither[FutureUnlessShutdown](requestE)
@@ -451,7 +463,6 @@ abstract class SequencerClientImpl(
                 psid,
                 messageIdO = None,
                 Batch(List.empty, protocolVersion),
-                topologyTimestampO = None,
                 Option.empty[TrafficReceipt],
               )
             )
@@ -495,11 +506,9 @@ abstract class SequencerClientImpl(
           })
 
         val resF = for {
-          // Snapshot used both for cost computation and signing the submission request
-          syncCryptoApi <- EitherT.liftF(syncCryptoClient.currentSnapshotApproximation)
-          snapshot = syncCryptoApi.ipsSnapshot
+          snapshot <- EitherT.liftF(snapshotF)
           cost <- EitherT.liftF(
-            trafficStateController.flatTraverse(_.computeCost(batch, snapshot))
+            trafficStateController.flatTraverse(_.computeCost(batch, snapshot.ipsSnapshot))
           )
           requestE = mkRequestE(cost)
           request <- EitherT.fromEither[FutureUnlessShutdown](requestE)
@@ -508,9 +517,9 @@ abstract class SequencerClientImpl(
             checkRequestSize(request, synchronizerParams.maxRequestSize)
           )
           _ <- SubmissionRequestValidations
-            .checkSenderAndRecipientsAreRegistered(request, snapshot)
+            .checkSenderAndRecipientsAreRegistered(request, snapshot.ipsSnapshot)
             .leftMap(_.toSendAsyncClientError)
-          acceptableSequencersO <- EitherT.right(getAcceptableSequencers(snapshot))
+          acceptableSequencersO <- EitherT.right(getAcceptableSequencers(snapshot.ipsSnapshot))
           _ <- cost
             .traverse_(c => trafficCostValidator.validate(c.cost.unwrap, traceContext))
             .leftMap[SendAsyncClientError](SendAsyncClientError.TrafficEnforcementRejected.apply)
@@ -524,7 +533,7 @@ abstract class SequencerClientImpl(
               useConfirmationResponseAmplificationParameters,
             () => peekAtSendResult(),
             latestAttemptRef,
-            syncCryptoApi,
+            snapshot,
             timestamps.approximateTimestampForSigning,
             acceptableSequencersO,
           ).value
@@ -615,7 +624,7 @@ abstract class SequencerClientImpl(
       // Do not add an aggregation rule for amplifiable requests if amplification has not been configured
       val amplifiableRequest =
         if (amplify && request.aggregationRule.isEmpty && patienceO.isDefined) {
-          val aggregationRule = AggregationRule.senderDedup(member, protocolVersion)
+          val aggregationRule = AggregationRule.senderDedup(protocolVersion)
           logger.debug(
             s"Adding aggregation rule $aggregationRule to submission request with message ID $messageId"
           )
@@ -659,23 +668,52 @@ abstract class SequencerClientImpl(
       }
       .thereafter {
         case scala.util.Success(UnlessShutdown.Outcome(Left(err))) =>
-          err match {
-            case SendAsyncClientError.RequestRefused(error) if error.isOverload =>
-              metrics.submissions.overloaded.inc()
-            case _ =>
+          processSyncRejection(messageId, err)
+
+        // While debugging a weird issue where time-proofs piled up, I noticed
+        // that depending on the error and the amplification state, we can get the
+        // rejection as well on the second one of the nested Either.
+        // The whole construction of the sequencer client send part with its amplification
+        // logic and nested EitherT's would warrant a refactoring.
+        case scala.util.Success(UnlessShutdown.Outcome(Right(result))) =>
+          result match {
+            case scala.util.Success(UnlessShutdown.Outcome(Left(err))) =>
+              processSyncRejection(messageId, err)
+            case scala.util.Success(UnlessShutdown.Outcome(Right(()))) =>
+            case scala.util.Success(AbortedDueToShutdown) =>
+            case scala.util.Failure(ex) =>
+              logger.info(s"Send of $messageId failed (inner condition)", ex)
           }
-
-          // cancel pending send now as we know the request will never cause a sequenced result
-          logger.debug(s"Cancelling the pending send as the sequencer returned error: $err")
-          sendTracker.cancelPendingSend(messageId)
-
+        case scala.util.Success(AbortedDueToShutdown) =>
         case scala.util.Failure(ex) =>
           logger.info(s"Send of $messageId failed", ex)
-
-        case scala.util.Success(UnlessShutdown.Outcome(Right(_))) |
-            scala.util.Success(AbortedDueToShutdown) =>
       }
 
+  }
+
+  private def processSyncRejection(messageId: MessageId, error: SendAsyncClientError)(implicit
+      traceContext: TraceContext
+  ) = {
+    val (typ, cause, warn) = error match {
+      case SendAsyncClientError.RequestRefused(error) =>
+        if (error.isOverload)
+          metrics.submissions.overloaded.inc()
+        ("refused", error.shortMessage, false)
+      case SendAsyncClientError.RequestAlreadyExists(error) => ("already-exists", error, false)
+      case SendAsyncClientError.RequestFailed(failed) => ("failed", failed, false)
+      case SendAsyncClientError.DuplicateMessageId =>
+        ("duplicate", "message id already registered with send tracker", true)
+      case SendAsyncClientError.RequestInvalid(invalid) => ("invalid", invalid, true)
+      case SendAsyncClientError.TrafficEnforcementRejected(rpc) => ("traffic", rpc.cause, true)
+    }
+    // cancel pending send now as we know the request will never cause a sequenced result
+    def message =
+      s"Cancelling the pending send as submission failed synchronously with $typ error: $cause"
+    if (warn)
+      logger.warn(message)
+    else
+      logger.debug(message)
+    sendTracker.cancelPendingSend(messageId)
   }
 
   /** Send the `signedRequest` via `firstLinkDetailsO`, which may be undefined if there is currently
@@ -792,17 +830,17 @@ abstract class SequencerClientImpl(
               nextState(sendInFlight = sendInFlight),
             )
 
-          case _: SendAsyncClientError.RequestRefused =>
+          case error: SendAsyncClientError.RequestRefused =>
             logger.debug(
-              s"Send request with message id $messageId was refused by $sequencerId: $error"
+              s"Send request with message id $messageId was refused by $sequencerId"
             )
             // Trust the single sequencer to determine whether the request should indeed be refused and give up.
             // TODO(#12377) Do not trust the sequencer and instead retry sensibly
             Right(Left(error))
 
-          case err: SendAsyncClientError.RequestAlreadyExists =>
+          case _: SendAsyncClientError.RequestAlreadyExists =>
             logger.debug(
-              s"Send request with message id $messageId was deduped by $sequencerId: ${err.message}"
+              s"Send request with message id $messageId was refused with already exists by $sequencerId"
             )
             // Trust the single sequencer to determine whether the request should indeed be refused and give up.
             // TODO(#12377) Do not trust the sequencer (I wouldn't retry but I would track the
@@ -1097,25 +1135,14 @@ abstract class SequencerClientImpl(
     def ack(
         request: AcknowledgeRequest,
         approximateSnapshot: SyncCryptoApi,
-        protocolVersion: ProtocolVersion,
     ): EitherT[FutureUnlessShutdown, String, Boolean] = for {
       signedRequest <- requestSigner.signRequest(
         request,
         HashPurpose.AcknowledgementSignature,
         approximateSnapshot,
-        // In PV34, session signing keys are not intended to be used. However, to maintain the
-        // previous behavior, we do not assign an end validity period and simply let Canton choose
-        // a session signing key that is valid for the current approximate signing timestamp.
-        if (protocolVersion < ProtocolVersion.v35)
-          Some(
-            SigningTimestampOverrides(
-              clock.now,
-              None,
-            )
-          )
-        // In PV35, acknowledgements are signed and verified using the same `fixed` timestamp - the timestamp
+        // Acknowledgements are signed and verified using the same `fixed` timestamp - the timestamp
         // being acknowledged.
-        else None,
+        signingTimestampOverrides = None,
       )
       acceptableSequencersO <- EitherT.right(
         getAcceptableSequencers(approximateSnapshot.ipsSnapshot)
@@ -1126,18 +1153,14 @@ abstract class SequencerClientImpl(
     if (LogicalUpgradeTime.canProcessKnowingPredecessor(synchronizerPredecessor, timestamp)) {
       val request = AcknowledgeRequest(member, timestamp, protocolVersion)
       for {
-        snapshot <- EitherT.liftF(
-          if (protocolVersion < ProtocolVersion.v35)
-            syncCryptoClient.currentSnapshotApproximation
-          else syncCryptoClient.snapshot(timestamp)
-        )
+        snapshot <- EitherT.liftF(syncCryptoClient.snapshot(timestamp))
         synchronizerSuccessor <- EitherT
           .liftF(snapshot.ipsSnapshot.announcedLsu())
           .map(_.map { case (successor, _) => successor })
 
         result <-
           if (LogicalUpgradeTime.canProcessKnowingSuccessor(synchronizerSuccessor, timestamp)) {
-            ack(request, snapshot, protocolVersion)
+            ack(request, snapshot)
           } else {
             logger.debug(
               s"Not acknowledging the timestamp $timestamp past the upgrade time (${synchronizerSuccessor
@@ -1155,88 +1178,23 @@ abstract class SequencerClientImpl(
     }
   }
 
-  override def downloadTopologyStateForInit(maxRetries: Int, retryLogLevel: Option[Level])(implicit
+  override def streamTopologyStateForInit(maxRetries: Int, retryLogLevel: Option[Level])(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, GenericStoredTopologyTransactions] = {
-    val triedSequencersRef = new AtomicReference[Set[SequencerId]](Set.empty)
+  ): EitherT[FutureUnlessShutdown, String, Source[GenericStoredTopologyTransaction, NotUsed]] = {
     val request = TopologyStateForInitRequest(member, protocolVersion)
-
-    def bftInitTopologyStateHash(
-        request: TopologyStateForInitRequest,
-        acceptableSequencersO: Option[Set[SequencerId]],
-    ): EitherT[FutureUnlessShutdown, String, TopologyStateForInitHashResponse] =
-      NonEmpty
-        .from(
-          connectionPool.getOneConnectionPerSequencer(
-            "init-topology-state-hash",
-            acceptableO = acceptableSequencersO,
-          )
-        )
-        .fold(
-          EitherT.leftT[FutureUnlessShutdown, TopologyStateForInitHashResponse](
-            "No connection available to get initial topology state hash"
-          )
-        )(sequencerConnections =>
-          BftSender
-            .makeRequest(
-              "init-topology-state-hash",
-              futureSupervisor,
-              logger,
-              sequencerConnections,
-              sequencerTransports.sequencerTrustThreshold,
-            )(
-              _.downloadTopologyStateForInitHash(request, timeouts.network.duration)
-            )(identity)
-            .leftMap(err => s"Failed to get initial topology state hash: $err")
-        )
-
-    def downloadSnapshot(
-        request: TopologyStateForInitRequest,
-        acceptableSequencersO: Option[Set[SequencerId]],
-    ): EitherT[FutureUnlessShutdown, String, GenericStoredTopologyTransactions] = {
-      val triedSequencers = triedSequencersRef.get
-
-      // We ignore the amplification part
-      val (linkDetailsO, _) =
-        getNextLink(
-          "download-snapshot",
-          exclusions = triedSequencers.toSeq,
-          acceptableO = acceptableSequencersO,
-          useConfirmationResponseAmplificationParameters = false,
-        )
-
-      val resultET = linkDetailsO match {
-        case Some(LinkDetails(_, sequencerId, connection)) =>
-          triedSequencersRef.updateAndGet(_ + sequencerId).discard
-          logger.debug(
-            s"Attempting to download topology state for init from $sequencerId (already tried: $triedSequencers)"
-          )
-          connection.downloadTopologyStateForInit(request, timeouts.network.duration)
-
-        case None =>
-          EitherT.leftT[FutureUnlessShutdown, TopologyStateForInitResponse](
-            "No connection available to download topology state for init"
-          )
-      }
-
-      resultET.map(_.topologyTransactions.value)
-    }
 
     for {
       syncCryptoApi <- EitherT.liftF(syncCryptoClient.currentSnapshotApproximation)
       acceptableSequencersO <- EitherT.liftF(getAcceptableSequencers(syncCryptoApi.ipsSnapshot))
-      transactions <-
-        BftTopologyForInitDownloader.downloadAndVerifyTopologyTxs(
-          maxRetries,
-          retryLogLevel,
-          retryDelay = 1.second,
-          request,
-          loggerFactory,
-          bftInitTopologyStateHash,
-          downloadSnapshot,
-          acceptableSequencersO,
-        )
-    } yield transactions
+      source <- bftTopologyForInitDownloader.streamAndVerifyTopologyTxs(
+        topologyStateStream,
+        maxRetries,
+        retryLogLevel,
+        retryDelay = 1.second,
+        request,
+        acceptableSequencersO,
+      )
+    } yield source
   }
 
   override val timeFetcher =
@@ -1257,6 +1215,71 @@ abstract class SequencerClientImpl(
 
   protected val periodicAcknowledgementsRef =
     new AtomicReference[Option[PeriodicAcknowledgements]](None)
+
+  private val topologyStateStream = new TopologyStateStream {
+    override def getBftInitTopologyStateHash(
+        request: TopologyStateForInitRequest,
+        acceptableSequencersO: Option[Set[SequencerId]],
+    )(implicit
+        traceContext: TraceContext
+    ): EitherT[FutureUnlessShutdown, String, TopologyStateForInitHashResponse] = NonEmpty
+      .from(
+        connectionPool.getOneConnectionPerSequencer(
+          "init-topology-state-hash",
+          acceptableO = acceptableSequencersO,
+        )
+      )
+      .fold(
+        EitherT.leftT[FutureUnlessShutdown, TopologyStateForInitHashResponse](
+          "No connection available to get initial topology state hash"
+        )
+      )(sequencerConnections =>
+        BftSender
+          .makeRequest(
+            "init-topology-state-hash",
+            futureSupervisor,
+            logger,
+            sequencerConnections,
+            sequencerTransports.sequencerTrustThreshold,
+          )(
+            _.downloadTopologyStateForInitHash(request, timeouts.network.duration)
+          )(identity)
+          .leftMap(err => s"Failed to get initial topology state hash: $err")
+      )
+
+    override def streamTopologyState(
+        request: TopologyStateForInitRequest,
+        acceptableSequencersO: Option[Set[SequencerId]],
+    )(implicit
+        traceContext: TraceContext
+    ): Either[String, Source[GenericStoredTopologyTransaction, NotUsed]] = {
+      // We ignore the amplification part
+      val (linkDetailsO, _) =
+        getNextLink(
+          "stream-snapshot",
+          exclusions = Seq.empty,
+          acceptableO = acceptableSequencersO,
+          useConfirmationResponseAmplificationParameters = false,
+        )
+
+      val resultE = linkDetailsO match {
+        case Some(LinkDetails(_, sequencerId, connection)) =>
+          logger.debug(
+            s"Attempting to download topology state for init from $sequencerId"
+          )
+          connection
+            .streamTopologyStateForInit(request, timeouts.network.duration)
+            .map(_.mapConcat(_.topologyTransactions.unwrap.result))
+
+        case None =>
+          Left[String, Source[GenericStoredTopologyTransaction, NotUsed]](
+            "No connection available to download topology state for init"
+          )
+      }
+
+      resultE
+    }
+  }
 }
 
 object SequencerClientImpl {
@@ -1346,6 +1369,7 @@ class RichSequencerClientImpl(
     recorderO: Option[SequencerClientRecorder],
     replayConfigO: Option[ReplayConfig],
     syncCryptoClient: SyncCryptoClient[SyncCryptoApi],
+    bftTopologyForInitDownloader: BftTopologyForInitDownloader,
     loggingConfig: LoggingConfig,
     override val trafficStateController: Option[TrafficStateController],
     exitOnFatalErrors: Boolean,
@@ -1368,6 +1392,7 @@ class RichSequencerClientImpl(
       recorderO,
       replayConfigO.isDefined,
       syncCryptoClient,
+      bftTopologyForInitDownloader,
       loggingConfig,
       exitOnFatalErrors,
       loggerFactory,
@@ -1539,10 +1564,10 @@ class RichSequencerClientImpl(
           .putIfAbsent(sequencerAggregator)
           .foreach(_ => ErrorUtil.invalidState("Sequencer aggregator already exists"))
 
-        val sequencerSubscriptionFactory = replayConfigO match {
+        val subscriptionWrapperFactory = replayConfigO match {
           case Some(ReplayConfig(recordingConfig, SequencerEvents)) =>
             logger.debug(s"using ReplaySequencerSubscription due to replay action SequencerEvents")
-            new ReplaySequencerSubscriptionFactory(
+            new ReplaySequencerSubscriptionWrapperFactory(
               eventValidatorFactory,
               recordingConfig.fullFilePath,
               timeouts,
@@ -1551,11 +1576,11 @@ class RichSequencerClientImpl(
 
           case Some(ReplayConfig(_recordingConfig, _action: SequencerSends)) =>
             logger.debug(s"using NullSequencerSubscription due to replay action SequencerSends")
-            new NullSequencerSubscriptionFactory(timeouts, loggerFactory)
+            new NoOpSequencerSubscriptionWrapperFactory(timeouts, loggerFactory)
 
           case None =>
             // Regular subscription factory
-            new SequencerSubscriptionFactoryImpl(
+            new SequencerSubscriptionWrapperFactoryImpl(
               eventValidatorFactory,
               timeouts,
               loggerFactory,
@@ -1573,7 +1598,7 @@ class RichSequencerClientImpl(
         )
 
         val sequencerSubscriptionPoolFactory = new SequencerSubscriptionPoolFactoryImpl(
-          sequencerSubscriptionFactory,
+          subscriptionWrapperFactory,
           subscriptionHandlerFactory,
           metrics.connectionPool,
           connectionPool.metricsContext,
@@ -1932,6 +1957,7 @@ class SequencerClientImplPekko[E: Pretty](
     recorderO: Option[SequencerClientRecorder],
     replayEnabled: Boolean,
     syncCryptoClient: SyncCryptoClient[SyncCryptoApi],
+    bftTopologyForInitDownloader: BftTopologyForInitDownloader,
     loggingConfig: LoggingConfig,
     override val trafficStateController: Option[TrafficStateController],
     exitOnTimeout: Boolean,
@@ -1957,6 +1983,7 @@ class SequencerClientImplPekko[E: Pretty](
       recorderO,
       replayEnabled,
       syncCryptoClient,
+      bftTopologyForInitDownloader,
       loggingConfig,
       exitOnTimeout,
       loggerFactory,
@@ -2246,7 +2273,7 @@ class SequencerClientImplPekko[E: Pretty](
       traceContext: TraceContext
   ): Flow[Either[A, B], Either[A, Traced[Seq[B]]], NotUsed] =
     Flow[Either[A, B]]
-      .batchN(config.eventInboxSize.unwrap, 1)
+      .batchNForMaxBatchSize(maxBatchSize = config.eventInboxSize.unwrap, maxBatchCount = 1)
       .mapConcat { batchBuffer =>
         val batchesOrError =
           IterableUtil.spansBy(batchBuffer.toSeq)(_.isRight).flatMap { case (_, block) =>

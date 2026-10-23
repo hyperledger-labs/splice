@@ -4,28 +4,42 @@
 package com.digitalasset.canton.participant.protocol.reassignment
 
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.data.ReassignmentRef
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.data.{CantonTimestamp, ReassignmentRef}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.{
   ReassignmentProcessorError,
   SubmissionValidationError,
 }
-import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId, Stakeholders}
+import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.PackageUnknownTo
+import com.digitalasset.canton.protocol.{
+  LfContractId,
+  LfSerializationVersion,
+  ReassignmentId,
+  Stakeholders,
+}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag
+import com.digitalasset.canton.util.ReassignmentTag.Target
 import com.digitalasset.canton.{LfPackageId, LfPartyId}
 
-trait ReassignmentValidationError extends Serializable with Product with PrettyPrinting {
-  override protected def pretty: Pretty[ReassignmentValidationError.this.type] =
-    prettyOfString(_.message)
+trait ReassignmentValidationError
+    extends Serializable
+    with Product
+    with PrettyPrintingFromCompanion {
+  override def prettyCompanion: PrettyPrintingCompanion[this.type] =
+    ReassignmentValidationError
   def message: String
 
   def toSubmissionValidationError: ReassignmentProcessorError =
     SubmissionValidationError(s"Submission failed because: $message")
 }
 
-object ReassignmentValidationError {
+object ReassignmentValidationError extends PrettyPrintingCompanion[ReassignmentValidationError] {
 
   final case class ReinterpretationAborted(reassignmentRef: ReassignmentRef, reason: String)
       extends ReassignmentValidationError {
@@ -131,9 +145,41 @@ object ReassignmentValidationError {
       s"For `$reassignmentRef`: reassigning participants mismatch (expected: $expected, declared: $declared)"
   }
 
+  final case class NonReassigningParticipantsDeclared(
+      reassignmentRef: ReassignmentRef,
+      targetTimestamp: Target[CantonTimestamp],
+      reassigningParticipants: Set[ParticipantId],
+      declared: Set[ParticipantId],
+  ) extends ReassignmentValidationError {
+    override def message: String =
+      s"For `$reassignmentRef`: declared participants ${declared.diff(reassigningParticipants)} are not reassigning participants at target timestamp ${targetTimestamp.unwrap} (reassigning participants: $reassigningParticipants)"
+  }
+
+  final case class PackageIdUnknownOrUnvetted(
+      contractIds: Set[LfContractId],
+      unknownTo: List[PackageUnknownTo],
+      synchronizerId: PhysicalSynchronizerId,
+  ) extends ReassignmentValidationError {
+    override def message: String =
+      s"Cannot unassign contracts `$contractIds` on synchronizer `$synchronizerId`: ${unknownTo.mkString(", ")}"
+  }
+
+  final case class ContractSerializationVersionNotSupported(
+      reassignmentRef: ReassignmentRef,
+      targetSynchronizerId: PhysicalSynchronizerId,
+      maxSynchronizerVersion: LfSerializationVersion,
+      contractVersion: LfSerializationVersion,
+  ) extends ReassignmentValidationError {
+    override def message: String =
+      s"For `$reassignmentRef`: contracts require serialization version $contractVersion but target synchronizer `$targetSynchronizerId` only supports up to version $maxSynchronizerVersion"
+  }
+
   final case class AbortedDueToShutdownOut(contractId: LfContractId)
       extends ReassignmentValidationError {
     override def message: String =
       s"Cannot unassign contract `$contractId`: aborted due to shutdown"
   }
+
+  override protected val pretty: Pretty[ReassignmentValidationError] =
+    prettyOfString(_.message)
 }

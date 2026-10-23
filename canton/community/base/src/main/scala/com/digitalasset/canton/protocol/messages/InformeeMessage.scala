@@ -11,9 +11,9 @@ import com.digitalasset.canton.data.{
   ViewPosition,
   ViewType,
 }
-import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrintingCompanion}
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
-import com.digitalasset.canton.protocol.{RootHash, v30, v31, v32}
+import com.digitalasset.canton.protocol.{RootHash, v30, v32}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -22,6 +22,7 @@ import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
+  ProtocolVersionValidation,
   RepresentativeProtocolVersion,
   VersionedProtoCodec,
   VersioningCompanionContext,
@@ -77,12 +78,6 @@ case class InformeeMessage(
       submittingParticipantSignature = Some(submittingParticipantSignature.toProtoV30),
     )
 
-  override def toProtoSomeEnvelopeContentV30: v30.EnvelopeContent.SomeEnvelopeContent =
-    v30.EnvelopeContent.SomeEnvelopeContent.InformeeMessage(toProtoV30)
-
-  override def toProtoSomeEnvelopeContentV31: v31.EnvelopeContent.SomeEnvelopeContent =
-    v31.EnvelopeContent.SomeEnvelopeContent.InformeeMessage(toProtoV30)
-
   override def toProtoSomeEnvelopeContentV32: v32.EnvelopeContent.SomeEnvelopeContent =
     v32.EnvelopeContent.SomeEnvelopeContent.InformeeMessage(toProtoV30)
 
@@ -90,7 +85,7 @@ case class InformeeMessage(
 
   override def viewType: ViewType = ViewType.TransactionViewType
 
-  override def pretty: Pretty[InformeeMessage] = prettyOfClass(unnamedParam(_.fullInformeeTree))
+  override def prettyCompanion: PrettyPrintingCompanion[InformeeMessage] = InformeeMessage
 
   @transient override protected lazy val companionObj: InformeeMessage.type = InformeeMessage
 }
@@ -99,11 +94,16 @@ object InformeeMessage
     extends VersioningCompanionContext[
       InformeeMessage,
       (GenTransactionTreeDeserializationContext, ProtocolVersion),
-    ] {
+    ]
+    with PrettyPrintingCompanion[InformeeMessage] {
+
+  override protected val pretty: Pretty[InformeeMessage] = prettyOfClass(
+    unnamedParam(_.fullInformeeTree)
+  )
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.InformeeMessage)(
-      supportedProtoVersion(_)((hashOps, proto) => fromProtoV30(hashOps)(proto)),
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v36)(v30.InformeeMessage)(
+      supportedProtoVersionPVV(_)(fromProtoV30),
       _.toProtoV30,
     )
   )
@@ -119,8 +119,10 @@ object InformeeMessage
   // but other classes use something else (e.g. "String").
   // In the end, it is most important that the errors are informative and this can be achieved in different ways.
   private[messages] def fromProtoV30(
-      context: (GenTransactionTreeDeserializationContext, ProtocolVersion)
-  )(informeeMessageP: v30.InformeeMessage): ParsingResult[InformeeMessage] = {
+      pvv: ProtocolVersionValidation,
+      context: (GenTransactionTreeDeserializationContext, ProtocolVersion),
+      informeeMessageP: v30.InformeeMessage,
+  ): ParsingResult[InformeeMessage] = {
     val (_, protocolVersion) = context
 
     // Use pattern matching to access the fields of v0.InformeeMessage,
@@ -135,7 +137,7 @@ object InformeeMessage
         "InformeeMessage.informeeTree",
         maybeFullInformeeTreeP,
       )
-      fullInformeeTree <- FullInformeeTree.fromProtoV30(context, fullInformeeTreeP)
+      fullInformeeTree <- FullInformeeTree.fromProtoV30(pvv, context, fullInformeeTreeP)
       submittingParticipantSignature <- ProtoConverter
         .required(
           "InformeeMessage.submittingParticipantSignature",

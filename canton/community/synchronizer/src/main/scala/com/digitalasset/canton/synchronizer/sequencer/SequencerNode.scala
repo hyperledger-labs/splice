@@ -45,6 +45,7 @@ import com.digitalasset.canton.protocol.{
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencer.admin.v30.SequencerInitializationServiceGrpc
 import com.digitalasset.canton.sequencing.client.{
+  BftTopologyForInitDownloader,
   RequestSigner,
   SendTracker,
   SequencedEventValidatorFactory,
@@ -119,6 +120,7 @@ import com.digitalasset.canton.version.{ProtocolVersion, ReleaseVersion}
 import com.google.common.annotations.VisibleForTesting
 import io.grpc.ServerServiceDefinition
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
 
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicReference
@@ -231,7 +233,10 @@ class SequencerNodeBootstrap(
     // add initialization service
     private val (initializationServiceDef, _) = adminServerRegistry.addService(
       SequencerInitializationServiceGrpc.bindService(
-        new GrpcSequencerInitializationService(this, loggerFactory)(executionContext),
+        new GrpcSequencerInitializationService(this, loggerFactory)(
+          executionContext,
+          Materializer.matFromSystem(actorSystem),
+        ),
         executionContext,
       )
     )
@@ -271,7 +276,7 @@ class SequencerNodeBootstrap(
         config.publicApi,
         arguments.futureSupervisor,
         loggerFactory,
-      )(config.sequencer, config.parameters.producePostOrderingTopologyTicks)
+      )(config.sequencer)
       addCloseable(factory)
       factory
     }
@@ -308,16 +313,28 @@ class SequencerNodeBootstrap(
     ): FutureUnlessShutdown[Option[StageResult]] =
       synchronizerConfigurationStore.fetchConfiguration.toOption.flatMapF {
         case Some(existing) =>
-          createSynchronizerTopologyStore(existing.synchronizerId).map { topologyManager =>
-            Some(
-              StageResult(
-                existing.synchronizerParameters,
-                createSequencerFactory(existing.synchronizerParameters.protocolVersion),
-                topologyManager,
-                topologyAndSequencerSnapshot = None,
-              )
+          val pv = existing.synchronizerParameters.protocolVersion
+
+          for {
+            _ <-
+              if (pv.isSupported)
+                FutureUnlessShutdown.unit
+              else
+                FutureUnlessShutdown.failed(
+                  new IllegalStateException(
+                    s"Sequencer ${ReleaseVersion.current} does not support protocol version $pv"
+                  )
+                )
+            topologyStore <- createSynchronizerTopologyStore(existing.synchronizerId)
+          } yield Some(
+            StageResult(
+              existing.synchronizerParameters,
+              createSequencerFactory(pv),
+              topologyStore,
+              topologyAndSequencerSnapshot = None,
             )
-          }
+          )
+
         case None =>
           // create sequencer server such that we can expose a health endpoint until initialized
           initSequencerNodeServer()
@@ -491,14 +508,12 @@ class SequencerNodeBootstrap(
                 val topologySnapshotValidator = new InitialTopologySnapshotValidator(
                   crypto.pureCrypto,
                   synchronizerTopologyStore,
-                  parameters.batchingConfig.topologyCacheAggregator,
+                  parameters.batchingConfig,
                   config.topology,
                   Some(crypto.staticSynchronizerParameters),
                   timeouts,
                   futureSupervisor = futureSupervisor,
                   loggerFactory,
-                  // only filter out completed proposals if this is a bootstrap from genesis.
-                  cleanupTopologySnapshot = sequencerSnapshot.isEmpty,
                 )
                 for {
                   _ <- topologySnapshotValidator.validateAndApplyInitialTopologySnapshot(
@@ -856,6 +871,7 @@ class SequencerNodeBootstrap(
             None,
             replayEnabled = false,
             syncCryptoWithOptionalSessionKeys,
+            new BftTopologyForInitDownloader(loggerFactory),
             parameters.loggingConfig,
             None,
             parameters.exitOnFatalFailures,
@@ -934,8 +950,6 @@ class SequencerNodeBootstrap(
             Some(
               TopologyManagerStatus.combined(authorizedTopologyManager, synchronizerTopologyManager)
             ),
-            arguments.config.topology,
-            arguments.config.parameters.producePostOrderingTopologyTicks,
             storage,
             clock,
             Seq(sequencerId) ++ membersToRegister,

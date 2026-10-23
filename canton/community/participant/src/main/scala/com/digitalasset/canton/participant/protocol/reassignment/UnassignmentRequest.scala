@@ -9,7 +9,7 @@ import com.digitalasset.canton.crypto.{HashOps, HmacOps, Salt, SaltSeed}
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
-import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentValidationError.PackageIdUnknownOrUnvetted
+import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentValidationError.PackageIdUnknownOrUnvetted
 import com.digitalasset.canton.participant.protocol.submission.UsableSynchronizers
 import com.digitalasset.canton.protocol.ReassignmentId
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
@@ -27,7 +27,8 @@ import scala.concurrent.ExecutionContext
   * @param reassigningParticipants
   *   The list of reassigning participants
   * @param targetTimestamp
-  *   The timestamp of the topology at the target synchronizer to be used for validation.
+  *   The timestamp of the target synchronizer topology on which the submitter declares it built the
+  *   request.
   */
 final case class UnassignmentRequest(
     submitterMetadata: ReassignmentSubmitterMetadata,
@@ -147,7 +148,7 @@ object UnassignmentRequest {
           sourcePsid.unwrap,
           sourceTopology.unwrap,
           stakeholders.all.view.map(_ -> contracts.sourcePackageIds.unwrap).toMap,
-          sourceTopology.unwrap.referenceTime,
+          sourceTopology.unwrap.timestamp,
         )
         .leftMap[ReassignmentValidationError](unknownPackage =>
           PackageIdUnknownOrUnvetted(contractIds, unknownPackage.unknownTo, sourcePsid.unwrap)
@@ -158,7 +159,7 @@ object UnassignmentRequest {
           targetPsid.unwrap,
           targetTopology.unwrap,
           stakeholders.all.view.map(_ -> contracts.targetPackageIds.unwrap).toMap,
-          targetTopology.unwrap.referenceTime,
+          targetTopology.unwrap.timestamp,
         )
         .leftMap[ReassignmentValidationError](unknownPackage =>
           PackageIdUnknownOrUnvetted(contractIds, unknownPackage.unknownTo, targetPsid.unwrap)
@@ -174,6 +175,12 @@ object UnassignmentRequest {
         contractValidator,
         contracts.contracts,
         _.targetValidationPackageId.unwrap,
+      )
+
+      _ <- ReassignmentValidation.checkMaxSerializationVersion(
+        ReassignmentRef.ContractIdRef(contractIds),
+        targetPsid,
+        contracts,
       )
 
     } yield {
@@ -193,5 +200,4 @@ object UnassignmentRequest {
       )
     }
   }
-
 }

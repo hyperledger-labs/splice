@@ -941,6 +941,22 @@ abstract class TopologyAdminConnection(
                           s"Submitted proposal ${signed.mapping} for $description, waiting until the proposal gets accepted"
                         )
                         signed.mapping
+                      }.recoverWith {
+                        // From PV37 a p2p proposal that switches active -> onboarding is rejected as an invalid hosting state transition even if this is just caused because it was built on a stale base and has an invalid serial
+                        case ex: StatusRuntimeException
+                            if ex.getStatus.getCode == Status.Code.INVALID_ARGUMENT &&
+                              Option(ex.getStatus.getDescription)
+                                .exists(_.contains("Invalid hosting state transitions")) =>
+                          check(AuthorizedState)
+                            .fold(_.map(_.base.serial), r => Some(r.base.serial))
+                            .flatMap {
+                              case Some(currentSerial)
+                                  if !resultBeforeProposingChange
+                                    .map(_.base.serial)
+                                    .contains(currentSerial) =>
+                                Future.failed(AuthorizedStateChanged(currentSerial))
+                              case _ => Future.failed(ex)
+                            }
                       }
                     }
                   }

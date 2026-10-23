@@ -9,7 +9,12 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.crypto.{SyncCryptoError, SynchronizerCryptoClient}
+import com.digitalasset.canton.crypto.signer.SyncCryptoSigner.SigningTimestampOverrides
+import com.digitalasset.canton.crypto.{
+  SyncCryptoError,
+  SynchronizerCryptoClient,
+  SynchronizerSnapshotSyncCryptoApi,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown, UnlessShutdown}
@@ -25,6 +30,7 @@ import com.digitalasset.canton.sequencing.client.{
   SequencerClientSend,
 }
 import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{MediatorId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -52,8 +58,11 @@ private[mediator] trait VerdictSender {
   def sendResultBatch(
       requestId: RequestId,
       batch: Batch[DefaultOpenEnvelope],
+      currentSnapshotApproximation: Option[SynchronizerSnapshotSyncCryptoApi],
+      // refers to the `clock.now` at the time of signing the verdicts
+      approximateTimestampForSigning: CantonTimestamp,
       decisionTime: CantonTimestamp,
-      aggregationRule: Option[AggregationRule],
+      aggregationRule: AggregationRule,
       sendVerdictWithDelay: Option[Duration],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit]
 
@@ -78,9 +87,10 @@ private[mediator] object VerdictSender {
       crypto: SynchronizerCryptoClient,
       mediatorId: MediatorId,
       parameters: VerdictSenderParameters,
+      clock: Clock,
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext, closeContext: CloseContext): VerdictSender =
-    new DefaultVerdictSender(sequencerSend, crypto, mediatorId, parameters, loggerFactory)
+    new DefaultVerdictSender(sequencerSend, crypto, mediatorId, parameters, clock, loggerFactory)
 }
 
 final case class VerdictSenderParameters(
@@ -97,6 +107,7 @@ private[mediator] class DefaultVerdictSender(
     crypto: SynchronizerCryptoClient,
     mediatorId: MediatorId,
     parameters: VerdictSenderParameters,
+    clock: Clock,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext, closeContext: CloseContext)
     extends VerdictSender
@@ -110,11 +121,12 @@ private[mediator] class DefaultVerdictSender(
       decisionTime: CantonTimestamp,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val resultET = for {
-      snapshot <- EitherT.right(crypto.ips.awaitSnapshot(requestId.unwrap))
+      // Checks for aggregation should be done with the snapshot at the time of the request.
+      snapshot <- EitherT.right(crypto.awaitSnapshot(requestId.unwrap))
       aggregationRule <- EitherT
         .right(
           groupAggregationRule(
-            snapshot,
+            snapshot.ipsSnapshot,
             request.mediator,
             protocolVersion,
           )
@@ -125,10 +137,32 @@ private[mediator] class DefaultVerdictSender(
             )
         )
       sendVerdict <- EitherT
-        .right(shouldSendVerdict(requestId, request.mediator, snapshot))
-      batch <- createResults(requestId, request, verdict)
+        .right(shouldSendVerdict(requestId, request.mediator, snapshot.ipsSnapshot))
+
+      // we use a snapshot approximation to generate the signature, effectively "guessing" what the sequenced time
+      // is going to be.
+      currentSnapshotApproximation <- EitherT.right(crypto.currentSnapshotApproximation)
+      // Reused for both the inner result message signing and the submission request signing
+      // below, so that both signatures are computed as of the same approximate time.
+      signingTimestamp = clock.now
+      batch <- createResults(
+        requestId,
+        request,
+        verdict,
+        currentSnapshotApproximation,
+        signingTimestamp,
+        decisionTime,
+      )
       _ <- EitherT.right[SyncCryptoError](
-        sendResultBatch(requestId, batch, decisionTime, aggregationRule, sendVerdict)
+        sendResultBatch(
+          requestId,
+          batch,
+          Some(currentSnapshotApproximation),
+          signingTimestamp,
+          decisionTime,
+          aggregationRule,
+          sendVerdict,
+        )
       )
     } yield ()
 
@@ -142,8 +176,10 @@ private[mediator] class DefaultVerdictSender(
   override def sendResultBatch(
       requestId: RequestId,
       batch: Batch[DefaultOpenEnvelope],
+      currentSnapshotApproximation: Option[SynchronizerSnapshotSyncCryptoApi],
+      approximateTimestampForSigning: CantonTimestamp,
       decisionTime: CantonTimestamp,
-      aggregationRule: Option[AggregationRule],
+      aggregationRule: AggregationRule,
       sendVerdictWithDelay: Option[Duration],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val callback: SendCallback = {
@@ -188,15 +224,16 @@ private[mediator] class DefaultVerdictSender(
           sequencerSend
             .send(
               batch,
+              currentSnapshotApproximation = currentSnapshotApproximation,
               timestamps = SendRequestTimestamps(
-                topologyTimestamp =
-                  if (protocolVersion <= ProtocolVersion.v34) Some(requestId.unwrap) else None,
-                // We use `clock.now` to stay consistent with how other submission requests are signed.
-                approximateTimestampForSigning = sequencerSend.clock.now,
+                // We reuse the same `approximateTimestampForSigning` used to sign the inner result message, so that both
+                // signatures are computed as of the same approximate time (and thus consistently
+                // pick the same session signing key, if any).
+                approximateTimestampForSigning = approximateTimestampForSigning,
                 maxSequencingTime = decisionTime,
               ),
               callback = callback,
-              aggregationRule = aggregationRule,
+              aggregationRule = Some(aggregationRule),
               amplify = true,
             )
         ) {
@@ -248,6 +285,9 @@ private[mediator] class DefaultVerdictSender(
       requestId: RequestId,
       request: MediatorConfirmationRequest,
       verdict: Verdict,
+      snapshotForSigning: SynchronizerSnapshotSyncCryptoApi,
+      now: CantonTimestamp,
+      decisionTime: CantonTimestamp,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncCryptoError, Batch[DefaultOpenEnvelope]] =
@@ -282,10 +322,13 @@ private[mediator] class DefaultVerdictSender(
         SignedProtocolMessage
           .signAndCreate(
             result,
-            snapshot,
-            // `ConfirmationResultMessage`s are signed and verified with a `fixed` timestamp,
-            // so no approximate timestamp is needed.
-            None,
+            snapshotForSigning,
+            Some(
+              SigningTimestampOverrides(
+                approximateTimestamp = now,
+                validityPeriodEnd = Some(decisionTime),
+              )
+            ),
           )
           .map(signedResult => List(OpenEnvelope(signedResult, recipients)(protocolVersion)))
       }
@@ -329,7 +372,7 @@ private[mediator] class DefaultVerdictSender(
       val index = group.active.indexOf(mediatorId)
       if (index > -1) {
         val position =
-          ((index + requestId.unwrap.toMicros) % (group.active.size)) - group.threshold.value - parameters.livenessMargin.value
+          ((index + requestId.unwrap.toMicros) % group.active.size) - group.threshold.value - parameters.livenessMargin.value
         // if position is negative, then we want to send immediately as we are part of the first threshold + extra nodes
         // otherwise, send with a delay proportional to our position in the group
         if (position > -1) {
@@ -347,7 +390,7 @@ private[mediator] class DefaultVerdictSender(
       protocolVersion: ProtocolVersion,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, Option[AggregationRule]] = {
+  ): EitherT[FutureUnlessShutdown, String, AggregationRule] = {
     val index = mediatorGroup.group
     for {
       mediatorGroup <- EitherT(
@@ -360,24 +403,9 @@ private[mediator] class DefaultVerdictSender(
           )
       )
     } yield {
-      val activeNE = NonEmpty
-        .from(mediatorGroup.active)
-        .getOrElse(
-          ErrorUtil.invalidState(
-            "MediatorGroup is expected to have at least 1 active member at this point"
-          )
-        )
-
-      // We need aggregation only if the mediator group is truly decentralized
-      // With PV35 we do always need to set it as we will be checking the group at
-      // time of delivery and not at time of construction.
-      Option.when(mediatorGroup.threshold.unwrap > 1 || protocolVersion > ProtocolVersion.v34)(
-        AggregationRule.activeMediators(
-          activeNE,
-          mediatorGroup.index,
-          mediatorGroup.threshold,
-          protocolVersion,
-        )
+      AggregationRule.activeMediators(
+        mediatorGroup.index,
+        protocolVersion,
       )
     }
   }
@@ -407,7 +435,13 @@ private[mediator] class DefaultVerdictSender(
         }
     if (recipientsByViewTypeAndRootHash.nonEmpty) {
       for {
+
         snapshot <- crypto.awaitSnapshot(requestId.unwrap)
+        // we use a snapshot approximation to generate the signature, effectively "guessing" what the sequenced time is going to be
+        currentSnapshotApproximation <- crypto.currentSnapshotApproximation
+        // Reused for both the inner rejection message signing and the submission request signing
+        // below, so that both signatures are computed as of the same approximate time.
+        signingTimestamp = clock.now
         envs <- MonadUtil.parTraverseWithLimit(parameters.parallelism)(
           recipientsByViewTypeAndRootHash.toSeq
         ) { case ((viewType, rootHash), flatRecipients) =>
@@ -424,10 +458,13 @@ private[mediator] class DefaultVerdictSender(
           SignedProtocolMessage
             .trySignAndCreate(
               rejection,
-              snapshot,
-              // `ConfirmationResultMessage`s are signed and verified with a `fixed` timestamp,
-              // so no approximate timestamp is needed.
-              None,
+              currentSnapshotApproximation,
+              Some(
+                SigningTimestampOverrides(
+                  approximateTimestamp = signingTimestamp,
+                  validityPeriodEnd = Some(decisionTime),
+                )
+              ),
             )
             .map(_ -> recipients)
         }
@@ -450,7 +487,7 @@ private[mediator] class DefaultVerdictSender(
             // if no mediator could be detected from RHMs, participants will also detect this and there's not need to send a reject
             mediatorGroup =>
               for {
-                aggregationRuleO <- groupAggregationRule(
+                aggregationRule <- groupAggregationRule(
                   snapshot.ipsSnapshot,
                   mediatorGroup,
                   protocolVersion,
@@ -467,8 +504,10 @@ private[mediator] class DefaultVerdictSender(
                   sendResultBatch(
                     requestId,
                     batch,
+                    Some(currentSnapshotApproximation),
+                    signingTimestamp,
                     decisionTime,
-                    aggregationRule = aggregationRuleO,
+                    aggregationRule = aggregationRule,
                     sendVerdict,
                   ),
                   s"Failed to send REJECT verdict for request=$requestId",

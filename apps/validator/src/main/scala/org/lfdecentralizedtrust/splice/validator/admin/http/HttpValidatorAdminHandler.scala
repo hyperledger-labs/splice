@@ -44,6 +44,7 @@ import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.canton.protocol.SynchronizerLimits
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -276,6 +277,8 @@ class HttpValidatorAdminHandler(
   ): GenericSignedTopologyTransaction = {
     val tx = TopologyTransaction
       .fromTrustedByteString(
+        TopologyTransactionDeserializationContext(SynchronizerLimits.default)
+      )(
         ByteString.copyFrom(Base64.getDecoder.decode(topologyTx.topologyTx))
       )
       .valueOr(error =>

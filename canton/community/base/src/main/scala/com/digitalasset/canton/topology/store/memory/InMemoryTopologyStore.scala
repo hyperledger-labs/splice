@@ -595,6 +595,25 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
     PekkoUtil.futureSourceUS(dataF)
   }
 
+  override def findEssentialStateInInterval(
+      fromExclusiveO: Option[SequencedTime],
+      toInclusive: SequencedTime,
+      includeRejected: Boolean,
+  )(implicit traceContext: TraceContext): Source[GenericStoredTopologyTransaction, NotUsed] = {
+    // 1. load all transactions with a sequenced time <= asOfInclusive, including proposals
+    val dataF = filteredState(
+      (lock.exclusive {
+        topologyTransactionStore.toSeq
+      }),
+      entry => fromExclusiveO.forall(entry.sequenced > _) && entry.sequenced <= toInclusive,
+      includeRejected = includeRejected,
+    ).map(
+      // 2. transform the result such that the validUntil fields are set as they were at maxEffective time of the snapshot
+      _.asSnapshotAtMaxEffectiveTime
+    ).map(stored => Source(stored.result))
+    PekkoUtil.futureSourceUS(dataF)
+  }
+
   override def findEssentialStateHashAtSequencedTime(
       asOfInclusive: SequencedTime
   )(implicit materializer: Materializer, traceContext: TraceContext): FutureUnlessShutdown[Hash] =
@@ -704,18 +723,39 @@ class InMemoryTopologyStore[+StoreId <: TopologyStoreId](
       _.result.findLast(tx => tx.hash == transaction.hash && tx.validFrom.value < asOfExclusive)
     )
 
+  override def findStoredByHashes(
+      asOfExclusive: CantonTimestamp,
+      hashes: Set[TxHash],
+      includeRejected: Boolean = false,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[TxHash, GenericStoredTopologyTransaction]] =
+    FutureUnlessShutdown.wrap {
+      lock.exclusive {
+        topologyTransactionStore.iterator
+          .filter(entry =>
+            hashes.contains(entry.transaction.hash) &&
+              entry.from.value < asOfExclusive &&
+              (includeRejected || entry.rejected.isEmpty)
+          )
+          .map(entry => entry.transaction.hash -> entry.toStoredTransaction)
+          .toMap
+      }
+    }
+
   override def findStoredForVersion(
       asOfExclusive: CantonTimestamp,
       transaction: GenericTopologyTransaction,
-      protocolVersion: ProtocolVersion,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[GenericStoredTopologyTransaction]] = {
-    val rpv = TopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
+    val rpv = transaction.representativeProtocolVersion
 
     allTransactions().map(
       _.result.findLast(tx =>
-        tx.transaction.transaction == transaction && tx.transaction.representativeProtocolVersion == rpv && tx.validFrom.value < asOfExclusive
+        // Comparison is done against the stored INNER payload (tx.transaction.transaction),
+        // not the wrapper (tx.transaction), bringing this in line with DbTopologyStore.
+        tx.transaction.transaction == transaction && tx.transaction.transaction.representativeProtocolVersion == rpv && tx.validFrom.value < asOfExclusive
       )
     )
   }

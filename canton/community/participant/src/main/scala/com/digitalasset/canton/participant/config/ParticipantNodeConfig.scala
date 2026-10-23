@@ -21,7 +21,6 @@ import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConf
 import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   IdentityProviderManagementConfig,
-  IndexServiceConfig as LedgerIndexServiceConfig,
   InteractiveSubmissionServiceConfig,
   PackageServiceConfig,
   PartyManagementServiceConfig,
@@ -30,6 +29,7 @@ import com.digitalasset.canton.platform.config.{
   TrafficAccountingConfig,
   UpdateServiceConfig,
   UserManagementServiceConfig,
+  IndexServiceConfig as LedgerIndexServiceConfig,
 }
 import com.digitalasset.canton.platform.indexer.IndexerConfig
 import com.digitalasset.canton.platform.store.backend.postgresql.PostgresDataSourceConfig
@@ -131,8 +131,14 @@ final case class ParticipantNodeConfig(
       .modify(ReplicationConfig.withDefaultO(storage, _))
 }
 
-/** Participant features configuration */
-final case class ParticipantFeaturesConfig()
+/** Participant features configuration
+  *
+  * @param deprecated
+  *   Feature flags to disable deprecated endpoints before their removal.
+  */
+final case class ParticipantFeaturesConfig(
+    deprecated: DeprecatedApiConfig = DeprecatedApiConfig()
+)
 
 /** Configuration to connect the console to a participant running remotely.
   *
@@ -361,12 +367,12 @@ object TestingTimeServiceConfig {
   *   When true (default), protocol feature flags will be automatically updated when the node
   *   connects to a synchronizer.
   * @param enableAllLedgerApiReassignments
-  *   Determines whether ACS imports use Created or Assigned events. Similarly, determines whether
-  *   the repair service uses Created/Archive events or Assigned/Unassigned events for add and purge
-  *   respectively. Only enable if your Ledger API consumers can process (un)assigned events and
-  *   require non-zero reassignment counters.
-  *   - false (Default): Uses Created/Archive; resets reassignment counters to zero.
-  *   - true: Uses Assigned/Unassigned; preserves existing reassignment counters.
+  *   Determines how ACS imports and the repair service add and purge commands are represented on
+  *   the Ledger API. Reassignment counters are preserved in both cases.
+  *   - false (Default): Contracts with a zero reassignment counter are represented as
+  *     Created/Archive events, contracts with a non-zero reassignment counter are represented as
+  *     Assigned/Unassigned events.
+  *   - true: All contracts are represented as Assigned/Unassigned events.
   *
   * Note: If multi-synchronizer is enabled via the EnableMultiSynchronizer flag, then Assigned and
   * Unassigned event will be emitted when processing reassignments messages from the synchronizer
@@ -392,7 +398,7 @@ final case class ParticipantNodeParameterConfig(
     caching: CachingConfigs = CachingConfigs(),
     stores: ParticipantStoreConfig = ParticipantStoreConfig(),
     minimumProtocolVersion: Option[ParticipantProtocolVersion] = Some(
-      ParticipantProtocolVersion(ProtocolVersion.v34)
+      ParticipantProtocolVersion(ProtocolVersion.v36)
     ),
     devVersionSupport: Boolean = false,
     alphaVersionSupport: Boolean = false,
@@ -563,7 +569,7 @@ object AcsCommitmentConfig {
       state match {
         case Always => false
         case Never => true
-        case OnNewProtocolVersions => protocolVersion < ProtocolVersion.acsCommitmentRedesign
+        case OnNewProtocolVersions => protocolVersion < ProtocolVersion.v36
       }
   }
 }
@@ -806,11 +812,19 @@ object ContractLoaderConfig {
 }
 
 /** Parameters for the Online Party Replication (OnPR) alpha preview feature
+  *
+  * @param unsafeSequencerChannelSupport
+  *   enable Sequencer Channel based ACS replication
+  * @param target
+  *   target participant specific configuration
+  * @param testInterceptor
+  *   test-only configuration to inject ProgrammableSequencer-style behavior during ACS replication
+  *   protocol processing.
   */
 final case class AlphaOnlinePartyReplicationConfig(
-    testInterceptor: Option[AlphaOnlinePartyReplicationConfig.TestInterceptor] = None,
     unsafeSequencerChannelSupport: Boolean = false,
-    pauseSynchronizerIndexingDuringPartyReplication: Boolean = false,
+    target: OnlinePartyReplicationTargetConfig = OnlinePartyReplicationTargetConfig(),
+    testInterceptor: Option[AlphaOnlinePartyReplicationConfig.TestInterceptor] = None,
 )
 
 object AlphaOnlinePartyReplicationConfig {
@@ -821,5 +835,17 @@ object AlphaOnlinePartyReplicationConfig {
     * is not possible to set through pureconfig.
     */
   type TestInterceptor = () => PartyReplicationTestInterceptor
-
 }
+
+/** Target participant specific online party replication configuration.
+  *
+  * @param pauseSynchronizerIndexingDuringPartyReplication
+  *   whether to pause the indexer during online party replication.
+  * @param disableAcsDigestSourceSignatureValidation
+  *   by default the target validates the source participant signature of the ACS digest. This
+  *   allows to disable signature verification.
+  */
+final case class OnlinePartyReplicationTargetConfig(
+    pauseSynchronizerIndexingDuringPartyReplication: Boolean = false,
+    disableAcsDigestSourceSignatureValidation: Boolean = false,
+)

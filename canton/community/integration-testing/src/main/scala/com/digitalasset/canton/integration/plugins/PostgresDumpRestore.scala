@@ -8,8 +8,9 @@ import com.digitalasset.canton.console.InstanceReference
 import com.digitalasset.canton.integration.TestConsoleEnvironment
 import com.digitalasset.canton.integration.util.CommandRunner
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.store.db.DbStorageSetup.DbBasicConfig
-import com.digitalasset.canton.store.db.PostgresTestContainerSetup
+import com.digitalasset.canton.store.db.{PostgresTestContainerSetup, PostgresTestDatabase}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Mutex
 import com.digitalasset.canton.{TempDirectory, TempFile}
@@ -43,6 +44,9 @@ sealed trait PostgresDumpRestore extends DbDumpRestore with NamedLogging {
     _ <- runDumpCommand(plugin.generateDbName(nodeName), tempFile.path)
   } yield ()
 
+  def saveDump(node: InstanceReference, dumpFileName: Path): Future[Unit] =
+    runDumpCommand(plugin.generateDbName(node.name), dumpFileName)
+
   def restoreDump(node: InstanceReference, dumpFileName: Path)(implicit
       env: TestConsoleEnvironment,
       traceContext: TraceContext,
@@ -55,9 +59,7 @@ sealed trait PostgresDumpRestore extends DbDumpRestore with NamedLogging {
     logger.debug(s"Starting to restore dump for node $nodeName")
     for {
       // somehow, pg_restore -c -C doesn't seem to cleanup the database, so doing it separately
-      _ <- plugin
-        .recreateDatabaseForNodeWithName(nodeName)
-        .failOnShutdownToAbortException("restoreDump")
+      _ <- CantonGrpcUtil.shutdownAsGrpcError(plugin.recreateDatabaseForNodeWithName(nodeName))
       _ = logger.debug(s"Successfully recreated database for node $nodeName, now restoring dump")
       _ <- runDumpOrRestoreCommand(
         "pg_restore",
@@ -82,8 +84,8 @@ sealed trait PostgresDumpRestore extends DbDumpRestore with NamedLogging {
       dbName: String,
   ): (String, Map[String, String]) = {
     val basicConfig = dbBasicConfig
-    val dbUserName = s"$dbName-user"
-    val dbPassword = "user"
+    val dbUserName = PostgresTestDatabase.userName(dbName)
+    val dbPassword = PostgresTestDatabase.password
     val host = basicConfig.host
 
     (
@@ -119,9 +121,6 @@ final case class LocalPostgresDumpRestore(
 
   // In the non-docker case, this is a noop
   def copyToLocal(source: TempDirectory, target: File): Unit = ()
-
-  def saveDump(node: InstanceReference, dumpFileName: Path): Future[Unit] =
-    runDumpCommand(plugin.generateDbName(node.name), dumpFileName)
 
   protected def runDumpOrRestoreCommand(
       command: String,

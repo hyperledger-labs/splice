@@ -3,7 +3,11 @@
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc
 
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcConnectionManager.PeerSender
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
@@ -22,7 +26,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.Mi
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.NamedLoggingUtils
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.BftOrderingMessage
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.AtomicUtil
+import com.digitalasset.canton.util.{AtomicUtil, SingleUseCell}
 import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.AtomicReference
@@ -35,17 +39,14 @@ final class P2PGrpcConnectionState(
 ) extends P2PConnectionState
     with NamedLogging
     with NamedLoggingUtils
-    with PrettyPrinting {
+    with PrettyPrintingFromCompanion {
 
   import P2PGrpcConnectionState.*
 
   private val stateRef = new AtomicReference(State())
 
-  override protected def pretty: Pretty[P2PGrpcConnectionState] =
-    prettyOfClass(
-      param("thisNode", _.thisNode.doubleQuoted),
-      param("state", _.stateRef.get()),
-    )
+  override def prettyCompanion: PrettyPrintingCompanion[P2PGrpcConnectionState] =
+    P2PGrpcConnectionState
 
   override def connections(implicit
       traceContext: TraceContext
@@ -79,8 +80,17 @@ final class P2PGrpcConnectionState(
   ): Boolean =
     connections.flatMap(_._1).contains(p2pEndpointId)
 
-  override def isOutgoing(p2pEndpointId: P2PEndpoint.Id): Boolean =
-    stateRef.get().p2pEndpointIdToNetworkRef.get(p2pEndpointId).exists(_.isOutgoingConnection)
+  override def isOutgoing(p2pEndpointId: P2PEndpoint.Id): Boolean = {
+    val state = stateRef.get()
+    import state.*
+    // Report the active transport's direction. Without a sender, treat an existing ref as an
+    //  outgoing attempt, including during teardown when a ref can temporarily outlive its sender.
+    p2pEndpointIdToBftNodeId
+      .get(p2pEndpointId)
+      .flatMap(bftNodeIdToPeerSender.get)
+      .map(_.isOutgoingConnection)
+      .getOrElse(p2pEndpointIdToNetworkRef.contains(p2pEndpointId))
+  }
 
   override def isConnected(p2pAddressId: P2PAddress.Id)(implicit
       traceContext: TraceContext
@@ -99,7 +109,7 @@ final class P2PGrpcConnectionState(
     stateRef.get().p2pEndpointIdToBftNodeId.get(p2pEndpointId)
 
   override def getNetworkRef(bftNodeId: BftNodeId): Option[P2PNetworkRef[BftOrderingMessage]] =
-    stateRef.get().bftNodeIdToNetworkRef.get(bftNodeId).map(_.networkRef)
+    stateRef.get().bftNodeIdToNetworkRef.get(bftNodeId)
 
   def getSender(
       p2pAddressId: P2PAddress.Id
@@ -218,27 +228,53 @@ final class P2PGrpcConnectionState(
   )(
       createNetworkRef: () => P2PNetworkRef[BftOrderingMessage]
   )(implicit traceContext: TraceContext): Unit = {
+    // The network ref (and thus its connection actor) is created eagerly, on this (the caller's,
+    //  i.e. the P2P network output module actor) thread, and *before* it is published to `stateRef`.
+    //  This ensures a concurrent shutdown or consolidation always observes the ref and can close it,
+    //  rather than racing with a still-pending creation and leaking an untracked connection actor.
+    //
+    //  Creation uses a two-phase start: the ref is created parked and inert (its connection actor
+    //  does not initialize nor touch any address-based connection state), and only the winning ref
+    //  is activated, via `startConnection()`, *after* it has been published below. This is why a
+    //  parked ref created during a superseded attempt can simply be closed without corrupting the
+    //  state now owned by the winner for the same address.
+    //
+    //  Creation is memoized so that it happens at most once even though the update function may be
+    //  re-run on CAS retries. It is only triggered when a new ref is actually needed (i.e. from the
+    //  `created` branch of the state transition), so `createNetworkRef` is never called when a ref
+    //  already exists.
+    val createdNetworkRef = new SingleUseCell[P2PNetworkRef[BftOrderingMessage]]
+    def getOrCreateNetworkRef(): P2PNetworkRef[BftOrderingMessage] =
+      createdNetworkRef.getOrElse {
+        val ref = createNetworkRef()
+        createdNetworkRef.putIfAbsent(ref).getOrElse(ref)
+      }
+
     val (prevState, newState, created) =
       AtomicUtil.updateAndGetComputed(stateRef)(
-        _.addNetworkRefIfMissing(p2pAddressId, createNetworkRef)
+        _.addNetworkRefIfMissing(p2pAddressId, () => getOrCreateNetworkRef())
       )
 
     if (!created) {
+      // A network ref may have been created during a superseded CAS attempt (one that lost the race
+      //  to a concurrent modification and, on retry, found a ref already present); it was never
+      //  installed and never started, so closing it here is inert (no address-based cleanup) and
+      //  simply avoids leaking its parked connection actor.
+      createdNetworkRef.get.foreach { orphanNetworkRef =>
+        logger.debug(
+          s"Closing network ref ${objId(orphanNetworkRef)} created for $p2pAddressId during a " +
+            "superseded attempt, as one already exists"
+        )
+        orphanNetworkRef.close()
+      }
       actionIfPresent()
       logger.debug(s"No network ref created for $p2pAddressId as one already exists")
     } else {
-      // Trigger the network ref creation
-      p2pAddressId match {
-        case Left(p2pEndpointId) =>
-          newState.p2pEndpointIdToNetworkRef.get(p2pEndpointId).foreach { networkRefEntry =>
-            val networkRef = networkRefEntry.networkRef
-            logger.debug(s"Created network ref ${objId(networkRef)} for endpoint $p2pEndpointId")
-          }
-        case Right(bftNodeId) =>
-          newState.bftNodeIdToNetworkRef.get(bftNodeId).foreach { networkRefEntry =>
-            val networkRef = networkRefEntry.networkRef
-            logger.debug(s"Created network ref ${objId(networkRef)} for BFT node ID $bftNodeId")
-          }
+      // The winning ref has been published, so it is now safe to start its connection: any
+      //  concurrent shutdown or consolidation can already observe and close it through the state.
+      createdNetworkRef.get.foreach { networkRef =>
+        logger.debug(s"Created network ref ${objId(networkRef)} for $p2pAddressId, starting it")
+        networkRef.startConnection()
       }
       val trimmedPrevState = prevState.only(p2pAddressId)
       val trimmedNewState = newState.only(p2pAddressId)
@@ -355,21 +391,13 @@ final class P2PGrpcConnectionState(
   }
 }
 
-object P2PGrpcConnectionState {
+object P2PGrpcConnectionState extends PrettyPrintingCompanion[P2PGrpcConnectionState] {
 
-  private final class P2PNetworkRefEntry(
-      private val createNetworkRef: () => P2PNetworkRef[BftOrderingMessage],
-      val isOutgoingConnection: Boolean,
-  ) extends PrettyPrinting {
-
-    lazy val networkRef: P2PNetworkRef[BftOrderingMessage] = createNetworkRef()
-
-    override protected def pretty: Pretty[P2PNetworkRefEntry] =
-      prettyOfClass(
-        param("networkRef", _.networkRef.toString.unquoted),
-        param("isOutgoingConnection", _.isOutgoingConnection),
-      )
-  }
+  override protected val pretty: Pretty[P2PGrpcConnectionState] =
+    prettyOfClass(
+      param("thisNode", _.thisNode.doubleQuoted),
+      param("state", _.stateRef.get()),
+    )
 
   private final case class State(
       // Node IDs and senders are in a 1:1 relationship, so we use a bidirectional mapping.
@@ -381,43 +409,16 @@ object P2PGrpcConnectionState {
 
       // Node IDs and network refs are kept in a 1:1 relationship, but we never look up by network ref,
       //  so a single map is sufficient.
-      bftNodeIdToNetworkRef: Map[BftNodeId, P2PNetworkRefEntry] = Map.empty,
+      bftNodeIdToNetworkRef: Map[BftNodeId, P2PNetworkRef[BftOrderingMessage]] = Map.empty,
 
       // For outgoing connections, a network ref is initially associated to an endpoint ID
       //  but is later be associated to a BFT node ID when authentication completes, or
       //  if an outgoing connection turns out to be a duplicate of an existing one
       //  for the same BFT node ID.
-      p2pEndpointIdToNetworkRef: Map[P2PEndpoint.Id, P2PNetworkRefEntry] = Map.empty,
-  ) extends PrettyPrinting {
+      p2pEndpointIdToNetworkRef: Map[P2PEndpoint.Id, P2PNetworkRef[BftOrderingMessage]] = Map.empty,
+  ) extends PrettyPrintingFromCompanion {
 
-    override protected def pretty: Pretty[State] =
-      prettyOfClass(
-        param(
-          "bftNodeIdToPeerSender",
-          _.bftNodeIdToPeerSender.map { case (bftNodeId, sender) =>
-            bftNodeId.doubleQuoted -> sender.toString.unquoted
-          },
-        ),
-        param(
-          "peerSenderToBftNodeId",
-          _.peerSenderToBftNodeId.map { case (sender, bftNodeId) =>
-            sender.toString.unquoted -> bftNodeId.doubleQuoted
-          },
-        ),
-        param(
-          "p2pEndpointIdToBftNodeId",
-          _.p2pEndpointIdToBftNodeId.map { case (p2pEndpointId, bftNodeId) =>
-            p2pEndpointId -> bftNodeId.doubleQuoted
-          },
-        ),
-        param(
-          "bftNodeIdToNetworkRef",
-          _.bftNodeIdToNetworkRef.map { case (bftNodeId, networkRefEntry) =>
-            bftNodeId.doubleQuoted -> networkRefEntry
-          },
-        ),
-        param("p2pEndpointIdToNetworkRef", _.p2pEndpointIdToNetworkRef),
-      )
+    override def prettyCompanion: PrettyPrintingCompanion[State] = State
 
     // TODO(#34191) and restructure to avoid local mutability
     // Returns the new state with the endpoint associated to the node,
@@ -623,7 +624,7 @@ object P2PGrpcConnectionState {
                         s"No connection nor network ref found for $p2pEndpointId"
                       ),
                     )
-                } { e =>
+                } { networkRef =>
                   if (clearNetworkRefAssociations) {
                     val updatedState =
                       copy(p2pEndpointIdToNetworkRef =
@@ -631,17 +632,17 @@ object P2PGrpcConnectionState {
                       )
                     updatedState ->
                       ResultWithLogs(
-                        (this, updatedState, None, Some(e.networkRef), Seq(p2pEndpointId)),
+                        (this, updatedState, None, Some(networkRef), Seq(p2pEndpointId)),
                         Level.DEBUG -> (() =>
-                          s"Network ref ${objId(e.networkRef)} unassociated from $p2pEndpointId (as requested)"
+                          s"Network ref ${objId(networkRef)} unassociated from $p2pEndpointId (as requested)"
                         ),
                       )
                   } else {
                     this ->
                       ResultWithLogs(
-                        (this, this, None, Some(e.networkRef), Seq(p2pEndpointId)),
+                        (this, this, None, Some(networkRef), Seq(p2pEndpointId)),
                         Level.DEBUG -> (() =>
-                          s"Network ref ${objId(e.networkRef)} not unassociated from $p2pEndpointId (as requested)"
+                          s"Network ref ${objId(networkRef)} not unassociated from $p2pEndpointId (as requested)"
                         ),
                       )
                   }
@@ -690,10 +691,11 @@ object P2PGrpcConnectionState {
 
     // Associates a new network ref to the node ID if one does not exist already,
     //  returning the new state, the state transition and a boolean indicating
-    //  whether a new network ref was associated.
+    //  whether a new network ref was associated. `getOrCreateNetworkRef` is only called when a new
+    //  ref is actually needed.
     def addNetworkRefIfMissing(
         p2pAddressId: P2PAddress.Id,
-        createNetworkRef: () => P2PNetworkRef[BftOrderingMessage],
+        getOrCreateNetworkRef: () => P2PNetworkRef[BftOrderingMessage],
     ): (State, (State, State, Boolean)) =
       p2pAddressId match {
         case Left(p2pEndpointId) =>
@@ -710,7 +712,7 @@ object P2PGrpcConnectionState {
                       p2pEndpointIdToNetworkRef
                         .updated(
                           p2pEndpointId,
-                          new P2PNetworkRefEntry(createNetworkRef, isOutgoingConnection = true),
+                          getOrCreateNetworkRef(),
                         )
                     )
                   updatedState ->
@@ -725,20 +727,17 @@ object P2PGrpcConnectionState {
                 }
             ) { bftNodeId =>
               // If the endpoint ID is associated with a BFT node ID, add the network ref
-              //  for the BFT node ID; this is an outgoing connection because the `Left` case
-              //  is only used for outgoing connections.
+              //  for the BFT node ID.
               addNetworkRefForBftNodeIdIfMissing(
                 bftNodeId,
-                createNetworkRef,
-                isOutgoingConnection = true,
+                getOrCreateNetworkRef,
               )
             }
 
         case Right(bftNodeId) =>
           addNetworkRefForBftNodeIdIfMissing(
             bftNodeId,
-            createNetworkRef,
-            isOutgoingConnection = false,
+            getOrCreateNetworkRef,
           )
       }
 
@@ -746,7 +745,7 @@ object P2PGrpcConnectionState {
     //  returning the new state, the state transition and a boolean indicating
     //  whether a new network ref was associated.
     //
-    // Consistently with `consolidateNetworkRefs`, also propagates the entry
+    // Consistently with `consolidateNetworkRefs`, also propagates the ref
     //  to the associated endpoints; this is necessary (and not already done
     //  by `consolidateNetworkRefs`) when a new network ref is created for
     //  a BFT node ID whose endpoints are already associated (e.g., on retry
@@ -755,21 +754,19 @@ object P2PGrpcConnectionState {
     //  happen when the association already exists.
     private def addNetworkRefForBftNodeIdIfMissing(
         bftNodeId: BftNodeId,
-        createNetworkRef: () => P2PNetworkRef[BftOrderingMessage],
-        isOutgoingConnection: Boolean,
+        getOrCreateNetworkRef: () => P2PNetworkRef[BftOrderingMessage],
     ): (State, (State, State, Boolean)) =
       bftNodeIdToNetworkRef
         .get(bftNodeId)
         .fold {
-          val networkRefEntry =
-            new P2PNetworkRefEntry(createNetworkRef, isOutgoingConnection)
+          val networkRef = getOrCreateNetworkRef()
           val associatedEndpointIds =
             p2pEndpointIdToBftNodeId.filter(_._2 == bftNodeId).keys
           val updatedState =
             copy(
-              bftNodeIdToNetworkRef = bftNodeIdToNetworkRef.updated(bftNodeId, networkRefEntry),
+              bftNodeIdToNetworkRef = bftNodeIdToNetworkRef.updated(bftNodeId, networkRef),
               p2pEndpointIdToNetworkRef = p2pEndpointIdToNetworkRef ++
-                associatedEndpointIds.map(_ -> networkRefEntry),
+                associatedEndpointIds.map(_ -> networkRef),
             )
           updatedState -> (
             this,
@@ -802,13 +799,13 @@ object P2PGrpcConnectionState {
           )
 
       maybeExistingNetworkRefAssociatedToNodeIdOrElseEndpoint
-        .map { selectedNetworkRefEntry =>
+        .map { selectedNetworkRef =>
           val newState =
             copy(bftNodeIdToNetworkRef =
               bftNodeIdToNetworkRef
-                .updated(bftNodeId, selectedNetworkRefEntry)
+                .updated(bftNodeId, selectedNetworkRef)
             ) // No-op if there was already a network ref associated to the node ID
-          newState.updateEndpointsNetworkRef(p2pEndpointIds, selectedNetworkRefEntry)
+          newState.updateEndpointsNetworkRef(p2pEndpointIds, selectedNetworkRef)
         }
         .getOrElse(this -> Seq.empty)
     }
@@ -817,20 +814,20 @@ object P2PGrpcConnectionState {
     //  and the network refs to close, if any duplicates were replaced.
     private def updateEndpointsNetworkRef(
         p2pEndpointIds: Iterable[P2PEndpoint.Id],
-        selectedNetworkRefEntry: P2PNetworkRefEntry,
+        selectedNetworkRef: P2PNetworkRef[BftOrderingMessage],
     ): (State, Iterable[(P2PEndpoint.Id, P2PNetworkRef[BftOrderingMessage])]) = {
       val updatedState =
         copy(p2pEndpointIdToNetworkRef =
           p2pEndpointIdToNetworkRef ++
             p2pEndpointIds.map { p2pEndpointId =>
-              p2pEndpointId -> selectedNetworkRefEntry
+              p2pEndpointId -> selectedNetworkRef
             }
         )
 
       val previousAssociatedRefs =
         p2pEndpointIds.flatMap(p2pEndpointId =>
-          p2pEndpointIdToNetworkRef.get(p2pEndpointId).map { networkRefEntry =>
-            p2pEndpointId -> networkRefEntry.networkRef
+          p2pEndpointIdToNetworkRef.get(p2pEndpointId).map { networkRef =>
+            p2pEndpointId -> networkRef
           }
         )
 
@@ -838,7 +835,7 @@ object P2PGrpcConnectionState {
         // Duplicated refs to close
         (for ((p2pEndpointId, networkRef) <- previousAssociatedRefs) yield {
           Option.when(
-            networkRef != selectedNetworkRefEntry.networkRef
+            networkRef != selectedNetworkRef
           )(p2pEndpointId -> networkRef)
         }).flatten
     }
@@ -945,7 +942,7 @@ object P2PGrpcConnectionState {
               (this, Option.empty[P2PNetworkRef[BftOrderingMessage]]),
               Level.DEBUG -> (() => s"No network ref found for $bftNodeId"),
             )
-          } { e =>
+          } { networkRef =>
             val updatedState =
               copy(
                 bftNodeIdToNetworkRef = bftNodeIdToNetworkRef.removed(bftNodeId),
@@ -957,9 +954,9 @@ object P2PGrpcConnectionState {
                 },
               )
             ResultWithLogs(
-              (updatedState, Option.when(closeNetworkRef)(e.networkRef)),
+              (updatedState, Option.when(closeNetworkRef)(networkRef)),
               Level.DEBUG -> (() =>
-                s"Removed network ref ${objId(e.networkRef)} for $bftNodeId and cleaned up its associations"
+                s"Removed network ref ${objId(networkRef)} for $bftNodeId and cleaned up its associations"
               ),
             )
           }
@@ -1067,6 +1064,43 @@ object P2PGrpcConnectionState {
             p2pEndpointIdToBftNodeId.get(endpointId).contains(nodeId)
           }
         },
+      )
+  }
+
+  private object State extends PrettyPrintingCompanion[State] {
+
+    override protected val pretty: Pretty[State] =
+      prettyOfClass(
+        param(
+          "bftNodeIdToPeerSender",
+          _.bftNodeIdToPeerSender.map { case (bftNodeId, sender) =>
+            bftNodeId.doubleQuoted -> sender.toString.unquoted
+          },
+        ),
+        param(
+          "peerSenderToBftNodeId",
+          _.peerSenderToBftNodeId.map { case (sender, bftNodeId) =>
+            sender.toString.unquoted -> bftNodeId.doubleQuoted
+          },
+        ),
+        param(
+          "p2pEndpointIdToBftNodeId",
+          _.p2pEndpointIdToBftNodeId.map { case (p2pEndpointId, bftNodeId) =>
+            p2pEndpointId -> bftNodeId.doubleQuoted
+          },
+        ),
+        param(
+          "bftNodeIdToNetworkRef",
+          _.bftNodeIdToNetworkRef.map { case (bftNodeId, networkRef) =>
+            bftNodeId.doubleQuoted -> networkRef.toString.unquoted
+          },
+        ),
+        param(
+          "p2pEndpointIdToNetworkRef",
+          _.p2pEndpointIdToNetworkRef.map { case (endpointId, networkRef) =>
+            endpointId -> networkRef.toString.unquoted
+          },
+        ),
       )
   }
 }

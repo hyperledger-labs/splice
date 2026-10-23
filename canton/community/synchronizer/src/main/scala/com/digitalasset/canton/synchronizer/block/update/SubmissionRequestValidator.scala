@@ -20,7 +20,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.GroupAddressResolver
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
@@ -87,7 +87,7 @@ private[update] final class SubmissionRequestValidator(
           envelopesHaveValidSignature <- batchSignatureFE
         } yield {
           // if all have valid signatures, then we'll mark this event as prevalidated, which means that the signature
-          // validation will be skipped and we only need to check that the key used was really the one valid
+          // validation will be skipped, and we only need to check that the key used was really the one valid
           // at the given time (using verifyKeyOwner)
           TracedPossiblyPrevalidated(
             send,
@@ -115,17 +115,11 @@ private[update] final class SubmissionRequestValidator(
     * despite returning a left, should be charged to the submitting sender.
     *
     * We can do this after we validated the submission signature.
-    *
-    * @param skipFreshInFlightValidationCheck
-    *   small optimization to skip the member check if the aggregation id is already known
     */
   def performIndependentValidations(
       sequencingTimestamp: CantonTimestamp,
       signedSubmissionRequest: TracedPossiblyPrevalidated[SignedContent[SubmissionRequest]],
-      snapshotToValidateSubmissionRequest: SyncCryptoApi,
-      topologySnapshotFromRequestO: Option[SyncCryptoApi],
-      topologyTimestampError: Option[SequencerDeliverError],
-      skipFreshInFlightValidationCheck: AggregationId => Boolean,
+      sequencingSnapshot: SyncCryptoApi,
   )(implicit
       traceContext: TraceContext,
       executionContext: ExecutionContext,
@@ -156,7 +150,7 @@ private[update] final class SubmissionRequestValidator(
       // Warn if we use an approximate snapshot but only after we've read at least one
       _ <- checkSignatureOnSubmissionRequest(
         signedSubmissionRequest,
-        snapshotToValidateSubmissionRequest,
+        sequencingSnapshot,
       ).mapK(validationFUSK)
       // At this point we know the sender has indeed properly signed the submission request
       // so we'll want to run the traffic control logic
@@ -173,51 +167,36 @@ private[update] final class SubmissionRequestValidator(
         // a delay can come from different nodes and we should only log this as a warning in a way where we can
         // attribute the delay to a specific node.
         {
-          SequencerError.ExceededMaxSequencingTime
+          com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.ExceededMaxSequencingTime
             .Error(
               sequencingTimestamp,
               submissionRequest.maxSequencingTime,
               submissionRequest.messageId.unwrap,
             )
             .discard
-          SubmissionOutcome.Discard
+          SubmissionOutcome.Discard // we have to drop this one as the client will not expect a receipt AFTER max sequencing time
         },
       )
       _ <- EitherT
         .cond[FutureUnlessShutdown](
           SubmissionRequestValidations.checkToAtMostOneMediator(submissionRequest),
-          (), {
-            SequencerError.MultipleMediatorRecipients
-              .Error(submissionRequest, sequencingTimestamp)
-              .report()
-            SubmissionOutcome.Discard: SubmissionOutcome
-          },
+          (),
+          SubmissionRequestValidator.discardOrBetterRejectInvalidRequest(
+            submissionRequest,
+            sequencingTimestamp,
+            "checkToAtMostOneMediator",
+            "Submission request has more than one mediator recipient",
+            protocolVersion,
+          ),
         )
         .mapK(validationFUSK)
       _ <- checkRecipientsAreKnown(
         submissionRequest,
         sequencingTimestamp,
       ).mapK(validationFUSK)
-      _ <- EitherT.fromEither[SequencedEventValidationF](
-        validateTopologyTimestamp(
-          sequencingTimestamp,
-          submissionRequest,
-          topologyTimestampError,
-        )
-      )
-      topologyOrSequencingSnapshot = topologySnapshotFromRequestO.getOrElse(
-        snapshotToValidateSubmissionRequest
-      )
-      // Preserve the old behavior to avoid ledger forks for older protocols.
-      _ <- (if (protocolVersion <= ProtocolVersion.v34)
-              inFlightAggregationHandler.validateMaxSequencingTimeForAggregationRule(
-                submissionRequest,
-                topologyOrSequencingSnapshot,
-                sequencingTimestamp,
-              )
-            else EitherTUtil.unitUS).mapK(validationFUSK)
+
       _ <- checkClosedEnvelopesSignatures(
-        topologyOrSequencingSnapshot,
+        sequencingSnapshot,
         signedSubmissionRequest.map(_.content),
         sequencingTimestamp,
       ).mapK(validationFUSK)
@@ -225,7 +204,7 @@ private[update] final class SubmissionRequestValidator(
         resolveSubmissionRequestRecipients(
           submissionRequest,
           sequencingTimestamp,
-          topologyOrSequencingSnapshot,
+          sequencingSnapshot,
         ).mapK(validationFUSK)
       // compute the aggregation id last (we keep this here as the old code computed
       // the aggregation id as first step in the sequential stage. we now do this in the
@@ -233,10 +212,8 @@ private[update] final class SubmissionRequestValidator(
       aggregationInfo <- inFlightAggregationHandler
         .computeAggregationIdAndValidateAggregationRule(
           sequencingTimestamp,
-          snapshotToValidateSubmissionRequest,
-          topologyOrSequencingSnapshot,
+          sequencingSnapshot,
           submissionRequest,
-          skipFreshInFlightValidationCheck,
         )
         .mapK(validationFUSK)
     } yield PrevalidationOutcome(recipients, aggregationInfo)
@@ -354,7 +331,7 @@ private[update] final class SubmissionRequestValidator(
               .areMembersRegisteredAt(group.active ++ group.passive, sequencingTimestamp)
               .map(_.flatMap {
                 case (member, false) => Some(member)
-                case (member, true) => None
+                case (_, true) => None
               })
 
           EitherT(
@@ -397,12 +374,12 @@ private[update] final class SubmissionRequestValidator(
                 }
             )
             .flatMap { closedUncompressedEnvelope =>
-              if (submissionRequest.prevalidated) {
+              if (submissionRequest.prevalidated)
                 closedUncompressedEnvelope.verifyKeyUsage(
                   topologyOrSequencingSnapshot,
                   submissionRequest.value.sender,
                 )
-              } else
+              else
                 closedUncompressedEnvelope.verifySignatures(
                   topologyOrSequencingSnapshot,
                   submissionRequest.value.sender,
@@ -410,17 +387,14 @@ private[update] final class SubmissionRequestValidator(
             }
       }
       .leftMap { error =>
-        if (reportError) {
-          SequencerError.InvalidEnvelopeSignature
-            .Error(
-              submissionRequest.value,
-              error,
-              sequencingTimestamp,
-              topologyOrSequencingSnapshot.ipsSnapshot.timestamp,
-            )
-            .report()
-        }
-        SubmissionOutcome.Discard
+        SubmissionRequestValidator.discardOrBetterRejectInvalidRequest(
+          submissionRequest.value,
+          sequencingTimestamp,
+          "checkClosedEnvelopesSignatures",
+          error.show,
+          protocolVersion,
+          reportError = reportError,
+        )
       }
 
   private def checkRecipientsAreKnown(
@@ -464,52 +438,34 @@ private[update] final class SubmissionRequestValidator(
   ): EitherT[FutureUnlessShutdown, SubmissionOutcome, Unit] = {
 
     val alarm = for {
-      _ <- (if (signedSubmissionRequest.prevalidated)
-              signedSubmissionRequest.value.verifyKeyUsage(
-                topologyOrSequencingSnapshot,
-                signedSubmissionRequest.value.content.sender,
-              )
-            else
-              signedSubmissionRequest.value
-                .verifySignature(
-                  topologyOrSequencingSnapshot,
-                  signedSubmissionRequest.value.content.sender,
-                  HashPurpose.SubmissionRequestSignature,
-                ))
-        .leftMap[BaseAlarm](error =>
-          SequencerError.InvalidSubmissionRequestSignature.Error(
-            signedSubmissionRequest.value,
-            error,
-            topologyOrSequencingSnapshot.ipsSnapshot.timestamp,
-            signedSubmissionRequest.value.timestampOfSigningKey,
+      _ <-
+        (if (signedSubmissionRequest.prevalidated)
+           signedSubmissionRequest.value.verifyKeyUsage(
+             topologyOrSequencingSnapshot,
+             signedSubmissionRequest.value.content.sender,
+           )
+         else
+           signedSubmissionRequest.value
+             .verifySignature(
+               topologyOrSequencingSnapshot,
+               signedSubmissionRequest.value.content.sender,
+               HashPurpose.SubmissionRequestSignature,
+             ))
+          .leftMap[BaseAlarm](error =>
+            SequencerError.InvalidSubmissionRequestSignature.Error(
+              signedSubmissionRequest.value,
+              error,
+              topologyOrSequencingSnapshot.ipsSnapshot.timestamp,
+              signedSubmissionRequest.value.timestampOfSigningKey,
+            )
           )
-        )
     } yield ()
-
     alarm.leftMap { a =>
       if (reportError)
         a.report()
-      SubmissionOutcome.Discard
+      SubmissionOutcome.Discard // must discard as the sender is not verified so cannot be charged for traffic
     }
   }
-
-  private def validateTopologyTimestamp(
-      sequencingTimestamp: CantonTimestamp,
-      submissionRequest: SubmissionRequest,
-      topologyTimestampError: Option[SequencerDeliverError],
-  )(implicit
-      traceContext: TraceContext
-  ): Either[SubmissionOutcome, Unit] =
-    topologyTimestampError
-      .map(
-        SubmissionOutcome.Reject.logAndCreate(
-          submissionRequest,
-          sequencingTimestamp,
-          _,
-        )
-      )
-      .toLeft(())
-
 }
 
 private[update] object SubmissionRequestValidator {
@@ -523,6 +479,47 @@ private[update] object SubmissionRequestValidator {
     WriterT.liftK[FutureUnlessShutdown, TrafficConsumption]
   def validationK(implicit executionContext: ExecutionContext) =
     FutureUnlessShutdown.outcomeK.andThen(validationFUSK)
+
+  /** Report invalid requests
+    *
+    * @param stepTextIncludedInRejection
+    *   which check failed (be careful when changing to avoid ledger forks)
+    */
+  def discardOrBetterRejectInvalidRequest(
+      submissionRequest: SubmissionRequest,
+      sequencingTimestamp: CantonTimestamp,
+      stepTextIncludedInRejection: String,
+      error: String,
+      protocolVersion: ProtocolVersion,
+      reportError: Boolean = true,
+  )(implicit errorLoggingContext: ErrorLoggingContext): SubmissionOutcome =
+    // We reject the request so the sender cannot just use traffic for free
+    if (protocolVersion > ProtocolVersion.v36) {
+      val rejection =
+        SequencerErrors.SubmissionRequestMalformedAndRejected(stepTextIncludedInRejection)
+      val ret = SubmissionOutcome.Reject.logAndCreate(
+        submissionRequest,
+        sequencingTimestamp,
+        rejection,
+        Some(error),
+        reportError = reportError,
+      )
+      ret
+    } else {
+      // don't include the detailed error message in the rejection to avoid ledger forks due to changed strings
+      if (reportError) {
+        errorLoggingContext.info(
+          s"Error occurred when processing request $sequencingTimestamp: $stepTextIncludedInRejection => $error"
+        )
+        val rejection =
+          SequencerErrors.SubmissionRequestMalformed.Error(
+            submissionRequest,
+            stepTextIncludedInRejection + " failed.",
+          )
+        rejection.report()
+      }
+      SubmissionOutcome.Discard
+    }
 
   object TrafficConsumption {
     implicit val accumulatedTrafficCostMonoid: Monoid[TrafficConsumption] =

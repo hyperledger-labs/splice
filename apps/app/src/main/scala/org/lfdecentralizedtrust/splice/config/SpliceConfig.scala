@@ -74,7 +74,9 @@ import com.digitalasset.canton.admin.api.client.data.{
   SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
   SubscriptionLivenessLimits,
+  AcsCommitmentLimits,
   SynchronizerLimits,
+  TopologyLimits,
   TransactionProtocolLimits,
 }
 import com.digitalasset.canton.tracing.TraceContext
@@ -655,6 +657,10 @@ object SpliceConfig {
       deriveReader[SvScanConfig]
     implicit val transactionProtocolLimitsReader: ConfigReader[TransactionProtocolLimits] =
       deriveReader[TransactionProtocolLimits]
+    implicit val topologyLimitsReader: ConfigReader[TopologyLimits] =
+      deriveReader[TopologyLimits]
+    implicit val acsCommitmentLimitsReader: ConfigReader[AcsCommitmentLimits] =
+      deriveReader[AcsCommitmentLimits]
     implicit val synchronizerLimitsReader: ConfigReader[SynchronizerLimits] =
       deriveReader[SynchronizerLimits]
     implicit val svSynchronizerNodeConfig: ConfigReader[SvSynchronizerNodeConfig] =
@@ -1189,6 +1195,10 @@ object SpliceConfig {
       deriveWriter[SvScanConfig]
     implicit val transactionProtocolLimitsWriter: ConfigWriter[TransactionProtocolLimits] =
       deriveWriter[TransactionProtocolLimits]
+    implicit val topologyLimitsWriter: ConfigWriter[TopologyLimits] =
+      deriveWriter[TopologyLimits]
+    implicit val acsCommitmentLimitsWriter: ConfigWriter[AcsCommitmentLimits] =
+      deriveWriter[AcsCommitmentLimits]
     implicit val synchronizerLimitsWriter: ConfigWriter[SynchronizerLimits] =
       deriveWriter[SynchronizerLimits]
     implicit val svSynchronizerNodeConfig: ConfigWriter[SvSynchronizerNodeConfig] =

@@ -52,6 +52,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.PekkoP2PGrpcNetworking.PekkoP2PGrpcNetworkManager
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.authentication.P2PAddAuthTokenHeaderGrpcServerInterceptor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.standalone.P2PGrpcStandaloneBftOrderingService
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.transport.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.pekko.PekkoModuleSystem.{
   PekkoEnv,
   PekkoFutureUnlessShutdown,
@@ -64,6 +65,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.{
   DefaultAuthenticationTokenManagerConfig,
   P2PConnectionManagementConfig,
+  P2PTransportMetricsConfig,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftOrderingModuleSystemInitializer.BftOrderingStores
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.OrderingTopologyProvider
@@ -94,6 +96,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.OrderingRequest
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.iss.BlockMetadata
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.snapshot.SequencerSnapshotAdditionalInfo
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusSegment.ConsensusMessage.PrePrepare
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.{
   Mempool,
   Output,
@@ -125,9 +128,10 @@ import com.digitalasset.canton.util.{DelayUtil, MaxBytesToDecompress, PekkoUtil,
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
+import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder
 import io.grpc.protobuf.services.ProtoReflectionServiceV1
 import io.grpc.stub.StreamObserver
-import io.grpc.{ServerInterceptors, ServerServiceDefinition}
+import io.grpc.{ServerInterceptor, ServerInterceptors, ServerServiceDefinition}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
@@ -146,9 +150,8 @@ final class BftBlockOrderer(
     cryptoApi: SynchronizerCryptoClient,
     sequencerId: SequencerId,
     clock: Clock,
-    authenticationServicesO: Option[
-      AuthenticationServices
-    ], // Owned and managed by the sequencer runtime, absent in some tests
+    // Owned and managed by the sequencer runtime, absent in some tests
+    authenticationServicesO: Option[AuthenticationServices],
     nodeParameters: CantonNodeParameters,
     sequencerSubscriptionInitialHeight: Long,
     override val orderingTimeFixMode: OrderingTimeFixMode,
@@ -207,9 +210,6 @@ final class BftBlockOrderer(
 
   private implicit val protocolVersion: ProtocolVersion = psId.protocolVersion
 
-  private val isAuthenticationEnabled =
-    config.initialNetwork.exists(_.endpointAuthentication.enabled)
-
   private val thisNode =
     config.standalone.fold(SequencerNodeId.toBftNodeId(sequencerId)) { standaloneConfig =>
       BftNodeId(standaloneConfig.thisSequencerId)
@@ -233,6 +233,18 @@ final class BftBlockOrderer(
       noTracingLogger,
       executorServiceMetrics = executorServiceMetrics,
     )
+
+  // Optional server-side HTTP/2- and TCP-level transport instrumentation for incoming P2P connections.
+  private val transportMetricsConfig =
+    config.initialNetwork.map(_.transportMetrics).getOrElse(P2PTransportMetricsConfig())
+
+  private val serverTransportInstrumentationO: Option[P2PNettyServerInstrumentation] =
+    Option.when(transportMetricsConfig.enabled)(
+      new P2PNettyServerInstrumentation(transportMetricsConfig.preferEpoll, loggerFactory)
+    )
+
+  private val transportMetricsServerInterceptorO: Option[ServerInterceptor] =
+    Option.when(transportMetricsConfig.enabled)(new P2PTransportMetricsServerInterceptor)
 
   // Standalone mode doesn't support authentication
   private val maybeAuthenticationServices =
@@ -493,11 +505,26 @@ final class BftBlockOrderer(
           metrics,
         )
       ) { standaloneConfig =>
-        new StandaloneOrderingTopologyProvider(
-          standaloneConfig,
-          cryptoApi.pureCrypto,
-          metrics,
-        )
+        standaloneConfig.testSlowdown
+          .flatMap(_.computeDelay)
+          .fold {
+            new StandaloneOrderingTopologyProvider(
+              standaloneConfig,
+              cryptoApi.pureCrypto,
+              metrics,
+            )
+          } { computeSlowdownConfig =>
+            new StandaloneOrderingTopologyProvider(
+              standaloneConfig,
+              cryptoApi.pureCrypto,
+              metrics,
+              delaySignMessageO = {
+                case _: PrePrepare =>
+                  computeSlowdownConfig.nextSignPrePrepareDelay
+                case _ => None
+              },
+            )
+          }
       }
 
     new BftOrderingModuleSystemInitializer(
@@ -547,7 +574,10 @@ final class BftBlockOrderer(
       timeouts,
     )
     timeouts.default.await(s"${getClass.getSimpleName} starting pruning scheduler")(
-      scheduler.start()
+      scheduler
+        .start()
+        // Recovered in BftSequencerFactory.createBlockOrderer
+        .failOnShutdownToAbortException("BftOrdererPruningScheduler")
     )
     scheduler
   }
@@ -591,6 +621,10 @@ final class BftBlockOrderer(
       p2pConnectionEventListener,
       p2pNetworkIn,
       metrics,
+      clock,
+      config.initialNetwork
+        .map(_.transportMetrics)
+        .getOrElse(P2PTransportMetricsConfig()),
       longRunningExecutor,
       timeouts,
       loggerFactory,
@@ -624,6 +658,11 @@ final class BftBlockOrderer(
             apiLoggingConfig = nodeParameters.loggingConfig.api,
             tracing = nodeParameters.tracing,
             grpcMetrics = metrics.grpcMetrics,
+            nettyServerBuilderCustomizer = serverTransportInstrumentationO
+              .map(instrumentation =>
+                (builder: NettyServerBuilder) => instrumentation.customize(builder).discard
+              )
+              .getOrElse((_: NettyServerBuilder) => ()),
           )
           .addService(
             ServerInterceptors.intercept(
@@ -640,6 +679,7 @@ final class BftBlockOrderer(
               List( // Filters are applied in reverse order
                 p2pAddAuthTokenHeaderGrpcServerInterceptorO,
                 maybeAuthenticationServices.map(_.authenticationServerInterceptor),
+                transportMetricsServerInterceptorO,
               ).flatten.asJava,
             ),
             withLogging = false,
@@ -707,7 +747,7 @@ final class BftBlockOrderer(
 
   override def acknowledge(signedAcknowledgeRequest: SignedContent[AcknowledgeRequest])(implicit
       traceContext: TraceContext
-  ): Future[Unit] = {
+  ): EitherT[Future, SequencerDeliverError, Unit] = {
     val request = signedAcknowledgeRequest.content
     logger.debug(s"member ${request.member} acknowledging timestamp ${request.timestamp}")
     sendToMempool(
@@ -716,7 +756,7 @@ final class BftBlockOrderer(
       signedAcknowledgeRequest.content.member,
       signedAcknowledgeRequest.toByteString,
       maxSequencingTime = None,
-    ).value.map(_ => ())
+    )
   }
 
   override def health(implicit traceContext: TraceContext): Future[SequencerDriverHealthStatus] = {
@@ -794,6 +834,10 @@ final class BftBlockOrderer(
           SyncCloseable(
             "p2pGrpcServerManager.close()",
             p2pGrpcServerManager.close(),
+          ),
+          SyncCloseable(
+            "serverTransportInstrumentation.close()",
+            serverTransportInstrumentationO.foreach(_.close()),
           ),
           SyncCloseable("p2pServerGrpcExecutor.shutdown()", p2pServerGrpcExecutor.shutdown()),
         ) ++
@@ -927,13 +971,22 @@ final class BftBlockOrderer(
     )
     EitherT(replyPromise.future.map {
       case SequencerNode.RequestAccepted => Either.unit
+      case SequencerNode.RequestRejected(
+            reason @ SequencerNode.RequestRejected.P2PNotReady(_, _)
+          ) =>
+        Left(SequencerErrors.Unavailable(reason.rejectionMessage))
+      // We map any other error to Overloaded to preserve backwards-compatibility.
+      // This is convenient because Overloaded is retried immediately in the
+      // sequencer client.  In the long term, we should extend SequencerErrors to
+      // include the other cases.
       case SequencerNode.RequestRejected(reason) =>
-        Left(SequencerErrors.Overloaded(reason)) // Currently the only case
+        Left(SequencerErrors.Overloaded(reason.rejectionMessage))
       case _ => Left(SequencerErrors.Internal("wrong response"))
     })
   }
 
   private def checkConfigSecurity()(implicit traceContext: TraceContext): Unit = {
+    val isAuthenticationEnabled = config.initialNetwork.exists(_.endpointAuthentication.enabled)
     if (
       !(isAuthenticationEnabled || config.initialNetwork
         .map(_.peerEndpoints)
@@ -956,7 +1009,9 @@ final class BftBlockOrderer(
     logger.info(description)
     config.initTimeout
       .await(s"${getClass.getSimpleName} $description")(
-        f.futureUnlessShutdown().failOnShutdownToAbortException(description)
+        f.futureUnlessShutdown()
+          // Recovered in the BftSequencerFactory.createBlockOrderer
+          .failOnShutdownToAbortException(description)
       )(ErrorLoggingContext.fromTracedLogger(logger))
   }
 }

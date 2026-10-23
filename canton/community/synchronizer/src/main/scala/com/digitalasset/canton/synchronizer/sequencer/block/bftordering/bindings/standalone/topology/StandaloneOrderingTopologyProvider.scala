@@ -39,12 +39,14 @@ import com.digitalasset.canton.version.ProtocolVersion
 import java.io.File
 import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 
 class StandaloneOrderingTopologyProvider(
     standaloneConfig: BftBlockOrdererConfig.BftBlockOrderingStandaloneNetworkConfig,
     crypto: CryptoPureApi,
     metrics: BftOrderingMetrics,
+    delaySignMessageO: Any => Option[FiniteDuration] = _ => None,
 )(implicit executionContext: ExecutionContext, synchronizerProtocolVersion: ProtocolVersion)
     extends OrderingTopologyProvider[PekkoEnv] {
 
@@ -95,11 +97,15 @@ class StandaloneOrderingTopologyProvider(
       SequencingParameters.Default.update(
         pbftViewChangeTimeout =
           PositiveFiniteDuration.tryFromDuration(standaloneConfig.pbftViewChangeTimeout).toInternal,
+        pbftViewChangeTimeoutStep = standaloneConfig.pbftViewChangeTimeoutStep,
+        pbftViewChangeTimeoutUpperBound = standaloneConfig.pbftViewChangeTimeoutUpperBound,
         segmentLength = segmentLength,
         blacklistLeaderSelectionPolicyConfig =
           standaloneConfig.blacklistLeaderSelectionPolicyConfig,
         maxRequestsInBatch = standaloneConfig.maxRequestsInBatch,
         maxBatchesPerBlockProposal = standaloneConfig.maxBatchesPerBlockProposal,
+        stricterDetectionOfRequestsPotentiallyChangingOrderingTopology =
+          standaloneConfig.stricterDetectionOfRequestsPotentiallyChangingOrderingTopology,
       ),
       DynamicSynchronizerParameters.defaultMaxRequestSize.value,
       ConventionalBootstrapTopologyActivationTime,
@@ -126,7 +132,13 @@ class StandaloneOrderingTopologyProvider(
           Some(
             (
               generateOrderingTopology(activationTime, checkPendingChanges),
-              new FixedKeysCryptoProvider(privKey, peerSigningPublicKeys, crypto, metrics),
+              new FixedKeysCryptoProvider(
+                privKey,
+                peerSigningPublicKeys,
+                crypto,
+                metrics,
+                delaySignMessageO,
+              ),
             )
           )
         )
@@ -147,7 +159,13 @@ class StandaloneOrderingTopologyProvider(
                 Option(
                   (
                     generateOrderingTopology(activationTime, checkPendingChanges),
-                    new FixedKeysCryptoProvider(privKey, peerSigningPublicKeys, crypto, metrics),
+                    new FixedKeysCryptoProvider(
+                      privKey,
+                      peerSigningPublicKeys,
+                      crypto,
+                      metrics,
+                      delaySignMessageO,
+                    ),
                   )
                 )
               },
