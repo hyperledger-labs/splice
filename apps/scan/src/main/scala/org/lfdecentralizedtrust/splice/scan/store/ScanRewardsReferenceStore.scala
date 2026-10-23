@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.scan.store
 
+import com.digitalasset.canton.tracing.TraceContext
+
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -10,7 +12,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.rewardaccountingv2.CalculateRewardsV2
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
@@ -212,18 +213,20 @@ object ScanRewardsReferenceStore {
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
-  ): ScanRewardsReferenceStore = {
-    val dbStore = new db.DbScanRewardsReferenceStore(
-      key = key,
-      storage = storage,
-      loggerFactory = loggerFactory,
-      retryProvider = retryProvider,
-      migrationId = migrationId,
-      participantId = participantId,
-      ingestionConfig = ingestionConfig,
-      defaultLimit = defaultLimit,
-    )
-    new CachingScanRewardsReferenceStore(dbStore, loggerFactory)
+      tc: TraceContext,
+  ): Future[ScanRewardsReferenceStore] = {
+    db.DbScanRewardsReferenceStore
+      .create(
+        key = key,
+        storage = storage,
+        loggerFactory = loggerFactory,
+        retryProvider = retryProvider,
+        migrationId = migrationId,
+        participantId = participantId,
+        ingestionConfig = ingestionConfig,
+        defaultLimit = defaultLimit,
+      )
+      .map(dbStore => new CachingScanRewardsReferenceStore(dbStore, loggerFactory))
   }
 
   case class Key(

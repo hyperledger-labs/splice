@@ -92,7 +92,8 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       ec: ExecutionContext,
       templateDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
-  ): SvSvStore = SvSvStore(
+      tc: TraceContext,
+  ): Future[SvSvStore] = SvSvStore(
     key,
     storage,
     loggerFactory,
@@ -143,7 +144,8 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       ec: ExecutionContext,
       templateDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
-  ): SvDsoStore = {
+      tc: TraceContext,
+  ): Future[SvDsoStore] = {
     SvDsoStore(
       key,
       storage,

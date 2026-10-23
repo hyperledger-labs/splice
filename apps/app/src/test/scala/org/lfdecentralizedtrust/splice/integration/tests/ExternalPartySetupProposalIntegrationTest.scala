@@ -148,7 +148,7 @@ class ExternalPartySetupProposalIntegrationTest
   "TransferPreapproval allows to transfer between externally signed parties" taggedAs (org.lfdecentralizedtrust.splice.util.Tags.SpliceAmulet_0_1_9) in {
     implicit env =>
       // Onboard and Create/Accept ExternalPartySetupProposal for Alice
-      val onboardingAlice @ OnboardingResult(aliceParty, alicePublicKey, alicePrivateKey) =
+      val onboardingAlice @ OnboardingResult(aliceParty, _, _) =
         onboardExternalParty(aliceValidatorBackend, Some("aliceExternal"))
       aliceValidatorBackend.participantClient.parties
         .hosted(filterParty =

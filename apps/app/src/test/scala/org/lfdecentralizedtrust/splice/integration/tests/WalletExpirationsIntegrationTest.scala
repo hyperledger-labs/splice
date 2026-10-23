@@ -102,7 +102,7 @@ class WalletExpirationsIntegrationTest
         Seq.empty,
       ) {
         val expiration = CantonTimestamp.now().plus(Duration.ofMillis(100))
-        val (_, _) = actAndCheck(
+        actAndCheck(
           "Alice creates a transfer offer", {
             aliceWalletClient.createTransferOffer(
               bob,

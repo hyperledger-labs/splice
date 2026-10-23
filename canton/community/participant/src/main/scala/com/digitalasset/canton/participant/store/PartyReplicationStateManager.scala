@@ -14,6 +14,7 @@ import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, L
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.party.PartyReplicationStatus
 import com.digitalasset.canton.participant.admin.party.PartyReplicator.AddPartyRequestId
+import com.digitalasset.canton.participant.admin.party.acsreplication.AcsReplicationStatus
 import com.digitalasset.canton.participant.store.PartyReplicationStateManager.{
   Modification,
   OnlinePartyReplicationOperationName,
@@ -28,21 +29,6 @@ import com.digitalasset.canton.util.{EitherTUtil, FutureUnlessShutdownUtil, Simp
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext
 import scala.util.chaining.scalaUtilChainingOps
-
-/** ACS replication progress specific read and write methods.
-  *
-  * Note: Non-sealed for testing.
-  */
-private[canton] trait AcsReplicationProgress {
-  def getAcsReplicationProgress(requestId: AddPartyRequestId)(implicit
-      traceContext: TraceContext
-  ): Option[PartyReplicationStatus.AcsReplicationProgress]
-
-  def updateAcsReplicationProgress(
-      requestId: AddPartyRequestId,
-      progress: PartyReplicationStatus.AcsReplicationProgress,
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit]
-}
 
 /** The [[PartyReplicationStateManager]] manages online party replication (OnPR) state in memory and
   * conditionally on disk (on behalf of OnPRs handled by this participant in the target participant
@@ -59,9 +45,9 @@ private[canton] trait AcsReplicationProgress {
   *     [[com.digitalasset.canton.participant.admin.party.PartyReplicationStatus.replicationO]] and
   *     does so from a simple execution queue.
   *   - Other components such as the
-  *     [[com.digitalasset.canton.participant.protocol.party.PartyReplicationTargetParticipantProcessor]]
+  *     [[com.digitalasset.canton.participant.protocol.party.acsreplication.AcsReplicationTargetParticipantProcessor]]
   *     update individual status subcomponents set to Some(_) such as
-  *     [[com.digitalasset.canton.participant.admin.party.PartyReplicationStatus.AcsReplicationProgress]]
+  *     [[com.digitalasset.canton.participant.admin.party.acsreplication.AcsReplicationStatus.AcsReplicationProgress]]
   *     from a simple execution queue.
   *   - Given that multiple components perform updates (but not necessarily in a racy fashion),
   *     error on the side of safety and have only the update methods use the simple execution queue
@@ -208,37 +194,34 @@ final class PartyReplicationStateManager(
   def get(requestId: AddPartyRequestId): Option[PartyReplicationStatus] =
     partyReplications.get(requestId)
 
-  /** Finds replication status by Daml sequencer channel agreement contract id.
-    *
-    * @param agreementContractId
-    *   Daml replication agreement contract id
-    * @return
-    *   party replication status if found, None otherwise
-    */
-  def findByAgreementContractId(agreementContractId: String): Option[PartyReplicationStatus] =
-    partyReplications.values.find(_.agreementStatus match {
-      case PartyReplicationStatus.AgreementStatus.Exists(contractId, _) =>
-        contractId.coid == agreementContractId
-      case _ => false
-    })
-
   def collectFirst[T](
       f: PartialFunction[(AddPartyRequestId, PartyReplicationStatus), T]
-  ): Option[T] = partyReplications.iterator.collectFirst(f)
+  ): Option[T] =
+    partyReplications.iterator.collectFirst(f)
 
   def collect[T](f: PartialFunction[(AddPartyRequestId, PartyReplicationStatus), T]): Seq[T] =
     partyReplications.iterator.collect(f).toSeq
 
   override def getAcsReplicationProgress(requestId: AddPartyRequestId)(implicit
       traceContext: TraceContext
-  ): Option[PartyReplicationStatus.AcsReplicationProgress] =
+  ): Option[AcsReplicationStatus.AcsReplicationProgress] =
     get(requestId).flatMap(_.replicationO)
 
   override def updateAcsReplicationProgress(
       requestId: AddPartyRequestId,
-      progress: PartyReplicationStatus.AcsReplicationProgress,
+      progress: AcsReplicationStatus.AcsReplicationProgress,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
     update_(requestId, _.modifyReplication(_ => progress))
+
+  def updateAcsReplicationStatus(
+      requestId: AddPartyRequestId,
+      acsReplicationStatus: AcsReplicationStatus,
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
+    update_(
+      requestId,
+      _.setAcsReplicationStatus(Some(acsReplicationStatus))
+        .setReplication(acsReplicationStatus.replicationO),
+    )
 
   override protected def onClosed(): Unit =
     LifeCycle.close(executionQueue)(logger)

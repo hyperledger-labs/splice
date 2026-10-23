@@ -11,7 +11,6 @@ import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.auth.CantonAdminTokenDispenser
-import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.AdminTokenConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -36,35 +35,24 @@ import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, CantonMutableHan
 import com.digitalasset.canton.participant.ParticipantNodeBootstrap.ParticipantServices
 import com.digitalasset.canton.participant.admin.*
 import com.digitalasset.canton.participant.admin.grpc.*
+import com.digitalasset.canton.participant.admin.party.acsreplication.AcsReplicator
 import com.digitalasset.canton.participant.admin.party.{PartyReplicationEndpoints, PartyReplicator}
-import com.digitalasset.canton.participant.commitment.{
-  AcsCommitmentHealthState,
-  AcsCommitmentProcessorManager,
-  DigestProcessorFactoryImpl,
-  DigestProcessorTopologyLookupImpl,
-  ReceivedAcsCommitmentMatcherFactoryImpl,
-}
+import com.digitalasset.canton.participant.commitment.*
 import com.digitalasset.canton.participant.config.*
 import com.digitalasset.canton.participant.extension.{
   ExtensionServiceExternalCallValidator,
   ExtensionServiceManager,
 }
 import com.digitalasset.canton.participant.health.admin.ParticipantStatus
-import com.digitalasset.canton.participant.ledger.api.{
-  AcsChangePublicationPostProcessor,
-  LedgerApiIndexService,
-  LedgerApiIndexer,
-  LedgerApiIndexerConfig,
-  LedgerApiServer,
-  StartableStoppableLedgerApiDependentServices,
-}
+import com.digitalasset.canton.participant.ledger.api.*
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
+import com.digitalasset.canton.participant.protocol.party.DefaultAcsReplicationContractHandlerFactory
 import com.digitalasset.canton.participant.protocol.submission.{
   CommandDeduplicatorImpl,
   InFlightSubmissionTracker,
 }
 import com.digitalasset.canton.participant.protocol.validation.ExternalCallValidator
-import com.digitalasset.canton.participant.pruning.{AcsCommitmentProcessor, PruningProcessor}
+import com.digitalasset.canton.participant.pruning.PruningProcessor
 import com.digitalasset.canton.participant.replica.ParticipantReplicaManager
 import com.digitalasset.canton.participant.scheduler.{
   ParticipantPruningScheduler,
@@ -90,7 +78,7 @@ import com.digitalasset.canton.platform.store.backend.LedgerEnd
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.resource.*
 import com.digitalasset.canton.scheduler.{Cron, CronWindowSchedule, Schedulers, SchedulersImpl}
-import com.digitalasset.canton.sequencing.client.{RecordingConfig, ReplayConfig, SequencerClient}
+import com.digitalasset.canton.sequencing.client.{RecordingConfig, ReplayConfig}
 import com.digitalasset.canton.store.IndexedStringStore
 import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.tea.TrafficEnforcementApp
@@ -126,7 +114,7 @@ import org.apache.pekko.actor.ActorSystem
 
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 import scala.util.Success
 
 class ParticipantNodeBootstrap(
@@ -405,7 +393,13 @@ class ParticipantNodeBootstrap(
           recordSequencerInteractions,
           replaySequencerConfig,
           loggerFactory,
-          healthService.dependencies.map(_.toComponentStatus),
+          healthData =
+            // Node-level components are reported as-is; the raw per-synchronizer components are
+            // replaced by synchronizer-labeled statuses (see componentStatusesWith). The health
+            // service itself keeps the raw components.
+            connectedSynchronizersHealthRef.get.fold(
+              healthService.dependencies.map(_.toComponentStatus)
+            )(_.componentStatusesWith(healthService.dependencies)),
         )
         addCloseable(node)
         setInitialized(participantServices)
@@ -500,6 +494,29 @@ class ParticipantNodeBootstrap(
 
         mutablePackageMetadataView = tryGetMutablePackageMetadataView()
 
+        offlineTopologyLookup = new OfflineTopologyLookupImpl(
+          clock = clock,
+          topologyConfig = config.topology,
+          timeouts = timeouts,
+          futureSupervisor = futureSupervisor,
+          psidLookup = lookupActivePsid,
+          topologyStoreO = psid =>
+            cantonSyncService.get
+              .flatMap(_.syncPersistentStateManager.get(psid))
+              .map(_.topologyStore),
+          staticSynchronizerParametersO = psid =>
+            cantonSyncService.get
+              .flatMap(_.syncPersistentStateManager.get(psid))
+              .map(_.staticSynchronizerParameters),
+          cleanSynchronizerRecordTime = lsid =>
+            persistentState
+              .map(_.ledgerApiStore)
+              .value
+              .cleanSynchronizerIndex(lsid)
+              .map(_.recordTime),
+          loggerFactory = loggerFactory,
+        )
+
         syncPersistentStateManager = new SyncPersistentStateManager(
           participantId,
           synchronizerAliasManager,
@@ -514,6 +531,7 @@ class ParticipantNodeBootstrap(
           clock,
           persistentState.map(_.ledgerApiStore),
           persistentState.map(_.contractStore),
+          offlineTopologyLookup,
           futureSupervisor,
           loggerFactory,
         )
@@ -594,7 +612,9 @@ class ParticipantNodeBootstrap(
                   ),
                   reassignmentOffsetPersistence =
                     ReassignmentStore.reassignmentOffsetPersistenceFor(
-                      syncPersistentStateManager
+                      participantId,
+                      syncPersistentStateManager,
+                      config.parameters.batching,
                     ),
                   postProcessor = inFlightSubmissionTracker
                     .processPublications(_)(_)
@@ -654,16 +674,6 @@ class ParticipantNodeBootstrap(
           timeouts = parameters.processingTimeouts,
         )
 
-        sequencerInfoLoader = new SequencerInfoLoader(
-          participantId,
-          parameters.processingTimeouts,
-          config.sequencerClient.clientChannelParams(parameters.tracing.propagation),
-          ProtocolVersionCompatibility.supportedProtocols(parameters),
-          parameters.protocolConfig.minimumProtocolVersion,
-          dontWarnOnDeprecatedPV = parameters.protocolConfig.dontWarnOnDeprecatedPV,
-          loggerFactory,
-        )
-
         teaTokenDispenserO = Option.when(config.trafficAccounting.enabled)(
           new CantonAdminTokenDispenser(
             tokenDuration = adminTokenConfig.adminTokenDuration.asJava,
@@ -685,6 +695,17 @@ class ParticipantNodeBootstrap(
                       instanceName = name,
                       ledgerApiPort = config.ledgerApi.clientConfig.port,
                       config = internalServerConfig,
+                      // If a correlation is pruned before its completion arrives, TEA can't debit
+                      // the submission. We use the ledger's pruning floor to keep correlations for
+                      // at least the maximum deduplication duration (7 days by default).
+                      minimumPruningRetention =
+                        persistentState.value.settingsStore.settings.maxDeduplicationDuration
+                          .getOrElse(
+                            throw new IllegalStateException(
+                              "Max deduplication duration is not available"
+                            )
+                          )
+                          .toConfig,
                       loggerFactory = loggerFactory,
                       timeouts = timeouts,
                       clock = clock,
@@ -818,23 +839,18 @@ class ParticipantNodeBootstrap(
         }
 
         schedulers <-
-          EitherT
-            .liftF(
-              {
-                val schedulers =
-                  new SchedulersImpl(
-                    Map("pruning" -> pruningScheduler) ++
-                      purgeObsoleteTopologySchedulerO.map("obsoleteTopology" -> _).toList.toMap,
-                    arguments.loggerFactory,
-                  )
-                if (isActive) {
-                  schedulers.start().map(_ => schedulers)
-                } else {
-                  Future.successful(schedulers)
-                }
-              }
+          EitherT.liftF {
+            val schedulers = new SchedulersImpl(
+              Map("pruning" -> pruningScheduler) ++
+                purgeObsoleteTopologySchedulerO.map("obsoleteTopology" -> _).toList.toMap,
+              arguments.loggerFactory,
             )
-            .mapK(FutureUnlessShutdown.outcomeK)
+            if (isActive) {
+              schedulers.start().map(_ => schedulers)
+            } else {
+              FutureUnlessShutdown.pure(schedulers)
+            }
+          }
 
         // Create extension service manager early so it can be shared with both CantonSyncService and LedgerApiServer
         extensionServiceManagerO: Option[ExtensionServiceManager] =
@@ -888,7 +904,6 @@ class ParticipantNodeBootstrap(
           parameters,
           pruningProcessor,
           arguments.metrics,
-          sequencerInfoLoader,
           arguments.futureSupervisor,
           loggerFactory,
           arguments.testingConfig,
@@ -908,15 +923,7 @@ class ParticipantNodeBootstrap(
           sync.setLsuStatusMetrics()
         }
 
-        _ = {
-          connectedSynchronizerHealth.set(sync.connectedSynchronizerHealth)
-          connectedSynchronizerEphemeralHealth.set(sync.ephemeralHealth)
-          connectedSynchronizerSequencerClientHealth.set(sync.sequencerClientHealth)
-          connectedSynchronizerSequencerConnectionPoolHealthRef.set(
-            sync.sequencerConnectionPoolHealth
-          )
-          connectedSynchronizerAcsCommitmentProcessorHealth.set(sync.acsCommitmentProcessorHealth)
-        }
+        _ = connectedSynchronizersHealthRef.set(Some(sync.connectedSynchronizersHealth))
 
         ledgerApiIndexServiceContainer = new LifeCycleContainer[LedgerApiIndexService](
           stateName = "ledger-api-index-service",
@@ -943,19 +950,23 @@ class ParticipantNodeBootstrap(
             EitherT.right[String](ledgerApiIndexServiceContainer.initializeNext())
           else EitherT.right[String](FutureUnlessShutdown.unit)
 
-        partyReplicatorContainerO = config.parameters.alphaOnlinePartyReplicationSupport.map(
+        acsReplicatorContainerO = config.parameters.alphaOnlinePartyReplicationSupport.map {
           config =>
-            new LifeCycleContainer[PartyReplicator](
-              stateName = "party-replicator",
+            new LifeCycleContainer[AcsReplicator](
+              stateName = "acs-replicator",
               create = () =>
                 FutureUnlessShutdown.pure(
-                  new PartyReplicator(
+                  new AcsReplicator(
                     participantId,
                     sync,
                     ledgerApiIndexServiceContainer.asEval.value.internalIndexService,
                     clock,
                     config,
                     storage,
+                    new DefaultAcsReplicationContractHandlerFactory(
+                      sync.participantNodePersistentState,
+                      loggerFactory,
+                    ),
                     futureSupervisor,
                     parameters.exitOnFatalFailures,
                     parameters.processingTimeouts,
@@ -964,7 +975,38 @@ class ParticipantNodeBootstrap(
                 ),
               loggerFactory = loggerFactory,
             )
-        )
+        }
+        _ <- acsReplicatorContainerO match {
+          // Initialize ACS replicator only if configured and the participant is active
+          case Some(acsReplicatorContainer) if sync.isActive() =>
+            EitherT.right[String](acsReplicatorContainer.initializeNext())
+          case _ => EitherT.right[String](FutureUnlessShutdown.unit)
+        }
+
+        partyReplicatorContainerO = for {
+          onPrConfig <- config.parameters.alphaOnlinePartyReplicationSupport
+          acsReplicatorContainer <- acsReplicatorContainerO
+        } yield {
+          new LifeCycleContainer[PartyReplicator](
+            stateName = "party-replicator",
+            create = () =>
+              FutureUnlessShutdown.pure(
+                new PartyReplicator(
+                  participantId,
+                  acsReplicatorContainer.asEval.value,
+                  sync,
+                  clock,
+                  onPrConfig,
+                  storage,
+                  futureSupervisor,
+                  parameters.exitOnFatalFailures,
+                  parameters.processingTimeouts,
+                  loggerFactory,
+                )
+              ),
+            loggerFactory = loggerFactory,
+          )
+        }
         _ <- partyReplicatorContainerO match {
           // Initialize party replication only if configured and the participant is active
           case Some(partyReplicatorContainer) if sync.isActive() =>
@@ -1143,6 +1185,7 @@ class ParticipantNodeBootstrap(
             adminServerRegistry,
             adminTokenDispenser,
             partyReplicatorContainerO.map(_.asEval),
+            acsReplicatorContainerO.map(_.asEval),
             ledgerApiIndexerContainer.asEval.map(_.ledgerApiStore),
             ledgerApiIndexServiceContainer.asEval.map(_.internalIndexService),
             futureSupervisor,
@@ -1165,7 +1208,6 @@ class ParticipantNodeBootstrap(
                   sync,
                   synchronizerAliasManager,
                   parameters.processingTimeouts,
-                  sequencerInfoLoader,
                   loggerFactory,
                 ),
                 executionContext,
@@ -1243,15 +1285,12 @@ class ParticipantNodeBootstrap(
         addCloseable(schedulers)
         addCloseable(ledgerApiIndexServiceContainer.currentAutoCloseable())
         partyReplicatorContainerO.foreach(repl => addCloseable(repl.currentAutoCloseable()))
+        acsReplicatorContainerO.foreach(repl => addCloseable(repl.currentAutoCloseable()))
         addCloseable(ledgerApiServerContainer.currentAutoCloseable())
         acsDigestProcessorManagerO.foreach(mgr => addCloseable(mgr.currentAutoCloseable()))
         addCloseable(ledgerApiDependentServices)
         addCloseable(mutablePackageMetadataView)
         // Health components owned by the bootstrap, not closed by the health service.
-        addCloseable(connectedSynchronizerHealth)
-        addCloseable(connectedSynchronizerEphemeralHealth)
-        addCloseable(connectedSynchronizerSequencerClientHealth)
-        addCloseable(connectedSynchronizerAcsCommitmentProcessorHealth)
         addCloseable(acsCommitmentProcessorPipelineHealth)
         trafficEnforcementComponentContainersO.foreach {
           case (trafficEnforcementAppContainer, trafficEnforcementBackendContainer) =>
@@ -1267,6 +1306,7 @@ class ParticipantNodeBootstrap(
           cantonSyncService = sync,
           ledgerApiIndexServiceContainer = ledgerApiIndexServiceContainer,
           schedulers = schedulers,
+          acsReplicatorContainerO = acsReplicatorContainerO,
           partyReplicatorContainerO = partyReplicatorContainerO,
           ledgerApiServerContainer = ledgerApiServerContainer,
           startableStoppableLedgerApiDependentServices = ledgerApiDependentServices,
@@ -1285,10 +1325,6 @@ class ParticipantNodeBootstrap(
       storage: Storage
   ): (DependenciesHealthService, LivenessHealthService) = {
     val constantSoftDependencies = Seq(
-      connectedSynchronizerHealth,
-      connectedSynchronizerEphemeralHealth,
-      connectedSynchronizerSequencerClientHealth,
-      connectedSynchronizerAcsCommitmentProcessorHealth,
       acsCommitmentProcessorPipelineHealth,
       ledgerApiIndexerHealth,
     )
@@ -1302,7 +1338,7 @@ class ParticipantNodeBootstrap(
       // reaching the node
       softDependencies = Eval.always(
         constantSoftDependencies ++
-          connectedSynchronizerSequencerConnectionPoolHealthRef.get.apply()
+          connectedSynchronizersHealthRef.get.toList.flatMap(_.allHealthComponents)
       ),
     )
     val liveness = LivenessHealthService.alwaysAlive(logger, timeouts)
@@ -1326,35 +1362,15 @@ class ParticipantNodeBootstrap(
     None
   )
 
-  lazy val connectedSynchronizerHealth: MutableHealthComponent = MutableHealthComponent(
-    loggerFactory,
-    ConnectedSynchronizer.healthName,
-    timeouts,
-  )
-  private lazy val connectedSynchronizerEphemeralHealth: MutableHealthComponent =
-    MutableHealthComponent(
-      loggerFactory,
-      SyncEphemeralState.healthName,
-      timeouts,
-    )
-  private lazy val connectedSynchronizerSequencerClientHealth: MutableHealthComponent =
-    MutableHealthComponent(
-      loggerFactory,
-      SequencerClient.healthName,
-      timeouts,
-    )
+  /** Health of all connected synchronizers, set once the sync service has been created. Used to
+    * report the health components of every connected synchronizer as soft dependencies of the
+    * node's health service.
+    */
+  private val connectedSynchronizersHealthRef =
+    new AtomicReference[Option[ConnectedSynchronizersHealth]](None)
+
   private lazy val ledgerApiIndexerHealth: MutableHealthComponent =
     MutableHealthComponent(loggerFactory, LedgerApiIndexer.healthComponentName, timeouts)
-
-  private val connectedSynchronizerSequencerConnectionPoolHealthRef =
-    new AtomicReference[() => Seq[HealthQuasiComponent]](() => Seq.empty)
-
-  private lazy val connectedSynchronizerAcsCommitmentProcessorHealth: MutableHealthComponent =
-    MutableHealthComponent(
-      loggerFactory,
-      AcsCommitmentProcessor.healthName,
-      timeouts,
-    )
 
   private lazy val acsCommitmentProcessorPipelineHealth =
     new MutableHealthQuasiComponent[HealthComponent](
@@ -1384,6 +1400,7 @@ object ParticipantNodeBootstrap {
       cantonSyncService: CantonSyncService,
       ledgerApiIndexServiceContainer: LifeCycleContainer[LedgerApiIndexService],
       schedulers: Schedulers,
+      acsReplicatorContainerO: Option[LifeCycleContainer[AcsReplicator]],
       partyReplicatorContainerO: Option[LifeCycleContainer[PartyReplicator]],
       ledgerApiServerContainer: LifeCycleContainer[LedgerApiServer],
       startableStoppableLedgerApiDependentServices: StartableStoppableLedgerApiDependentServices,

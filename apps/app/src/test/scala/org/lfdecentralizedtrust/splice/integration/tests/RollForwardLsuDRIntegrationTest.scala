@@ -85,7 +85,7 @@ class RollForwardLsuDRIntegrationTest
   val trafficExportTimeFile = File.newTemporaryFile()
 
   // This needs to be long enough in the future that we can start Canton and initialize for SVs.
-  val maxSequencingTime = CantonTimestamp.now().plusSeconds(240)
+  val maxSequencingTime = CantonTimestamp.now().plusSeconds(300)
   // 5s chosen by fair dice roll
   val lowerBoundSequencingTimeExclusive = maxSequencingTime.plusSeconds(5)
   val upgradeTime = lowerBoundSequencingTimeExclusive
@@ -135,8 +135,7 @@ class RollForwardLsuDRIntegrationTest
                     .focus(_.localSynchronizerNodes)
                     .modify(c =>
                       c.copy(
-                        legacy = c.current.some,
-                        current = c.current.focus(_.protocolVersion).replace(ProtocolVersion.v37),
+                        legacy = c.current.some
                       )
                     )
                     .focus(_.onboarding)

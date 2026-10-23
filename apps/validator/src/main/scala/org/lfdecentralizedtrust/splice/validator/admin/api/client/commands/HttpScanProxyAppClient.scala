@@ -12,7 +12,13 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scanproxy as scanProxy}
 import org.lfdecentralizedtrust.splice.http.v0.scanproxy.{GetDsoPartyIdResponse, ScanproxyClient}
-import org.lfdecentralizedtrust.splice.util.{Codec, ContractWithState, DsoInfo, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  Codec,
+  ContractWithState,
+  DsoInfo,
+  DsoInfoV1,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedDevelopmentFundCoupon
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
@@ -56,6 +62,23 @@ object HttpScanProxyAppClient {
       DsoInfo,
     ]] = { case scanProxy.GetDsoInfoResponse.OK(response) =>
       DsoInfo.fromHttp(response)
+    }
+  }
+
+  case object GetDsoInfoV1 extends ScanProxyBaseCommand[scanProxy.GetDsoInfoV1Response, DsoInfoV1] {
+    override def submitRequest(
+        client: ScanproxyClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], scanProxy.GetDsoInfoV1Response] =
+      client.getDsoInfoV1(headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[scanProxy.GetDsoInfoV1Response, Either[
+      String,
+      DsoInfoV1,
+    ]] = { case scanProxy.GetDsoInfoV1Response.OK(response) =>
+      DsoInfoV1.fromHttp(response)
     }
   }
 

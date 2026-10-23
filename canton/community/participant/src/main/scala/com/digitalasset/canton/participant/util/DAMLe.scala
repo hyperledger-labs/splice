@@ -14,7 +14,11 @@ import com.digitalasset.canton.data.{
 import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.EngineController.GetEngineAbortStatus
 import com.digitalasset.canton.participant.store.ReplayContractLookup
@@ -66,11 +70,12 @@ object DAMLe {
       enableLfDev: Boolean,
       enableLfBeta: Boolean,
       enableStackTraces: Boolean,
+      executionMode: interpretation.ExecutionMode = interpretation.ExecutionMode.UpdateMachine,
       profileDir: Option[Path] = None,
       snapshotDir: Option[Path] = None,
       iterationsBetweenInterruptions: Long =
         10000, // 10000 is the default value in the engine configuration,
-      transactionLimits: interpretation.Limits = interpretation.Limits.Lenient,
+      transactionLimits: interpretation.LimitConfig = interpretation.LimitConfig.Off,
       paranoidMode: Boolean,
       submissionPhaseLogging: EngineLoggingConfig,
       validationPhaseLogging: EngineLoggingConfig,
@@ -90,6 +95,7 @@ object DAMLe {
         paranoid = paranoidMode,
         submissionPhaseLogging = submissionPhaseLogging,
         validationPhaseLogging = validationPhaseLogging,
+        executionMode = executionMode,
       ),
       loggerFactory,
     )
@@ -111,26 +117,43 @@ object DAMLe {
   type TransactionEnricher = Enricher[LfVersionedTransaction, LfVersionedTransaction]
   type ContractEnricher = Enricher[(FatContractInstance, Set[LfPackageId]), FatContractInstance]
 
-  sealed trait ReinterpretationError extends PrettyPrinting
+  sealed trait ReinterpretationError extends PrettyPrintingFromCompanion
 
   final case class EngineError(cause: Error) extends ReinterpretationError {
-    override protected def pretty: Pretty[EngineError] = adHocPrettyInstance
+    override def prettyCompanion: PrettyPrintingCompanion[EngineError] = EngineError
+  }
+
+  object EngineError extends PrettyPrintingCompanion[EngineError] {
+    override protected val pretty: Pretty[EngineError] = adHocPrettyInstance
   }
 
   final case class EngineAborted(reason: String) extends ReinterpretationError {
-    override protected def pretty: Pretty[EngineAborted] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[EngineAborted] = EngineAborted
+  }
+
+  object EngineAborted extends PrettyPrintingCompanion[EngineAborted] {
+    override protected val pretty: Pretty[EngineAborted] = prettyOfClass(
       param("reason", _.reason.doubleQuoted)
     )
   }
 
   final case class EnrichmentError(reason: String) extends ReinterpretationError {
-    override protected def pretty: Pretty[EnrichmentError] = adHocPrettyInstance
+    override def prettyCompanion: PrettyPrintingCompanion[EnrichmentError] = EnrichmentError
+  }
+
+  object EnrichmentError extends PrettyPrintingCompanion[EnrichmentError] {
+    override protected val pretty: Pretty[EnrichmentError] = adHocPrettyInstance
   }
 
   final case class ExternalCallReplayMissing(
       key: ExternalCallKey
   ) extends ReinterpretationError {
-    override protected def pretty: Pretty[ExternalCallReplayMissing] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[ExternalCallReplayMissing] =
+      ExternalCallReplayMissing
+  }
+
+  object ExternalCallReplayMissing extends PrettyPrintingCompanion[ExternalCallReplayMissing] {
+    override protected val pretty: Pretty[ExternalCallReplayMissing] = prettyOfClass(
       param("key", _.key)
     )
   }

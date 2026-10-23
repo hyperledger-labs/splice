@@ -5,7 +5,7 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 
 import cats.syntax.either.*
 import com.daml.metrics.api.MetricsContext
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeNumeric, PositiveDouble}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeNumeric, PositiveDouble, PositiveInt}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
@@ -55,6 +55,7 @@ import RetransmissionsManager.{
   MaxRetransmissionRequestBurstFactorPerNode,
   NodeRoundRobin,
   RetransmissionRequestPeriod,
+  sendRetransmissionResponse,
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -66,7 +67,9 @@ class RetransmissionsManager[E <: Env[E]](
     metrics: BftOrderingMetrics,
     override val loggerFactory: NamedLoggerFactory,
     logEndOfEpochProgress: Boolean,
+    windowSizeForRetransmissionOfCommitCertificates: Option[PositiveInt],
     // Passed only in tests
+    consensusExtraAllowedRetransmissionRequestsPerSecond: Int,
     previousEpochsRetransmissionsTrackerO: Option[PreviousEpochsRetransmissionsTracker] = None,
     // Monotonic elapsed-time source (nanoseconds) for the request rate limiter, injectable in tests.
     rateLimiterNanoTime: () => Long = () => System.nanoTime(),
@@ -91,8 +94,11 @@ class RetransmissionsManager[E <: Env[E]](
 
   private val requestRateLimiter =
     new BftNodeRateLimiter(
-      maxTasksPerSecond =
-        NonNegativeNumeric.tryCreate(1.toDouble / RetransmissionRequestPeriod.toSeconds.toDouble),
+      maxTasksPerSecond = NonNegativeNumeric.tryCreate(
+        // we allow 1 request per node every RetransmissionRequestPeriod
+        // plus consensusExtraAllowedRetransmissionRequestsPerSecond to allow some requests from nodes that are missing pre-prepares are reaching a quorum of prepares
+        1.toDouble / RetransmissionRequestPeriod.toSeconds.toDouble + consensusExtraAllowedRetransmissionRequestsPerSecond.toDouble
+      ),
       maxBurstFactor = PositiveDouble.tryCreate(MaxRetransmissionRequestBurstFactorPerNode),
       timeSource = rateLimiterNanoTime(),
     )
@@ -398,13 +404,12 @@ class RetransmissionsManager[E <: Env[E]](
       receiver: BftNodeId,
       commitCertificates: Seq[CommitCertificate],
   )(implicit traceContext: TraceContext): Unit =
-    p2pNetworkOut.asyncSend(
-      P2PNetworkOut.send(
-        P2PNetworkOut.BftOrderingNetworkMessage.RetransmissionMessage(
-          Consensus.RetransmissionsMessage.RetransmissionResponse(thisNode, commitCertificates)
-        ),
-        destinationBftNodeId = receiver,
-      )
+    sendRetransmissionResponse(
+      p2pNetworkOut,
+      thisNode,
+      receiver,
+      commitCertificates,
+      windowSizeForRetransmissionOfCommitCertificates,
     )
 
   private def signRetransmissionNetworkMessage(
@@ -454,6 +459,35 @@ object RetransmissionsManager {
 
   // TODO(#24443): unify this value with catch up and pass it as config
   val HowManyEpochsToKeep = 5
+
+  def sendRetransmissionResponse(
+      p2pNetworkOut: ModuleRef[P2PNetworkOut.Message],
+      myId: BftNodeId,
+      receiver: BftNodeId,
+      commitCertificates: Seq[CommitCertificate],
+      windowSizeForRetransmission: Option[PositiveInt],
+  )(implicit traceContext: TraceContext, metricsContext: MetricsContext): Unit = {
+    val groupsOfCommitCertificates = windowSizeForRetransmission match {
+      case Some(value) => commitCertificates.grouped(value.value)
+      case None =>
+        // If no window size is specified, send all commit certificates in a single message.
+        Seq(commitCertificates)
+    }
+
+    groupsOfCommitCertificates.foreach { commitCertificates =>
+      p2pNetworkOut.asyncSend(
+        P2PNetworkOut.send(
+          P2PNetworkOut.BftOrderingNetworkMessage.RetransmissionMessage(
+            Consensus.RetransmissionsMessage.RetransmissionResponse(
+              myId,
+              commitCertificates,
+            )
+          ),
+          destinationBftNodeId = receiver,
+        )
+      )
+    }
+  }
 
   class NodeRoundRobin {
     @SuppressWarnings(Array("org.wartremover.warts.Var"))

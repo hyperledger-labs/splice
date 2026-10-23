@@ -4,7 +4,6 @@
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.v2.transaction_filter.EventFormat
 import com.daml.ledger.api.v2.{reassignment, state_service}
 import com.digitalasset.canton.auth.AuthInterceptor
 import com.digitalasset.canton.http.WebsocketConfig
@@ -19,11 +18,11 @@ import com.digitalasset.canton.http.json.v2.JsContractEntry.{
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.{JsCantonError, JsEvent}
 import com.digitalasset.canton.ledger.client.LedgerClient
-import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
+import com.google.protobuf.timestamp.Timestamp
 import io.circe.Codec
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 import io.grpc.stub.StreamObserver
@@ -79,6 +78,10 @@ class JsStateService(
       JsStateService.getLastPrunedOffsetsEndpoint,
       getLatestPrunedOffsets,
     ),
+    withServerLogic(
+      JsStateService.convertRecordTimeToOffset,
+      convertRecordTimeToOffset,
+    ),
   )
 
   private def getConnectedSynchronizers(
@@ -127,68 +130,41 @@ class JsStateService(
         .resultToRight
   }
 
+  private def convertRecordTimeToOffset(
+      callerContext: CallerContext
+  ): TracedInput[(Timestamp, Option[String])] => Future[
+    Either[JsCantonError, state_service.ConvertRecordTimeToOffsetResponse]
+  ] = {
+    implicit val traceContext: TraceContext = callerContext.traceContext()
+
+    req =>
+      stateServiceClient(callerContext.token())
+        .convertRecordTimeToOffset(
+          state_service.ConvertRecordTimeToOffsetRequest(
+            Some(req.in._1),
+            req.in._2.getOrElse(""),
+          )
+        )
+        .resultToRight
+  }
+
   private def getActiveContractsStream(
       caller: CallerContext
   ): TracedInput[Unit] => Flow[
-    LegacyDTOs.GetActiveContractsRequest,
+    state_service.GetActiveContractsRequest,
     JsGetActiveContractsResponse,
     NotUsed,
   ] =
     _ => {
       implicit val tc: TraceContext = caller.traceContext()
-      Flow[LegacyDTOs.GetActiveContractsRequest].map {
-        toGetActiveContractsRequest
-      } via
-        prepareSingleWsStream(
-          (
-              req: state_service.GetActiveContractsRequest,
-              obs: StreamObserver[state_service.GetActiveContractsResponse],
-          ) => stateServiceClient(caller.token()).getActiveContracts(req, obs),
-          (r: state_service.GetActiveContractsResponse) =>
-            protocolConverters.GetActiveContractsResponse.toJson(r),
-        )
-    }
-
-  private def toGetActiveContractsRequest(
-      req: LegacyDTOs.GetActiveContractsRequest
-  )(implicit traceContext: TraceContext): state_service.GetActiveContractsRequest =
-    (req.eventFormat, req.filter, req.verbose) match {
-      case (Some(_), Some(_), _) =>
-        throw RequestValidationErrors.InvalidArgument
-          .Reject(
-            "Both event_format and filter are set. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
-          )
-          .asGrpcError
-      case (Some(_), _, true) =>
-        throw RequestValidationErrors.InvalidArgument
-          .Reject(
-            "Both event_format and verbose are set. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
-          )
-          .asGrpcError
-      case (Some(_), None, false) =>
-        state_service.GetActiveContractsRequest(
-          activeAtOffset = req.activeAtOffset,
-          eventFormat = req.eventFormat,
-          streamContinuationToken = req.streamContinuationToken,
-        )
-      case (None, None, _) =>
-        throw RequestValidationErrors.InvalidArgument
-          .Reject(
-            "Either filter/verbose or event_format is required. Please use either backwards compatible arguments (filter and verbose) or event_format."
-          )
-          .asGrpcError
-      case (None, Some(filter), verbose) =>
-        state_service.GetActiveContractsRequest(
-          activeAtOffset = req.activeAtOffset,
-          eventFormat = Some(
-            EventFormat(
-              filtersByParty = filter.filtersByParty,
-              filtersForAnyParty = filter.filtersForAnyParty,
-              verbose = verbose,
-            )
-          ),
-          streamContinuationToken = req.streamContinuationToken,
-        )
+      prepareSingleWsStream(
+        (
+            req: state_service.GetActiveContractsRequest,
+            obs: StreamObserver[state_service.GetActiveContractsResponse],
+        ) => stateServiceClient(caller.token()).getActiveContracts(req, obs),
+        (r: state_service.GetActiveContractsResponse) =>
+          protocolConverters.GetActiveContractsResponse.toJson(r),
+      )
     }
 
   private def getActiveContractsPage(
@@ -217,7 +193,7 @@ object JsStateService extends DocumentationEndpoints {
     .in(sttp.tapir.stringToPath("active-contracts"))
     .out(
       webSocketBody[
-        LegacyDTOs.GetActiveContractsRequest,
+        state_service.GetActiveContractsRequest,
         CodecFormat.Json,
         Either[JsCantonError, JsGetActiveContractsResponse],
         CodecFormat.Json,
@@ -227,7 +203,7 @@ object JsStateService extends DocumentationEndpoints {
 
   val activeContractsListEndpoint = state.post
     .in(sttp.tapir.stringToPath("active-contracts"))
-    .in(jsonBody[LegacyDTOs.GetActiveContractsRequest])
+    .in(jsonBody[state_service.GetActiveContractsRequest])
     .out(jsonBody[Seq[JsGetActiveContractsResponse]])
     .description(
       s"""Query active contracts list (blocking call).
@@ -279,6 +255,13 @@ object JsStateService extends DocumentationEndpoints {
     .out(jsonBody[state_service.GetLatestPrunedOffsetsResponse])
     .protoRef(state_service.StateServiceGrpc.METHOD_GET_LATEST_PRUNED_OFFSETS)
 
+  val convertRecordTimeToOffset = state.get
+    .in(sttp.tapir.stringToPath("convert-record-time-to-offset"))
+    .in(query[Timestamp]("record-time"))
+    .in(query[Option[String]]("synchronizer-id"))
+    .out(jsonBody[state_service.ConvertRecordTimeToOffsetResponse])
+    .protoRef(state_service.StateServiceGrpc.METHOD_CONVERT_RECORD_TIME_TO_OFFSET)
+
   override def documentation: Seq[AnyEndpoint] = Seq(
     activeContractsEndpoint,
     activeContractsListEndpoint,
@@ -287,6 +270,7 @@ object JsStateService extends DocumentationEndpoints {
     getConnectedSynchronizersEndpoint,
     getLedgerEndEndpoint,
     getLastPrunedOffsetsEndpoint,
+    convertRecordTimeToOffset,
   )
 }
 
@@ -336,9 +320,6 @@ object JsStateServiceCodecs {
   implicit val getActiveContractsRequestRW: Codec[state_service.GetActiveContractsRequest] =
     deriveRelaxedCodec
 
-  implicit val getActiveContractsRequestLegacyRW: Codec[LegacyDTOs.GetActiveContractsRequest] =
-    deriveRelaxedCodec
-
   implicit val jsGetActiveContractsResponseRW: Codec[JsGetActiveContractsResponse] =
     deriveConfiguredCodec
 
@@ -374,7 +355,9 @@ object JsStateServiceCodecs {
   implicit val getLatestPrunedOffsetsResponseRW
       : Codec[state_service.GetLatestPrunedOffsetsResponse] =
     deriveRelaxedCodec
-
+  implicit val convertRecordTimeToOffsetResponseRW
+      : Codec[state_service.ConvertRecordTimeToOffsetResponse] =
+    deriveRelaxedCodec
   // Schema mappings are added to align generated tapir docs with a circe mapping of ADTs
 
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))

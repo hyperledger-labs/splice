@@ -26,7 +26,11 @@ import com.digitalasset.canton.lifecycle.{
   PromiseUnlessShutdown,
   PromiseUnlessShutdownFactory,
 }
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.commitment.ReceivedAcsCommitmentValidator
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
@@ -252,7 +256,7 @@ trait MessageDispatcher { this: NamedLogging =>
     val deliver = eventE.event.content
     // TODO(#13883) Validate the topology timestamp
     // TODO(#13883) Centralize the topology timestamp constraints in a single place so that they are well-documented
-    val Deliver(_pts, ts, _, _, batch, topologyTimestampO, _) = deliver
+    val Deliver(_pts, ts, _, _, batch, _) = deliver
 
     val envelopesWithCorrectSynchronizerId =
       filterBatchForSynchronizerId(batch, sequencerCounter, ts)
@@ -269,10 +273,9 @@ trait MessageDispatcher { this: NamedLogging =>
       identityResult <- processTopologyTransactions(
         sequencerCounter,
         SequencedTime(ts),
-        deliver.topologyTimestampO,
         envelopesWithCorrectSynchronizerId,
       )
-      trafficResult <- processTraffic(ts, topologyTimestampO, envelopesWithCorrectSynchronizerId)
+      trafficResult <- processTraffic(ts, envelopesWithCorrectSynchronizerId)
       legacyAcsCommitmentResult <- processLegacyAcsCommitmentEnvelope(
         envelopesWithCorrectSynchronizerId,
         sequencerCounter,
@@ -299,23 +302,21 @@ trait MessageDispatcher { this: NamedLogging =>
   protected def processTopologyTransactions(
       sc: SequencerCounter,
       ts: SequencedTime,
-      topologyTimestampO: Option[CantonTimestamp],
       envelopes: Seq[DefaultOpenEnvelope],
   )(implicit traceContext: TraceContext): ProcessingResult =
     doProcess(
-      TopologyTransaction(() => topologyProcessor(sc, ts, topologyTimestampO, Traced(envelopes)))
+      TopologyTransaction(() => topologyProcessor(sc, ts, Traced(envelopes)))
     )
 
   protected def processTraffic(
       ts: CantonTimestamp,
-      timestampOfSigningKeyO: Option[CantonTimestamp],
       envelopes: Seq[DefaultOpenEnvelope],
   )(implicit
       traceContext: TraceContext
   ): ProcessingResult =
     doProcess(
       TrafficControlTransaction(() =>
-        trafficProcessor.processSetTrafficPurchasedEnvelopes(ts, timestampOfSigningKeyO, envelopes)
+        trafficProcessor.processSetTrafficPurchasedEnvelopes(ts, envelopes)
       )
     )
 
@@ -366,8 +367,7 @@ trait MessageDispatcher { this: NamedLogging =>
           .foreach(alarmIfNonEmptySigned.tupled)
 
         val containsTopologyTransactions = DefaultOpenEnvelopesFilter.containsTopology(
-          envelopes = envelopes,
-          withExplicitTopologyTimestamp = event.event.content.topologyTimestampO.isDefined,
+          envelopes = envelopes
         )
 
         val isReceipt = event.event.content.messageIdO.isDefined
@@ -668,7 +668,6 @@ trait MessageDispatcher { this: NamedLogging =>
             _synchronizerId,
             messageIdO,
             _batch,
-            _,
             _,
           ) =>
         // The event was submitted by the current participant iff the message ID is set.
@@ -1036,7 +1035,6 @@ private[participant] object MessageDispatcher {
   type ParticipantTopologyProcessor = (
       SequencerCounter,
       SequencedTime,
-      Option[CantonTimestamp],
       Traced[Seq[DefaultOpenEnvelope]],
   ) => HandlerResult
 
@@ -1078,9 +1076,14 @@ private[participant] object MessageDispatcher {
   /** @tparam A
     *   The type returned by processors for the given kind
     */
-  sealed trait MessageKind extends Product with Serializable with PrettyPrinting {
-    override protected def pretty: Pretty[MessageKind.this.type] =
-      prettyOfObject[MessageKind.this.type]
+  sealed trait MessageKind extends Product with Serializable with PrettyPrintingFromCompanion {
+    // `this.type` rather than `MessageKind`, so that subclasses can point at their own companion
+    override def prettyCompanion: PrettyPrintingCompanion[this.type] = MessageKind
+  }
+
+  object MessageKind extends PrettyPrintingCompanion[MessageKind] {
+    override protected val pretty: Pretty[MessageKind] =
+      prettyOfObject[MessageKind]
   }
 
   final case class TopologyTransaction(run: () => HandlerResult) extends MessageKind
@@ -1091,10 +1094,18 @@ private[participant] object MessageDispatcher {
       futureEventPublication: FutureUnlessShutdown[EventPublicationData],
       run: () => HandlerResult,
   ) extends MessageKind {
-    override protected def pretty: Pretty[RequestKind] = prettyOfParam(_.viewType)
+    override def prettyCompanion: PrettyPrintingCompanion[RequestKind] = RequestKind
+  }
+
+  object RequestKind extends PrettyPrintingCompanion[RequestKind] {
+    override protected val pretty: Pretty[RequestKind] = prettyOfParam(_.viewType)
   }
   final case class ResultKind(viewType: ViewType, run: () => HandlerResult) extends MessageKind {
-    override protected def pretty: Pretty[ResultKind] = prettyOfParam(_.viewType)
+    override def prettyCompanion: PrettyPrintingCompanion[ResultKind] = ResultKind
+  }
+
+  object ResultKind extends PrettyPrintingCompanion[ResultKind] {
+    override protected val pretty: Pretty[ResultKind] = prettyOfParam(_.viewType)
   }
   final case class AcsCommitment(
       futureEventPublication: Option[FutureEventPublication],

@@ -230,24 +230,45 @@ class HttpScanHandler(
   )()(extracted: TraceContext): Future[v0.ScanResource.GetDsoInfoResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getDsoInfo") { _ => _ =>
-      for {
-        latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
-        amuletRules <- store.getAmuletRulesWithState()
-        rulesAndStates <- store.getDsoRulesWithStateWithSvNodeStates()
-        dsoRules = rulesAndStates.dsoRules
-      } yield DsoInfo(
-        svUser = svUserName,
-        svParty = svParty,
-        dsoParty = store.key.dsoParty,
-        votingThreshold = Thresholds.requiredNumVotes(dsoRules),
-        latestMiningRound = latestOpenMiningRound.toContractWithState,
-        amuletRules = amuletRules,
-        dsoRules = dsoRules,
-        svNodeStates = rulesAndStates.svNodeStates,
-        initialRound = Some(initialRound),
-      ).toHttp
+      lookupDsoInfo().map(_.toHttp)
     }
   }
+
+  def getDsoInfoV1(
+      respond: v0.ScanResource.GetDsoInfoV1Response.type
+  )()(extracted: TraceContext): Future[v0.ScanResource.GetDsoInfoV1Response] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getDsoInfoV1") { _ => _ =>
+      lookupDsoInfo().map(_.toV1.toHttp)
+    }
+  }
+
+  def getSvInfo(
+      respond: v0.ScanResource.GetSvInfoResponse.type
+  )()(extracted: TraceContext): Future[v0.ScanResource.GetSvInfoResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getSvInfo") { _ => _ =>
+      Future.successful(definitions.GetSvInfoResponse(svUserName, svParty.toProtoPrimitive))
+    }
+  }
+
+  private def lookupDsoInfo()(implicit tc: TraceContext): Future[DsoInfo] =
+    for {
+      latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
+      amuletRules <- store.getAmuletRulesWithState()
+      rulesAndStates <- store.getDsoRulesWithStateWithSvNodeStates()
+      dsoRules = rulesAndStates.dsoRules
+    } yield DsoInfo(
+      svUser = svUserName,
+      svParty = svParty,
+      dsoParty = store.key.dsoParty,
+      votingThreshold = Thresholds.requiredNumVotes(dsoRules),
+      latestMiningRound = latestOpenMiningRound.toContractWithState,
+      amuletRules = amuletRules,
+      dsoRules = dsoRules,
+      svNodeStates = rulesAndStates.svNodeStates,
+      initialRound = Some(initialRound),
+    )
 
   def getOpenAndIssuingMiningRounds(
       response: v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse.type

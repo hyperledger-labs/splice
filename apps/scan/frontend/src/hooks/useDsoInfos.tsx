@@ -14,10 +14,8 @@ export const useDsoInfos = (): UseQueryResult<DsoInfo> => {
   return useQuery({
     queryKey: ['getDsoInfo', DsoRules, AmuletRules],
     queryFn: async () => {
-      const resp = await scanClient.getDsoInfo();
+      const resp = await scanClient.getDsoInfoV1();
       return {
-        svUser: resp.sv_user,
-        svPartyId: resp.sv_party_id,
         dsoPartyId: resp.dso_party_id,
         votingThreshold: BigInt(resp.voting_threshold),
         amuletRules: Contract.decodeOpenAPI(resp.amulet_rules.contract, AmuletRules),

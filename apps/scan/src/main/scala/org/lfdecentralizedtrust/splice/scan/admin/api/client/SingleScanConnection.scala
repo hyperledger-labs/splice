@@ -58,6 +58,7 @@ import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
   DsoInfo,
+  DsoInfoV1,
   FactoryChoiceWithDisclosures,
   TemplateJsonDecoder,
 }
@@ -194,6 +195,13 @@ class SingleScanConnection private[client] (
       tc: TraceContext,
   ): Future[DsoInfo] = {
     runHttpCmd(config.adminApi.url, HttpScanAppClient.GetDsoInfo(List()))
+  }
+
+  override def getDsoInfoV1()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[DsoInfoV1] = {
+    runHttpCmd(config.adminApi.url, HttpScanAppClient.GetDsoInfoV1(List()))
   }
 
   override def getHoldingsSummaryAt(

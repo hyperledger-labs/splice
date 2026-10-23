@@ -7,7 +7,11 @@ import com.daml.tls.TlsClientConfig
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
@@ -17,6 +21,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.Bft
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder
 import io.grpc.stub.StreamObserver
 
 import scala.concurrent.ExecutionContextExecutor
@@ -58,14 +63,19 @@ object P2PGrpcNetworking {
         transportSecurity: Boolean,
     ) extends Ordered[Id]
         with Product
-        with PrettyPrinting {
+        with PrettyPrintingFromCompanion {
 
       lazy val url = s"${if (transportSecurity) "https" else "http"}://$address:$port"
 
       override def compare(that: Id): Int =
         Id.unapply(this).compare(Id.unapply(that))
 
-      override protected def pretty: Pretty[Id] =
+      override def prettyCompanion: PrettyPrintingCompanion[Id] = Id
+    }
+
+    object Id extends PrettyPrintingCompanion[Id] {
+
+      override protected val pretty: Pretty[Id] =
         prettyOfClassWithName("P2PUrl")(unnamedParam(_.url.doubleQuoted))
     }
 
@@ -137,6 +147,7 @@ object P2PGrpcNetworking {
   private[grpc] def createNettyClientChannelBuilder(
       clientChannelBuilder: ClientChannelBuilder,
       endpointConfig: P2PEndpointConfig,
+      channelCustomizer: NettyChannelBuilder => Unit = _ => (),
   )(implicit executionContextExecutor: ExecutionContextExecutor) =
     clientChannelBuilder.create(
       endpoint = Endpoint(endpointConfig.address, endpointConfig.port),
@@ -148,6 +159,7 @@ object P2PGrpcNetworking {
       //  as the ordering protocol itself provides resilience.
       loadBalancingPolicy = None,
       healthCheck = false,
+      channelCustomizer = channelCustomizer,
     )
 
   private[grpc] def completeGrpcStreamObserver(

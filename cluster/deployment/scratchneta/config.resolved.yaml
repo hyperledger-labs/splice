@@ -91,7 +91,6 @@ monitoring:
           seconds: 3600
         computeDuration:
           seconds: 1200
-        usePv36Metrics: false
       acsSnapshots:
         saveLatencyThresholdSeconds: 5400
         updateLatencyThresholdSeconds: 3

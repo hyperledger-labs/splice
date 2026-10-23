@@ -54,12 +54,37 @@ trait BaseVersioningCompanionF[
   protected type Invariants = Seq[Invariant[ValueClass, this.type]]
 
   object VersioningTable {
+
+    /** Create a versioning table
+      * @param head
+      *   First proto codec
+      * @param tail
+      *   Other proto codecs
+      */
     def apply(
         head: (ProtoVersion, Codec),
         tail: (ProtoVersion, Codec)*
     ): VersioningTable = SupportedProtoVersions.fromNonEmpty(name)(
       NonEmpty.mk(Seq, head, tail*)
     )
+
+    /** Create a versioning table
+      * @param minimumPvOverride
+      *   Can allow to override the minimum protocol version. This should be used only to allow to
+      *   deserialize old messages.
+      * @param head
+      *   First proto codec
+      * @param tail
+      *   Other proto codecs
+      */
+    def withMinimumPvOverride(
+        minimumPvOverride: ProtocolVersion,
+        head: (ProtoVersion, Codec),
+        tail: (ProtoVersion, Codec)*
+    ): VersioningTable =
+      SupportedProtoVersions.fromNonEmpty(name, expectedMinimumPv = minimumPvOverride)(
+        NonEmpty.mk(Seq, head, tail*)
+      )
   }
 
   /** Will check that default value rules defined in [[invariants]] hold.
@@ -90,11 +115,11 @@ trait BaseVersioningCompanionF[
     */
   def protoVersionFor(
       protocolVersion: RepresentativeProtocolVersion[this.type]
-  ): ProtoVersion = versioningTable.protoVersionFor(protocolVersion)
+  ): Either[String, ProtoVersion] = versioningTable.protoVersionFor(protocolVersion)
 
   /** Return the Proto version corresponding to the protocol version
     */
-  def protoVersionFor(protocolVersion: ProtocolVersion): ProtoVersion =
+  def protoVersionFor(protocolVersion: ProtocolVersion): Either[String, ProtoVersion] =
     versioningTable.protoVersionFor(protocolVersionRepresentativeFor(protocolVersion))
 
   /** Proto versions that are supported by `fromByteString` See the helper `supportedProtoVersion`
@@ -127,14 +152,16 @@ trait BaseVersioningCompanionF[
     )
   } yield valueClass
 
+  def admissibleRpvs(rpv: ProtocolVersion): Seq[ProtocolVersion] = Seq(rpv)
+
   private def deserialize(
       protocolVersionValidation: ProtocolVersionValidation,
       context: Context,
   )(bytes: OriginalByteString): ParsingResult[DeserializedValueClass] = for {
     proto <- ProtoConverter.protoParser(v1.UntypedVersionedMessage.parseFrom)(bytes)
     data <- proto.wrapper.data.toRight(ProtoDeserializationError.FieldNotSet(s"$name: data"))
-    valueClass <- versioningTable
-      .deserializerFor(ProtoVersion(proto.version))(protocolVersionValidation, context, bytes, data)
+    deserializer <- versioningTable.deserializerFor(ProtoVersion(proto.version))
+    valueClass <- deserializer(protocolVersionValidation, context, bytes, data)
   } yield valueClass
 
   def fromByteString(expectedProtocolVersion: ProtocolVersion, context: Context)(
@@ -199,13 +226,13 @@ trait BaseVersioningCompanionF[
     for {
       proto <- ProtoConverter.protoParserArray(v1.UntypedVersionedMessage.parseFrom)(bytes)
       data <- proto.wrapper.data.toRight(ProtoDeserializationError.FieldNotSet(s"$name: data"))
-      valueClass <- versioningTable
-        .deserializerFor(ProtoVersion(proto.version))(
-          ProtocolVersionValidation.NoValidation,
-          context,
-          ByteString.copyFrom(bytes),
-          data,
-        )
+      deserializer <- versioningTable.deserializerFor(ProtoVersion(proto.version))
+      valueClass <- deserializer(
+        ProtocolVersionValidation.NoValidation,
+        context,
+        ByteString.copyFrom(bytes),
+        data,
+      )
     } yield valueClass
 
   def fromTrustedByteArray(bytes: Array[Byte])(implicit
@@ -272,15 +299,16 @@ trait BaseVersioningCompanionF[
     def fromTrustedProtoVersioned(
         proto: VersionedMessage[DeserializedValueClass]
     ): ParsingResult[DeserializedValueClass] =
-      proto.wrapper.data.toRight(ProtoDeserializationError.FieldNotSet(s"$name: data")).flatMap {
-        bytes =>
-          versioningTable.deserializerFor(ProtoVersion(proto.version))(
-            ProtocolVersionValidation.NoValidation,
-            context,
-            bytes,
-            bytes,
-          )
-      }
+      for {
+        bytes <- proto.wrapper.data.toRight(ProtoDeserializationError.FieldNotSet(s"$name: data"))
+        deserializer <- versioningTable.deserializerFor(ProtoVersion(proto.version))
+        instance <- deserializer(
+          ProtocolVersionValidation.NoValidation,
+          context,
+          bytes,
+          bytes,
+        )
+      } yield instance
 
     try {
       v1.UntypedVersionedMessage
@@ -318,9 +346,9 @@ trait BaseVersioningCompanionF[
   ): ParsingResult[Unit] =
     protocolVersionValidation match {
       case ProtocolVersionValidation.PV(pv) =>
-        val expected = protocolVersionRepresentativeFor(pv).representative
+        val expected = admissibleRpvs(protocolVersionRepresentativeFor(pv).representative)
         Either.cond(
-          expected == deserializedRepresentativeProtocolVersion,
+          expected.contains(deserializedRepresentativeProtocolVersion),
           (),
           unexpectedProtoVersionError(expected, deserializedRepresentativeProtocolVersion),
         )
@@ -330,11 +358,12 @@ trait BaseVersioningCompanionF[
     }
 
   private[version] def unexpectedProtoVersionError(
-      expected: ProtocolVersion,
+      expected: Seq[ProtocolVersion],
       found: ProtocolVersion,
   ) =
     OtherError(
-      s"Error while deserializing a $name; expected representative protocol version $expected but found $found"
+      s"Error while deserializing a $name; expected representative protocol version ${expected
+          .mkString(", ")} but found $found"
     )
 }
 

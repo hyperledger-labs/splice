@@ -5,7 +5,7 @@ package com.digitalasset.canton.synchronizer.sequencer.block
 
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.synchronizer.block.data.SequencerBlockStore
@@ -44,7 +44,6 @@ class DriverBlockSequencerFactory[C](
     sequencerDriverFactory: SequencerDriverFactory { type ConfigType = C },
     config: C,
     blockSequencerConfig: BlockSequencerConfig,
-    producePostOrderingTopologyTicks: Boolean,
     health: Option[SequencerHealthConfig],
     storage: Storage,
     protocolVersion: ProtocolVersion,
@@ -82,18 +81,20 @@ class DriverBlockSequencerFactory[C](
       ec: ExecutionContextExecutor,
       materializer: Materializer,
       tracer: Tracer,
-  ): BlockOrderer =
-    new DriverBlockOrderer(
-      sequencerDriverFactory.create(
-        config,
-        nodeParameters.nonStandardConfig,
-        clock,
-        initialBlockHeight,
-        cryptoApi.psid.toString,
-        sequencerId.toProtoPrimitive,
-        synchronizerLoggerFactory,
-      ),
-      orderingTimeFixMode,
+  ): UnlessShutdown[BlockOrderer] =
+    UnlessShutdown.Outcome(
+      new DriverBlockOrderer(
+        sequencerDriverFactory.create(
+          config,
+          nodeParameters.nonStandardConfig,
+          clock,
+          initialBlockHeight,
+          cryptoApi.psid.toString,
+          sequencerId.toProtoPrimitive,
+          synchronizerLoggerFactory,
+        ),
+        orderingTimeFixMode,
+      )
     )
 
   override protected final def createBlockSequencer(
@@ -125,7 +126,6 @@ class DriverBlockSequencerFactory[C](
       store,
       sequencerStore,
       blockSequencerConfig,
-      producePostOrderingTopologyTicks,
       balanceStore,
       storage,
       futureSupervisor,
@@ -151,7 +151,6 @@ object DriverBlockSequencerFactory extends LazyLogging {
       driverVersion: Int,
       rawConfig: ConfigCursor,
       blockSequencerConfig: BlockSequencerConfig,
-      producePostOrderingTopologyTicks: Boolean,
       health: Option[SequencerHealthConfig],
       storage: Storage,
       protocolVersion: ProtocolVersion,
@@ -176,7 +175,6 @@ object DriverBlockSequencerFactory extends LazyLogging {
       driverFactory,
       config,
       blockSequencerConfig,
-      producePostOrderingTopologyTicks,
       health,
       storage,
       protocolVersion,
@@ -194,7 +192,6 @@ object DriverBlockSequencerFactory extends LazyLogging {
       driverVersion: Int,
       config: C,
       blockSequencerConfig: BlockSequencerConfig,
-      producePostOrderingTopologyTicks: Boolean,
       health: Option[SequencerHealthConfig],
       storage: Storage,
       protocolVersion: ProtocolVersion,
@@ -207,7 +204,6 @@ object DriverBlockSequencerFactory extends LazyLogging {
       getSequencerDriverFactory(driverName, driverVersion),
       config,
       blockSequencerConfig,
-      producePostOrderingTopologyTicks,
       health,
       storage,
       protocolVersion,

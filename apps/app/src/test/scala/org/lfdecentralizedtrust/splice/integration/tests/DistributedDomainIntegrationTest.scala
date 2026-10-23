@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithIsolatedEnvironment
+import org.lfdecentralizedtrust.splice.sv.config.SvSynchronizerNodeConfig
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplificationAccess.*
@@ -56,6 +57,14 @@ class DistributedDomainIntegrationTest
       sv2Backend.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
       sv3Backend.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
       sv4Backend.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+    }
+    clue("Sequencers have the correct static synchronizer parameters") {
+      val staticParams =
+        sv1Backend.sequencerClientFor(_.current).synchronizer_parameters.static.get()
+      staticParams.synchronizerLimits shouldBe SvSynchronizerNodeConfig.defaultSynchronizerLimits
+      forAll(Seq(sv2Backend, sv3Backend, sv4Backend)) { sv =>
+        sv.sequencerClientFor(_.current).synchronizer_parameters.static.get() shouldBe staticParams
+      }
     }
 
     clue("SV participants are connected to all sequencers") {

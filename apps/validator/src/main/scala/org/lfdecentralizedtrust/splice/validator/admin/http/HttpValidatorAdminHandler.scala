@@ -44,6 +44,7 @@ import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.canton.protocol.SynchronizerLimits
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -276,6 +277,8 @@ class HttpValidatorAdminHandler(
   ): GenericSignedTopologyTransaction = {
     val tx = TopologyTransaction
       .fromTrustedByteString(
+        TopologyTransactionDeserializationContext(SynchronizerLimits.default)
+      )(
         ByteString.copyFrom(Base64.getDecoder.decode(topologyTx.topologyTx))
       )
       .valueOr(error =>
@@ -347,7 +350,7 @@ class HttpValidatorAdminHandler(
             txs = body.signedTopologyTxs.map(decodeSignedTopologyTx(publicKey, _)),
           )
           // The PartyToParticipant mapping requires both the external signature from the party namespace but also one from the participant which we create here
-          participantId <- participantAdminConnection.getParticipantId()
+          _ <- participantAdminConnection.getParticipantId()
           _ <- participantAdminConnection.proposeMapping(
             TopologyStoreId.Synchronizer(synchronizerId),
             partyToParticipant,

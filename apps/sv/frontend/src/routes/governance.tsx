@@ -40,6 +40,7 @@ export const Governance: React.FC = () => {
 
   const votesHooks = useVotesHooks();
   const dsoInfosQuery = votesHooks.useDsoInfos();
+  const svInfoQuery = votesHooks.useSvInfo();
   const listVoteRequestsQuery = votesHooks.useListDsoRulesVoteRequests();
   const voteResultsInfiniteQuery = useInfiniteVoteRequestResults();
   const voteResultsCountQuery = useVoteRequestResultsCount();
@@ -49,7 +50,7 @@ export const Governance: React.FC = () => {
     : [];
   const votesQuery = votesHooks.useListVotes(voteRequestIds);
 
-  const svPartyId = dsoInfosQuery.data?.svPartyId;
+  const svPartyId = svInfoQuery.data?.svPartyId;
   const votingThreshold = dsoInfosQuery.data?.votingThreshold;
   const svs = dsoInfosQuery.data?.dsoRules.payload.svs;
   const alreadyVotedRequestIds: Set<ContractId<VoteRequest>> = useMemo(() => {

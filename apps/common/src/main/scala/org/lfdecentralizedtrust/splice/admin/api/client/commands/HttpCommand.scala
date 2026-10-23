@@ -88,20 +88,4 @@ trait HttpCommand[Res, Result, C] {
       decoder: TemplateJsonDecoder
   ): PartialFunction[Res, Either[String, Result]]
 
-  private[splice] final def withRawResponse: HttpCommand[Res, Res, C] = {
-    val self: this.type = this
-    new HttpCommand[Res, Res, C] {
-      override val createGenClientFn = self.createGenClientFn
-      override def submitRequest(
-          client: Client,
-          headers: List[HttpHeader],
-      ) = self.submitRequest(client, headers)
-
-      override protected def handleOk()(implicit
-          decoder: TemplateJsonDecoder
-      ) = { case res => Right(res) }
-
-      override lazy val operationName: String = self.operationName
-    }
-  }
 }

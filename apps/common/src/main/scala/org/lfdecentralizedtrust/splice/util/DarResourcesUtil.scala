@@ -30,9 +30,6 @@ object DarResourcesUtil extends NamedLogging {
   def lookupPackageId(packageId: String): Option[DarResource] =
     pkgIdToDarResource.get(packageId)
 
-  def getDarResources(packageIds: Seq[String]): Seq[DarResource] =
-    packageIds.flatMap(lookupPackageId)
-
   def lookupPackageMetadata(name: PackageName, version: PackageVersion): Option[DarResource] =
     pkgMetadataToDarResource.get((name, version))
 

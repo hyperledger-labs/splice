@@ -209,7 +209,7 @@ class ScanApp(
       domainMigrationId <- appInitStep("Resolving domain migration id") {
         resolveDomainMigrationId()
       }
-      store = ScanStore(
+      store <- ScanStore(
         key = ScanStore.Key(dsoParty = dsoParty),
         storage,
         loggerFactory,
@@ -391,24 +391,23 @@ class ScanApp(
         dsoParty,
         config.spliceInstanceNames.nameServiceNameAcronym.toLowerCase(),
       )
-      rewardsReferenceStore = {
-        val rewardsStore = ScanRewardsReferenceStore(
-          key = ScanRewardsReferenceStore.Key(
-            dsoParty = dsoParty,
-            synchronizerId = synchronizerId,
-          ),
-          storage,
-          loggerFactory,
-          retryProvider,
-          domainMigrationId,
-          participantId,
-          config.automation.ingestion,
-          config.parameters.defaultLimit,
-        )
-        automation.registerRewardsReferenceStoreIngestion(rewardsStore)
-        automation.registerRewardComputationTrigger(rewardsStore)
-        automation.registerPruneRewardAccountingTrigger(rewardsStore, scanVerdictStore)
-        rewardsStore
+      rewardsReferenceStore <- ScanRewardsReferenceStore(
+        key = ScanRewardsReferenceStore.Key(
+          dsoParty = dsoParty,
+          synchronizerId = synchronizerId,
+        ),
+        storage,
+        loggerFactory,
+        retryProvider,
+        domainMigrationId,
+        participantId,
+        config.automation.ingestion,
+        config.parameters.defaultLimit,
+      )
+      _ = {
+        automation.registerRewardsReferenceStoreIngestion(rewardsReferenceStore)
+        automation.registerRewardComputationTrigger(rewardsReferenceStore)
+        automation.registerPruneRewardAccountingTrigger(rewardsReferenceStore, scanVerdictStore)
       }
       verdictAutomation = new ScanVerdictAutomationService(
         config,

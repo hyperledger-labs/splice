@@ -11,14 +11,13 @@ import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.*
-import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.SyncCryptoApiParticipantProvider
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.*
-import com.digitalasset.canton.health.{HealthQuasiComponent, HealthStatus, MutableHealthComponent}
+import com.digitalasset.canton.health.HealthStatus
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.*
 import com.digitalasset.canton.ledger.participant.state.SyncService.ConnectedSynchronizerResponse
@@ -71,7 +70,6 @@ import com.digitalasset.canton.platform.apiserver.services.command.TrafficEnforc
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.resource.DbExceptionRetryPolicy
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
-import com.digitalasset.canton.sequencing.client.SequencerClient
 import com.digitalasset.canton.sequencing.client.SequencerClient.CloseReason
 import com.digitalasset.canton.store.PendingOperation
 import com.digitalasset.canton.store.SequencedEventStore.SearchCriterion
@@ -143,7 +141,6 @@ private[sync] class SynchronizerConnectionsManager(
     pendingLsuOperationsStore: PendingLsuOperation.Store,
     pendingOnboardingTransactionsStore: PendingOnboardingTransactions.Store,
     metrics: ParticipantMetrics,
-    sequencerInfoLoader: SequencerInfoLoader,
     isActive: () => Boolean,
     declarativeChangeTrigger: () => Unit,
     futureSupervisor: FutureSupervisor,
@@ -162,16 +159,11 @@ private[sync] class SynchronizerConnectionsManager(
 
   import ShowUtil.*
 
-  val connectedSynchronizerHealth: MutableHealthComponent =
-    MutableHealthComponent(loggerFactory, ConnectedSynchronizer.healthName, timeouts)
-  val ephemeralHealth: MutableHealthComponent =
-    MutableHealthComponent(loggerFactory, SyncEphemeralState.healthName, timeouts)
-  val sequencerClientHealth: MutableHealthComponent =
-    MutableHealthComponent(loggerFactory, SequencerClient.healthName, timeouts)
-  val sequencerConnectionPoolHealthRef =
-    new AtomicReference[() => Seq[HealthQuasiComponent]](() => Seq.empty)
-  val acsCommitmentProcessorHealth: MutableHealthComponent =
-    MutableHealthComponent(loggerFactory, AcsCommitmentProcessor.healthName, timeouts)
+  /** Tracks the health components of every connected synchronizer, keyed by physical synchronizer
+    * id.
+    */
+  val connectedSynchronizersHealth: ConnectedSynchronizersHealth =
+    new ConnectedSynchronizersHealth()
 
   // Listeners to synchronizer connections
   // The listeners are notified only if the connection starts synchronizer processing
@@ -301,13 +293,13 @@ private[sync] class SynchronizerConnectionsManager(
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] =
-    sequencerInfoLoader // TODO(i27622): use the connection pool to validate the config
-      .validateSequencerConnection(
-        config.synchronizerAlias,
-        config.psid,
-        config.sequencerConnections,
-        sequencerConnectionValidation,
-      )
+    EitherT(synchronizerRegistry.validateConfig(config, sequencerConnectionValidation))
+      .leftMap(SyncServiceError.SyncServiceInconsistentConnectivity.Error(_): SyncServiceError)
+
+  def getPsid(config: SynchronizerConnectionConfig)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SyncServiceError, PhysicalSynchronizerId] =
+    EitherT(synchronizerRegistry.getPsid(config))
       .leftMap(SyncServiceError.SyncServiceInconsistentConnectivity.Error(_): SyncServiceError)
 
   /** Reconnect configured synchronizers
@@ -1229,6 +1221,7 @@ private[sync] class SynchronizerConnectionsManager(
                 promiseUSFactory,
                 connectedSynchronizerMetrics,
                 parameters.cachingConfigs.sessionEncryptionKeyCache,
+                parameters.cachingConfigs.transparencyCheckCache,
                 synchronizerConnectionConfig,
                 onboardingClearanceScheduler,
                 participantId,
@@ -1309,29 +1302,34 @@ private[sync] class SynchronizerConnectionsManager(
             )
           )
 
-          // TODO(i23328): Aggregate the health of all connected synchronizers
-          _ = connectedSynchronizerHealth.set(connectedSynchronizer)
-          _ = ephemeralHealth.set(connectedSynchronizer.ephemeral)
-          _ = sequencerClientHealth.set(connectedSynchronizer.sequencerClient.healthComponent)
-          _ = sequencerConnectionPoolHealthRef.set(() =>
-            connectedSynchronizer.sequencerClient.getConnectionPoolHealthStatus
-          )
-
-          _ = connectedSynchronizer.acsCommitmentProcessorO match {
-            case Some(acsCommitmentProcessor) =>
-              acsCommitmentProcessorHealth.set(acsCommitmentProcessor.healthComponent)
-            case None =>
-              acsCommitmentProcessorHealth.set(
+          acsCommitmentProcessorHealthComponent =
+            connectedSynchronizer.acsCommitmentProcessorO match {
+              case Some(acsCommitmentProcessor) => acsCommitmentProcessor.healthComponent
+              case None =>
                 new com.digitalasset.canton.health.HealthComponent.AlwaysHealthyComponent(
                   AcsCommitmentProcessor.healthName,
                   logger,
                 )
-              )
-          }
+            }
 
           _ = connectedSynchronizer.resolveUnhealthy()
 
           _ = connectedSynchronizers.tryAdd(connectedSynchronizer)
+
+          // Register the health components after tryAdd: connects and disconnects are serialized
+          // through the connectQueue, so there is no concurrent path here; tryAdd additionally
+          // rejects a duplicate connection for this psid before it can touch the health entry.
+          _ = connectedSynchronizersHealth.set(
+            psid,
+            ConnectedSynchronizersHealth.SynchronizerHealth(
+              connectedSynchronizer = connectedSynchronizer,
+              ephemeral = connectedSynchronizer.ephemeral,
+              sequencerClient = connectedSynchronizer.sequencerClient.healthComponent,
+              sequencerConnectionPool =
+                () => connectedSynchronizer.sequencerClient.getConnectionPoolHealthStatus,
+              acsCommitmentProcessor = acsCommitmentProcessorHealthComponent,
+            ),
+          )
 
           // Start sequencer client subscription only after synchronizer has been added to connectedSynchronizers
           _ <-
@@ -1472,6 +1470,7 @@ private[sync] class SynchronizerConnectionsManager(
       .map { synchronizerId =>
         val removedO = connectedSynchronizers.psidFor(synchronizerId).flatMap { psid =>
           syncCrypto.remove(psid)
+          connectedSynchronizersHealth.remove(psid)
           connectedSynchronizers.remove(psid)
         }
         removedO match {
@@ -1693,14 +1692,11 @@ private[sync] class SynchronizerConnectionsManager(
 
   override def onClosed(): Unit = {
 
+    connectedSynchronizersHealth.clear()
+
     val queues = Seq(connectQueue, pureHandshakesQueue)
 
-    val instances = queues ++ connectedSynchronizers.snapshot.values.toSeq ++ Seq(
-      connectedSynchronizerHealth,
-      ephemeralHealth,
-      sequencerClientHealth,
-      acsCommitmentProcessorHealth,
-    )
+    val instances = queues ++ connectedSynchronizers.snapshot.values.toSeq
 
     LifeCycle.close(instances)(logger)
   }

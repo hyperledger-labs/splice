@@ -3,9 +3,15 @@
 
 package com.digitalasset.canton.data
 
-import com.digitalasset.canton.protocol.{ContractInstance, LfContractId, Stakeholders}
+import cats.syntax.either.*
+import com.digitalasset.canton.ProtoDeserializationError.ContractDeserializationError
+import com.digitalasset.canton.protocol.{ContractInstance, LfContractId, Stakeholders, v30, v31}
+import com.digitalasset.canton.serialization.ProtoConverter
+import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.{LfPackageId, ReassignmentCounter}
+import com.digitalasset.canton.validation.ProtoValidation
+import com.digitalasset.canton.version.ProtocolVersionValidation
+import com.digitalasset.canton.{LfPackageId, ProtoDeserializationError, ReassignmentCounter}
 import com.digitalasset.daml.lf.data.Ref.{PackageName, TypeConId}
 import com.digitalasset.nonempty.NonEmpty
 import com.digitalasset.nonempty.NonEmptyReturningOps.*
@@ -16,9 +22,76 @@ final case class ContractReassignment(
     targetValidationPackageId: Target[LfPackageId],
     counter: ReassignmentCounter,
 ) {
-  // TODO(#26468): Use source/target validation package ids for vetting checks in phase 3
   def templateId: TypeConId = contract.inst.templateId
   def packageName: PackageName = contract.inst.packageName
+
+  def toProtoV30: v30.ActiveContract = v30.ActiveContract(
+    contract = contract.encoded,
+    reassignmentCounter = counter.toProtoPrimitive,
+  )
+
+  def toProtoV31: v31.ActiveContract = v31.ActiveContract(
+    contract = contract.encoded,
+    sourceValidationPackageId = sourceValidationPackageId.unwrap,
+    targetValidationPackageId = targetValidationPackageId.unwrap,
+    reassignmentCounter = counter.toProtoPrimitive,
+  )
+
+}
+
+object ContractReassignment {
+
+  /** In v30 the validation package ids are not transmitted, so they are derived from the contract's
+    * template package id.
+    */
+  def fromProtoV30(activeContract: v30.ActiveContract): ParsingResult[ContractReassignment] = {
+    val v30.ActiveContract(contractP, reassignmentCounterP) = activeContract
+
+    ContractInstance
+      .decodeWithCreatedAt(contractP)
+      .leftMap(err => ContractDeserializationError(err): ProtoDeserializationError)
+      .map(contract =>
+        ContractReassignment(
+          contract = contract,
+          sourceValidationPackageId = Source(contract.templateId.packageId),
+          targetValidationPackageId = Target(contract.templateId.packageId),
+          counter = ReassignmentCounter(reassignmentCounterP),
+        )
+      )
+  }
+
+  def fromProtoV31(
+      pvv: ProtocolVersionValidation
+  )(activeContract: v31.ActiveContract): ParsingResult[ContractReassignment] = {
+    val v31.ActiveContract(
+      contractP,
+      sourceValidationPackageIdP,
+      targetValidationPackageIdP,
+      reassignmentCounterP,
+    ) = activeContract
+
+    for {
+      sourceValidationPackageId <- ProtoValidation.validateThen(
+        sourceValidationPackageIdP,
+        "source_validation_package_id",
+        pvv,
+      )(ProtoConverter.parsePackageId)
+      targetValidationPackageId <- ProtoValidation.validateThen(
+        targetValidationPackageIdP,
+        "target_validation_package_id",
+        pvv,
+      )(ProtoConverter.parsePackageId)
+      contract <- ContractInstance
+        .decodeWithCreatedAt(contractP)
+        .leftMap(err => ContractDeserializationError(err): ProtoDeserializationError)
+    } yield ContractReassignment(
+      contract = contract,
+      sourceValidationPackageId = Source(sourceValidationPackageId),
+      targetValidationPackageId = Target(targetValidationPackageId),
+      counter = ReassignmentCounter(reassignmentCounterP),
+    )
+  }
+
 }
 
 final case class ContractsReassignmentBatch private (
@@ -30,9 +103,6 @@ final case class ContractsReassignmentBatch private (
     item => (item.contract.contractId, item.counter)
   }
 
-  // TODO(#29199): Use source/target validation package ids for vetting checks
-  def packageIds: Set[LfPackageId] = contracts.view.map(_.templateId.packageId).toSet
-
   def sourcePackageIds: Source[Set[LfPackageId]] = Source(
     contracts.view.map(_.sourceValidationPackageId.unwrap).toSet
   )
@@ -40,6 +110,7 @@ final case class ContractsReassignmentBatch private (
     contracts.view.map(_.targetValidationPackageId.unwrap).toSet
   )
 
+  // This can be done because all contracts in a batch have the same stakeholders.
   def stakeholders: Stakeholders = Stakeholders(contracts.head1.contract.metadata)
 }
 
@@ -67,28 +138,21 @@ object ContractsReassignmentBatch {
   )
 
   def partition(
-      contractCounters: Seq[
-        (ContractInstance, Source[LfPackageId], Target[LfPackageId], ReassignmentCounter)
-      ]
+      contracts: Seq[ContractReassignment]
   ): Seq[ContractsReassignmentBatch] =
-    contractCounters
-      .groupBy1 { case (contract, _, _, _) => Stakeholders(contract.metadata) }
-      .map { case (_, byStakeholder) =>
-        new ContractsReassignmentBatch(byStakeholder.map {
-          case (contract, sourceValidationId, targetValidationId, counter) =>
-            ContractReassignment(contract, sourceValidationId, targetValidationId, counter)
-        })
-      }
+    contracts
+      .groupBy1(c => Stakeholders(c.contract.metadata))
+      .values
+      .map(ContractsReassignmentBatch.apply)
       .toSeq
 
   def create(
-      contractCounters: Seq[
-        (ContractInstance, Source[LfPackageId], Target[LfPackageId], ReassignmentCounter)
-      ]
+      contracts: Seq[ContractReassignment]
   ): Either[InvalidReassignmentBatch, ContractsReassignmentBatch] =
-    partition(contractCounters) match {
+    partition(contracts) match {
       case Nil => Left(EmptyBatch)
       case Seq(batch) => Right(batch)
       case more => Left(DifferingStakeholders(more.map(_.stakeholders)))
     }
+
 }

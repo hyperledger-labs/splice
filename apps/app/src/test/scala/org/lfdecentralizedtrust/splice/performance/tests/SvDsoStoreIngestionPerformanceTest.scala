@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.performance.tests
 
+import com.digitalasset.canton.tracing.TraceContext
+
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -53,8 +55,8 @@ class SvDsoStoreIngestionPerformanceTest(
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
-    Future.successful(
-      new DbSvDsoStore(
+    DbSvDsoStore
+      .create(
         SvStore.Key(svParty, dsoParty),
         storage,
         loggerFactory,
@@ -65,8 +67,8 @@ class SvDsoStoreIngestionPerformanceTest(
         participantId = mkParticipantId("IngestionPerformanceIngestionTest"),
         IngestionConfig(),
         defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-      )(ec, templateJsonDecoder, closeContext).multiDomainAcsStore
-    )
+      )(ec, templateJsonDecoder, closeContext, TraceContext.empty)
+      .map(_.multiDomainAcsStore)
   }
 
 }

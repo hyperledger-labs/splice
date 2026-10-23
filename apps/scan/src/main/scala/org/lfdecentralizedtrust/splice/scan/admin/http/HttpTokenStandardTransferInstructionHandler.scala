@@ -294,7 +294,7 @@ class HttpTokenStandardTransferInstructionHandler(
       tc: TraceContext
   ): Future[FactoryResponse] = {
     for {
-      choiceContextBuilder <- getAmuletRulesTransferContextV1(excludeDebugFields)
+      _ <- getAmuletRulesTransferContextV1(excludeDebugFields)
       externalPartyAmuletRules <- store.getExternalPartyAmuletRules()
       // pre-approval and featured app rights are only provided if they exist and are required
       isSelfTransfer = receiver == sender

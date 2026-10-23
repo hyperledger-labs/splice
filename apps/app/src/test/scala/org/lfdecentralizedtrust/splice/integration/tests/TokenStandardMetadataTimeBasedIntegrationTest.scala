@@ -108,7 +108,7 @@ class TokenStandardMetadataTimeBasedIntegrationTest
       val (_, forcedSnapshotTime) = actAndCheck(
         "Advance rounds to a point where round totals are defined and the tapped amulet",
         // We sadly need 7 rounds as we need to get to a point where round 0 is closed
-        for (i <- 1 to 7) {
+        for (_ <- 1 to 7) {
           advanceRoundsToNextRoundOpening
         },
       )(

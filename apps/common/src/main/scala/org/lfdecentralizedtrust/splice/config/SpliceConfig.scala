@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.config
 
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.StartupMemoryCheckConfig.ReportingLevel.Warn
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
@@ -29,10 +28,6 @@ abstract class SpliceBackendConfig extends LocalNodeConfig {
 
 }
 
-/** Abstraction to remove code duplication when implementing Canton traits and specifying parameters we don't use
-  * anyway.
-  */
-abstract class GrpcClientConfig extends NodeConfig {}
 abstract class HttpClientConfig extends NetworkAppNodeConfig {}
 
 final case class SplicePostgresConfig(
@@ -146,8 +141,6 @@ case class SharedSpliceAppParameters(
   override def watchdog: Option[WatchdogConfig] = None
 
   override def startupMemoryCheckConfig: StartupMemoryCheckConfig = StartupMemoryCheckConfig(Warn)
-
-  def dispatchQueueBackpressureLimit: NonNegativeInt = ???
 
   override def topologyConfig: TopologyConfig = ???
 

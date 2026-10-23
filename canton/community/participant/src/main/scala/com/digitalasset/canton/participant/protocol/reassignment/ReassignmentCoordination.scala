@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.protocol.reassignment
 import cats.data.EitherT
 import cats.instances.future.catsStdInstancesForFuture
 import cats.syntax.functor.*
+import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.crypto.{
   SyncCryptoApiParticipantProvider,
   SynchronizerCryptoClient,
@@ -60,11 +61,16 @@ trait GetTopologyAtTimestamp {
   ]
 }
 
+/** @param isKnownSynchronizer
+  *   whether a persistent state exists for the synchronizer, which holds once the participant has
+  *   connected and handshaked with it. Being registered is not enough.
+  */
 class ReassignmentCoordination(
     reassignmentStoreFor: Target[SynchronizerId] => Either[
       ReassignmentProcessorError,
       ReassignmentStore,
     ],
+    isKnownSynchronizer: SynchronizerId => Boolean,
     reassignmentSubmissionFor: PhysicalSynchronizerId => Option[ReassignmentSubmissionHandle],
     pendingUnassignments: Source[SynchronizerId] => Option[ReassignmentSynchronizer],
     staticSynchronizerParametersGetter: StaticSynchronizerParametersGetter,
@@ -164,8 +170,8 @@ class ReassignmentCoordination(
       _ <- EitherT.right[UnknownPhysicalSynchronizer](timeout.getOrElse(onImmediate))
     } yield ()
 
-  /** Submits an assignment. Used by the [[UnassignmentProcessingSteps]] to automatically trigger
-    * the submission of an assignment after the exclusivity timeout.
+  /** Submits an assignment. Used by [[AutomaticAssignment]] to submit an assignment on this
+    * participant's own initiative.
     */
   private[reassignment] def assign(
       targetSynchronizerId: Target[PhysicalSynchronizerId],
@@ -253,7 +259,7 @@ class ReassignmentCoordination(
       .fromEither[FutureUnlessShutdown](getStaticSynchronizerParameter(targetPsid))
     topoClient <- EitherT
       .fromEither[FutureUnlessShutdown](getTopologyClient(targetPsid, staticSynchronizerParameters))
-    // TODO(i26479): we could not fail even if the participant is disconnected from the target synchronizer
+    // TODO(i33643): we could validate unassignments against the stored target topology when disconnected from the target
     timestamp <- topoClient.traverseSingleton { case (_, client) =>
       EitherT.rightT[FutureUnlessShutdown, UnknownPhysicalSynchronizer](
         client.approximateTimestamp
@@ -309,6 +315,11 @@ class ReassignmentCoordination(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, Unit] =
     for {
+      _ <- EitherT.cond[FutureUnlessShutdown](
+        isKnownSynchronizer(source.unwrap),
+        (),
+        UnknownSynchronizer(source.unwrap, "storing assignment data"): ReassignmentProcessorError,
+      )
       reassignmentStore <- EitherT.fromEither[FutureUnlessShutdown](
         reassignmentStoreFor(target)
       )
@@ -345,6 +356,8 @@ object ReassignmentCoordination {
 
     new ReassignmentCoordination(
       reassignmentStoreFor = reassignmentStoreFor,
+      isKnownSynchronizer = synchronizerId =>
+        syncPersistentStateManager.reassignmentStore(synchronizerId).isDefined,
       reassignmentSubmissionFor = submissionHandles,
       pendingUnassignments = pendingUnassignments,
       staticSynchronizerParametersGetter = syncPersistentStateManager,
@@ -362,6 +375,8 @@ trait ReassignmentSubmissionHandle {
       contractIds: Seq[LfContractId],
       targetSynchronizer: Target[PhysicalSynchronizerId],
       sourceTopology: Source[TopologySnapshot],
+      overrideSourceValidationPkgIds: Map[LfContractId, LfPackageId],
+      overrideTargetValidationPkgIds: Map[LfContractId, LfPackageId],
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, ReassignmentProcessorError, FutureUnlessShutdown[

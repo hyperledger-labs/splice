@@ -22,13 +22,13 @@
       "http://ans.localhost"
     ],
     "crossOriginAuth": false,
-    "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the ANS UI for the validator runbook",
+    "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the ANS UI for validator validator",
     "grantTypes": [
       "authorization_code",
       "implicit",
       "refresh_token"
     ],
-    "name": "ANS UI (Pulumi managed, test-stack)",
+    "name": "ANS UI (validator) (Pulumi managed, test-stack)",
     "oidcConformant": true,
     "refreshToken": {
       "expirationType": "expiring",

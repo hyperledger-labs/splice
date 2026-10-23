@@ -5,26 +5,35 @@ package com.digitalasset.canton.data
 
 import cats.syntax.either.*
 import cats.syntax.functor.*
-import com.digitalasset.canton.ProtoDeserializationError.{
-  ContractDeserializationError,
-  InvariantViolation,
-  OtherError,
-}
-import com.digitalasset.canton.ReassignmentCounter
-import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.ProtoDeserializationError.{InvariantViolation, OtherError}
+import com.digitalasset.canton.crypto.{CryptoPureApi, HashOps, HashPurpose, Salt, Signature}
 import com.digitalasset.canton.data.MerkleTree.RevealSubtree
 import com.digitalasset.canton.data.ReassignmentRef.ContractIdRef
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrintingCompanion}
 import com.digitalasset.canton.protocol.messages.UnassignmentMediatorMessage
-import com.digitalasset.canton.protocol.{v30, *}
+import com.digitalasset.canton.protocol.{RootHash, Stakeholders, ViewHash, v30, v31}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
-import com.digitalasset.canton.validation.ProtoValidation
-import com.digitalasset.canton.version.*
+import com.digitalasset.canton.validation.{
+  ProtoUnvalidatedSeq,
+  ProtoUnvalidatedString,
+  ProtoValidation,
+}
+import com.digitalasset.canton.version.{
+  HasProtocolVersionedWrapper,
+  HasToByteString,
+  ProtoVersion,
+  ProtocolVersion,
+  ProtocolVersionValidation,
+  RepresentativeProtocolVersion,
+  VersionedProtoCodec,
+  VersioningCompanionContext,
+  VersioningCompanionContextMemoization,
+}
 import com.google.protobuf.ByteString
 
 import java.util.UUID
@@ -74,10 +83,8 @@ final case class UnassignmentViewTree(
       UnassignmentMediatorMessage.protocolVersionRepresentativeFor(protocolVersion)
     )
 
-  override protected def pretty: Pretty[UnassignmentViewTree] = prettyOfClass(
-    param("common data", _.commonData),
-    param("view", _.view),
-  )
+  override def prettyCompanion: PrettyPrintingCompanion[UnassignmentViewTree] =
+    UnassignmentViewTree
 
   @transient override protected lazy val companionObj: UnassignmentViewTree.type =
     UnassignmentViewTree
@@ -87,12 +94,18 @@ object UnassignmentViewTree
     extends VersioningCompanionContext[
       UnassignmentViewTree,
       (HashOps, Source[ProtocolVersionValidation]),
-    ] {
+    ]
+    with PrettyPrintingCompanion[UnassignmentViewTree] {
 
   override val name: String = "UnassignmentViewTree"
 
+  override protected val pretty: Pretty[UnassignmentViewTree] = prettyOfClass(
+    param("common data", _.commonData),
+    param("view", _.view),
+  )
+
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.ReassignmentViewTree)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v36)(v30.ReassignmentViewTree)(
       supportedProtoVersion(_)((context, proto) => fromProtoV30(context)(proto)),
       _.toProtoV30,
     )
@@ -186,7 +199,19 @@ final case class UnassignmentCommonData private (
 
   override def hashPurpose: HashPurpose = HashPurpose.UnassignmentCommonData
 
-  override protected def pretty: Pretty[UnassignmentCommonData] = prettyOfClass(
+  override def prettyCompanion: PrettyPrintingCompanion[UnassignmentCommonData] =
+    UnassignmentCommonData
+}
+
+object UnassignmentCommonData
+    extends VersioningCompanionContextMemoization[
+      UnassignmentCommonData,
+      HashOps,
+    ]
+    with PrettyPrintingCompanion[UnassignmentCommonData] {
+  override val name: String = "UnassignmentCommonData"
+
+  override protected val pretty: Pretty[UnassignmentCommonData] = prettyOfClass(
     param("submitter metadata", _.submitterMetadata),
     param("source synchronizer id", _.sourceSynchronizerId),
     param("source mediator group", _.sourceMediatorGroup),
@@ -195,17 +220,9 @@ final case class UnassignmentCommonData private (
     param("uuid", _.uuid),
     param("salt", _.salt),
   )
-}
-
-object UnassignmentCommonData
-    extends VersioningCompanionContextMemoization[
-      UnassignmentCommonData,
-      HashOps,
-    ] {
-  override val name: String = "UnassignmentCommonData"
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.UnassignmentCommonData)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v36)(v30.UnassignmentCommonData)(
       supportedProtoVersionMemoizedPVV(_)(fromProtoV30),
       _.toProtoV30,
     )
@@ -300,14 +317,12 @@ object UnassignmentCommonData
   */
 /** @param salt
   *   The salt used to blind the Merkle hash.
-  * @param contract
-  *   Contract being reassigned
+  * @param contracts
+  *   The contracts being reassigned
   * @param targetSynchronizerId
   *   The synchronizer to which the contract is reassigned.
   * @param targetTimestamp
   *   The timestamp of the topology on the target synchronizer to use for validations.
-  * @param targetProtocolVersion
-  *   Protocol version of the target synchronizer
   */
 final case class UnassignmentView private (
     override val salt: Salt,
@@ -336,15 +351,26 @@ final case class UnassignmentView private (
       salt = Some(salt.toProtoV30),
       targetPhysicalSynchronizerId = targetSynchronizerId.unwrap.toProtoPrimitive,
       targetTimestamp = targetTimestamp.unwrap.toProtoPrimitive,
-      contracts = contracts.contracts.map { reassign =>
-        v30.ActiveContract(
-          reassign.contract.encoded,
-          reassign.counter.toProtoPrimitive,
-        )
-      },
+      contracts = contracts.contracts.map(_.toProtoV30),
     )
 
-  override protected def pretty: Pretty[UnassignmentView] = prettyOfClass(
+  protected def toProtoV31: v31.UnassignmentView =
+    v31.UnassignmentView(
+      salt = Some(salt.toProtoV30),
+      targetPhysicalSynchronizerId = targetSynchronizerId.unwrap.toProtoPrimitive,
+      targetTimestamp = targetTimestamp.unwrap.toProtoPrimitive,
+      contracts = contracts.contracts.map(_.toProtoV31),
+    )
+
+  override def prettyCompanion: PrettyPrintingCompanion[UnassignmentView] = UnassignmentView
+}
+
+object UnassignmentView
+    extends VersioningCompanionContextMemoization[UnassignmentView, HashOps]
+    with PrettyPrintingCompanion[UnassignmentView] {
+  override val name: String = "UnassignmentView"
+
+  override protected val pretty: Pretty[UnassignmentView] = prettyOfClass(
     param("template ids", _.contracts.contracts.map(_.templateId).toSet),
     param("target synchronizer id", _.targetSynchronizerId),
     param("target timestamp", _.targetTimestamp),
@@ -354,16 +380,16 @@ final case class UnassignmentView private (
     ), // do not log contract details because it contains confidential data
     param("salt", _.salt),
   )
-}
-
-object UnassignmentView extends VersioningCompanionContextMemoization[UnassignmentView, HashOps] {
-  override val name: String = "UnassignmentView"
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.UnassignmentView)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v36)(v30.UnassignmentView)(
       supportedProtoVersionMemoizedPVV(_)(fromProtoV30),
       _.toProtoV30,
-    )
+    ),
+    ProtoVersion(31) -> VersionedProtoCodec(ProtocolVersion.v37)(v31.UnassignmentView)(
+      supportedProtoVersionMemoizedPVV(_)(fromProtoV31),
+      _.toProtoV31,
+    ),
   )
 
   def create(hashOps: HashOps)(
@@ -380,20 +406,18 @@ object UnassignmentView extends VersioningCompanionContextMemoization[Unassignme
       targetTimestamp,
     )(hashOps, protocolVersionRepresentativeFor(sourceProtocolVersion.unwrap), None)
 
-  private[this] def fromProtoV30(
+  private[this] def fromProto[P](
       pvv: ProtocolVersionValidation,
       hashOps: HashOps,
-      unassignmentViewP: v30.UnassignmentView,
+      protoVersion: ProtoVersion,
+      saltP: Option[com.digitalasset.canton.crypto.v30.Salt],
+      targetSynchronizerIdP: ProtoUnvalidatedString,
+      targetTimestampP: Long,
+      contractsP: ProtoUnvalidatedSeq[P],
+      parseContract: P => ParsingResult[ContractReassignment],
   )(
       bytes: ByteString
-  ): ParsingResult[UnassignmentView] = {
-    val v30.UnassignmentView(
-      saltP,
-      targetSynchronizerIdP,
-      targetTimestampP,
-      contractsP,
-    ) = unassignmentViewP
-
+  ): ParsingResult[UnassignmentView] =
     for {
       salt <- ProtoConverter.parseRequired(Salt.fromProtoV30, "salt", saltP)
       targetSynchronizerId <- ProtoValidation.validateThen(
@@ -404,25 +428,14 @@ object UnassignmentView extends VersioningCompanionContextMemoization[Unassignme
       targetTimestamp <- CantonTimestamp.fromProtoPrimitive(targetTimestampP)
       contracts <- ProtoValidation
         .validateLengthThen(contractsP, "contracts", pvv, ProtoValidation.MaxCollectionSize) {
-          case (v30.ActiveContract(contractP, reassignmentCounterP), _) =>
-            ContractInstance
-              .decodeWithCreatedAt(contractP)
-              .leftMap(err => ContractDeserializationError(err))
-              .map(c =>
-                (
-                  c,
-                  Source(c.templateId.packageId),
-                  Target(c.templateId.packageId),
-                  ReassignmentCounter(reassignmentCounterP),
-                )
-              )
+          case (contractP, _) => parseContract(contractP)
         }
         .flatMap(
           ContractsReassignmentBatch
             .create(_)
             .leftMap(err => InvariantViolation(Some("contracts"), err.toString))
         )
-      rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
+      rpv <- protocolVersionRepresentativeFor(protoVersion)
     } yield UnassignmentView(
       salt,
       contracts,
@@ -434,7 +447,41 @@ object UnassignmentView extends VersioningCompanionContextMemoization[Unassignme
       Some(bytes),
     )
 
-  }
+  private[this] def fromProtoV30(
+      pvv: ProtocolVersionValidation,
+      hashOps: HashOps,
+      unassignmentViewP: v30.UnassignmentView,
+  )(
+      bytes: ByteString
+  ): ParsingResult[UnassignmentView] =
+    fromProto(
+      pvv,
+      hashOps,
+      ProtoVersion(30),
+      unassignmentViewP.salt,
+      unassignmentViewP.targetPhysicalSynchronizerId,
+      unassignmentViewP.targetTimestamp,
+      unassignmentViewP.contracts,
+      ContractReassignment.fromProtoV30,
+    )(bytes)
+
+  private[this] def fromProtoV31(
+      pvv: ProtocolVersionValidation,
+      hashOps: HashOps,
+      unassignmentViewP: v31.UnassignmentView,
+  )(
+      bytes: ByteString
+  ): ParsingResult[UnassignmentView] =
+    fromProto(
+      pvv,
+      hashOps,
+      ProtoVersion(31),
+      unassignmentViewP.salt,
+      unassignmentViewP.targetPhysicalSynchronizerId,
+      unassignmentViewP.targetTimestamp,
+      unassignmentViewP.contracts,
+      ContractReassignment.fromProtoV31(pvv),
+    )(bytes)
 }
 
 /** A fully unblinded [[UnassignmentViewTree]]
@@ -444,8 +491,7 @@ object UnassignmentView extends VersioningCompanionContextMemoization[Unassignme
   */
 final case class FullUnassignmentTree(tree: UnassignmentViewTree)
     extends FullReassignmentViewTree
-    with HasToByteString
-    with PrettyPrinting {
+    with HasToByteString {
   require(tree.isFullyUnblinded, "An unassignment request must be fully unblinded")
 
   protected[this] val commonData: UnassignmentCommonData = tree.commonData.tryUnwrap
@@ -474,12 +520,18 @@ final case class FullUnassignmentTree(tree: UnassignmentViewTree)
 
   override def rootHash: RootHash = tree.rootHash
 
-  override protected def pretty: Pretty[FullUnassignmentTree] = prettyOfClass(unnamedParam(_.tree))
+  override def prettyCompanion: PrettyPrintingCompanion[FullUnassignmentTree] =
+    FullUnassignmentTree
 
   override def toByteString: ByteString = tree.toByteString
 }
 
-object FullUnassignmentTree {
+object FullUnassignmentTree extends PrettyPrintingCompanion[FullUnassignmentTree] {
+
+  override protected val pretty: Pretty[FullUnassignmentTree] = prettyOfClass(
+    unnamedParam(_.tree)
+  )
+
   def fromByteString(
       crypto: CryptoPureApi,
       expectedProtocolVersion: Source[ProtocolVersionValidation],

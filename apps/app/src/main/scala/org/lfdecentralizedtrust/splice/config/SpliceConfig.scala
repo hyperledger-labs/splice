@@ -74,7 +74,9 @@ import com.digitalasset.canton.admin.api.client.data.{
   SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
   SubscriptionLivenessLimits,
+  AcsCommitmentLimits,
   SynchronizerLimits,
+  TopologyLimits,
   TransactionProtocolLimits,
 }
 import com.digitalasset.canton.tracing.TraceContext
@@ -403,10 +405,7 @@ object SpliceConfig {
 
   private val cantonConfigReaders = new CantonConfig.ConfigReaders()(elc)
 
-  class ConfigReaders(implicit
-      private val
-      elc: ErrorLoggingContext
-  ) {
+  class ConfigReaders() {
     // TODO(#7525) Fail on unknown keys.
     import BaseCantonConfig.Readers.{preventAllUnknownKeys as _, *}
 
@@ -658,6 +657,10 @@ object SpliceConfig {
       deriveReader[SvScanConfig]
     implicit val transactionProtocolLimitsReader: ConfigReader[TransactionProtocolLimits] =
       deriveReader[TransactionProtocolLimits]
+    implicit val topologyLimitsReader: ConfigReader[TopologyLimits] =
+      deriveReader[TopologyLimits]
+    implicit val acsCommitmentLimitsReader: ConfigReader[AcsCommitmentLimits] =
+      deriveReader[AcsCommitmentLimits]
     implicit val synchronizerLimitsReader: ConfigReader[SynchronizerLimits] =
       deriveReader[SynchronizerLimits]
     implicit val svSynchronizerNodeConfig: ConfigReader[SvSynchronizerNodeConfig] =
@@ -1192,6 +1195,10 @@ object SpliceConfig {
       deriveWriter[SvScanConfig]
     implicit val transactionProtocolLimitsWriter: ConfigWriter[TransactionProtocolLimits] =
       deriveWriter[TransactionProtocolLimits]
+    implicit val topologyLimitsWriter: ConfigWriter[TopologyLimits] =
+      deriveWriter[TopologyLimits]
+    implicit val acsCommitmentLimitsWriter: ConfigWriter[AcsCommitmentLimits] =
+      deriveWriter[AcsCommitmentLimits]
     implicit val synchronizerLimitsWriter: ConfigWriter[SynchronizerLimits] =
       deriveWriter[SynchronizerLimits]
     implicit val svSynchronizerNodeConfig: ConfigWriter[SvSynchronizerNodeConfig] =
@@ -1309,10 +1316,8 @@ object SpliceConfig {
       deriveWriter[SpliceConfig]
   }
 
-  private implicit def configReader(implicit
-      elc: ErrorLoggingContext
-  ): ConfigReader[SpliceConfig] = {
-    val readers = new ConfigReaders()(elc)
+  private implicit def configReader: ConfigReader[SpliceConfig] = {
+    val readers = new ConfigReaders()
     readers.spliceConfigReader
   }
 

@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.scan.store
 
+import com.digitalasset.canton.tracing.TraceContext
+
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -10,7 +12,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.codegen.java.splice
@@ -260,11 +261,10 @@ object ScanStore {
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       close: CloseContext,
-  ): ScanStore = {
-    new CachingScanStore(
-      loggerFactory,
-      retryProvider,
-      new DbScanStore(
+      tc: TraceContext,
+  ): Future[ScanStore] = {
+    DbScanStore
+      .create(
         key = key,
         storage,
         loggerFactory,
@@ -276,10 +276,17 @@ object ScanStore {
         defaultLimit,
         acsStoreDescriptorUserVersion,
         txLogStoreDescriptorUserVersion,
-      ),
-      cacheConfigs,
-      metrics,
-    )
+      )
+      .map { dbStore =>
+        new CachingScanStore(
+          loggerFactory,
+          retryProvider,
+          dbStore,
+          cacheConfigs,
+          metrics,
+        )
+
+      }
   }
 
   def contractFilter(

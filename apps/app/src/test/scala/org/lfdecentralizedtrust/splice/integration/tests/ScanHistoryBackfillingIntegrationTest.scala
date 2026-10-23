@@ -177,7 +177,7 @@ class ScanHistoryBackfillingIntegrationTest
     def currentRoundInScan(backend: ScanAppBackendReference): Long =
       backend.getLatestOpenMiningRound(CantonTimestamp.now()).contract.payload.round.number
 
-    val (previousRound, currentRound) = actAndCheck(
+    actAndCheck(
       "Advance one round, to commit transactions related to the round infrastructure", {
         val previousRound = currentRoundInScan(sv1ScanBackend)
         // Note: runOnce() does nothing if there is no work to be done.

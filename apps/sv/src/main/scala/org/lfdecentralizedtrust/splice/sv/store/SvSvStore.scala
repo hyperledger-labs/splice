@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.sv.store
 
+import com.digitalasset.canton.tracing.TraceContext
+
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.ValidatorOnboarding
@@ -20,7 +22,6 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
-import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
@@ -107,8 +108,9 @@ object SvSvStore {
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
-  ): SvSvStore =
-    new DbSvSvStore(
+      tc: TraceContext,
+  ): Future[SvSvStore] =
+    DbSvSvStore.create(
       key,
       storage,
       loggerFactory,

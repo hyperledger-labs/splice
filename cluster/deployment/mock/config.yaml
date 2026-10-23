@@ -54,7 +54,7 @@ sv:
             tokensPerFill: 250
             fillInterval: 60s
 splitwell:
-  maxDarVersion: '0.1.8'
+  maxDarVersion: '0.1.24'
   participantPruningSchedule:
     cron: "0 /10 * * * ?" # Run every 10min
     maxDuration: "5m"
@@ -147,8 +147,6 @@ monitoring:
     enableNoDataAlerts: true
     enableExtraHighPrioAlerts: true
     alerts:
-      acsCommitments:
-        usePv36Metrics: true
       cloudSql:
         maintenance: true
       svNames:
@@ -494,7 +492,7 @@ validators:
           value: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
       additionalJvmOptions: -Dparticipantoption
   extra-validator:
-    namespace: validator
+    namespace: extra-validator
     partyHint: 'extra-validator'
     walletGateway: !include(../../configs/shared/wallet_gateway.yaml) {}
 cloudArmor:

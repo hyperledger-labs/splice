@@ -9,7 +9,7 @@ import com.digitalasset.canton.*
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.LightTransactionViewTree.SubviewReferenceAndKey
 import com.digitalasset.canton.data.ViewPosition.MerklePathElement
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrintingCompanion}
 import com.digitalasset.canton.protocol.{SynchronizerLimits, ViewHash, v30, v31}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.{ParsingResult, parseNonNegativeInt}
@@ -46,8 +46,7 @@ sealed abstract case class LightTransactionViewTree private[data] (
       LightTransactionViewTree.type
     ]
 ) extends TransactionViewTree
-    with HasProtocolVersionedWrapper[LightTransactionViewTree]
-    with PrettyPrinting {
+    with HasProtocolVersionedWrapper[LightTransactionViewTree] {
 
   // This sequence contains the references of the direct subviews.
   // By definition, all these subviews are blinded, therefore we can only store their references.
@@ -78,23 +77,29 @@ sealed abstract case class LightTransactionViewTree private[data] (
 
   override def validated: Either[String, this.type] = for {
     _ <- super[TransactionViewTree].validated
-    // Check subview hashes only if subview references include view hashes.
-    _ <-
-      if (representativeProtocolVersion < LightTransactionViewTree.rpvCiphertextIdEncryption) {
-        val subviewHashes = subviewReferences.collect { case ByViewHash(vh) => vh }
-        if (subviewHashes.sizeCompare(subviewReferences) != 0)
-          throw new IllegalStateException(
-            s"Expected all subview references to be view hashes for protocol " +
-              s"versions < ${LightTransactionViewTree.rpvCiphertextIdEncryption}, but found " +
-              s"a different type of reference."
-          )
-        Either.cond(
-          view.subviewHashesConsistentWith(subviewHashes),
-          (),
-          s"The provided subview hashes are inconsistent with the provided view (view: ${view.viewHash} " +
-            s"at position: $viewPosition, subview hashes: $subviewHashes)",
-        )
-      } else Right(())
+    _ <- Either.cond(
+      subviewReferences.forall {
+        case ByViewHash(_) =>
+          representativeProtocolVersion < LightTransactionViewTree.rpvCiphertextIdEncryption
+        case ByCiphertextId(_, _) =>
+          representativeProtocolVersion >= LightTransactionViewTree.rpvCiphertextIdEncryption
+      },
+      (),
+      s"Invalid subview reference types for protocol version $representativeProtocolVersion",
+    )
+    // For view hash references, verify consistency against the subviews' root hash.
+    // For ciphertext ID references, hash consistency cannot be checked.
+    // In both cases, verify structure: subview references and the subview root
+    // hash must both be present or both be empty.
+    _ <- Either.cond(
+      (representativeProtocolVersion >= LightTransactionViewTree.rpvCiphertextIdEncryption ||
+        view.subviewHashesConsistentWith(
+          subviewReferences.collect { case ByViewHash(vh) => vh }
+        )) &&
+        subviewReferences.isEmpty == view.subviews.subviews.rootHashO.isEmpty,
+      (),
+      s"The provided subview references are inconsistent with the provided view (view: ${view.viewHash} at position: $viewPosition)",
+    )
   } yield this
 
   @transient override protected lazy val companionObj: LightTransactionViewTree.type =
@@ -130,7 +135,8 @@ sealed abstract case class LightTransactionViewTree private[data] (
       },
     )
 
-  override lazy val pretty: Pretty[LightTransactionViewTree] = prettyOfClass(unnamedParam(_.tree))
+  override def prettyCompanion: PrettyPrintingCompanion[LightTransactionViewTree] =
+    LightTransactionViewTree
 }
 
 final case class LightTransactionViewTreeDeserializationContext(
@@ -143,25 +149,32 @@ object LightTransactionViewTree
     extends VersioningCompanionContextPVValidation2[
       LightTransactionViewTree,
       LightTransactionViewTreeDeserializationContext,
-    ] {
+    ]
+    with PrettyPrintingCompanion[LightTransactionViewTree] {
   override val name: String = "LightTransactionViewTree"
 
+  override protected val pretty: Pretty[LightTransactionViewTree] = prettyOfClass(
+    unnamedParam(_.tree)
+  )
+
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.LightTransactionViewTree)(
-      supportedProtoVersion(_)((context, proto) => fromProtoV30(context)(proto)),
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v36)(v30.LightTransactionViewTree)(
+      supportedProtoVersionPVV(_)((pvv, context, proto) => fromProtoV30(pvv, context)(proto)),
       _.toProtoV30,
     ),
-    ProtoVersion(31) -> VersionedProtoCodec(ProtocolVersion.transparency)(
+    ProtoVersion(31) -> VersionedProtoCodec(ProtocolVersion.transparencyAndCiphertextId)(
       v31.LightTransactionViewTree
     )(
-      supportedProtoVersion(_)((context, proto) => fromProtoV31(context)(proto)),
+      supportedProtoVersionPVV(_)((pvv, context, proto) => fromProtoV31(pvv, context)(proto)),
       _.toProtoV31,
     ),
   )
 
   // From v`transparency` onwards, ciphertext IDs are used.
   private val rpvCiphertextIdEncryption =
-    LightTransactionViewTree.protocolVersionRepresentativeFor(ProtocolVersion.transparency)
+    LightTransactionViewTree.protocolVersionRepresentativeFor(
+      ProtocolVersion.transparencyAndCiphertextId
+    )
 
   final case class InvalidLightTransactionViewTree(message: String)
       extends RuntimeException(message)
@@ -191,7 +204,8 @@ object LightTransactionViewTree
     ) {}.validated
 
   private def fromProtoV30(
-      context: (LightTransactionViewTreeDeserializationContext, ProtocolVersion)
+      pvv: ProtocolVersionValidation,
+      context: (LightTransactionViewTreeDeserializationContext, ProtocolVersion),
   )(
       protoT: v30.LightTransactionViewTree
   ): ParsingResult[LightTransactionViewTree] =
@@ -202,6 +216,7 @@ object LightTransactionViewTree
         protocolVersion,
       ) = context
       tree <- GenTransactionTree.fromProtoV30(
+        pvv,
         (GenTransactionTreeDeserializationContext(hashOps, synchronizerLimits), protocolVersion),
         protoTree,
       )
@@ -209,7 +224,7 @@ object LightTransactionViewTree
         .validateLengthThen(
           protoT.subviewHashesAndKeys,
           "subview_hashes_and_keys",
-          ProtocolVersionValidation.PV(protocolVersion),
+          pvv,
           ProtoValidation.MaxCollectionSize,
         ) { case (v30.ViewHashAndKey(viewHashT, keyT), _) =>
           for {
@@ -232,7 +247,8 @@ object LightTransactionViewTree
 
   @unused
   private def fromProtoV31(
-      context: (LightTransactionViewTreeDeserializationContext, ProtocolVersion)
+      pvv: ProtocolVersionValidation,
+      context: (LightTransactionViewTreeDeserializationContext, ProtocolVersion),
   )(
       protoT: v31.LightTransactionViewTree
   ): ParsingResult[LightTransactionViewTree] =
@@ -243,6 +259,7 @@ object LightTransactionViewTree
         protocolVersion,
       ) = context
       tree <- GenTransactionTree.fromProtoV30(
+        pvv,
         (GenTransactionTreeDeserializationContext(hashOps, synchronizerLimits), protocolVersion),
         protoTree,
       )
@@ -250,7 +267,7 @@ object LightTransactionViewTree
         .validateLengthThen(
           protoT.subviewKeysByCiphertextId,
           "subview_keys_by_ciphertext_id",
-          ProtocolVersionValidation.PV(protocolVersion),
+          pvv,
           ProtoValidation.MaxCollectionSize,
         ) { case (v31.CiphertextIdAndKey(ciphertextIdT, indexT, keyT), _) =>
           for {
@@ -283,8 +300,6 @@ object LightTransactionViewTree
     *   Additional data associated with [[LightTransactionViewTree]]s. Each
     *   [[FullTransactionViewTree]] in the result aggregates the data from all aggregated
     *   [[LightTransactionViewTree]]s in preorder.
-    * @param topLevelOnly
-    *   whether to return only top-level full view trees
     * @param lightViewTrees
     *   the light transaction view trees to convert with optional ciphertext IDs (PV`transparency`+)
     */
@@ -292,8 +307,6 @@ object LightTransactionViewTree
       lens: PLens[A, B, (LightTransactionViewTree, C), (FullTransactionViewTree, RoseTree[C])],
       protocolVersion: ProtocolVersion,
       hashOps: HashOps,
-      // TODO(#23971) we don't need this parameter any more, only the true case is used.
-      topLevelOnly: Boolean,
       // For PV`transparency`+, during decryption we assign a reference to each [[LightTransactionViewTree]]
       // based on the ciphertext ID (hash) containing it and its relative position within that ciphertext.
       // This identifier can then be used to reconstruct the corresponding
@@ -340,9 +353,7 @@ object LightTransactionViewTree
         val cs = RoseTree(c, subviewCs*)
         val fullViewTreeBoxed = lens.replace(fullViewTree -> cs)(lightViewTreeBoxed)
 
-        if (topLevelOnly) {
-          subviewReferencesB ++= subviewReferences
-        }
+        subviewReferencesB ++= subviewReferences
 
         val fullViewReference: ViewReference = ciphertextIdO match {
           case Some(ciphertextId) => ciphertextId
@@ -367,7 +378,7 @@ object LightTransactionViewTree
         .result()
         .collect {
           case (viewReference, fullViewTreeBoxed)
-              if !topLevelOnly || !allSubviewReferences.contains(viewReference) =>
+              if !allSubviewReferences.contains(viewReference) =>
             fullViewTreeBoxed
         }
 

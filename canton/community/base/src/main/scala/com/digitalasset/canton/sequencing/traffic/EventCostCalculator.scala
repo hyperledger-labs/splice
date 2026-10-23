@@ -4,7 +4,11 @@
 package com.digitalasset.canton.sequencing.traffic
 
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.EventCostCalculator.{
@@ -13,9 +17,6 @@ import com.digitalasset.canton.sequencing.traffic.EventCostCalculator.{
 }
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.Member
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 
@@ -36,9 +37,13 @@ object EventCostCalculator {
       readCost: Long,
       finalCost: Long,
       recipients: NonEmpty[Seq[Recipient]],
-  ) extends PrettyPrinting {
+  ) extends PrettyPrintingFromCompanion {
+    override def prettyCompanion: PrettyPrintingCompanion[EnvelopeCostDetails] =
+      EnvelopeCostDetails
+  }
 
-    override protected def pretty: Pretty[EnvelopeCostDetails] = prettyOfClass(
+  object EnvelopeCostDetails extends PrettyPrintingCompanion[EnvelopeCostDetails] {
+    override protected val pretty: Pretty[EnvelopeCostDetails] = prettyOfClass(
       param("write cost", _.writeCost),
       param("read cost", _.readCost),
       param("final cost", _.finalCost),
@@ -61,9 +66,12 @@ object EventCostCalculator {
       groupToMembersSize: Map[GroupRecipient, Int],
       envelopes: Map[ClosedEnvelope, EnvelopeCostDetails],
       eventCost: NonNegativeLong,
-  ) extends PrettyPrinting {
+  ) extends PrettyPrintingFromCompanion {
+    override def prettyCompanion: PrettyPrintingCompanion[EventCostDetails] = EventCostDetails
+  }
 
-    override protected def pretty: Pretty[EventCostDetails] = prettyOfClass(
+  object EventCostDetails extends PrettyPrintingCompanion[EventCostDetails] {
+    override protected val pretty: Pretty[EventCostDetails] = prettyOfClass(
       param("event cost", _.eventCost),
       param("cost multiplier", _.costMultiplier),
       param("group to members size", _.groupToMembersSize),
@@ -79,28 +87,20 @@ class EventCostCalculator(override val loggerFactory: NamedLoggerFactory) extend
       event: Batch[ClosedEnvelope],
       costMultiplier: PositiveInt,
       groupToMembers: Map[GroupRecipient, Set[Member]],
-      protocolVersion: ProtocolVersion,
       baseEventCost: NonNegativeLong,
-  )(implicit traceContext: TraceContext): EventCostDetails =
-    // If changing the cost computation, make sure to tie it to a protocol version
-    // For now there's only one version of cost computation
-    if (protocolVersion >= ProtocolVersion.v34) {
-      val envelopeCosts = event.envelopes
-        .map(envelope => envelope -> computeEnvelopeCost(costMultiplier, groupToMembers)(envelope))
-        .toMap
-      val eventCost =
-        NonNegativeLong.tryCreate(envelopeCosts.values.map(_.finalCost).sum) + baseEventCost
-      EventCostDetails(
-        costMultiplier,
-        groupToMembers.view.mapValues(_.size).toMap,
-        envelopeCosts,
-        eventCost,
-      )
-    } else {
-      ErrorUtil.invalidState(
-        s"Traffic control is not supported for protocol version $protocolVersion"
-      )
-    }
+  ): EventCostDetails = {
+    val envelopeCosts = event.envelopes
+      .map(envelope => envelope -> computeEnvelopeCost(costMultiplier, groupToMembers)(envelope))
+      .toMap
+    val eventCost =
+      NonNegativeLong.tryCreate(envelopeCosts.values.map(_.finalCost).sum) + baseEventCost
+    EventCostDetails(
+      costMultiplier,
+      groupToMembers.view.mapValues(_.size).toMap,
+      envelopeCosts,
+      eventCost,
+    )
+  }
 
   @VisibleForTesting
   protected def payloadSize(envelope: ClosedEnvelope): ParsingResult[Int] =
