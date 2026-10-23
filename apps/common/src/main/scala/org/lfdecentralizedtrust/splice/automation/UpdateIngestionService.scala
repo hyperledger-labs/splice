@@ -21,12 +21,18 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerConnection,
   SpliceMetrics,
 }
+import org.lfdecentralizedtrust.splice.automation.UpdateIngestionService.IngestionProgress
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import scala.concurrent.duration.*
+import scala.util.{Failure, Success}
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.metrics.api.MetricHandle.{Counter, LabeledMetricsFactory}
-import com.daml.metrics.api.{MetricInfo, MetricName, MetricQualification}
+import com.daml.metrics.api.{MetricInfo, MetricName, MetricQualification, MetricsContext}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.lifecycle.UnlessShutdown
 
 /** Ingestion for ACS and transfer stores.
   * We ingest them independently but we ensure that the acs store
@@ -52,6 +58,17 @@ class UpdateIngestionService(
   private val metrics = new UpdateIngestionServiceMetrics(retryProvider.metricsFactory)
 
   private val filter = ingestionSink.ingestionFilter
+
+  // Progress tracking for the stall watchdog. The ledger API stream can stop delivering without ever failing,
+  // in which case the retry loop of RetryingService never kicks in and the store silently stops advancing.
+  // All of it lives in one immutable value so that readers always see a consistent snapshot, and so that a
+  // stall can be claimed with a compare-and-set that fails if anything was ingested since the snapshot.
+  private val progress = new AtomicReference(
+    IngestionProgress(offset = -1L, atNanos = System.nanoTime())
+  )
+  private val stallCheckInFlight = new AtomicBoolean(false)
+
+  override protected def isMakingProgress: Boolean = !progress.get().stalled
 
   override protected val loggerFactory: NamedLoggerFactory =
     baseLoggerFactory.append("ingestionLoopFor", ingestionTargetName)
@@ -93,6 +110,8 @@ class UpdateIngestionService(
             _ <- ingestAcsAndInFlight(acsOffset)
           } yield acsOffset
       }
+      // Restart the watchdog window for the new stream. `stalled` stays set until something is actually ingested.
+      _ = progress.updateAndGet(_.copy(offset = subscribeFrom, atNanos = System.nanoTime()))
     } yield new ServiceWithGuaranteedShutdown(
       source = batchSource(connection.updates(subscribeFrom, filter)),
       map = process,
@@ -108,13 +127,96 @@ class UpdateIngestionService(
       NonEmptyList.fromFoldable(msgs) match {
         case Some(batch) =>
           logger.debug(s"Processing batch of ${batch.size} elements")
-          ingestionSink.ingestUpdateBatch(batch.map(_.updateOrCheckpoint))
+          ingestionSink
+            .ingestUpdateBatch(batch.map(_.updateOrCheckpoint))
+            .map(_ => recordProgress(batch.last.updateOrCheckpoint.offset))
         case None =>
           logger.error(
             "Received empty batch of updates to ingest. This is never supposed to happen."
           )
           Future.unit
       }
+    }
+  }
+
+  private def recordProgress(offset: Long): Unit =
+    progress.set(IngestionProgress(offset = offset, atNanos = System.nanoTime()))
+
+  private def scheduleStallCheck(): Unit = {
+    implicit val tc: TraceContext = TraceContext.empty
+    retryProvider
+      .scheduleAfterUnlessShutdown(
+        checkForStall(),
+        backoffClock,
+        config.ingestion.stallCheckInterval,
+        jitter = 0.1,
+      )
+      .unwrap
+      .onComplete {
+        case Success(UnlessShutdown.AbortedDueToShutdown) => ()
+        case Success(UnlessShutdown.Outcome(_)) => scheduleStallCheck()
+        case Failure(ex) =>
+          // Never let an unexpected failure end the watchdog, as that would silently disable it.
+          logger.warn("Ingestion stall check failed unexpectedly, rescheduling it.", ex)
+          scheduleStallCheck()
+      }
+  }
+
+  /** Restarts the current ingestion instance if it has not made progress for `stallTimeout` while the participant
+    * has moved on. An idle ledger (ledger end == last ingested offset) is not a stall.
+    *
+    * The ledger end query is asynchronous, so the stream may recover or be replaced while it is in flight. We
+    * therefore take one snapshot of the progress and the stream instance before asking, derive everything from
+    * that snapshot, and claim the stall with a compare-and-set on it: if anything was ingested since, the claim
+    * fails and the stream is left alone. Only one check runs at a time.
+    */
+  private def checkForStall()(implicit tc: TraceContext): Future[Unit] = {
+    val stallTimeout = config.ingestion.stallTimeout.underlying
+    val snapshot = progress.get()
+    val stalledFor = (System.nanoTime() - snapshot.atNanos).nanos
+    currentService.filter(_.isActive) match {
+      case Some(instance)
+          if !isPaused && stalledFor >= stallTimeout &&
+            stallCheckInFlight.compareAndSet(false, true) =>
+        // `flatMap` so that an exception thrown by `ledgerEnd()` itself ends up in the recover below.
+        Future.unit
+          .flatMap(_ => connection.ledgerEnd())
+          .map { ledgerEnd =>
+            if (currentService.exists(_ eq instance) && instance.isActive && !isPaused) {
+              val now = System.nanoTime()
+              if (
+                UpdateIngestionService.hasStalled(
+                  stalledFor,
+                  stallTimeout,
+                  ledgerEnd,
+                  snapshot.offset,
+                )
+              ) {
+                // Give the restarted instance a full window. Fails if progress was recorded since the snapshot.
+                if (
+                  progress.compareAndSet(snapshot, snapshot.copy(atNanos = now, stalled = true))
+                ) {
+                  logger.warn(
+                    s"Ingestion of $ingestionTargetName made no progress for $stalledFor: ingested up to offset " +
+                      s"${snapshot.offset} while the ledger end is at $ledgerEnd. Restarting the ingestion loop."
+                  )
+                  metrics.stallRestarts.inc()(MetricsContext.Empty)
+                  instance.initiateShutdown()
+                }
+              } else {
+                // An idle ledger gets a full window before the next check.
+                progress.compareAndSet(snapshot, snapshot.copy(atNanos = now)).discard
+              }
+            }
+          }
+          .recover { case ex =>
+            logger.info(
+              "Failed to check ingestion progress against the ledger end, will retry.",
+              ex,
+            )
+          }
+          .andThen { case _ => stallCheckInFlight.set(false) }
+      case _ => Future.unit
     }
   }
 
@@ -157,10 +259,43 @@ class UpdateIngestionService(
 
   // Kick-off the ingestion
   start()
+  scheduleStallCheck()
+}
+
+object UpdateIngestionService {
+
+  /** What the stall watchdog knows about the ingestion: the offset and time of the last ingested batch, and whether
+    * a stall was detected that has not been followed by any ingestion yet.
+    */
+  private[automation] final case class IngestionProgress(
+      offset: Long,
+      atNanos: Long,
+      stalled: Boolean = false,
+  )
+
+  /** The ingestion has stalled if it made no progress for at least `timeout` while the participant's ledger end is
+    * ahead of the last ingested offset. If the ledger end has not moved past what we ingested the ledger is simply
+    * idle, which is not a stall.
+    */
+  private[automation] def hasStalled(
+      stalledFor: FiniteDuration,
+      timeout: FiniteDuration,
+      ledgerEnd: Long,
+      lastIngestedOffset: Long,
+  ): Boolean = stalledFor >= timeout && ledgerEnd > lastIngestedOffset
 }
 
 class UpdateIngestionServiceMetrics(metricsFactory: LabeledMetricsFactory) {
   val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "update-ingestion-service"
+  val stallRestarts: Counter =
+    metricsFactory.counter(
+      MetricInfo(
+        prefix :+ "stall-restarts",
+        summary =
+          "Number of times the ingestion loop was restarted because it stopped making progress.",
+        qualification = MetricQualification.Errors,
+      )
+    )
   val activeContractsBufferSize: Counter =
     metricsFactory.counter(
       MetricInfo(

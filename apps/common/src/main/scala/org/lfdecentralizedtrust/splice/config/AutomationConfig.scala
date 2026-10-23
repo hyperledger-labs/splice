@@ -123,4 +123,11 @@ case class IngestionConfig(
     activeContractsMaxBackoff: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
     activeContractsRandomFactor: Double = 0.2,
     activeContractsBufferSize: Int = 1000,
+    /** If the ingestion makes no progress for this long while the participant's ledger end is ahead of the
+      * last ingested offset, the update stream is considered stalled: the ingestion loop is restarted and the
+      * service reports itself as unhealthy until it ingests again.
+      */
+    stallTimeout: PositiveFiniteDuration = PositiveFiniteDuration.ofMinutes(10),
+    /** How often to check for a stalled ingestion. */
+    stallCheckInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
 )
