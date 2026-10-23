@@ -144,9 +144,18 @@ abstract class RetryingService(
     )
   }
 
+  /** The currently running instance, if any. */
+  protected final def currentService: Option[ServiceWithShutdown] = currentServiceInstance.get()
+
+  /** Whether the service has been paused through [[pause]]. */
+  protected final def isPaused: Boolean = !waitForResumePromise.isCompleted
+
+  /** Subclasses that can detect an active-but-wedged instance override this to flip the health to false. */
+  protected def isMakingProgress: Boolean = true
+
   final override def isHealthy: Boolean =
-    // Healthy if there's an active instance
-    currentServiceInstance.get().exists(_.isActive)
+    // Healthy if there's an active instance that is not known to be wedged
+    currentServiceInstance.get().exists(_.isActive) && isMakingProgress
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   @volatile

@@ -24,9 +24,12 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
+import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.metrics.api.MetricHandle.{Counter, LabeledMetricsFactory}
-import com.daml.metrics.api.{MetricInfo, MetricName, MetricQualification}
+import com.daml.metrics.api.{MetricInfo, MetricName, MetricQualification, MetricsContext}
+import com.digitalasset.canton.lifecycle.UnlessShutdown
 
 /** Ingestion for ACS and transfer stores.
   * We ingest them independently but we ensure that the acs store
@@ -52,6 +55,14 @@ class UpdateIngestionService(
   private val metrics = new UpdateIngestionServiceMetrics(retryProvider.metricsFactory)
 
   private val filter = ingestionSink.ingestionFilter
+
+  // Progress tracking for the stall watchdog. The ledger API stream can stop delivering without ever failing,
+  // in which case the retry loop of RetryingService never kicks in and the store silently stops advancing.
+  private val lastProgressNanos = new AtomicLong(System.nanoTime())
+  private val lastIngestedOffset = new AtomicLong(-1L)
+  private val stalled = new AtomicBoolean(false)
+
+  override protected def isMakingProgress: Boolean = !stalled.get()
 
   override protected val loggerFactory: NamedLoggerFactory =
     baseLoggerFactory.append("ingestionLoopFor", ingestionTargetName)
@@ -93,6 +104,11 @@ class UpdateIngestionService(
             _ <- ingestAcsAndInFlight(acsOffset)
           } yield acsOffset
       }
+      _ = {
+        // Only restart the watchdog window here: `stalled` must stay set until something is actually ingested.
+        lastIngestedOffset.set(subscribeFrom)
+        lastProgressNanos.set(System.nanoTime())
+      }
     } yield new ServiceWithGuaranteedShutdown(
       source = batchSource(connection.updates(subscribeFrom, filter)),
       map = process,
@@ -108,7 +124,9 @@ class UpdateIngestionService(
       NonEmptyList.fromFoldable(msgs) match {
         case Some(batch) =>
           logger.debug(s"Processing batch of ${batch.size} elements")
-          ingestionSink.ingestUpdateBatch(batch.map(_.updateOrCheckpoint))
+          ingestionSink
+            .ingestUpdateBatch(batch.map(_.updateOrCheckpoint))
+            .map(_ => recordProgress(batch.last.updateOrCheckpoint.offset))
         case None =>
           logger.error(
             "Received empty batch of updates to ingest. This is never supposed to happen."
@@ -116,6 +134,58 @@ class UpdateIngestionService(
           Future.unit
       }
     }
+  }
+
+  private def recordProgress(offset: Long): Unit = {
+    lastIngestedOffset.set(offset)
+    lastProgressNanos.set(System.nanoTime())
+    stalled.set(false)
+  }
+
+  private def scheduleStallCheck(): Unit = {
+    implicit val tc: TraceContext = TraceContext.empty
+    retryProvider
+      .scheduleAfterUnlessShutdown(
+        checkForStall(),
+        backoffClock,
+        config.ingestion.stallCheckInterval,
+        jitter = 0.1,
+      )
+      .unwrap
+      .foreach {
+        case UnlessShutdown.Outcome(_) => scheduleStallCheck()
+        case UnlessShutdown.AbortedDueToShutdown => ()
+      }
+  }
+
+  /** Restarts the current ingestion instance if it has not made progress for `stallTimeout` while the participant
+    * has moved on. An idle ledger (ledger end == last ingested offset) is not a stall.
+    */
+  private def checkForStall()(implicit tc: TraceContext): Future[Unit] = {
+    val stalledFor = (System.nanoTime() - lastProgressNanos.get()).nanos
+    val stallTimeout = config.ingestion.stallTimeout.underlying
+    val running = !isPaused && currentService.exists(_.isActive)
+    if (!running || stalledFor < stallTimeout) Future.unit
+    else
+      connection
+        .ledgerEnd()
+        .map { ledgerEnd =>
+          val ingested = lastIngestedOffset.get()
+          if (UpdateIngestionService.hasStalled(stalledFor, stallTimeout, ledgerEnd, ingested)) {
+            logger.warn(
+              s"Ingestion of $ingestionTargetName made no progress for $stalledFor: ingested up to offset $ingested " +
+                s"while the ledger end is at $ledgerEnd. Restarting the ingestion loop."
+            )
+            stalled.set(true)
+            metrics.stallRestarts.inc()(MetricsContext.Empty)
+            currentService.foreach(_.initiateShutdown())
+          }
+          // Give the (re)started instance a full window before checking again.
+          lastProgressNanos.set(System.nanoTime())
+        }
+        .recover { case ex =>
+          logger.info("Failed to check ingestion progress against the ledger end, will retry.", ex)
+        }
   }
 
   private def ingestAcsAndInFlight(
@@ -157,10 +227,34 @@ class UpdateIngestionService(
 
   // Kick-off the ingestion
   start()
+  scheduleStallCheck()
+}
+
+object UpdateIngestionService {
+
+  /** The ingestion has stalled if it made no progress for at least `timeout` while the participant's ledger end is
+    * ahead of the last ingested offset. If the ledger end has not moved past what we ingested the ledger is simply
+    * idle, which is not a stall.
+    */
+  private[automation] def hasStalled(
+      stalledFor: FiniteDuration,
+      timeout: FiniteDuration,
+      ledgerEnd: Long,
+      lastIngestedOffset: Long,
+  ): Boolean = stalledFor >= timeout && ledgerEnd > lastIngestedOffset
 }
 
 class UpdateIngestionServiceMetrics(metricsFactory: LabeledMetricsFactory) {
   val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "update-ingestion-service"
+  val stallRestarts: Counter =
+    metricsFactory.counter(
+      MetricInfo(
+        prefix :+ "stall-restarts",
+        summary =
+          "Number of times the ingestion loop was restarted because it stopped making progress.",
+        qualification = MetricQualification.Errors,
+      )
+    )
   val activeContractsBufferSize: Counter =
     metricsFactory.counter(
       MetricInfo(
