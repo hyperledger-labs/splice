@@ -122,6 +122,7 @@ case class ScanAppBackendConfig(
     updateHistoryBackfillBatchSize: Int = 100,
     updateHistoryBackfillImportUpdatesEnabled: Boolean = true,
     updateHistoryMaxPageSize: Int = Limit.DefaultMaxPageSize,
+    updateHistoryPartitionRunwayDays: Int = 7,
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
     cache: ScanCacheConfig = ScanCacheConfig(),
@@ -145,6 +146,14 @@ case class ScanAppBackendConfig(
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
+  require(
+    updateHistoryPartitionRunwayDays > 0,
+    "updateHistoryPartitionRunwayDays cannot be below 1 day",
+  )
+  require(
+    updateHistoryPartitionRunwayDays < 365,
+    "Large values of updateHistoryPartitionRunwayDays can delay startup or affect performance by having too many tables.",
+  )
   override val nodeTypeName: String = "scan"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig

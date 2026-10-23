@@ -212,7 +212,7 @@ class DbExternalPartyWalletStoreTest
       defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
     )
     for {
-      _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
+      _ <- store.multiDomainAcsStore.testIngestionSink.initialize(mockLedgerConnection())
       _ <- store.multiDomainAcsStore.testIngestionSink
         .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(

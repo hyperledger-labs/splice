@@ -1643,7 +1643,9 @@ class DbScanStoreTest
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {
-      initializeResult <- store.multiDomainAcsStore.testIngestionSink.initialize()
+      initializeResult <- store.multiDomainAcsStore.testIngestionSink.initialize(
+        mockLedgerConnection()
+      )
       _ <- initializeResult match {
         case ResumeAtOffset(_) | UpdateHistoryInitAtLatestPrunedOffset => Future.unit
         case InitializeAcsAtLatestOffset =>
@@ -1685,8 +1687,9 @@ class DbScanStoreTest
         loggerFactory,
         enableImportUpdateBackfill = true,
         HistoryMetrics(NoOpMetricsFactory, migrationId),
+        clock,
       )
-      _ <- updateHistory.ingestionSink.initialize()
+      _ <- updateHistory.ingestionSink.initialize(mockLedgerConnection())
       _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
         updateHistory,
         timeStart,

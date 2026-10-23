@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.automation
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
+  UpdateHistoryPartitionMaintenanceTrigger,
   SpliceAppAutomationService,
   SqlIndexInitializationTrigger,
   TxLogBackfillingTrigger,
@@ -110,6 +111,12 @@ class ScanAutomationService(
     )
 
   registerUpdateHistoryIngestion(updateHistory)
+  registerTrigger(
+    new UpdateHistoryPartitionMaintenanceTrigger(
+      updateHistory,
+      triggerContext,
+    )
+  )
 
   def registerRewardsReferenceStoreIngestion(
       rewardsReferenceStore: ScanRewardsReferenceStore

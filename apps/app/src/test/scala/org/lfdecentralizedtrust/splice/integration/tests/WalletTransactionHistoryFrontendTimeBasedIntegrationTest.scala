@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{
@@ -28,6 +29,12 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndAmuletMerging
       .withAmuletPrice(amuletPrice)
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllScanAppConfigs_(
+          // more days than default runway days are advanced
+          _.copy(updateHistoryPartitionRunwayDays = 90)
+        )(config)
+      )
 
   "A wallet transaction history UI" should {
 
