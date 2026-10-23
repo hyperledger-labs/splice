@@ -19,7 +19,9 @@ if (!sv && !dsyncNode) {
   throw new Error('Either SPLICE_SV or SPLICE_DSYNC_NODE must be specified in the environment');
 }
 if (sv && dsyncNode) {
-  throw new Error(`Only one of SPLICE_SV or SPLICE_DSYNC_NODE can be specified in the environment (found: sv='${sv}', dsyncNode='${dsyncNode}')`);
+  throw new Error(
+    `Only one of SPLICE_SV or SPLICE_DSYNC_NODE can be specified in the environment (found: sv='${sv}', dsyncNode='${dsyncNode}')`
+  );
 }
 
 async function auth0CacheAndInstallNode(

@@ -90,6 +90,7 @@
         "driver": {
           "externalAddress": "sequencer-p2p-8.sv-1.mock.global.canton.network.digitalasset.com",
           "externalPort": 443,
+          "peerEndpoints": [],
           "persistence": {
             "databaseName": "sequencer_8_dabft",
             "secretName": "sequencer-bft-8-pg-secrets"
