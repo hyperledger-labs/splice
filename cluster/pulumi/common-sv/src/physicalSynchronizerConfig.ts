@@ -99,29 +99,27 @@ export function withPhysicalSynchronizers<C extends SyncNodeConfigWithOverrides>
     { mediator: SvMediatorConfig; sequencer: SvSequencerConfig; cantonBft: SvCantonBftConfig }
   >;
 } {
-  const physicalSynchronizers = migrations.map(
-    migration => {
-      const mergedSequencer = mergeConfigFragments(
-        sequencer,
-        physicalSynchronizerOverrides[migration.id]?.sequencer || {}
-      ) as SvSequencerConfig;
-      return [
-        migration.id,
-        {
-          mediator: mergeConfigFragments(
-            mediator,
-            physicalSynchronizerOverrides[migration.id]?.mediator || {}
-          ) as SvMediatorConfig,
-          sequencer: mergedSequencer,
-          cantonBft: mergeConfigFragments(
-            _.pick(mergedSequencer, ['cloudSql', 'splicePostgres']),
-            cantonBft || {},
-            physicalSynchronizerOverrides[migration.id]?.cantonBft || {}
-          ) as SvCantonBftConfig,
-        },
-      ];
-    }
-  );
+  const physicalSynchronizers = migrations.map(migration => {
+    const mergedSequencer = mergeConfigFragments(
+      sequencer,
+      physicalSynchronizerOverrides[migration.id]?.sequencer || {}
+    ) as SvSequencerConfig;
+    return [
+      migration.id,
+      {
+        mediator: mergeConfigFragments(
+          mediator,
+          physicalSynchronizerOverrides[migration.id]?.mediator || {}
+        ) as SvMediatorConfig,
+        sequencer: mergedSequencer,
+        cantonBft: mergeConfigFragments(
+          _.pick(mergedSequencer, ['cloudSql', 'splicePostgres']),
+          cantonBft || {},
+          physicalSynchronizerOverrides[migration.id]?.cantonBft || {}
+        ) as SvCantonBftConfig,
+      },
+    ];
+  });
   return {
     ...svConfig,
     physicalSynchronizers: _.fromPairs(physicalSynchronizers),
