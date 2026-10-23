@@ -222,8 +222,5 @@ StateService/GetConnectedSynchronizers.*INTERNAL/Failed retrieving SynchronizerT
 # client retries and succeeds
 SERVER_OVERLOADED.*Reached the limit of concurrent requests for.*DownloadTopologyStateForInit
 
-# TODO(#7789) Remove this once Canton stops logging warnings due to normal concurrent operations.
-sequenced.*but rejected.*during topology validation
-
 Not accepting submission as aggregation ID.*is already marked as delivered
 SEQUENCER_AGGREGATE_SUBMISSION_ALREADY_SENT
