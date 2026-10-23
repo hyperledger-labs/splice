@@ -3,7 +3,7 @@
   "main": "src/index.ts",
   "dependencies": {
     "@canton-network/splice-pulumi-common": "1.0.0",
-    "@pulumi/policy": "1.20.0"
+    "@pulumi/policy": "1.21.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
