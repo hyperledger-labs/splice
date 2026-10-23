@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   CLUSTER_HOSTNAME,
-  config,
   ExactNamespace,
   exactNamespace,
   imagePullSecret,

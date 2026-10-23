@@ -1937,7 +1937,7 @@ function subcmd_bootstrap_dsync() {
         _error "Usage: $SCRIPTNAME bootstrap_dsync <dsync_name>"
     fi
 
-    $SPLICE_ROOT/build-tools/bootstrap-dsync.py --dsync "$DSYNC_NAME"
+    "$SPLICE_ROOT/build-tools/bootstrap-dsync.py" --dsync "$DSYNC_NAME"
 }
 
 function _get_single_pod() {
