@@ -350,7 +350,7 @@ class HttpValidatorAdminHandler(
             txs = body.signedTopologyTxs.map(decodeSignedTopologyTx(publicKey, _)),
           )
           // The PartyToParticipant mapping requires both the external signature from the party namespace but also one from the participant which we create here
-          participantId <- participantAdminConnection.getParticipantId()
+          _ <- participantAdminConnection.getParticipantId()
           _ <- participantAdminConnection.proposeMapping(
             TopologyStoreId.Synchronizer(synchronizerId),
             partyToParticipant,

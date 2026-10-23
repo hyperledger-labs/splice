@@ -904,7 +904,7 @@ class UserWalletTxLogParser(
                 )
             }
 
-          case TransferInstruction_Withdraw(node) =>
+          case TransferInstruction_Withdraw(_) =>
             defer {
               parseTrees(
                 tree,
@@ -923,7 +923,7 @@ class UserWalletTxLogParser(
                 )
             }
 
-          case TransferInstruction_Reject(node) =>
+          case TransferInstruction_Reject(_) =>
             defer {
               parseTrees(
                 tree,

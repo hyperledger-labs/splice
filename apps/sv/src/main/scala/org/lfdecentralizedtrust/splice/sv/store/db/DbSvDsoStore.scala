@@ -1578,7 +1578,7 @@ class DbSvDsoStore(
         case None => Future.successful(Seq.empty)
         case Some(voters) =>
           for {
-            dsoRules <- getDsoRules()
+            _ <- getDsoRules()
             voterParties = DbStorage.toInClause("voter", voters)
             result <- storage
               .query(

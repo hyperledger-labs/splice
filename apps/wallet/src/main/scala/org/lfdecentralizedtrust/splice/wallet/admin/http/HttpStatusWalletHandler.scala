@@ -59,7 +59,7 @@ class HttpStatusWalletHandler(
   override def featureSupport(respond: r0.FeatureSupportResponse.type)()(
       tuser: AuthenticatedRequest
   ): Future[r0.FeatureSupportResponse] = {
-    implicit val AuthenticatedRequest(user, traceContext) = tuser
+    implicit val AuthenticatedRequest(_, traceContext) = tuser
     withSpan(s"$workflowId.featureSupport") { _ => _ =>
       val parties = Seq(store.walletKey.dsoParty)
       val now = CantonTimestamp.now()

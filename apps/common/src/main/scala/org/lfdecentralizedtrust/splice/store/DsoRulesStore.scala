@@ -52,10 +52,6 @@ trait DsoRulesStore extends AppStore {
       )
     )
 
-  def getDsoRulesWithOffset()(implicit tc: TraceContext): Future[QueryResult[
-    ContractWithState[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]
-  ]] = lookupDsoRulesWithStateWithOffset().map(_.sequence getOrElse (throw noActiveDsoRules))
-
   def getDsoRulesWithSvNodeState(svParty: PartyId)(implicit
       tc: TraceContext
   ): Future[DsoRulesStore.DsoRulesWithSvNodeState] = {
@@ -146,8 +142,6 @@ trait DsoRulesStore extends AppStore {
     } yield DsoRulesStore.DsoRulesWithStateWithSvNodeStates(dsoRules, svNodeStates)
   }
 
-  private def noActiveDsoRules =
-    Status.NOT_FOUND.withDescription("No active DsoRules contract").asRuntimeException()
 }
 
 object DsoRulesStore {

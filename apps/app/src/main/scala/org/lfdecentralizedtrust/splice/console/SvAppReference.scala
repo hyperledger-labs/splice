@@ -94,18 +94,6 @@ abstract class SvAppReference(
       httpCommand(HttpSvOperatorAppClient.GetDsoInfo)
     }
 
-  @Help.Summary("Get the CometBFT node status")
-  def cometBftNodeStatus(): definitions.CometBftNodeStatusResponse =
-    consoleEnvironment.run {
-      httpCommand(HttpSvPublicAppClient.GetCometBftNodeStatus())
-    }
-
-  @Help.Summary("Get the CometBFT node dump")
-  def cometBftNodeDebugDump(): definitions.CometBftNodeDumpResponse =
-    consoleEnvironment.run {
-      httpCommand(HttpSvOperatorAppClient.GetCometBftNodeDump())
-    }
-
   @Help.Summary("Make a CometBFT Json RPC request")
   def cometBftJsonRpcRequest(
       id: definitions.CometBftJsonRpcRequestId,
@@ -377,12 +365,6 @@ class SvAppBackendReference(
       )
     }
 
-  @Help.Summary("Get the CometBFT node debug dump")
-  def cometBftNodeDump(): definitions.CometBftNodeDumpResponse =
-    consoleEnvironment.run {
-      httpCommand(HttpSvOperatorAppClient.GetCometBftNodeDump())
-    }
-
   @Help.Summary("Get the party to participant mapping for a given party")
   def getPartyToParticipant(partyId: String): definitions.GetPartyToParticipantResponseV1 =
     consoleEnvironment.run {
@@ -411,11 +393,6 @@ class SvAppBackendReference(
 
   lazy val sequencerClient: SequencerClientReference =
     sequencerClientFor(_.current)
-
-  lazy val sequencerClientSuccessor: SequencerClientReference =
-    sequencerClientFor(
-      _.successor.getOrElse(throw new IllegalStateException("successor not configured"))
-    )
 
   def sequencerClientFor(
       node: SvSynchronizerNodesConfig => SvSynchronizerNodeConfig

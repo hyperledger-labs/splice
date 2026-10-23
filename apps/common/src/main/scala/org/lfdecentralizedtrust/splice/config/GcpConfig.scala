@@ -79,13 +79,6 @@ object GcpBucketConfig {
   def inferForCluster(bucketName: BucketName): GcpBucketConfig =
     infer("GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS", "da-cn-devnet", bucketName.value)
 
-  def inferForBundles: GcpBucketConfig =
-    infer(
-      "GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS",
-      "da-cn-shared",
-      "cn-release-bundles",
-    )
-
   private def infer(envVar: String, projectId: String, bucketName: String): GcpBucketConfig = {
     val credentialsConfig =
       sys.env.get(envVar) match {

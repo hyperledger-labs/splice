@@ -77,11 +77,4 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
     blob.getContent()
   }
 
-  def fileExists(fileName: String): Boolean = {
-    val blobId = BlobId.of(config.bucketName, fileName)
-    storage.get(blobId) match {
-      case blob: Blob => blob.exists()
-      case _ => false
-    }
-  }
 }

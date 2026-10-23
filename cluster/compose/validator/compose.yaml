@@ -23,7 +23,10 @@ services:
       # database already exists. Set to false (via start.sh '-d') to disable this check.
       - ENABLE_PARTICIPANT_DB_CONFLICT_CHECK=${ENABLE_PARTICIPANT_DB_CONFLICT_CHECK:-true}
     volumes:
-      - postgres-splice:/var/lib/postgresql/data
+      # Postgres 18 and above
+      - postgres-splice:/var/lib/postgresql
+      # Postgres 17 and below. Replace the volume above with this one if you haven't yet upgraded to Postgres >=18.
+      #- postgres-splice:/var/lib/postgresql/data
       - ./postgres-entrypoint.sh:/postgres-entrypoint.sh
     entrypoint: /postgres-entrypoint.sh
     user: "postgres"

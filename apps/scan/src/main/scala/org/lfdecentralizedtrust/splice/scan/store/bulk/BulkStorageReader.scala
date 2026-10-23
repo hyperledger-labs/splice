@@ -46,7 +46,7 @@ class BulkStorageReader(
                 s"Latest snapshot in committed bulk storage is at $ts, which is before the requested timestamp $atOrBeforeTimestamp, returning that one"
               )
               ts
-            case Some(ts) => storageConfig.computeBulkSnapshotTimeAtOrBefore(atOrBeforeTimestamp)
+            case Some(_) => storageConfig.computeBulkSnapshotTimeAtOrBefore(atOrBeforeTimestamp)
           }
       objects <- getAcsSnapshotObjects(
         snapshotTs,
@@ -75,7 +75,7 @@ class BulkStorageReader(
             s"Latest snapshot in staging bulk storage is at $ts, which is not after the requested timestamp $afterTimestamp"
           )
           Future.successful(None)
-        case Some(ts) if afterTimestamp == CantonTimestamp.MinValue =>
+        case Some(_) if afterTimestamp == CantonTimestamp.MinValue =>
           logger.debug(
             "snapshots exist in staging bulk storage, but `afterTimestamp` is at minimum value, finding the first snapshot expected in staging bulk storage"
           )
@@ -154,7 +154,7 @@ class BulkStorageReader(
             s"Latest updates in staging bulk storage ending at $latestStagingTs, which is not after the requested timestamp $minTs, returning None for segment starting at $minTs"
           )
           Future.successful(None)
-        case Some(latestStagingTs) =>
+        case Some(_) =>
           getSegmentStartingAt(startTimestamp)
       }
   }
@@ -286,7 +286,7 @@ class BulkStorageReader(
               s"Cannot parse folder name $folder, error: $err"
             )
             .asRuntimeException()
-        case Right((folderStart, folderEnd)) =>
+        case Right((_, folderEnd)) =>
           folderEnd <= lastSegmentEnd
       }
     }
