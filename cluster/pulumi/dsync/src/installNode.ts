@@ -22,7 +22,7 @@ function installIngress(xns: ExactNamespace) {
     'ingress-sv',
     'splice-cluster-ingress-runbook',
     {
-      withSvIngress: true, // TODO: this installs too much, but not sure I care
+      withSvIngress: true, // this actually installs too much, but doesn't seem worth having a separate config parameter to avoid that
       ingress: {
         decentralizedSynchronizer: {
           migrationIds: dsyncMigrationConfig.runningMigrations().map(x => x.id.toString()),
