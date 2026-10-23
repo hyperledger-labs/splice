@@ -33,7 +33,6 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added priority shutdown tasks in `OnShutdownRunner` that run before other tasks, and added `setAsClosing` method.
 * Disabled `logConfigOnStartup` by default as it also logs secrets.
 * Changed `metrics.filterByNodeAndAttribute` in `InstanceReference ` to filter by `node_name` instead of `node` to match the Splice metrics
-* Marked protocol version 37 as stable in `ProtocolVersion` (and in `stableProtocolVersions` build info in `BuildCommon`).
 * Worked around `BaseIntegrationTest.assertThrowsAndLogsCommandFailures` only supporting Canton's `EnvironmentDefinition` (and thus not Splice's).
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs

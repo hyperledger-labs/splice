@@ -28,7 +28,7 @@ export DB_PORT
 ACTION=""
 MULTI_SYNC_PROFILE=()
 DOWN_COMMAND=( stop )
-ALPHA_PROTOCOL_VERSION_ENV=""
+ALPHA_PROTOCOL_VERSION_ENV=$LOCALNET_DIR/env/alpha-protocol-version.env
 
 function usage() {
     echo "Usage: $SCRIPTNAME <start|stop> [-D] [-M] [-u] [-p <protocol_version>]"
