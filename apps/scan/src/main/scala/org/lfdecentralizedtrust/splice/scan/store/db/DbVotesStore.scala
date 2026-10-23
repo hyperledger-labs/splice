@@ -31,12 +31,14 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, DbKeyValueStore}
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
+import org.lfdecentralizedtrust.splice.scan.store.votesbackfilling.VotesBackfillingStore
 import org.lfdecentralizedtrust.splice.store.events.DsoRulesCloseVoteRequest
 import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import org.lfdecentralizedtrust.splice.util.Trees
+import slick.dbio.DBIO
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import slick.jdbc.{JdbcProfile, PostgresProfile}
+import slick.jdbc.{GetResult, JdbcProfile, PostgresProfile}
 
 import scala.concurrent.{ExecutionContext, Future}
 import java.time.Instant
@@ -46,8 +48,9 @@ import scala.jdk.OptionConverters.*
 
 /** Historical vote results (exercised DsoRules_CloseVoteRequest choices).
   *
-  * Owns table `votes_store_results`, and the key `votes_store_first_ingested_record_time_<storeId>`
-  * in the key value store.
+  * Owns table `votes_store_results`, and the keys `votes_store_first_ingested_record_time_<storeId>`,
+  * `votes_store_backfill_progress_<storeId>` and `votes_store_backfill_complete_<storeId>` in the
+  * key value store.
   */
 class DbVotesStore private (
     storage: DbStorage,
@@ -57,6 +60,7 @@ class DbVotesStore private (
 )(implicit ec: ExecutionContext, closeContext: CloseContext)
     extends AcsJdbcTypes
     with HistoricalVotesStore
+    with VotesBackfillingStore
     with LimitHelpers
     with NamedLogging {
 
@@ -70,12 +74,74 @@ class DbVotesStore private (
   /** The record time of the first transaction that the ingestion of this store has seen.
     * Vote results from before that time have to be backfilled.
     */
-  def getFirstIngestedRecordTime()(implicit tc: TraceContext): Future[Option[CantonTimestamp]] = {
+  override def getFirstIngestedRecordTime()(implicit
+      tc: TraceContext
+  ): Future[Option[CantonTimestamp]] = {
     import ScanKeyValueProvider.timestampCodec
     kvStore
       .readValueAndLogOnDecodingFailure[CantonTimestamp](firstIngestedRecordTimeKey(storeId))
       .value
   }
+
+  /** Where [[VotesStoreBackfilling]] should resume from, or `None` if it has not started yet. */
+  override def getBackfillingCursor()(implicit
+      tc: TraceContext
+  ): Future[Option[VotesBackfillCursor]] = {
+    import ScanKeyValueProvider.votesBackfillCursorCodec
+    kvStore
+      .readValueAndLogOnDecodingFailure[VotesBackfillCursor](backfillCursorKey(storeId))
+      .value
+  }
+
+  override def isBackfillingComplete()(implicit tc: TraceContext): Future[Boolean] =
+    kvStore
+      .readValueAndLogOnDecodingFailure[Boolean](backfillCompleteKey(storeId))
+      .value
+      .map(_.getOrElse(false))
+
+  override def markBackfillingComplete()(implicit tc: TraceContext): Future[Unit] =
+    kvStore.setValue(backfillCompleteKey(storeId), true).map { _ =>
+      logger.info("DbVotesStore backfilling is complete")
+    }
+
+  /** Inserts vote results backfilled from a peer scan's `votes_store_results`, and persists
+    * `cursor` in the same transaction, so that backfilling never inserts the same page twice.
+    */
+  override def insertPeerVoteResults(
+      rows: Seq[PeerVoteResult],
+      cursor: VotesBackfillCursor,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    import ScanKeyValueProvider.votesBackfillCursorCodec
+    import profile.api.jdbcActionExtensionMethods
+    storage
+      .queryAndUpdate(
+        DBIO
+          .seq(rows.map(_.toInsert(storeId).action)*)
+          .andThen(kvStore.setValueAction(backfillCursorKey(storeId), cursor))
+          .transactionally,
+        "DbVotesStore.insertPeerVoteResults",
+      )
+      .map(_ => ())
+  }
+
+  /** Serves [[VotesStoreBackfilling]] running on a peer: a page of this store's own rows, strictly
+    * before `before`, ordered backwards by `(record_time, event_number)`.
+    *
+    * Deliberately does not use `row_id`: it is a local identity column, not comparable across scans.
+    */
+  def listBackfillPage(
+      before: VotesBackfillCursor,
+      limit: PageLimit,
+  )(implicit tc: TraceContext): Future[Seq[ServedVoteResult]] =
+    storage.query(
+      sql"""select record_time, synchronizer_id, update_id, event_number, choice_result
+            from #$table
+            where store_id = $storeId
+              and (record_time, event_number) < (${before.recordTime.toMicros}, ${before.eventNumber})
+            order by record_time desc, event_number desc
+            limit ${sqlLimit(limit)}""".as[ServedVoteResult],
+      "DbVotesStore.listBackfillPage",
+    )
 
   override def listVoteRequestResults(
       filters: VoteResultsFilters,
@@ -223,6 +289,86 @@ object DbVotesStore {
   // making assumptions about it never changing.
   def firstIngestedRecordTimeKey(storeId: Int): String =
     s"votes_store_first_ingested_record_time_$storeId"
+  def backfillCursorKey(storeId: Int): String =
+    s"votes_store_backfill_cursor_$storeId"
+  def backfillCompleteKey(storeId: Int): String =
+    s"votes_store_backfill_complete_$storeId"
+
+  /** Where [[VotesStoreBackfilling]] should resume: everything at `(recordTime, eventNumber)` or
+    * later is already in `votes_store_results`; backfilling continues strictly before it.
+    */
+  final case class VotesBackfillCursor(recordTime: CantonTimestamp, eventNumber: Int)
+
+  /** A vote result as served to a peer: what identifies it, and the JSON of its result as stored.
+    * Everything else in `votes_store_results` is derived from the result by the receiver, see
+    * [[PeerVoteResult]]. The JSON is passed on as stored, without decoding it.
+    */
+  final case class ServedVoteResult(
+      recordTime: CantonTimestamp,
+      synchronizerId: String,
+      updateId: String,
+      eventNumber: Int,
+      choiceResult: String,
+  )
+
+  implicit private val getResultServedVoteResult: GetResult[ServedVoteResult] = GetResult { prs =>
+    import prs.*
+    ServedVoteResult(
+      recordTime = CantonTimestamp.ofEpochMicro(<<[Long]),
+      synchronizerId = <<[String],
+      updateId = <<[String],
+      eventNumber = <<[Int],
+      choiceResult = <<[String],
+    )
+  }
+
+  /** A vote result backfilled from a peer scan. Like for the votes that are ingested, all columns
+    * of `votes_store_results` are derived from the result.
+    */
+  final case class PeerVoteResult(
+      recordTime: CantonTimestamp,
+      synchronizerId: String,
+      updateId: String,
+      eventNumber: Int,
+      result: DsoRules_CloseVoteRequestResult,
+  ) {
+    def toInsert(storeId: Int): InsertVoteResult =
+      DbVotesStore.toInsert(
+        result,
+        storeId,
+        recordTime.toMicros,
+        synchronizerId,
+        updateId,
+        eventNumber,
+      )
+  }
+
+  object PeerVoteResult {
+
+    /** Decodes the JSON of a vote result that a peer served.
+      *
+      * Throws if it cannot be decoded, e.g., because it is from a newer Daml model. Unlike for ingestion,
+      * which would block the whole ACS store, this does not store a placeholder: the peer has the
+      * actual vote, and a placeholder would lose it for good. Backfilling stops until the app is updated.
+      */
+    def decode(
+        recordTime: CantonTimestamp,
+        synchronizerId: String,
+        updateId: String,
+        eventNumber: Int,
+        choiceResult: String,
+    ): PeerVoteResult =
+      Try(DsoRules_CloseVoteRequestResult.fromJson(choiceResult)) match {
+        case Success(result) =>
+          PeerVoteResult(recordTime, synchronizerId, updateId, eventNumber, result)
+        case Failure(e) =>
+          throw new IllegalArgumentException(
+            s"Failed to decode the vote result in update $updateId at record time $recordTime " +
+              "that a peer served, this app might be too old",
+            e,
+          )
+      }
+  }
 
   /** Records the record time of the first transaction that the ingestion has seen, unless it is already set.
     * Runs in the same SQL transaction as the ingestion of the votes, so the value is recorded if and only if
@@ -314,7 +460,16 @@ object DbVotesStore {
         // Only the nodes that are a CloseVoteRequest exercise can fail here, all other nodes are ignored.
         Try(event match {
           case DsoRulesCloseVoteRequest(node) =>
-            Some(toInsert(node.result.value, storeId, recordTime, tx, eventNumber))
+            Some(
+              toInsert(
+                node.result.value,
+                storeId,
+                recordTime,
+                tx.getSynchronizerId,
+                tx.getUpdateId,
+                eventNumber,
+              )
+            )
           case _ => None
         }) match {
           case Success(insert) => insert
@@ -327,8 +482,14 @@ object DbVotesStore {
               e,
             )
             Some(
-              toInsert(placeholderResult(recordTime), storeId, recordTime, tx, eventNumber)
-                .copy(error = Some(e.getMessage.take(MaxErrorLength)))
+              toInsert(
+                placeholderResult(recordTime),
+                storeId,
+                recordTime,
+                tx.getSynchronizerId,
+                tx.getUpdateId,
+                eventNumber,
+              ).copy(error = Some(e.getMessage.take(MaxErrorLength)))
             )
         }
       }
@@ -340,15 +501,16 @@ object DbVotesStore {
       result: DsoRules_CloseVoteRequestResult,
       storeId: Int,
       recordTime: Long,
-      tx: Transaction,
+      synchronizerId: String,
+      updateId: String,
       eventNumber: Int,
   ): InsertVoteResult = {
     val outcome = VoteRequestOutcome.parse(result.outcome)
     InsertVoteResult(
       storeId = storeId,
       recordTime = recordTime,
-      synchronizerId = String2066.tryCreate(tx.getSynchronizerId),
-      updateId = String2066.tryCreate(tx.getUpdateId),
+      synchronizerId = String2066.tryCreate(synchronizerId),
+      updateId = String2066.tryCreate(updateId),
       eventNumber = eventNumber,
       voteActionName = String2066.tryCreate(actionName(result.request.action)),
       voteRequesterName = String2066.tryCreate(result.request.requester),

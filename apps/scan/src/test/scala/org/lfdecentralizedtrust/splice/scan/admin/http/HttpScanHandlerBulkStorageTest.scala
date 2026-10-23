@@ -36,7 +36,7 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.{
   UpdateHistoryBulkStoragePersistentProgress,
   UpdatesSegment,
 }
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
+import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanAppRewardsStore, DbVotesStore}
 import org.lfdecentralizedtrust.splice.store.{
   AppStoreWithIngestion,
   HistoricalVotesStore,
@@ -84,6 +84,7 @@ class HttpScanHandlerBulkStorageTest extends AnyWordSpec with BaseTest {
       snapshotStore = mock[AcsSnapshotStore],
       eventStore = mock[ScanEventStore],
       historicalVotesStore = mock[HistoricalVotesStore],
+      votesStore = mock[DbVotesStore],
       bulkStorage = bulkStorage,
       scanApiMetrics = mock[ScanHttpApiMetrics],
       dsoAnsResolver = mock[DsoAnsResolver],

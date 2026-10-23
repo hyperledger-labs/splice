@@ -30,6 +30,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.config.CantonBftPeerConfig
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
+import org.lfdecentralizedtrust.splice.store.Limit
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
@@ -290,6 +291,39 @@ class ScanIntegrationTest
           s"Expected '$field' to contain at most $maxItems items, but contained $tooMany."
         )),
       )
+    }
+  }
+
+  "reject page sizes larger than 1000 with 400" in { implicit env =>
+    import env.{actorSystem, executionContext}
+    registerHttpConnectionPoolsCleanup(env)
+
+    val tooMany = Limit.DefaultMaxPageSize + 1
+    val before = "2024-01-01T00:00:00Z"
+    val cases: Seq[(String, String)] = Seq(
+      "/api/scan/v2/updates" -> s"""{"page_size":$tooMany}""",
+      "/api/scan/v0/events" -> s"""{"page_size":$tooMany}""",
+      "/api/scan/v0/admin/sv/voteresults" -> s"""{"limit":$tooMany}""",
+      "/api/scan/v0/backfilling/updates-before" ->
+        s"""{"migration_id":0,"synchronizer_id":"${decentralizedSynchronizerId.toProtoPrimitive}","before":"$before","count":$tooMany}""",
+      "/api/scan/v0/backfilling/import-updates" ->
+        s"""{"migration_id":0,"after_update_id":"","limit":$tooMany}""",
+      "/api/scan/v0/backfilling/votes-before" ->
+        s"""{"before_record_time":"$before","before_event_number":0,"count":$tooMany}""",
+    )
+
+    forEvery(Table(("path", "body"), cases*)) { case (path, body) =>
+      val response = Http()
+        .singleRequest(
+          Post(s"${sv1ScanBackend.httpClientConfig.url}$path")
+            .withEntity(HttpEntity(ContentTypes.`application/json`, body))
+        )
+        .futureValue
+      val responseBody = Unmarshal(response.entity).to[String].futureValue
+      clue(s"$path responded with $responseBody") {
+        response.status shouldBe StatusCodes.BadRequest
+        responseBody should include(s"Exceeded limit maximum ($tooMany > ")
+      }
     }
   }
 

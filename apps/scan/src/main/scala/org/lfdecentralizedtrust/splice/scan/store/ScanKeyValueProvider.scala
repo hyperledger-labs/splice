@@ -10,6 +10,7 @@ import io.circe.generic.semiauto.deriveCodec
 import org.lfdecentralizedtrust.splice.store.KeyValueStore
 import cats.implicits.toBifunctorOps
 import org.lfdecentralizedtrust.splice.scan.store.bulk.UpdatesSegment
+import org.lfdecentralizedtrust.splice.scan.store.db.DbVotesStore.VotesBackfillCursor
 
 class ScanKeyValueProvider(val store: KeyValueStore, val loggerFactory: NamedLoggerFactory)
     extends NamedLogging {}
@@ -23,4 +24,7 @@ object ScanKeyValueProvider {
       )
 
   implicit val updatesSegmentCodec: Codec[UpdatesSegment] = deriveCodec[UpdatesSegment]
+
+  implicit val votesBackfillCursorCodec: Codec[VotesBackfillCursor] =
+    deriveCodec[VotesBackfillCursor]
 }

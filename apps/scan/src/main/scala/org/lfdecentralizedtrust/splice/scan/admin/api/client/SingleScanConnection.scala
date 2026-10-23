@@ -97,6 +97,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.HoldingsSummaryRequest.RecordTimeMatch
 import org.lfdecentralizedtrust.splice.metrics.ScanConnectionMetrics
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BftSequencer
+import org.lfdecentralizedtrust.splice.scan.store.db.DbVotesStore.{
+  PeerVoteResult,
+  VotesBackfillCursor,
+}
 
 import scala.util.{Failure, Success}
 
@@ -571,6 +575,20 @@ class SingleScanConnection private[client] (
         afterUpdateId,
         count,
       ),
+    )
+
+  def getVotesAvailability(before: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[definitions.VotesAvailability] =
+    runHttpCmd(config.adminApi.url, HttpScanAppClient.GetVotesBackfillingStatus(before))
+
+  override def getVotesBefore(
+      before: VotesBackfillCursor,
+      count: Int,
+  )(implicit tc: TraceContext): Future[Seq[PeerVoteResult]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetVotesBefore(before, count),
     )
 
   override def listVoteRequestResults(
