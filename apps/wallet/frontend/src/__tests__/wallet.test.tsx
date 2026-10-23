@@ -98,6 +98,7 @@ test('login screen shows up', async () => {
     </WalletConfigProvider>
   );
   expect(() => screen.findByText('Log In')).toBeDefined();
+  expect(await screen.findByText('You are on Ecilps')).toBeDefined();
 });
 
 describe('Wallet user can', () => {

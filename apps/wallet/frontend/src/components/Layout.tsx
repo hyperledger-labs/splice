@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import { Header } from '@canton-network/splice-common-frontend';
+import { Header, NetworkBanner } from '@canton-network/splice-common-frontend';
 
 import { Box, Divider, Stack } from '@mui/material';
 import Container from '@mui/material/Container';
@@ -21,6 +21,7 @@ export const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const config = useWalletConfig();
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
+      <NetworkBanner networkName={config.spliceInstanceNames.networkName} />
       <Container maxWidth="xl">
         <Header
           title={config.spliceInstanceNames.amuletName + ' Wallet'}
@@ -60,6 +61,7 @@ export const BasicLayout: React.FC<LayoutProps> = (props: LayoutProps) => {
   return (
     <Container maxWidth="lg" sx={{ marginTop: 4 }}>
       <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
+        <NetworkBanner networkName={config.spliceInstanceNames.networkName} />
         <Container maxWidth="xl">
           <Header title={config.spliceInstanceNames.amuletName + ' Wallet'} navLinks={[]}>
             <Stack direction="row" alignItems="center" spacing={1} paddingLeft={1}>

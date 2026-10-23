@@ -1,7 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import { AmountDisplay, ErrorDisplay, Loading } from '@canton-network/splice-common-frontend';
+import {
+  AmountDisplay,
+  ErrorDisplay,
+  Loading,
+  NetworkBanner,
+} from '@canton-network/splice-common-frontend';
 
 import { Box, Divider, Stack, Toolbar, Typography } from '@mui/material';
 
@@ -22,6 +27,7 @@ const PaymentHeader: React.FC = () => {
 
   return (
     <Box bgcolor="colors.neutral.20">
+      <NetworkBanner networkName={config.spliceInstanceNames.networkName} />
       <Toolbar sx={{ padding: 2 }}>
         <Typography variant="h5" autoCapitalize="characters" flex={'1'}>
           {config.spliceInstanceNames.amuletName} Wallet

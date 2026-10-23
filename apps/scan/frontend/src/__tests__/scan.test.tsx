@@ -29,6 +29,7 @@ test('home screen shows up', async () => {
   const appName = await screen.findByText(`${spliceInstanceNames.amuletName} Scan`);
 
   expect(appName).toBeDefined();
+  expect(screen.getByText(`You are on ${spliceInstanceNames.networkName}`)).toBeDefined();
 });
 
 test('total circulating amulet balance is displayed', async () => {
