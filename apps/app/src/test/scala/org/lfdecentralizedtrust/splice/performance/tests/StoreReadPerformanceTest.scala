@@ -118,8 +118,8 @@ abstract class StoreReadPerformanceTest(
       ),
       metric(
         "db_exec_time_ns",
-        "DB executor execution time recorded by DbStorageMetrics (InMemoryMetricsFactory). " +
-          "Millisecond-truncated, so a coarse lower bound for the DB-fetch cost.",
+        "DB executor execution time recorded by DbStorageMetrics (nanosecond precision), " +
+          "i.e. the DB-fetch cost for this operation.",
         metrics.dbExecTimeNs,
       ),
       metric(
@@ -155,14 +155,14 @@ abstract class StoreReadPerformanceTest(
       accF.flatMap { acc =>
         val wallBefore = System.nanoTime()
         val cpuBefore = getProcessCpuTimeNs
-        val dbExecMsBefore = totalDbExecTimeMs
+        val dbExecNsBefore = totalDbExecTimeNs
         op.execute(tc).map { _ =>
           val wallAfter = System.nanoTime()
           val cpuAfter = getProcessCpuTimeNs
-          val dbExecMsAfter = totalDbExecTimeMs
+          val dbExecNsAfter = totalDbExecTimeNs
           val duration = wallAfter - wallBefore
           val cpuDeltaNs = math.max(cpuAfter - cpuBefore, 0L)
-          val dbExecNs = math.max(dbExecMsAfter - dbExecMsBefore, 0L) * 1000000L
+          val dbExecNs = math.max(dbExecNsAfter - dbExecNsBefore, 0L)
           val heapUsed = getHeapUsedBytes
           val cpuToWallClockRatio =
             if (duration > 0) BigDecimal(cpuDeltaNs) / BigDecimal(duration) else BigDecimal(0)

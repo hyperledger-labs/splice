@@ -1,8 +1,9 @@
 package org.lfdecentralizedtrust.splice.performance.tests
 
 import cats.data.NonEmptyList
+import com.daml.metrics.api.MetricHandle.Timer
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
-import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext}
+import com.daml.metrics.api.{HistogramInventory, MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
@@ -67,22 +68,20 @@ abstract class BaseStorePerformanceTest(
   type Store <: HasIngestionSink
   protected def mkStore(storage: DbStorage): Future[Store]
 
-  /** In-memory metrics factory wired into the storage's [[DbStorageMetrics]].
+  /** Metrics factory wired into the storage's [[DbStorageMetrics]].
     *  The DB executor `exectime` timer is recorded and can be read back to measure DB time.
+    *
+    *  Uses [[NanoTimerMetricsFactory]] (not `InMemoryMetricsFactory`) because the latter truncates
+    *  every timer sample to whole milliseconds, which floors all sub-millisecond DB queries to 0.
     */
-  protected val dbMetricsFactory: InMemoryMetricsFactory = new InMemoryMetricsFactory
+  protected val dbMetricsFactory: NanoTimerMetricsFactory = new NanoTimerMetricsFactory
 
   /** Sum of all recorded DB executor execution times (both read and write queues),
-    * in milliseconds. The time is monotonically increasing. We need to snapshot
+    * in nanoseconds. The time is monotonically increasing. We need to snapshot
     * before/after an operation to find the duration of an operation.
     */
-  protected def totalDbExecTimeMs: Long =
-    dbMetricsFactory.metrics.timers.iterator.collect {
-      case (name, byContext) if name.toString.endsWith("exectime") =>
-        byContext.values.iterator
-          .map(timer => timer.data.recordedValues.values.flatten.sum)
-          .sum
-    }.sum
+  protected def totalDbExecTimeNs: Long =
+    dbMetricsFactory.totalNanos(_.endsWith("exectime"))
 
   /** A short name for this test, used as the metrics file name and Pushgateway label. */
   protected def testName: String = this.getClass.getSimpleName.stripSuffix("$")
@@ -298,3 +297,47 @@ abstract class BaseStorePerformanceTest(
     }
   }
 }
+
+/** A metrics factory that preserves nanosecond precision for timers.
+  */
+class NanoTimerMetricsFactory extends InMemoryMetricsFactory {
+  private val nanoTimers = scala.collection.concurrent.TrieMap[MetricName, NanoTimer]()
+
+  override def timer(info: MetricInfo)(implicit context: MetricsContext): Timer =
+    nanoTimers.getOrElseUpdate(info.name, new NanoTimer(info))
+
+  /** Total nanoseconds recorded across all timers whose metric name matches `nameFilter`. */
+  def totalNanos(nameFilter: String => Boolean): Long =
+    nanoTimers.iterator.collect {
+      case (name, timer) if nameFilter(name.toString) => timer.totalNanos.get()
+    }.sum
+}
+
+/** A [[Timer]] that accumulates the total recorded duration in nanoseconds. */
+final class NanoTimer(override val info: MetricInfo) extends Timer {
+  val totalNanos = new java.util.concurrent.atomic.AtomicLong(0)
+
+  override def update(duration: Long, unit: java.util.concurrent.TimeUnit)(implicit
+      context: MetricsContext
+  ): Unit = { val _ = totalNanos.addAndGet(unit.toNanos(duration)) }
+
+  override def update(duration: java.time.Duration)(implicit context: MetricsContext): Unit = {
+    val _ = totalNanos.addAndGet(duration.toNanos)
+  }
+
+  override def time[T](call: => T)(implicit context: MetricsContext): T = {
+    val start = System.nanoTime()
+    try call
+    finally { val _ = totalNanos.addAndGet(System.nanoTime() - start) }
+  }
+
+  override def startAsync()(implicit context: MetricsContext): Timer.TimerHandle = {
+    val start = System.nanoTime()
+    new Timer.TimerHandle {
+      override def stop()(implicit context: MetricsContext): Unit = {
+        val _ = totalNanos.addAndGet(System.nanoTime() - start)
+      }
+    }
+  }
+}
+
