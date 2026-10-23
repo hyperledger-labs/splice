@@ -1587,6 +1587,36 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/reward-coupons-v2-disclosures:
+    post:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getRewardCouponsV2Disclosures"
+      description: |
+        Retrieve created event blobs for active contracts of the Daml template
+        `Splice.Amulet:RewardCouponV2` by contract ID.
+        Requests are limited to 100 contract IDs; larger requests return 400.
+        Missing or archived contracts, and contracts of other templates, are omitted
+        from the response. If no matching active contracts are found, the response
+        contains an empty map.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetRewardCouponsV2DisclosuresRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetRewardCouponsV2DisclosuresResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/internal/reward-accounting-process/rounds/earliest-available:
     get:
       tags: [internal, scan]
@@ -4019,6 +4049,33 @@ components:
           type: array
           items:
             "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+
+    GetRewardCouponsV2DisclosuresRequest:
+      type: object
+      required: ["contract_ids"]
+      properties:
+        contract_ids:
+          description: |
+            Contract IDs of the `Splice.Amulet:RewardCouponV2` contracts to retrieve.
+            At most 100 contract IDs may be supplied per request.
+          type: array
+          maxItems: 100
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+
+    GetRewardCouponsV2DisclosuresResponse:
+      type: object
+      required: ["created_event_blobs"]
+      properties:
+        created_event_blobs:
+          description: |
+            A map from contract ID to base64-encoded created event blob for the
+            requested active `Splice.Amulet:RewardCouponV2` contracts.
+            Missing or archived contracts, and contracts of other templates,
+            are omitted. No contract payloads or other metadata are returned.
+          type: object
+          additionalProperties:
+            type: string
 
     ListBulkAcsSnapshotObjectsResponse:
       type: object
