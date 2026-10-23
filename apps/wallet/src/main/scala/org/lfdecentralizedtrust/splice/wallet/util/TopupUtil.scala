@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.environment.CommandPriority
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -105,6 +106,23 @@ object TopupUtil {
           .map(walletBalance >= _)
     }
   }
+
+  def highPriorityIncreaseBalanceForTopup(
+      scanConnection: ScanConnection,
+      validatorWalletStore: UserWalletStore,
+      validatorTopupConfig: ValidatorTopupConfig,
+      clock: Clock,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[CommandPriority] =
+    hasSufficientFundsForTopupOnGlobalSync(
+      scanConnection,
+      validatorWalletStore,
+      validatorTopupConfig,
+      clock,
+    ).map(if (_) CommandPriority.Low else CommandPriority.High)
 
   /** The synchronizer a traffic purchase is for, as AmuletRules knows it. */
   sealed trait TrafficSynchronizer

@@ -39,6 +39,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection.*
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkObjectKind
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BulkStorageObjects
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.store.VoteResultsFilters
@@ -366,8 +367,11 @@ trait ScanConnection
       tc: TraceContext,
   ): Future[Option[GetRewardAccountingBatchResponse]]
 
-  def getBulkObjectChecksums(requiredCatchupTimestamp: CantonTimestamp, objectKeys: Seq[String])(
-      implicit
+  def getBulkObjectChecksums(
+      requiredCatchupTimestamp: CantonTimestamp,
+      kind: BulkObjectKind,
+      objectKeys: Seq[String],
+  )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[GetBulkObjectChecksumsResponse]

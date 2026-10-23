@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
@@ -25,7 +26,6 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.BulkStorageBa
   BackfillUpperBound,
 }
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
-import org.lfdecentralizedtrust.splice.store.TimestampWithMigrationId
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Instant
@@ -40,7 +40,6 @@ class BulkStorageBackfillingTest
     with HasActorSystem {
 
   private val storageConfig = ScanStorageConfigs.scanStorageConfigV1
-  private val migrationId = 0L
 
   private def ts(day: Int): CantonTimestamp =
     CantonTimestamp.tryFromInstant(Instant.parse(f"2026-01-$day%02dT00:00:00Z"))
@@ -49,10 +48,7 @@ class BulkStorageBackfillingTest
     storageConfig.getSegmentFolder(ts(fromDay), Some(ts(toDay)))
 
   private def segment(fromDay: Int, toDay: Int): UpdatesSegment =
-    UpdatesSegment(
-      TimestampWithMigrationId(ts(fromDay), migrationId),
-      TimestampWithMigrationId(ts(toDay), migrationId),
-    )
+    UpdatesSegment(ts(fromDay), ts(toDay))
 
   private def objects(folderName: String, n: Int): Seq[ObjectKeyAndChecksum] =
     (0 until n).map(i => ObjectKeyAndChecksum(s"$folderName/updates_compact_json_$i.zstd", s"d-$i"))
@@ -62,7 +58,7 @@ class BulkStorageBackfillingTest
 
   private class InMemoryProgress extends BackfillingProgress {
     val updates = new AtomicReference[Option[UpdatesSegment]](None)
-    val snapshots = new AtomicReference[Option[TimestampWithMigrationId]](None)
+    val snapshots = new AtomicReference[Option[CantonTimestamp]](None)
     val complete = new AtomicReference[Int](0)
     override def readUpdatesCursor(implicit tc: TraceContext, ec: ExecutionContext) =
       Future.successful(updates.get())
@@ -72,7 +68,7 @@ class BulkStorageBackfillingTest
     ) = Future.successful(updates.set(Some(segment)))
     override def readSnapshotsCursor(implicit tc: TraceContext, ec: ExecutionContext) =
       Future.successful(snapshots.get())
-    override def persistSnapshotsCursor(ts: TimestampWithMigrationId)(implicit
+    override def persistSnapshotsCursor(ts: CantonTimestamp)(implicit
         tc: TraceContext,
         ec: ExecutionContext,
     ) = Future.successful(snapshots.set(Some(ts)))
@@ -230,7 +226,6 @@ class BulkStorageBackfillingTest
         noPeerWillHoldRetryInterval = NonNegativeFiniteDuration.ofMillis(10),
       ),
       storageConfig,
-      migrationId,
       listing,
       copier,
       progress,
@@ -245,7 +240,7 @@ class BulkStorageBackfillingTest
       backfilling(progress, copier).map { steps =>
         copier.copied.get() shouldBe (folders.flatMap(_._2) ++ snapshots.flatMap(_._2)).map(_.key)
         progress.updates.get() shouldBe Some(segment(3, 4))
-        progress.snapshots.get() shouldBe Some(TimestampWithMigrationId(ts(4), migrationId))
+        progress.snapshots.get() shouldBe Some(ts(4))
         progress.complete.get() shouldBe 1
         steps.last shouldBe BulkStorageBackfilling.Completed
       }
@@ -256,7 +251,7 @@ class BulkStorageBackfillingTest
       val copier = new RecordingCopier
       backfilling(progress, copier).map { steps =>
         steps.collect { case s: BulkStorageBackfilling.SnapshotCopied =>
-          s.snapshot.timestamp
+          s.at
         } shouldBe
           Seq(ts(2), ts(3), ts(4))
         steps.collect { case s: BulkStorageBackfilling.SnapshotSkipped => s } shouldBe empty
@@ -299,7 +294,7 @@ class BulkStorageBackfillingTest
     "resume from the persisted cursors and skip what was already copied" in {
       val progress = new InMemoryProgress
       progress.updates.set(Some(segment(2, 3)))
-      progress.snapshots.set(Some(TimestampWithMigrationId(ts(2), migrationId)))
+      progress.snapshots.set(Some(ts(2)))
       val copier = new RecordingCopier
       backfilling(progress, copier).map { _ =>
         copier.copied.get() shouldBe (folders(2)._2 ++ snapshots(1)._2 ++ snapshots(2)._2)
@@ -319,7 +314,7 @@ class BulkStorageBackfillingTest
         steps =>
           steps.collect { case s: BulkStorageBackfilling.SnapshotSkipped => s.at } shouldBe
             Seq(ts(3))
-          progress.snapshots.get() shouldBe Some(TimestampWithMigrationId(ts(3), migrationId))
+          progress.snapshots.get() shouldBe Some(ts(3))
       }
     }
 
@@ -340,7 +335,7 @@ class BulkStorageBackfillingTest
     "wait when the peers only have a snapshot this Scan already copied" in {
       val progress = new InMemoryProgress
       progress.updates.set(Some(segment(3, 4)))
-      progress.snapshots.set(Some(TimestampWithMigrationId(ts(3), migrationId)))
+      progress.snapshots.set(Some(ts(3)))
       val copier = new RecordingCopier
       val onlyOlderSnapshot = new ListingWith(
         snapshot = Future.successful(
@@ -362,7 +357,7 @@ class BulkStorageBackfillingTest
           BulkStorageBackfilling.WaitingForPeers(ts(4)),
         )
         copier.copied.get() shouldBe empty
-        progress.snapshots.get() shouldBe Some(TimestampWithMigrationId(ts(3), migrationId))
+        progress.snapshots.get() shouldBe Some(ts(3))
       }
     }
 
@@ -500,7 +495,7 @@ class BulkStorageBackfillingTest
         copier.copied.get() shouldBe
           (folders(0)._2 ++ folders(1)._2 ++ snapshots(0)._2 ++ snapshots(1)._2).map(_.key)
         progress.updates.get() shouldBe Some(segment(2, 3))
-        progress.snapshots.get() shouldBe Some(TimestampWithMigrationId(ts(3), migrationId))
+        progress.snapshots.get() shouldBe Some(ts(3))
         progress.complete.get() shouldBe 1
       }
     }
@@ -526,7 +521,7 @@ class BulkStorageBackfillingTest
         copier.copied.get() shouldBe
           (folders.flatMap(_._2) ++ snapshots.flatMap(_._2)).map(_.key)
         progress.updates.get() shouldBe Some(segment(3, 4))
-        progress.snapshots.get() shouldBe Some(TimestampWithMigrationId(ts(4), migrationId))
+        progress.snapshots.get() shouldBe Some(ts(4))
         progress.complete.get() shouldBe 1
       }
     }

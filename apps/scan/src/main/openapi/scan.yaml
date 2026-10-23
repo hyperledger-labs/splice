@@ -1781,6 +1781,11 @@ paths:
           required: true
           schema:
             $ref: "#/components/schemas/BulkStorageBucket"
+        - name: "kind"
+          in: "query"
+          required: false
+          schema:
+            $ref: "#/components/schemas/BulkObjectKind"
       responses:
         "200":
           description: ok
@@ -4079,6 +4084,7 @@ components:
           description: |
             The list of keys of the bulk storage objects for which checksums are requested.
           type: array
+          maxItems: 1000
           items:
             type: string
 
@@ -4130,11 +4136,20 @@ components:
         - "staging"
         - "committed"
 
+    BulkObjectKind:
+      type: string
+      description: |
+        The kind of bulk storage objects a progress query refers to: "updates" for update segments, "snapshots" for
+        ACS snapshots. Without a kind, the query refers to both.
+      enum:
+        - "updates"
+        - "snapshots"
+
     BulkObjectsAvailability:
       type: string
       description: |
-        Whether the requested bucket of this Scan holds all bulk storage objects (update segments and ACS snapshots)
-        up to the requested record time.
+        Whether the requested bucket of this Scan holds all bulk storage objects of the requested kind (update
+        segments, ACS snapshots, or both when no kind is given) up to the requested record time.
         "available": it does.
         "processing": it does not yet. The record time lies within this Scan's own history, so it produces the
         objects itself from its own data; they appear once its dump (staging) or its check against the peers

@@ -3,9 +3,12 @@
 
 package org.lfdecentralizedtrust.splice.scan.rewards
 
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Numeric
 import com.digitalasset.daml.lf.data.{assertRight as damlRight}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
 import scala.jdk.OptionConverters.RichOptional
 
 /** Derived parameters passed to computeRewardTotals.
@@ -94,7 +97,9 @@ final case class RewardComputationInputs(
   }
 }
 
-object RewardComputationInputs {
+object RewardComputationInputs extends NamedLogging {
+  override protected def loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
+
   private val scale: Numeric.Scale = Numeric.Scale.assertFromInt(10)
   private[scan] val zero: Numeric = fromLong(0L)
   // Daml default for optDevelopmentFundPercentage
@@ -107,11 +112,12 @@ object RewardComputationInputs {
     Numeric.assertFromBigDecimal(scale, x)
 
   /** Build RewardComputationInputs and batchSize from an OpenMiningRound contract.
+    * batchSize is capped at `DbScanAppRewardsStore.MaxChildBatches`, with a warning.
     *
     * Returns `None` for pre-CIP-104 rounds where `trafficPrice` or `rewardConfig` is absent.
     */
-  def fromOpenMiningRound(
-      round: OpenMiningRound
+  def fromOpenMiningRound(round: OpenMiningRound)(implicit
+      tc: TraceContext
   ): Option[(RewardComputationInputs, Int)] =
     for {
       rewardConfig <- round.rewardConfig.toScala
@@ -132,7 +138,16 @@ object RewardComputationInputs {
         trafficPrice = fromBigDecimal(trafficPrice),
         appRewardCouponThreshold = fromBigDecimal(rewardConfig.appRewardCouponThreshold),
       )
-      (inputs, rewardConfig.batchSize.toInt)
+      // Daml doesn't bound batchSize yet, so cap it to what lookupBatchByHash will
+      // serve
+      val configuredBatchSize: Long = rewardConfig.batchSize
+      val maxBatchSize = DbScanAppRewardsStore.MaxChildBatches
+      if (configuredBatchSize > maxBatchSize)
+        logger.warn(
+          s"RewardConfig.batchSize $configuredBatchSize of round ${round.round.number} exceeds " +
+            s"the $maxBatchSize child batches that scan serves; using $maxBatchSize"
+        )
+      (inputs, configuredBatchSize.min(maxBatchSize.toLong).toInt)
     }
 
   private def div(a: Numeric, b: Numeric): Numeric =

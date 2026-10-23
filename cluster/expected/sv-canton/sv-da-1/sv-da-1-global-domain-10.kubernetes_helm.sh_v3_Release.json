@@ -80,10 +80,6 @@
           {
             "name": "ADDITIONAL_CONFIG_SEQUENCER_RATE_LIMITS",
             "value": "canton.sequencers.sequencer.sequencer.block.throughput-cap.messages.confirmation-request {\n  global-tps-cap = 2\n  per-client-tps-cap = 1\n  global-kbps-cap = 200\n  per-client-kbps-cap = 100\n}\ncanton.sequencers.sequencer.sequencer.block.throughput-cap.messages.confirmation-response {\n  global-tps-cap = 6\n  per-client-tps-cap = 5\n  global-kbps-cap = 600\n  per-client-kbps-cap = 500\n}\ncanton.sequencers.sequencer.sequencer.block.throughput-cap.messages.topology {\n  global-tps-cap = 4\n  per-client-tps-cap = 3\n  global-kbps-cap = 400\n  per-client-kbps-cap = 300\n}"
-          },
-          {
-            "name": "CUSTOM_MOCK_ENV_VAR_NAME",
-            "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSequencerJvmFlag",

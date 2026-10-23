@@ -109,7 +109,7 @@
       },
       "refresh": true,
       "resyncFrequencySeconds": 300,
-      "retryMaxBackoffDurationSeconds": 600,
+      "retryMaxBackoffDurationSeconds": 900,
       "retryOnUpdateConflict": true,
       "serviceAccountName": "sv-runbook-sa",
       "stack": "organization/sv-runbook/sv-runbook.mock",

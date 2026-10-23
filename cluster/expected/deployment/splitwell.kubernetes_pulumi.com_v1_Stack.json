@@ -107,7 +107,7 @@
           "name": "splice-node-active"
         }
       },
-      "retryMaxBackoffDurationSeconds": 600,
+      "retryMaxBackoffDurationSeconds": 900,
       "retryOnUpdateConflict": true,
       "serviceAccountName": "splitwell-sa",
       "stack": "organization/splitwell/splitwell.mock",

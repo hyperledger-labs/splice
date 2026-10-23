@@ -36,6 +36,7 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerSnapshot
 import com.digitalasset.canton.synchronizer.sequencer.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.{SequencerId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
 
@@ -173,14 +174,16 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
 
     val nodeStatus = node.health.status
 
-    consoleEnvironment.run {
-      runner.adminCommand(
-        InitializeFromGenesisState(
-          genesisState.newInput(),
-          synchronizerParameters.toInternal.valueOr(consoleEnvironment.raiseError),
-          serverVersion = nodeStatus.releaseVersion,
+    TraceContext.withNewTraceContext("assign_from_genesis_state") { implicit traceContext =>
+      consoleEnvironment.run {
+        runner.adminCommand(
+          InitializeFromGenesisState(
+            genesisState.newInput(),
+            synchronizerParameters.toInternal.valueOr(consoleEnvironment.raiseError),
+            serverVersion = nodeStatus.releaseVersion,
+          )
         )
-      )
+      }
     }
   }
 
@@ -204,14 +207,16 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
 
     val nodeStatus = node.health.status
 
-    consoleEnvironment.run {
-      runner.adminCommand(
-        InitializeFromGenesisStateV2(
-          genesisState.newInput(),
-          synchronizerParameters.toInternal.valueOr(consoleEnvironment.raiseError),
-          serverVersion = nodeStatus.releaseVersion,
+    TraceContext.withNewTraceContext("assign_from_genesis_stateV2") { implicit traceContext =>
+      consoleEnvironment.run {
+        runner.adminCommand(
+          InitializeFromGenesisStateV2(
+            genesisState.newInput(),
+            synchronizerParameters.toInternal.valueOr(consoleEnvironment.raiseError),
+            serverVersion = nodeStatus.releaseVersion,
+          )
         )
-      )
+      }
     }
   }
 
@@ -238,18 +243,20 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
 
     val nodeStatus = node.health.status
 
-    consoleEnvironment.run {
-      runner.adminCommand(
-        InitializeFromLsuPredecessor(
-          new BufferedInputStream(
-            new java.io.FileInputStream(inputFile)
-          ),
-          synchronizerParameters.toInternal.valueOr(consoleEnvironment.raiseError),
-          ignorePsidCheck = ignorePsidCheck,
-          synchronizerId = synchronizerId,
-          serverVersion = nodeStatus.releaseVersion,
+    TraceContext.withNewTraceContext("initialize_from_lsu_predecessor") { implicit traceContext =>
+      consoleEnvironment.run {
+        runner.adminCommand(
+          InitializeFromLsuPredecessor(
+            new BufferedInputStream(
+              new java.io.FileInputStream(inputFile)
+            ),
+            synchronizerParameters.toInternal.valueOr(consoleEnvironment.raiseError),
+            ignorePsidCheck = ignorePsidCheck,
+            synchronizerId = synchronizerId,
+            serverVersion = nodeStatus.releaseVersion,
+          )
         )
-      )
+      }
     }
   }
 
@@ -267,10 +274,12 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
     if (waitForReady && !node.health.initialized())
       node.health.wait_for_ready_for_initialization()
 
-    consoleEnvironment.run {
-      runner.adminCommand(
-        InitializeFromOnboardingState(onboardingStateStream = onboardingState.newInput())
-      )
+    TraceContext.withNewTraceContext("assign_from_onboarding_state") { implicit traceContext =>
+      consoleEnvironment.run {
+        runner.adminCommand(
+          InitializeFromOnboardingState(onboardingStateStream = onboardingState.newInput())
+        )
+      }
     }
   }
 
@@ -284,10 +293,12 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
     if (waitForReady && !node.health.initialized())
       node.health.wait_for_ready_for_initialization()
 
-    consoleEnvironment.run {
-      runner.adminCommand(
-        InitializeFromOnboardingStateV2(onboardingState.newInput())
-      )
+    TraceContext.withNewTraceContext("assign_from_onboarding_stateV2") { implicit traceContext =>
+      consoleEnvironment.run {
+        runner.adminCommand(
+          InitializeFromOnboardingStateV2(onboardingState.newInput())
+        )
+      }
     }
   }
 

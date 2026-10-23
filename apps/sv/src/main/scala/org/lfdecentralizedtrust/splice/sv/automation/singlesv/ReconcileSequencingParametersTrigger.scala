@@ -7,6 +7,7 @@ import cats.implicits.catsSyntaxTuple2Semigroupal
 import com.google.protobuf.ByteString
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.SequencingParameters as ConsoleSequencingParameters
+import com.digitalasset.canton.admin.api.client.data.SequencingParametersAccess.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.SequencingParameters
 import com.digitalasset.canton.topology.PhysicalSynchronizerId

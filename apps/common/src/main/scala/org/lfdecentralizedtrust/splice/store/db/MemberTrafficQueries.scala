@@ -10,6 +10,7 @@ import com.digitalasset.canton.topology.{Member, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import org.lfdecentralizedtrust.splice.store.LimitHelpers
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
@@ -25,7 +26,7 @@ trait MemberTrafficQueries extends AcsJdbcTypes with LimitHelpers { this: NamedL
       acsTableName: String,
       acsStoreId: AcsStoreId,
       migrationId: Long,
-      memberId: Member,
+      memberId: StoreMemberId,
       synchronizerId: SynchronizerId,
   )(implicit ec: ExecutionContext, tc: TraceContext, closeContext: CloseContext): Future[Long] =
     for {
@@ -40,7 +41,7 @@ trait MemberTrafficQueries extends AcsJdbcTypes with LimitHelpers { this: NamedL
                 and template_id_qualified_name = ${QualifiedName(
               MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
             )}
-                and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
+                and member_traffic_member = ${memberId}
                 and member_traffic_domain = $synchronizerId
              """.as[Long].headOption,
           // the callers' method name, which is what the DB retry logs report

@@ -15,7 +15,9 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.console.LedgerApiCommandRunnerAccess.*
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
+import com.digitalasset.canton.console.commands.BaseLedgerApiAdministrationAccess.*
 import com.digitalasset.canton.console.{
   ConsoleCommandResult,
   ConsoleMacros,
@@ -24,6 +26,7 @@ import com.digitalasset.canton.console.{
   LedgerApiCommandRunner,
 }
 import com.digitalasset.canton.crypto.provider.jce.JcePureCrypto
+import com.digitalasset.canton.crypto.provider.jce.JcePureCryptoAccess.*
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}

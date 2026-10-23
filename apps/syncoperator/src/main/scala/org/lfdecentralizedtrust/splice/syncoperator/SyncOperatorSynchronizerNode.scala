@@ -17,6 +17,7 @@ import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
+import com.digitalasset.canton.protocol.StaticSynchronizerParametersAccess.*
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.version.ProtocolVersion
@@ -73,7 +74,7 @@ final class SyncOperatorSynchronizerNode(
     SynchronizerParametersConfig(synchronizerLimits =
       config.synchronizerLimits
         .map(_.toInternal)
-        .filter(_ => config.protocolVersion >= ProtocolVersion.v36)
+        .filter(_ => config.protocolVersion >= ProtocolVersion.v37)
     )
       .toStaticSynchronizerParameters(
         CryptoConfig(provider = CryptoProvider.Jce),

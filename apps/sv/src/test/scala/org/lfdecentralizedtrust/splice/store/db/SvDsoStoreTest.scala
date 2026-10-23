@@ -57,6 +57,7 @@ import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState.Assigned
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
   InMemoryUnavailablePartiesStore,
@@ -2050,7 +2051,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listMemberTrafficContracts(
-            goodMember,
+            StoreMemberId(goodMember),
             dummyDomain,
             PageLimit.tryCreate(100),
           )
@@ -2076,7 +2077,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.getTotalPurchasedMemberTraffic(
-            goodMember,
+            StoreMemberId(goodMember),
             dummyDomain,
           )
         } yield result shouldBe (1 to 3).sum.toLong
@@ -2115,10 +2116,16 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           _ <- dummyDomain.create(dedicated, createdEventObservers = Seq(operatorParty))(
             store.multiDomainAcsStore
           )
-          decentralizedTotal <- store.getTotalPurchasedMemberTraffic(member, dummyDomain)
-          dedicatedTotal <- store.getTotalPurchasedMemberTraffic(member, dummy2Domain)
+          decentralizedTotal <- store.getTotalPurchasedMemberTraffic(
+            StoreMemberId(member),
+            dummyDomain,
+          )
+          dedicatedTotal <- store.getTotalPurchasedMemberTraffic(
+            StoreMemberId(member),
+            dummy2Domain,
+          )
           dedicatedContracts <- store.listMemberTrafficContracts(
-            member,
+            StoreMemberId(member),
             dummy2Domain,
             PageLimit.tryCreate(100),
           )
@@ -2146,7 +2153,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
           _ <- dummyDomain.create(memberTraffic(member, dummyDomain, 100L))(
             store.multiDomainAcsStore
           )
-          result <- store.getTotalPurchasedMemberTraffic(member, dummyDomain)
+          result <- store.getTotalPurchasedMemberTraffic(StoreMemberId(member), dummyDomain)
           // The unparseable row is ingested with a null synchronizer id and never matches a
           // lookup, which takes an already parsed SynchronizerId. Ingestion itself survives.
         } yield result shouldBe 100L
