@@ -1,0 +1,61 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.UnitTests.GovernanceLock where
+
+import DA.Assert
+import DA.Optional
+import DA.TextMap qualified as TextMap
+
+import Daml.Script
+
+import Splice.Api.Token.MetadataV1
+import Splice.GovernanceLock
+import Splice.GovernanceLock.Request
+import Splice.TokenStandard.Utils
+
+testAdmin : Party
+testAdmin = fromSome $ partyFromText "registry-admin"
+
+-- | Fully explicit test cases for the TSv1 encoding, to ensure that the specification lines up.
+test_tsv1Encoding : Script ()
+test_tsv1Encoding = do
+    partyToText lockManagerParty === "cip-127_lock-manager::1220000000000000000000000000000000000000000000000000000000000000abcd"
+    encodeLockCompatMemo (encodeCommonLockMetadataEntries (GLK_SuperValidatorRightsOwner "someSv") LS_Locked)
+      === "cip-127/memo:lock-kind=sv-lock&lock-subject=someSv&lock-status=locked"
+    encodeLockCompatMemo (encodeCommonLockMetadataEntries (GLK_ProvisionalFeaturedApp provider) LS_Vesting)
+      === ("cip-127/memo:lock-kind=provisional-fa-lock&lock-subject=" <> partyToText provider <> "&lock-status=vesting")
+  where
+    provider = fromSome $ partyFromText "someFA::122abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab"
+
+-- | Fully explicit test case of a TSv1 memo that a wallet sends to create a lock.
+test_parseGovernanceLockRequestTSv1_memo : Script ()
+test_parseGovernanceLockRequestTSv1_memo = do
+    let memo = "cip-127/memo:request=create-lock&lock-kind=sv-lock&lock-subject=someSv"
+    GLR_CreateGovernanceLock{fullSpecification} <- parse $ Metadata $ TextMap.fromList [(reasonMetaKey, memo)]
+    fullSpecification === FullLockSpecification with kind = GLK_SuperValidatorRightsOwner "someSv"
+  where
+    parse = parseGovernanceLockRequestTSv1 testAdmin lockManagerParty None
+
+-- | Round-trip testing to cover the GovernanceLockKind space in the parsers.
+-- A lock's memo, with a request added, parses back to the lock's specification.
+test_governanceLockSpecificationTSv1_roundTrip : Script ()
+test_governanceLockSpecificationTSv1_roundTrip = do
+    assertRoundTrip serializeThenParse $ FullLockSpecification with
+      kind = GLK_SuperValidatorRightsOwner with svName = "some-other-sv"
+    assertRoundTrip serializeThenParse $ FullLockSpecification with
+      kind = GLK_FeaturedApp with provider = fromSome $ partyFromText "some-other-sv"
+    assertRoundTrip serializeThenParse $ FullLockSpecification with
+      kind = GLK_ProvisionalFeaturedApp with provider = fromSome $ partyFromText "someFA::122abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab"
+  where
+    serializeThenParse : FullLockSpecification -> Script FullLockSpecification
+    serializeThenParse specification = do
+      let memo = encodeLockCompatMemo $
+            (requestMetaKey, "create-lock") :: encodeCommonLockMetadataEntries specification.kind LS_Locked
+      request <- parseGovernanceLockRequestTSv1 testAdmin lockManagerParty None $ Metadata $ TextMap.singleton reasonMetaKey memo
+      case request of
+        GLR_CreateGovernanceLock{fullSpecification} -> pure fullSpecification
+        _ -> fail "Expected GLR_CreateGovernanceLock"
+
+assertRoundTrip : (CanAssert m, Eq a, Show a) => (a -> m a) -> a -> m ()
+assertRoundTrip f a = f a >>= assertEq a

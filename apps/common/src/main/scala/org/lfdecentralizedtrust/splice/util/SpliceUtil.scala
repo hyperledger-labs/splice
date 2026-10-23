@@ -406,6 +406,8 @@ object SpliceUtil {
       Optional.empty(),
       // amuletSwitchOverTimes
       Optional.empty(),
+      // governanceLockConfig
+      Optional.empty(),
     )
 
   def defaultAnsConfig(

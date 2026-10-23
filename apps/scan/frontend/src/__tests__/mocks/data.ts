@@ -183,6 +183,7 @@ export function amuletRules(zeroTransferFees: boolean): any {
         developmentFundManagerBlacklist: null,
         minDevelopmentFundMintingDelay: null,
         amuletSwitchOverTimes: null,
+        governanceLockConfig: null,
       },
       futureValues: [],
     },

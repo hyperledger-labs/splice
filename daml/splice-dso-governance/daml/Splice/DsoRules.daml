@@ -21,6 +21,9 @@ import Splice.Amulet
 import Splice.Amulet.RewardAccountingV2 qualified as RewardAccountingV2
 import Splice.AmuletRules
 import Splice.ExternalPartyAmuletRules
+import Splice.GovernanceLock
+import Splice.GovernanceLock.Substitution
+import Splice.GovernanceLock.Transfer
 import Splice.TokenStandard.Utils qualified as TSU
 
 import Splice.ExternalPartyConfigState
@@ -346,6 +349,18 @@ data DsoRules_MergeUnclaimedDevelopmentFundCouponsResult = DsoRules_MergeUnclaim
 
 data DsoRules_ExpireDevelopmentFundCouponResult = DsoRules_ExpireDevelopmentFundCouponResult with
     result : DevelopmentFundCoupon_DsoExpireResult
+  deriving (Serializable)
+
+data DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLockResult = DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLockResult {}
+  deriving (Serializable)
+
+data DsoRules_GovernanceLock_DsoExpireResult = DsoRules_GovernanceLock_DsoExpireResult {}
+  deriving (Serializable)
+
+data DsoRules_GovernanceLockSubstitution_DsoExpireResult = DsoRules_GovernanceLockSubstitution_DsoExpireResult {}
+  deriving (Serializable)
+
+data DsoRules_GovernanceLockTransfer_DsoExpireResult = DsoRules_GovernanceLockTransfer_DsoExpireResult {}
   deriving (Serializable)
 
 data DsoRules_MiningRound_CloseResult = DsoRules_MiningRound_CloseResult with
@@ -1608,6 +1623,58 @@ template DsoRules with
         _ <- getAndValidateSvParty this (Some sv)
         result <- exercise developmentFundCouponCid DevelopmentFundCoupon_DsoExpire
         pure $ DsoRules_ExpireDevelopmentFundCouponResult with result
+
+    nonconsuming choice DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLock : DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLockResult
+      -- ^ Converts a provisional featured app `GovernanceLock` to a true featured app lock.
+      with
+        governanceLockCid : ContractId GovernanceLock
+        featuredAppRightCid : ContractId FeaturedAppRight
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        void $ fetchChecked (ForDso with dso) governanceLockCid
+        exercise governanceLockCid GovernanceLock_DsoConvertProvisionalFeaturedAppLock with featuredAppRightCid
+        pure DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLockResult
+
+    nonconsuming choice DsoRules_GovernanceLock_DsoExpire : DsoRules_GovernanceLock_DsoExpireResult
+      -- ^ Expires a fully vested `GovernanceLock`, so that SVs can garbage-collect
+      -- locks that nobody has bothered to withdraw.
+      with
+        governanceLockCid : ContractId GovernanceLock
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        void $ fetchChecked (ForDso with dso) governanceLockCid
+        exercise governanceLockCid GovernanceLock_DsoExpire
+        pure $ DsoRules_GovernanceLock_DsoExpireResult
+
+    nonconsuming choice DsoRules_GovernanceLockSubstitution_DsoExpire : DsoRules_GovernanceLockSubstitution_DsoExpireResult
+      -- ^ Withdraws an expired substitution proposal, so that SVs can garbage-collect
+      -- proposals that nobody accepted or withdrew, returning the funds to their owner.
+      with
+        substitutionCid : ContractId GovernanceLockSubstitution
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        void $ fetchChecked (ForDso with dso) substitutionCid
+        _ <- exercise substitutionCid GovernanceLockSubstitution_DsoExpire
+        pure $ DsoRules_GovernanceLockSubstitution_DsoExpireResult
+
+    nonconsuming choice DsoRules_GovernanceLockTransfer_DsoExpire : DsoRules_GovernanceLockTransfer_DsoExpireResult
+      -- ^ Expires a lock transfer proposal that the receiver never accepted, so
+      -- that SVs can garbage-collect proposals left behind by their senders.
+      with
+        transferCid : ContractId GovernanceLockTransfer
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        void $ fetchChecked (ForDso with dso) transferCid
+        _ <- exercise transferCid GovernanceLockTransfer_DsoExpire
+        pure $ DsoRules_GovernanceLockTransfer_DsoExpireResult
 
     nonconsuming choice DsoRules_MiningRound_Close : DsoRules_MiningRound_CloseResult
       with

@@ -17,6 +17,14 @@ function lsToSet<T>(ls: T[]): DamlSet<T> {
   };
 }
 
+function wrapMicroseconds(microseconds: string | null): { microseconds: string } | null {
+  return microseconds !== null && microseconds !== '' ? { microseconds } : null;
+}
+
+function nullIfAllNull<A extends Record<string, unknown>>(a: A): A | null {
+  return Object.values(a).some(v => v !== null) ? a : null;
+}
+
 /**
  * Given a list of config changes, build and return an AmuletConfig<'USD'>.
  * The config changes should have all fields, whether they have been changed or not.
@@ -113,16 +121,10 @@ export function buildAmuletRulesConfigFromChanges(
     transferPreapprovalFee: getValue('transferPreapprovalFee', true),
     featuredAppActivityMarkerAmount: getValue('featuredAppActivityMarkerAmount', true),
     optDevelopmentFundManager: getValue('optDevelopmentFundManager', true),
-    externalPartyConfigStateTickDuration:
-      externalPartyConfigStateTickDuration === null
-        ? null
-        : { microseconds: externalPartyConfigStateTickDuration },
+    externalPartyConfigStateTickDuration: wrapMicroseconds(externalPartyConfigStateTickDuration),
     transferPreapprovalBaseDuration: null,
     developmentFundManagerBlacklist,
-    minDevelopmentFundMintingDelay:
-      minDevelopmentFundMintingDelay === null
-        ? null
-        : { microseconds: minDevelopmentFundMintingDelay },
+    minDevelopmentFundMintingDelay: wrapMicroseconds(minDevelopmentFundMintingDelay),
     amuletSwitchOverTimes: amuletSwitchOverTimes,
     transferConfig: {
       createFee: { fee: getValue('transferConfigCreateFee', false) },
@@ -136,10 +138,7 @@ export function buildAmuletRulesConfigFromChanges(
       maxNumInputs: getValue('transferConfigMaxNumInputs', false),
       maxNumOutputs: getValue('transferConfigMaxNumOutputs', false),
       maxNumLockHolders: getValue('transferConfigMaxNumLockHolders', false),
-      tokenStandardMaxTTL:
-        transferConfigTokenStandardMaxTTL && transferConfigTokenStandardMaxTTL !== ''
-          ? { microseconds: transferConfigTokenStandardMaxTTL }
-          : null,
+      tokenStandardMaxTTL: wrapMicroseconds(transferConfigTokenStandardMaxTTL),
     },
 
     issuanceCurve: {
@@ -208,6 +207,16 @@ export function buildAmuletRulesConfigFromChanges(
             },
             appRewardCouponThreshold: getValue('rewardConfigAppRewardCouponThreshold', false),
           },
+
+    governanceLockConfig: nullIfAllNull({
+      minimumLockAmount: getValue('governanceLockConfigMinimumLockAmount', true),
+      superValidatorLockVestingDuration: wrapMicroseconds(
+        getValue('governanceLockConfigSuperValidatorLockVestingDuration', true)
+      ),
+      featuredAppLockVestingDuration: wrapMicroseconds(
+        getValue('governanceLockConfigFeaturedAppLockVestingDuration', true)
+      ),
+    }),
   };
 
   return amuletConfig;

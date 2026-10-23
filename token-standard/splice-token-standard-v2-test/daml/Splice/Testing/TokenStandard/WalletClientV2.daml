@@ -33,14 +33,22 @@ module Splice.Testing.TokenStandard.WalletClientV2
     listTransferInstructionsV2,
 
     transferV2,
+    tryTransferV2Result,
     acceptTransferInstructionV2,
+    tryAcceptTransferInstructionV2Result,
     rejectTransferInstructionV2,
+    tryRejectTransferInstructionV2Result,
     withdrawTransferInstructionV2,
+    tryWithdrawTransferInstructionV2Result,
 
     transferV1,
+    tryTransferV1Result,
     acceptTransferInstructionV1,
+    tryAcceptTransferInstructionV1Result,
     rejectTransferInstructionV1,
+    tryRejectTransferInstructionV1Result,
     withdrawTransferInstructionV1,
+    tryWithdrawTransferInstructionV1Result,
 
     -- * Managing allocations
     listAllocationInstructionsV2,
@@ -115,6 +123,7 @@ module Splice.Testing.TokenStandard.WalletClientV2
 
 import DA.Action (unless, when)
 import DA.Foldable (forA_)
+import DA.Foldable qualified as Foldable
 import DA.List (dedupSort, dedupOn, sort, unique)
 import DA.Map qualified as Map
 import DA.Optional
@@ -122,6 +131,7 @@ import DA.Time
 import DA.Text qualified as T
 import DA.TextMap qualified as TextMap
 import DA.Set qualified as Set
+import DA.Traversable qualified as Traversable
 
 import Splice.Api.Token.MetadataV1 as MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as V1
@@ -305,47 +315,90 @@ transferV1 registries actor transferArg = do
   batch <- mkTransferFactory_TransferV1 registries transferArg
   extractPendingTransferInstructionV1 <$> executeSingletonTSABatch registries actor batch
 
+tryTransferV1Result : MultiRegistry.MultiRegistry -> Party -> V1.TransferFactory_Transfer -> Script (Either SubmitError V1.TransferInstructionResult)
+tryTransferV1Result registries actor transferArg = do
+  batch <- mkTransferFactory_TransferV1 registries transferArg
+  fmap extractTransferInstructionV1Result <$> tryExecuteSingletonTSABatch registries actor batch
+
 transferV2 : MultiRegistry.MultiRegistry -> Party -> V2.TransferFactory_Transfer -> Script (Optional (ContractId V2.TransferInstruction))
 transferV2 registries actor transferArg = do
   batch <- mkTransferFactory_TransferV2 registries transferArg
   extractPendingTransferInstructionV2 <$> executeSingletonTSABatch registries actor batch
+
+tryTransferV2Result : MultiRegistry.MultiRegistry -> Party -> V2.TransferFactory_Transfer -> Script (Either SubmitError V2.TransferInstructionResult)
+tryTransferV2Result registries actor transferArg = do
+  batch <- mkTransferFactory_TransferV2 registries transferArg
+  fmap extractTransferInstructionResultV2 <$> tryExecuteSingletonTSABatch registries actor batch
 
 acceptTransferInstructionV2 : MultiRegistry.MultiRegistry -> Party -> ContractId V2.TransferInstruction -> Script (Optional (ContractId V2.TransferInstruction))
 acceptTransferInstructionV2 registries actor instrCid = do
   batch <- mkTransferInstruction_AcceptV2 registries actor instrCid
   extractPendingTransferInstructionV2 <$> executeSingletonTSABatch registries actor batch
 
+tryAcceptTransferInstructionV2Result : MultiRegistry.MultiRegistry -> Party -> ContractId V2.TransferInstruction -> Script (Either SubmitError V2.TransferInstructionResult)
+tryAcceptTransferInstructionV2Result registries actor instrCid = do
+  batch <- mkTransferInstruction_AcceptV2 registries actor instrCid
+  fmap extractTransferInstructionResultV2 <$> tryExecuteSingletonTSABatch registries actor batch
+
 rejectTransferInstructionV2 : MultiRegistry.MultiRegistry -> Party -> ContractId V2.TransferInstruction -> Script (Optional (ContractId V2.TransferInstruction))
 rejectTransferInstructionV2 registries actor instrCid = do
   batch <- mkTransferInstruction_RejectV2 registries actor instrCid
   extractPendingTransferInstructionV2 <$> executeSingletonTSABatch registries actor batch
+
+tryRejectTransferInstructionV2Result : MultiRegistry.MultiRegistry -> Party -> ContractId V2.TransferInstruction -> Script (Either SubmitError V2.TransferInstructionResult)
+tryRejectTransferInstructionV2Result registries actor instrCid = do
+  batch <- mkTransferInstruction_RejectV2 registries actor instrCid
+  fmap extractTransferInstructionResultV2 <$> tryExecuteSingletonTSABatch registries actor batch
 
 withdrawTransferInstructionV2 : MultiRegistry.MultiRegistry -> Party -> ContractId V2.TransferInstruction -> Script (Optional (ContractId V2.TransferInstruction))
 withdrawTransferInstructionV2 registries actor instrCid = do
   batch <- mkTransferInstruction_WithdrawV2 registries actor instrCid
   extractPendingTransferInstructionV2 <$> executeSingletonTSABatch registries actor batch
 
+tryWithdrawTransferInstructionV2Result : MultiRegistry.MultiRegistry -> Party -> ContractId V2.TransferInstruction -> Script (Either SubmitError V2.TransferInstructionResult)
+tryWithdrawTransferInstructionV2Result registries actor instrCid = do
+  batch <- mkTransferInstruction_WithdrawV2 registries actor instrCid
+  fmap extractTransferInstructionResultV2 <$> tryExecuteSingletonTSABatch registries actor batch
+
 acceptTransferInstructionV1 : MultiRegistry.MultiRegistry -> Party -> ContractId V1.TransferInstruction -> Script (Optional (ContractId V1.TransferInstruction))
 acceptTransferInstructionV1 registries actor instrCid = do
   batch <- mkTransferInstruction_AcceptV1 registries actor instrCid
   extractPendingTransferInstructionV1 <$> executeSingletonTSABatch registries actor batch
+
+tryAcceptTransferInstructionV1Result : MultiRegistry.MultiRegistry -> Party -> ContractId V1.TransferInstruction -> Script (Either SubmitError V1.TransferInstructionResult)
+tryAcceptTransferInstructionV1Result registries actor instrCid = do
+  batch <- mkTransferInstruction_AcceptV1 registries actor instrCid
+  fmap extractTransferInstructionV1Result <$> tryExecuteSingletonTSABatch registries actor batch
 
 rejectTransferInstructionV1 : MultiRegistry.MultiRegistry -> Party -> ContractId V1.TransferInstruction -> Script (Optional (ContractId V1.TransferInstruction))
 rejectTransferInstructionV1 registries actor instrCid = do
   batch <- mkTransferInstruction_RejectV1 registries actor instrCid
   extractPendingTransferInstructionV1 <$> executeSingletonTSABatch registries actor batch
 
+tryRejectTransferInstructionV1Result : MultiRegistry.MultiRegistry -> Party -> ContractId V1.TransferInstruction -> Script (Either SubmitError V1.TransferInstructionResult)
+tryRejectTransferInstructionV1Result registries actor instrCid = do
+  batch <- mkTransferInstruction_RejectV1 registries actor instrCid
+  fmap extractTransferInstructionV1Result <$> tryExecuteSingletonTSABatch registries actor batch
+
 withdrawTransferInstructionV1 : MultiRegistry.MultiRegistry -> Party -> ContractId V1.TransferInstruction -> Script (Optional (ContractId V1.TransferInstruction))
 withdrawTransferInstructionV1 registries actor instrCid = do
   batch <- mkTransferInstruction_WithdrawV1 registries actor instrCid
   extractPendingTransferInstructionV1 <$> executeSingletonTSABatch registries actor batch
 
+tryWithdrawTransferInstructionV1Result : MultiRegistry.MultiRegistry -> Party -> ContractId V1.TransferInstruction -> Metadata -> Script (Either SubmitError V1.TransferInstructionResult)
+tryWithdrawTransferInstructionV1Result registries actor instrCid meta = do
+  batch <- mkTransferInstruction_WithdrawV1' registries actor instrCid meta
+  fmap extractTransferInstructionV1Result <$> tryExecuteSingletonTSABatch registries actor batch
+
+extractTransferInstructionV1Result : BatchingUtilityV2.TokenStandardActionResult -> V1.TransferInstructionResult
+extractTransferInstructionV1Result (BatchingUtilityV2.TSAR_TransferInstructionResultV1 result) = result
+extractTransferInstructionV1Result result = error $ "Expected a TransferInstructionResultV1, but got: " <> show result
+
 extractPendingTransferInstructionV1 : BatchingUtilityV2.TokenStandardActionResult -> Optional (ContractId V1.TransferInstruction)
-extractPendingTransferInstructionV1 (BatchingUtilityV2.TSAR_TransferInstructionResultV1 result) =
-  case result.output of
+extractPendingTransferInstructionV1 result =
+  case (extractTransferInstructionV1Result result).output of
     V1.TransferInstructionResult_Pending instrCid -> Some instrCid
     _ -> None
-extractPendingTransferInstructionV1 result = error $ "Expected a TransferInstructionResultV1, but got: " <> show result
 
 extractTransferInstructionResultV2 : BatchingUtilityV2.TokenStandardActionResult -> V2.TransferInstructionResult
 extractTransferInstructionResultV2 (BatchingUtilityV2.TSAR_TransferInstructionResultV2 result) = result
@@ -477,12 +530,14 @@ withdrawAllocationV1 registries actor alloc = do
   batch <- mkAllocation_WithdrawV1 registries alloc
   executeSingletonTSABatch registries actor batch
 
--- | Execute a batch of token standard actions.
-executeTSABatch
-  : MultiRegistry.MultiRegistry -> Party -> TSABatch
-  -> Script (BatchingUtilityV2.BatchingUtility_ExecuteBatchResult, [TransferEventsV2.EventLog_HoldingsChange])
-executeTSABatch registries actor batch
-  | null batch.actions = pure
+executeTSABatchM
+  : Applicative m
+  => (SubmitOptions -> Commands BatchingUtilityV2.BatchingUtility_ExecuteBatchResult -> Script (m (BatchingUtilityV2.BatchingUtility_ExecuteBatchResult, TransactionTree)))
+  -> ([Party] -> Script (m (BatchingUtilityV2.BatchingUtility_ExecuteBatchResult, TransactionTree)) -> Script (m (BatchingUtilityV2.BatchingUtility_ExecuteBatchResult, [TransferEventsV2.EventLog_HoldingsChange])))
+  -> MultiRegistry.MultiRegistry -> Party -> TSABatch
+  -> Script (m (BatchingUtilityV2.BatchingUtility_ExecuteBatchResult, [TransferEventsV2.EventLog_HoldingsChange]))
+executeTSABatchM run extract registries actor batch
+  | null batch.actions = pure $ pure
     ( BatchingUtilityV2.BatchingUtility_ExecuteBatchResult with
         actionResults = []
         outputHoldingMap = mempty
@@ -494,22 +549,39 @@ executeTSABatch registries actor batch
     case batchingUtils of
       [] -> fail $ "No batching utility found for actor " <> show actor
       (batchingUtilityCid, _) :: _ ->
-        extractAndCheckTxHistory (Map.keys registries) $
-          submitResultAndTree (actAs actor <> discloseMany' batch.disclosures) $
+        extract (Map.keys registries) $
+          run (actAs actor <> discloseMany' batch.disclosures) $
             exerciseCmd batchingUtilityCid BatchingUtilityV2.BatchingUtility_ExecuteBatch with
                 actions = batch.actions
                 inputHoldingMap
                 archiveAfterExecution = False
 
--- | Execute a batch containing a single token standard action.
-executeSingletonTSABatch : MultiRegistry.MultiRegistry -> Party -> TSABatch -> Script BatchingUtilityV2.TokenStandardActionResult
-executeSingletonTSABatch registries actor batch = do
-  -- Note: in a production wallet we'd want to execute the action directly without the BatchingUtilityV2
-  -- to save on traffic cost. For testing here, we skip that for code simplicity.
-  (result, _changes) <- executeTSABatch registries actor batch
-  case result.actionResults of
+-- | Execute a batch of token standard actions.
+executeTSABatch
+  : MultiRegistry.MultiRegistry -> Party -> TSABatch
+  -> Script (BatchingUtilityV2.BatchingUtility_ExecuteBatchResult, [TransferEventsV2.EventLog_HoldingsChange])
+executeTSABatch registries actor batch =
+  runIdentity <$> executeTSABatchM @Identity (\o -> \c -> Identity <$> submitResultAndTree o c) extractAndCheckTxHistoryM registries actor batch
+
+executeSingletonTSABatchM
+  :  Traversable.Traversable m
+  => (MultiRegistry.MultiRegistry -> Party -> TSABatch -> Script (m (BatchingUtilityV2.BatchingUtility_ExecuteBatchResult, [TransferEventsV2.EventLog_HoldingsChange])))
+  -> MultiRegistry.MultiRegistry -> Party -> TSABatch
+  -> Script (m BatchingUtilityV2.TokenStandardActionResult)
+executeSingletonTSABatchM execute registries actor batch = do
+  result <- execute registries actor batch
+  Traversable.forA result \(res, _) -> case res.actionResults of
     [res] -> pure res
     _ -> fail "Multiple actions were executed in the batch, expected exactly one"
+
+-- | Execute a batch containing a single token standard action.
+executeSingletonTSABatch : MultiRegistry.MultiRegistry -> Party -> TSABatch -> Script BatchingUtilityV2.TokenStandardActionResult
+executeSingletonTSABatch registries actor batch =
+  runIdentity <$> executeSingletonTSABatchM (\r -> \a -> \b -> Identity <$> executeTSABatch r a b) registries actor batch
+
+-- | Like 'executeSingletonTSABatch', but returns the submission error instead of failing.
+tryExecuteSingletonTSABatch : MultiRegistry.MultiRegistry -> Party -> TSABatch -> Script (Either SubmitError BatchingUtilityV2.TokenStandardActionResult)
+tryExecuteSingletonTSABatch = executeSingletonTSABatchM $ executeTSABatchM trySubmitResultAndTree extractAndCheckTxHistoryM
 
 -- | Get a map of unlocked holding cids for the given accounts and instruments.
 getHoldingMap : Party -> [(V2.Account, V2.InstrumentId)] -> Script BatchingUtilityV2.HoldingMap
@@ -654,7 +726,11 @@ mkTransferInstruction_RejectV2 registries actor cid = do
 
 mkTransferInstruction_WithdrawV1
   : MultiRegistry.MultiRegistry -> Party -> ContractId V1.TransferInstruction -> Script TSABatch
-mkTransferInstruction_WithdrawV1 registries actor cid = do
+mkTransferInstruction_WithdrawV1 registries actor cid = mkTransferInstruction_WithdrawV1' registries actor cid emptyMetadata
+
+mkTransferInstruction_WithdrawV1'
+  : MultiRegistry.MultiRegistry -> Party -> ContractId V1.TransferInstruction -> Metadata -> Script TSABatch
+mkTransferInstruction_WithdrawV1' registries actor cid meta = do
   Some instrView <- queryInterfaceContractId @V1.TransferInstruction actor cid
   registry <- MultiRegistry.getRegistryApiV1 registries (instrView.transfer.instrumentId.admin)
   context <- V1.getTransferInstruction_WithdrawContext registry cid emptyMetadata
@@ -665,7 +741,7 @@ mkTransferInstruction_WithdrawV1 registries actor cid = do
           arg = V1.TransferInstruction_Withdraw with
             extraArgs = ExtraArgs with
               context = context.choiceContext
-              meta = emptyMetadata
+              meta
       ]
     disclosures = context.disclosures
     accountsAndInstruments = Set.empty
@@ -966,13 +1042,17 @@ submitAndCheckTxHistory adminParties submitOptions action = do
   (result, _changes) <- extractAndCheckTxHistory adminParties $ submitResultAndTree submitOptions action
   pure result
 
-extractAndCheckTxHistory : [Party] -> Script (a, TransactionTree) -> Script (a, [TransferEventsV2.EventLog_HoldingsChange])
-extractAndCheckTxHistory adminParties action = do
+extractAndCheckTxHistoryM : Traversable.Traversable m => [Party] -> Script (m (a, TransactionTree)) -> Script (m (a, [TransferEventsV2.EventLog_HoldingsChange]))
+extractAndCheckTxHistoryM adminParties action = do
   holdingsBefore <- snapshotHoldings adminParties
-  (result, txTree) <- action
-  holdingsAfter <- snapshotHoldings adminParties
-  changes <- validateHoldingsChanges holdingsBefore txTree holdingsAfter
-  pure (result, changes)
+  result <- action
+  Traversable.forA result \(res, txTree) -> do
+    holdingsAfter <- snapshotHoldings adminParties
+    changes <- validateHoldingsChanges holdingsBefore txTree holdingsAfter
+    pure (res, changes)
+
+extractAndCheckTxHistory : [Party] -> Script (a, TransactionTree) -> Script (a, [TransferEventsV2.EventLog_HoldingsChange])
+extractAndCheckTxHistory adminParties action = runIdentity <$> extractAndCheckTxHistoryM adminParties (Identity <$> action)
 
 expectTxHistoryReasons : [TransferEventsV2.EventLog_HoldingsChange] -> [(V2.Account, [Text], Text)] -> Script ()
 expectTxHistoryReasons changes expectedReasons = do
@@ -1152,3 +1232,24 @@ getHoldingsChangesFromTree txTree = do
 getExercisedFromTreeEvent : TreeEvent -> [Exercised]
 getExercisedFromTreeEvent (ExercisedEvent e) = e :: concatMap getExercisedFromTreeEvent e.childEvents
 getExercisedFromTreeEvent (CreatedEvent _) = []
+
+-- General utilities
+--------------------
+
+data Identity a = Identity a
+
+runIdentity : Identity a -> a
+runIdentity (Identity a) = a
+
+instance Functor Identity where
+  fmap f (Identity a) = Identity (f a)
+
+instance Applicative Identity where
+  pure = Identity
+  Identity f <*> Identity a = Identity (f a)
+
+instance Foldable.Foldable Identity where
+  foldr f z (Identity a) = f a z
+
+instance Traversable.Traversable Identity where
+  mapA f (Identity a) = Identity <$> f a
