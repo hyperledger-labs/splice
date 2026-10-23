@@ -70,9 +70,6 @@ abstract class BaseStorePerformanceTest(
 
   /** Metrics factory wired into the storage's [[DbStorageMetrics]].
     *  The DB executor `exectime` timer is recorded and can be read back to measure DB time.
-    *
-    *  Uses [[NanoTimerMetricsFactory]] (not `InMemoryMetricsFactory`) because the latter truncates
-    *  every timer sample to whole milliseconds, which floors all sub-millisecond DB queries to 0.
     */
   protected val dbMetricsFactory: NanoTimerMetricsFactory = new NanoTimerMetricsFactory
 
