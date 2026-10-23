@@ -156,10 +156,12 @@ abstract class StoreReadPerformanceTest(
         val wallBefore = System.nanoTime()
         val cpuBefore = getProcessCpuTimeNs
         val dbExecNsBefore = totalDbExecTimeNs
+        val dbExecCountBefore = totalDbExecCount
         op.execute(tc).map { _ =>
           val wallAfter = System.nanoTime()
           val cpuAfter = getProcessCpuTimeNs
           val dbExecNsAfter = totalDbExecTimeNs
+          val dbExecCount = totalDbExecCount - dbExecCountBefore
           val duration = wallAfter - wallBefore
           val cpuDeltaNs = math.max(cpuAfter - cpuBefore, 0L)
           val dbExecNs = math.max(dbExecNsAfter - dbExecNsBefore, 0L)
@@ -171,6 +173,7 @@ abstract class StoreReadPerformanceTest(
             f"Read '${op.name}': time=${BigDecimal(duration) / 1e6}%.2f ms, " +
               f"dbExec=${BigDecimal(dbExecNs) / 1e6}%.2f ms, " +
               f"decode=${BigDecimal(math.max(duration - dbExecNs, 0L)) / 1e6}%.2f ms, " +
+              f"dbQueries=$dbExecCount, maxDbQuery=${BigDecimal(maxDbExecNs) / 1e6}%.2f ms, " +
               f"updateSize=$updateSizeBytes bytes, numUpdates=${txs.size}"
           logger.info(msg)
           println(s"${this.getClass.getName}: $msg")

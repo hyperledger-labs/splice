@@ -80,6 +80,14 @@ abstract class BaseStorePerformanceTest(
   protected def totalDbExecTimeNs: Long =
     dbMetricsFactory.totalNanos(_.endsWith("exectime"))
 
+  /** Number of DB query executions recorded so far (diagnostic: how many queries ran). */
+  protected def totalDbExecCount: Long =
+    dbMetricsFactory.totalCount(_.endsWith("exectime"))
+
+  /** Largest single DB query execution time so far, in ns (diagnostic: one big query vs many). */
+  protected def maxDbExecNs: Long =
+    dbMetricsFactory.maxNanos(_.endsWith("exectime"))
+
   /** A short name for this test, used as the metrics file name and Pushgateway label. */
   protected def testName: String = this.getClass.getSimpleName.stripSuffix("$")
 
@@ -305,35 +313,54 @@ class NanoTimerMetricsFactory extends InMemoryMetricsFactory {
 
   /** Total nanoseconds recorded across all timers whose metric name matches `nameFilter`. */
   def totalNanos(nameFilter: String => Boolean): Long =
-    nanoTimers.iterator.collect {
-      case (name, timer) if nameFilter(name.toString) => timer.totalNanos.get()
-    }.sum
+    matching(nameFilter).map(_.totalNanos.get()).sum
+
+  /** Number of samples (individual query executions) recorded across matching timers. */
+  def totalCount(nameFilter: String => Boolean): Long =
+    matching(nameFilter).map(_.count.get()).sum
+
+  /** Largest single recorded sample (in ns) across matching timers. */
+  def maxNanos(nameFilter: String => Boolean): Long =
+    matching(nameFilter).map(_.maxNanos).maxOption.getOrElse(0L)
+
+  private def matching(nameFilter: String => Boolean): Iterator[NanoTimer] =
+    nanoTimers.iterator.collect { case (name, timer) if nameFilter(name.toString) => timer }
 }
 
-/** A [[Timer]] that accumulates the total recorded duration in nanoseconds. */
+/** A [[Timer]] that accumulates the total recorded duration in nanoseconds, plus the sample count
+  * and largest single sample (for diagnosing whether DB time is one big query or many small ones).
+  */
 final class NanoTimer(override val info: MetricInfo) extends Timer {
   val totalNanos = new java.util.concurrent.atomic.AtomicLong(0)
+  val count = new java.util.concurrent.atomic.AtomicLong(0)
+  private val maxNanosRef = new java.util.concurrent.atomic.AtomicLong(0)
+
+  def maxNanos: Long = maxNanosRef.get()
+
+  private def record(nanos: Long): Unit = {
+    val _ = totalNanos.addAndGet(nanos)
+    val _ = count.incrementAndGet()
+    val _ = maxNanosRef.accumulateAndGet(nanos, Math.max)
+  }
 
   override def update(duration: Long, unit: java.util.concurrent.TimeUnit)(implicit
       context: MetricsContext
-  ): Unit = { val _ = totalNanos.addAndGet(unit.toNanos(duration)) }
+  ): Unit = record(unit.toNanos(duration))
 
-  override def update(duration: java.time.Duration)(implicit context: MetricsContext): Unit = {
-    val _ = totalNanos.addAndGet(duration.toNanos)
-  }
+  override def update(duration: java.time.Duration)(implicit context: MetricsContext): Unit =
+    record(duration.toNanos)
 
   override def time[T](call: => T)(implicit context: MetricsContext): T = {
     val start = System.nanoTime()
     try call
-    finally { val _ = totalNanos.addAndGet(System.nanoTime() - start) }
+    finally record(System.nanoTime() - start)
   }
 
   override def startAsync()(implicit context: MetricsContext): Timer.TimerHandle = {
     val start = System.nanoTime()
     new Timer.TimerHandle {
-      override def stop()(implicit context: MetricsContext): Unit = {
-        val _ = totalNanos.addAndGet(System.nanoTime() - start)
-      }
+      override def stop()(implicit context: MetricsContext): Unit =
+        record(System.nanoTime() - start)
     }
   }
 }
