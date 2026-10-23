@@ -52,6 +52,7 @@
             },
             "peerEndpoints": {
               "type": "array",
+              "description": "initial set of cantonBFT peers. Should be left empty for gSync SVs, use only for dedicated synchronizers.",
               "items": {
                 "type": "object",
                 "properties": {
