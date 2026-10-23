@@ -42,8 +42,8 @@
 
   - Helm charts
 
-    - All `values.schema.json` files now use JSON Schema draft 2020-12 and set `unevaluatedProperties: false` at the top level.
-      Previously accepted unknown top-level keys now will cause `helm template` / `lint` / `install` to fail.
+    - The values schemas on all Helm charts now enforce `unevaluatedProperties: false`:
+      Top-level Helm values keys that are unknown (i.e., not part of the schema) will now will cause `helm template` / `lint` / `install` to fail.
 
 
   - Summary of Breaking Changes:
