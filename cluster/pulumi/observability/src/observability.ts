@@ -1103,7 +1103,8 @@ function createGrafanaAlerting(namespace: Input<string>) {
             ),
             'acs_commitment_pv36_alerts.yaml': readGrafanaAlertingFile(
               'acs_commitment_pv36_alerts.yaml'
-            ).replaceAll(
+            )
+              .replaceAll(
                 '$ACS_COMMITMENT_CHECKPOINT_DELAY_THRESHOLD_SECONDS',
                 monitoringConfig.alerting.alerts.acsCommitments.checkpointDelay.seconds.toString()
               )
