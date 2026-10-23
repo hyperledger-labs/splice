@@ -230,7 +230,9 @@ abstract class TopologyAdminConnection(
           )
           .subflatMap { results =>
             results.headOption match {
-              case Some(result) if result.mapping == expectedMapping =>
+              case Some(result)
+                  if result.mapping == expectedMapping &&
+                    result.base.operation == TopologyChangeOp.Replace =>
                 Right(result)
               case other =>
                 Left(other)

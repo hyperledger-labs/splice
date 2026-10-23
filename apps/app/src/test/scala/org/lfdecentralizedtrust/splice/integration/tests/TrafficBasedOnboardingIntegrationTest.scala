@@ -138,22 +138,39 @@ class TrafficBasedOnboardingIntegrationTest
       bobValidatorBackend.onboardUser("TestUserBob")
     }
 
-    clue("Bob Validator has ParticipantSynchronizerPermission") {
-      eventually() {
-        sv1ScanBackend.getParticipantSynchronizerPermission(
-          decentralizedSynchronizerId.toProtoPrimitive,
-          bobValidatorBackend.participantClient.id.toProtoPrimitive,
-        ) shouldBe Some(
-          SynchronizerPermissionState(None)
-        )
-      }
-    }
-
     val bobParticipantId = bobValidatorBackend.participantClient.id.toProtoPrimitive
     val suspendTime = env.environment.clock.now.plus(java.time.Duration.ofHours(1)).toInstant
 
     bobValidatorBackend.stop()
     aliceValidatorBackend.stop()
+
+    clue("SVs vote to permanently revoke Bob") {
+      manuallyBlockValidator(bobParticipantId, None, revoked = true)
+    }
+
+    clue("Verify Bob's ParticipantSynchronizerPermission is completely removed") {
+      eventually() {
+        sv1ScanBackend.getParticipantSynchronizerPermission(
+          decentralizedSynchronizerId.toProtoPrimitive,
+          bobParticipantId,
+        ) shouldBe None
+      }
+    }
+
+    clue("SVs vote to unblocked Bob") {
+      manuallyUnblockValidator(
+        sv1Backend.listValidatorBlockeds(bobParticipantId).head.contractId
+      )
+    }
+
+    clue("Verify Bob's ParticipantSynchronizerPermission is restored by automation") {
+      eventually() {
+        sv1ScanBackend.getParticipantSynchronizerPermission(
+          decentralizedSynchronizerId.toProtoPrimitive,
+          bobParticipantId,
+        ) shouldBe Some(SynchronizerPermissionState(None))
+      }
+    }
 
     clue("SVs vote to temporarily suspend Bob") {
       manuallyBlockValidator(bobParticipantId, Some(suspendTime), revoked = false)
