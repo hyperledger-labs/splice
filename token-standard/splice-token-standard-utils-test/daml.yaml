@@ -5,7 +5,7 @@ sdk-version: 3.5.2
 name: splice-token-standard-utils-test
 description: |
   Tests of the token-standard-utils library.
-version: 1.0.4
+version: 1.0.5
 source: daml
 dependencies:
   - daml-prim
@@ -32,7 +32,7 @@ data-dependencies:
   - ../examples/splice-token-test-trading-app-v2/.daml/dist/splice-token-test-trading-app-v2-current.dar
 build-options:
   - --explicit-serializable=yes
-  - --target=2.1
+  - --target=2.3
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
 codegen:

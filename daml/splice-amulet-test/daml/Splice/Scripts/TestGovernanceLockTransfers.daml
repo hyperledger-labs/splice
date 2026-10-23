@@ -1,0 +1,523 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Tests for the transfer of governance locks and vesting locks to a new owner.
+module Splice.Scripts.TestGovernanceLockTransfers where
+
+import DA.Assert ((===))
+import DA.Foldable (forA_)
+import DA.Map qualified as Map
+import DA.Time
+
+import Daml.Script
+import Splice.Amulet.TokenApiUtils (amuletInstrumentId)
+import Splice.Api.Token.HoldingV2 qualified as V2
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1 qualified as V1
+import Splice.GovernanceLock
+import Splice.GovernanceLock.Request
+import Splice.GovernanceLock.Transfer
+import Splice.Scripts.TestGovernanceLocks
+import Splice.Scripts.TokenStandard.TestAmuletTokenStandardTestEnv
+import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
+import Splice.Testing.Utils
+import Splice.TokenStandard.Utils (ForwardCompatible(..), basicAccount, reasonToMeta, toAnyContractId)
+
+-- | How long a lock transfer proposal lasts: the `tokenStandardMaxTTL` config,
+-- which the test config leaves unset, so its default of 90 days applies.
+lockTransferTTL : RelTime
+lockTransferTTL = days 90
+
+-- | Terms of a valid transfer of `amount` of the locks with key `source` to
+-- `receiver`, requested now.
+validLockTransfer : GovernanceLockKey -> Party -> Decimal -> Script LockTransferArgs
+validLockTransfer source receiver amount = do
+  now <- getTime
+  pure LockTransferArgs with
+    source
+    receiver
+    amount
+    requestedAt = now
+    extraArgs = emptyExtraArgs
+
+lockWithSpec
+  : GovernanceLockOperations i r t -> TestEnv -> Party -> Decimal -> GovernanceLockSpecification
+  -> Script (ContractId GovernanceLock, GovernanceLock)
+lockWithSpec ops env owner amount specification = do
+  let registry = env.registriesEnv.amuletV2
+  AmuletRegistryV2.tapFaucet registry owner amount
+  lockCid <- expectSuccess $ ops.governanceLock (testEnvRegistries env) owner amount (governanceLockKind specification)
+  Some lock <- queryContractId owner lockCid
+  pure (lockCid, lock)
+
+-- | Creates an SV governance lock of `amount` for `owner`, funded by the faucet.
+svLock : GovernanceLockOperations i r t -> TestEnv -> Party -> Decimal -> Script (ContractId GovernanceLock, GovernanceLock)
+svLock ops env owner amount = lockWithSpec ops env owner amount $
+  fullLockSpecification $ GLK_SuperValidatorRightsOwner "TestSV"
+
+-- | Creates an SV vesting lock of `amount` for `owner`, by
+-- fully unlocking a governance lock. It vests over the default SV vesting
+-- duration of a year, so it ends after `lockTransferTTL`.
+svVestingLock : GovernanceLockOperations i r t -> TestEnv -> Party -> Decimal -> Script (ContractId GovernanceLock, GovernanceLock)
+svVestingLock ops env owner amount = do
+  (lockCid, _) <- lockWithSpec ops env owner amount $ fullLockSpecification $ GLK_SuperValidatorRightsOwner "TestVestingSV"
+  vestingLockFor ops env owner lockCid amount
+
+-- | Creates an FA vesting lock of `amount` for `owner`, by
+-- fully unlocking a governance lock. It vests over the default FA vesting
+-- duration of 60 days, so it ends before `lockTransferTTL`.
+faVestingLock : GovernanceLockOperations i r t -> TestEnv -> Party -> Decimal -> Script (ContractId GovernanceLock, GovernanceLock)
+faVestingLock ops env owner amount = do
+  (lockCid, _) <- lockWithSpec ops env owner amount $ fullLockSpecification $ GLK_FeaturedApp env.provider1
+  vestingLockFor ops env owner lockCid amount
+
+-- | Fully unlocks a governance lock of `amount`, with vesting starting in an hour.
+vestingLockFor
+  :  GovernanceLockOperations i r t -> TestEnv -> Party -> ContractId GovernanceLock -> Decimal
+  -> Script (ContractId GovernanceLock, GovernanceLock)
+vestingLockFor ops env owner lockCid amount = do
+  now <- getTime
+  let unlockAt = now `addRelTime` hours 1
+  vestingLockCid <- expectSuccess $ ops.governanceUnlock (testEnvRegistries env) lockCid owner (unlockMeta amount unlockAt)
+  Some vestingLock <- queryContractId owner vestingLockCid
+  pure (vestingLockCid, vestingLock)
+
+-- Creation of lock transfer proposals
+--------------------------------------
+
+testLockTransfer_governanceLock_tsv1 : Script ()
+testLockTransfer_governanceLock_tsv1 =
+  testLockTransfer_governanceLock tsv1Operations \inputHoldingCids r -> r with inputHoldingCids = fmap downcast inputHoldingCids
+
+testLockTransfer_governanceLock_tsv2 : Script ()
+testLockTransfer_governanceLock_tsv2 =
+  testLockTransfer_governanceLock tsv2Operations \inputHoldingCids r -> r with inputHoldingCids
+
+testLockTransfer_governanceLock
+  :  (HasFromInterface GovernanceLockTransfer i, HasField "senderChangeCids" r [ContractId h])
+  => GovernanceLockOperations i r t
+  -> ([ContractId V2.Holding] -> t -> t)
+  -> Script ()
+testLockTransfer_governanceLock ops setInputHoldingCids = do
+  env@TestEnv{..} <- setupTest
+  -- `setupTest` gives alice 1000.0 unlocked (incl. an expired lock); bob starts
+  -- with nothing.
+  (lockCid, lock) <- svLock ops env alice 100000.0
+  checkBalances env alice (1000.0, 100000.0)
+  checkBalances env bob (0.0, 0.0)
+
+  -- A wallet may pass input holdings with the request. The proposal does not use them, so they stay
+  -- active under the same contract ids.
+  inputHoldingCids <- WalletClientV2.listUnlockedHoldingCidsFor (basicAccount alice) alice instrId
+  assertMsg "alice must have unlocked holdings to pass as inputs" $ not (null inputHoldingCids)
+  transfer <- validLockTransfer (key lock) bob 40000.0
+  result <- expectSuccess $ ops.proposeTransfer' (testEnvRegistries env) alice transfer (setInputHoldingCids inputHoldingCids)
+  result.senderChangeCids === []
+  transferCid <- fromInterfaceContractId @GovernanceLockTransfer <$> ops.expectPendingTransfer result
+  unchangedHoldingCids <- WalletClientV2.listUnlockedHoldingCidsFor (basicAccount alice) alice instrId
+  unchangedHoldingCids === inputHoldingCids
+
+  -- The proposal stores the terms and the source key as given, and expires 90
+  -- days after `requestedAt`.
+  let expected = GovernanceLockTransfer with
+        source = transfer.source
+        receiver = transfer.receiver
+        amount = transfer.amount
+        requestedAt = transfer.requestedAt
+        expiresAt = transfer.requestedAt `addRelTime` lockTransferTTL
+  forA_ [alice, bob, instrId.admin] \p -> do
+    governanceLockTransfer <- queryContractId p transferCid
+    governanceLockTransfer === Some expected
+
+  -- The expiry counts from `requestedAt`, not from the time of creation.
+  let earlierTransfer = transfer with requestedAt = transfer.requestedAt `addRelTime` hours (-12)
+  earlierTransferCid <- expectSuccess $ ops.proposeTransfer (testEnvRegistries env) alice earlierTransfer
+  Some earlierGovernanceLockTransfer <- queryContractId bob earlierTransferCid
+  earlierGovernanceLockTransfer.expiresAt ===
+    earlierTransfer.requestedAt `addRelTime` lockTransferTTL
+
+  -- No funds move, and the source lock is untouched.
+  checkBalances env alice (1000.0, 100000.0)
+  checkBalances env bob (0.0, 0.0)
+  checkLockUntouched alice lockCid lock
+  checkLockedHolding alice lockCid 100000.0
+
+  -- A proposal for the full amount can be created for the same lock: proposals
+  -- do not reserve funds.
+  fullTransfer <- validLockTransfer (key lock) bob 100000.0
+  expectSuccess $ ops.proposeTransfer (testEnvRegistries env) alice fullTransfer
+  checkLockUntouched alice lockCid lock
+  checkBalances env alice (1000.0, 100000.0)
+
+  -- A source lock that ends within 90 days: the proposal expires at its `endTime`.
+  (_, faVestingLock) <- faVestingLock tsv1Operations env alice 50000.0
+  faVestingTimes <- requireVestingLock faVestingLock.specification
+  assertMsg "the FA vesting lock must end before the transfer expiry" $
+    faVestingTimes.endTime < transfer.requestedAt `addRelTime` lockTransferTTL
+  let faTransfer = transfer with source = key faVestingLock
+  faTransferCid <- expectSuccess $ ops.proposeTransfer (testEnvRegistries env) alice faTransfer
+  faVestingLockTransfer <- queryContractId bob faTransferCid
+  faVestingLockTransfer === Some GovernanceLockTransfer with
+    source = faTransfer.source
+    receiver = faTransfer.receiver
+    amount = faTransfer.amount
+    requestedAt = faTransfer.requestedAt
+    expiresAt = faVestingTimes.endTime
+  Some view <- queryInterfaceContractId bob (asTransferInstruction faTransferCid)
+  view.transfer.meta === transferGovernanceLockMetadata faVestingLock.specification
+
+testLockTransfer_keyWithoutLock_tsv1 : Script ()
+testLockTransfer_keyWithoutLock_tsv1 = testLockTransfer_keyWithoutLock tsv1Operations
+
+testLockTransfer_keyWithoutLock_tsv2 : Script ()
+testLockTransfer_keyWithoutLock_tsv2 = testLockTransfer_keyWithoutLock tsv2Operations
+
+-- | Resolution happens on accept, so a proposal for a key that matches no lock is still created.
+testLockTransfer_keyWithoutLock : GovernanceLockOperations i r t -> Script ()
+testLockTransfer_keyWithoutLock ops = do
+  env@TestEnv{..} <- setupTest
+  let governanceKey = GovernanceLockKey with
+        dso = instrId.admin
+        owner = alice
+        specification = fullLockSpecification $ GLK_SuperValidatorRightsOwner "NoSuchSV"
+  governanceTransfer <- validLockTransfer governanceKey bob 40000.0
+  governanceTransferCid <- expectSuccess $ ops.proposeTransfer (testEnvRegistries env) alice governanceTransfer
+  Some _ <- queryContractId bob governanceTransferCid
+  -- Nothing was locked or moved.
+  checkBalances env alice (1000.0, 0.0)
+  checkBalances env bob (0.0, 0.0)
+
+-- Rejected lock transfer proposals
+-----------------------------------
+
+testLockTransfer_failures_tsv1 : Script ()
+testLockTransfer_failures_tsv1 = testLockTransfer_failures tsv1Operations "requires authorizers alice"
+
+testLockTransfer_failures_tsv2 : Script ()
+testLockTransfer_failures_tsv2 = testLockTransfer_failures tsv2Operations "allowed actors"
+
+-- | Rejected proposals. None of the failed attempts moves funds or touches the source locks.
+testLockTransfer_failures
+  :  (HasField "executeBefore" t Time, HasField "meta" t Metadata)
+  => GovernanceLockOperations i r t
+  -> Text
+  -> Script ()
+testLockTransfer_failures ops expectedAuthFailure = do
+  env@TestEnv{..} <- setupTest
+  (lockCid, lock) <- svLock ops env alice 100000.0
+  (vestingLockCid, vestingLock) <- svVestingLock ops env alice 100000.0
+  now <- getTime
+  transfer <- validLockTransfer (key lock) bob 40000.0
+  let mustFail proposer msg t =
+        expectFailureContaining msg =<< ops.proposeTransfer (testEnvRegistries env) proposer t
+
+  mustFail alice "'receiver' is equal to 'sender'" transfer with receiver = alice
+
+  mustFail alice "'amount' is not greater than 'zero'" transfer with amount = 0.0
+  mustFail alice "'amount' is not greater than 'zero'" transfer with amount = -1.0
+
+  -- Deadlines: `requestedAt` must be in the past, but no more than a day ago.
+  mustFail alice "Ledger time is strictly before deadline 'transfer.requestedAt'"
+    transfer with requestedAt = now `addRelTime` hours 1
+  mustFail alice "Ledger time is at or past deadline 'requestedAt + 1 day'"
+    transfer with requestedAt = now `addRelTime` days (-2)
+
+  -- The owner of the source locks must authorize the proposal.
+  WalletClientV2.createBatchingUtility charlie
+  mustFail charlie expectedAuthFailure transfer
+
+  -- The TSv1 request must not have expired, and must name the new owner.
+  expectFailureContaining "transfer.executeBefore" =<<
+    ops.proposeTransfer' (testEnvRegistries env) alice transfer \r -> r with executeBefore = now `addRelTime` hours (-1)
+  expectFailureContaining (missingMetadataMessage newLockOwnerMetaKey) =<<
+    ops.proposeTransfer' (testEnvRegistries env) alice transfer \r -> r with
+      meta = reasonToMeta
+        (tsv1RequestMemo' GLRT_TransferLock (governanceLockKind lock.specification) [(transferAmountMetaKey, "40000.0")])
+        emptyMetadata
+
+  -- A source vesting lock that has fully vested cannot be transferred.
+  vestingTimes <- requireVestingLock vestingLock.specification
+  passTime $ (vestingTimes.endTime `subTime` now) + seconds 1
+  laterTransfer <- validLockTransfer (key vestingLock) bob 40000.0
+  expectFailureContaining
+    "Ledger time is at or past deadline 'source lock endTime'" =<<
+    ops.proposeTransfer (testEnvRegistries env) alice laterTransfer
+
+  -- None of the failed attempts moved funds or touched the source locks. The
+  -- fully vested lock now counts as unlocked.
+  checkLockUntouched alice lockCid lock
+  checkLockUntouched alice vestingLockCid vestingLock
+  checkBalances env alice (101000.0, 100000.0)
+  checkBalances env bob (0.0, 0.0)
+
+-- Accept, withdraw and reject of lock transfer proposals through token standard
+--------------------------------------------------------------------------------
+
+-- | The TSv1 interface of a lock transfer proposal.
+asTransferInstruction : ContractId t -> ContractId V1.TransferInstruction
+asTransferInstruction = coerceContractId
+
+-- | alice proposes to transfer `amount` of her 100000.0 SV lock to bob.
+setupGovernanceLockTransfer
+  :  GovernanceLockOperations i r t
+  -> Decimal
+  -> Script (TestEnv, ContractId GovernanceLock, GovernanceLock, ContractId GovernanceLockTransfer)
+setupGovernanceLockTransfer ops amount = do
+  env@TestEnv{..} <- setupTest
+  (lockCid, lock) <- svLock ops env alice 100000.0
+  transfer <- validLockTransfer (key lock) bob amount
+  transferCid <- expectSuccess $ ops.proposeTransfer (testEnvRegistries env) alice transfer
+  pure (env, lockCid, lock, transferCid)
+
+-- | alice proposes to transfer `amount` of her 100000.0 SV vesting lock to bob.
+setupVestingLockTransfer
+  :  GovernanceLockOperations i r t
+  -> Decimal
+  -> Script (TestEnv, ContractId GovernanceLock, GovernanceLock, ContractId GovernanceLockTransfer)
+setupVestingLockTransfer ops amount = do
+  env@TestEnv{..} <- setupTest
+  (lockCid, lock) <- svVestingLock ops env alice 100000.0
+  transfer <- validLockTransfer (key lock) bob amount
+  transferCid <- expectSuccess $ ops.proposeTransfer (testEnvRegistries env) alice transfer
+  pure (env, lockCid, lock, transferCid)
+
+testLockTransferV1_view : Script ()
+testLockTransferV1_view = do
+  (TestEnv{..}, _, lock, transferCid) <- setupGovernanceLockTransfer tsv1Operations 40000.0
+  Some proposal <- queryContractId bob transferCid
+  Some view <- queryInterfaceContractId bob (asTransferInstruction transferCid)
+  view === V1.TransferInstructionView with
+    originalInstructionCid = None
+    transfer = V1.Transfer with
+      sender = alice
+      receiver = bob
+      amount = 40000.0
+      instrumentId = amuletInstrumentId instrId.admin
+      requestedAt = proposal.requestedAt
+      executeBefore = proposal.expiresAt
+      inputHoldingCids = []
+      meta = transferGovernanceLockMetadata lock.specification
+    status = V1.TransferPendingInternalWorkflow with
+      pendingActions = Map.fromList [(bob, "accept transfer; reject transfer"), (alice, "withdraw transfer")]
+    meta = emptyMetadata
+
+testLockTransfer_acceptPartialGovernanceLock_tsv1 : Script ()
+testLockTransfer_acceptPartialGovernanceLock_tsv1 = testLockTransfer_acceptPartialGovernanceLock tsv1Operations
+
+testLockTransfer_acceptPartialGovernanceLock_tsv2 : Script ()
+testLockTransfer_acceptPartialGovernanceLock_tsv2 = testLockTransfer_acceptPartialGovernanceLock tsv2Operations
+
+testLockTransfer_acceptPartialGovernanceLock : HasField "senderChangeCids" r [ContractId h] => GovernanceLockOperations i r t -> Script ()
+testLockTransfer_acceptPartialGovernanceLock ops = do
+  (env@TestEnv{..}, lockCid, lock, transferCid) <- setupGovernanceLockTransfer ops 40000.0
+
+  result <- expectSuccess $ ops.acceptInstruction env (coerceContractId transferCid) bob
+  result.senderChangeCids === []
+  [] <- ops.expectCompletedTransfer result
+
+  -- bob owns a new lock with the transferred funds and the same specification
+  [(newLockCid, newLock)] <- governanceLocksOf bob
+  newLock.amount === 40000.0
+  newLock.specification === lock.specification
+  newLock.originalLockCid === Some (toAnyContractId transferCid)
+  checkLockedHolding bob newLockCid 40000.0
+
+  -- alice keeps the rest
+  [(remainingLockCid, remainder)] <- governanceLocksOf alice
+  remainder.amount === 60000.0
+  remainder.specification === lock.specification
+  checkLockedHolding alice remainingLockCid 60000.0
+
+  -- the funds moved from alice to bob, and they stay locked
+  checkBalances env alice (1000.0, 60000.0)
+  checkBalances env bob (0.0, 40000.0)
+  archivedLock <- queryContractId alice lockCid
+  archivedLock === None
+  archivedTransfer <- queryContractId alice transferCid
+  archivedTransfer === None
+
+testLockTransfer_acceptFullGovernanceLock_tsv1 : Script ()
+testLockTransfer_acceptFullGovernanceLock_tsv1 = testLockTransfer_acceptFullGovernanceLock tsv1Operations
+
+testLockTransfer_acceptFullGovernanceLock_tsv2 : Script ()
+testLockTransfer_acceptFullGovernanceLock_tsv2 = testLockTransfer_acceptFullGovernanceLock tsv2Operations
+
+testLockTransfer_acceptFullGovernanceLock : GovernanceLockOperations i r t -> Script ()
+testLockTransfer_acceptFullGovernanceLock ops = do
+  (env@TestEnv{..}, _, _, transferCid) <- setupGovernanceLockTransfer ops 100000.0
+
+  [] <- ops.expectCompletedTransfer =<< expectSuccess (ops.acceptInstruction env (coerceContractId transferCid) bob)
+
+  [(newLockCid, _)] <- governanceLocksOf bob
+  checkLockedHolding bob newLockCid 100000.0
+  aliceLocks <- governanceLocksOf alice
+  aliceLocks === []
+  checkBalances env alice (1000.0, 0.0)
+  checkBalances env bob (0.0, 100000.0)
+
+testLockTransfer_acceptMergesSourceLocks_tsv1 : Script ()
+testLockTransfer_acceptMergesSourceLocks_tsv1 = testLockTransfer_acceptMergesSourceLocks tsv1Operations
+
+testLockTransfer_acceptMergesSourceLocks_tsv2 : Script ()
+testLockTransfer_acceptMergesSourceLocks_tsv2 = testLockTransfer_acceptMergesSourceLocks tsv2Operations
+
+testLockTransfer_acceptMergesSourceLocks : GovernanceLockOperations i r t -> Script ()
+testLockTransfer_acceptMergesSourceLocks ops = do
+  (env@TestEnv{..}, _, lock, transferCid) <- setupGovernanceLockTransfer ops 40000.0
+  svLock ops env bob 50000.0
+  [] <- ops.expectCompletedTransfer =<< expectSuccess (ops.acceptInstruction env (coerceContractId transferCid) bob)
+  bobLocks <- governanceLocksOf bob
+  length bobLocks === 2
+
+  WalletClientV2.createBatchingUtility charlie
+  transfer <- validLockTransfer ((key lock) with owner = bob) charlie 90000.0
+  mergedTransferCid <- expectSuccess $ ops.proposeTransfer (testEnvRegistries env) bob transfer
+  [] <- ops.expectCompletedTransfer =<< expectSuccess (ops.acceptInstruction env (coerceContractId mergedTransferCid) charlie)
+
+  [(charlieLockCid, _)] <- governanceLocksOf charlie
+  checkLockedHolding charlie charlieLockCid 90000.0
+  remainingBobLocks <- governanceLocksOf bob
+  remainingBobLocks === []
+  checkBalances env bob (0.0, 0.0)
+  checkBalances env charlie (0.0, 90000.0)
+
+testLockTransfer_acceptPartialVestingLock_tsv1 : Script ()
+testLockTransfer_acceptPartialVestingLock_tsv1 = testLockTransfer_acceptPartialVestingLock tsv1Operations
+
+testLockTransfer_acceptPartialVestingLock_tsv2 : Script ()
+testLockTransfer_acceptPartialVestingLock_tsv2 = testLockTransfer_acceptPartialVestingLock tsv2Operations
+
+testLockTransfer_acceptPartialVestingLock : HasField "senderChangeCids" r [ContractId h] => GovernanceLockOperations i r t -> Script ()
+testLockTransfer_acceptPartialVestingLock ops = do
+  (env@TestEnv{..}, _, lock, transferCid) <- setupVestingLockTransfer ops 30000.0
+
+  result <- expectSuccess $ ops.acceptInstruction env (coerceContractId transferCid) bob
+  result.senderChangeCids === []
+  [] <- ops.expectCompletedTransfer result
+
+  -- bob's new lock keeps the vesting schedule of the source lock
+  [(newLockCid, newLock)] <- vestingLocksOf bob
+  lockTimes <- requireVestingLock lock.specification
+  newLockTimes <- requireVestingLock newLock.specification
+  newLock.amount === 30000.0
+  newLockTimes.vestingPeriod === lockTimes.vestingPeriod
+  newLockTimes.endTime === lockTimes.endTime
+  newLock.specification === lock.specification
+  checkLockedHolding bob newLockCid 30000.0
+  -- the funds stay locked until the end of the vesting period
+  Some lockedAmulet <- queryContractId bob newLock.lockedAmulet
+  lockedAmulet.lock.expiresAt === lockTimes.endTime
+
+  [(remainingLockCid, remainder)] <- vestingLocksOf alice
+  remainderTimes <- requireVestingLock remainder.specification
+  remainder.amount === 70000.0
+  remainderTimes.endTime === lockTimes.endTime
+  checkLockedHolding alice remainingLockCid 70000.0
+
+  checkBalances env alice (1000.0, 70000.0)
+  checkBalances env bob (0.0, 30000.0)
+
+testLockTransfer_withdraw_tsv1 : Script ()
+testLockTransfer_withdraw_tsv1 = testLockTransfer_withdraw tsv1Operations
+
+testLockTransfer_withdraw_tsv2 : Script ()
+testLockTransfer_withdraw_tsv2 = testLockTransfer_withdraw tsv2Operations
+
+testLockTransfer_withdraw : GovernanceLockOperations i r t -> Script ()
+testLockTransfer_withdraw ops = do
+  (env@TestEnv{..}, lockCid, lock, transferCid) <- setupGovernanceLockTransfer ops 40000.0
+
+  -- only the owner of the source lock can withdraw
+  expectFailureContaining "" =<< ops.withdrawInstruction env (coerceContractId transferCid) bob
+  senderChanges <- ops.expectFailedTransfer =<< expectSuccess (ops.withdrawInstruction env (coerceContractId transferCid) alice)
+  senderChanges === []
+
+  archivedTransfer <- queryContractId alice transferCid
+  archivedTransfer === None
+  checkLockUntouched alice lockCid lock
+  checkBalances env alice (1000.0, 100000.0)
+  checkBalances env bob (0.0, 0.0)
+
+testLockTransfer_reject_tsv1 : Script ()
+testLockTransfer_reject_tsv1 = testLockTransfer_reject tsv1Operations "Authorization failure"
+
+testLockTransfer_reject_tsv2 : Script ()
+testLockTransfer_reject_tsv2 = testLockTransfer_reject tsv2Operations "allowed actors"
+
+testLockTransfer_reject : GovernanceLockOperations i r t -> Text -> Script ()
+testLockTransfer_reject ops expectedAuthFailure = do
+  (env@TestEnv{..}, lockCid, lock, transferCid) <- setupGovernanceLockTransfer ops 40000.0
+
+  -- only the receiver can reject
+  expectFailureContaining expectedAuthFailure =<< ops.rejectInstruction env (coerceContractId transferCid) alice
+  senderChanges <- ops.expectFailedTransfer =<< expectSuccess (ops.rejectInstruction env (coerceContractId transferCid) bob)
+  senderChanges === []
+
+  archivedTransfer <- queryContractId alice transferCid
+  archivedTransfer === None
+  checkLockUntouched alice lockCid lock
+  checkBalances env alice (1000.0, 100000.0)
+  checkBalances env bob (0.0, 0.0)
+
+testLockTransfer_acceptFailures_tsv1 : Script ()
+testLockTransfer_acceptFailures_tsv1 = testLockTransfer_acceptFailures tsv1Operations
+
+testLockTransfer_acceptFailures_tsv2 : Script ()
+testLockTransfer_acceptFailures_tsv2 = testLockTransfer_acceptFailures tsv2Operations
+
+testLockTransfer_acceptFailures : GovernanceLockOperations i r t -> Script ()
+testLockTransfer_acceptFailures ops = do
+  env@TestEnv{..} <- setupTest
+  (lockCid, lock) <- svLock ops env alice 100000.0
+
+  -- only the receiver can accept
+  transfer <- validLockTransfer (key lock) bob 40000.0
+  transferCid <- expectSuccess $ ops.proposeTransfer (testEnvRegistries env) alice transfer
+  expectFailureContaining "" =<< ops.acceptInstruction env (coerceContractId transferCid) alice
+
+  -- more than the source lock holds
+  tooLarge <- validLockTransfer (key lock) bob 150000.0
+  tooLargeCid <- expectSuccess $ ops.proposeTransfer (testEnvRegistries env) alice tooLarge
+  expectFailureContaining "transferred lock has less funds" =<<
+    ops.acceptInstruction env (coerceContractId tooLargeCid) bob
+
+  -- the remainder of 5000.0 is below the minimum lock amount of 10000.0
+  smallRemainder <- validLockTransfer (key lock) bob 95000.0
+  smallRemainderCid <- expectSuccess $ ops.proposeTransfer (testEnvRegistries env) alice smallRemainder
+  expectFailureContaining "minimum governance lock amount" =<<
+    ops.acceptInstruction env (coerceContractId smallRemainderCid) bob
+
+  -- no lock matches the source key. The registry cannot build a choice context
+  -- for this proposal, so exercise the TSv1 choices directly.
+  let noLockKey = (key lock) with specification = fullLockSpecification $ GLK_SuperValidatorRightsOwner "NoSuchSV"
+  noLock <- validLockTransfer noLockKey bob 40000.0
+  noLockCid <- expectSuccess $ ops.proposeTransfer (testEnvRegistries env) alice noLock
+  expectFailureContaining "No locks found with key" =<<
+    submitWithTransferContext registriesEnv.amuletV2 (actAs bob) \context ->
+      exerciseCmd (asTransferInstruction noLockCid) V1.TransferInstruction_Accept with
+        extraArgs = emptyExtraArgs with context
+
+  -- proposals that cannot be accepted can still be rejected or withdrawn
+  [] <- ops.expectFailedTransfer =<< expectSuccess (ops.rejectInstruction env (coerceContractId tooLargeCid) bob)
+  [] <- ops.expectFailedTransfer =<< expectSuccess (ops.withdrawInstruction env (coerceContractId smallRemainderCid) alice)
+  [] <- tsv1Operations.expectFailedTransfer =<< expectSuccess (
+    submitWithTransferContext registriesEnv.amuletV2 (actAs alice) \_ ->
+      exerciseCmd (asTransferInstruction noLockCid) V1.TransferInstruction_Withdraw with
+        extraArgs = emptyExtraArgs)
+  forA_ [tooLargeCid, smallRemainderCid, noLockCid] \cid -> do
+    archived <- queryContractId alice cid
+    archived === None
+
+  checkLockUntouched alice lockCid lock
+  checkBalances env alice (1000.0, 100000.0)
+  checkBalances env bob (0.0, 0.0)
+
+testLockTransfer_updateFails_tsv1 : Script ()
+testLockTransfer_updateFails_tsv1 = do
+  (TestEnv{..}, _, _, transferCid) <- setupGovernanceLockTransfer tsv1Operations 40000.0
+  expectFailureContaining "transfers cannot be updated" =<<
+    submitWithTransferContext registriesEnv.amuletV2 (actAs instrId.admin) \context ->
+      exerciseCmd (asTransferInstruction transferCid) V1.TransferInstruction_Update with
+        extraActors = []
+        extraArgs = emptyExtraArgs with context

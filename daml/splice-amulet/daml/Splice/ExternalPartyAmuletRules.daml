@@ -29,6 +29,8 @@ import Splice.AmuletAllocation as AmuletAllocationV1
 import Splice.AmuletAllocationV2 as AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
+import Splice.GovernanceLock (lockManagerParty)
+import Splice.GovernanceLock.Request (governanceLock_transferFactoryV1_transferImpl)
 import Splice.Types
 import Splice.Util
 
@@ -141,7 +143,8 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
-      transferFactory_transferExtraObservers = transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl
+      transferFactory_transferExtraObservers arg =
+        filter (/= lockManagerParty) $ transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl arg
 
       transferFactory_transferImpl =
         transferFactoryV2_transferDefaultImplUsingV1 $ amulet_transferFactoryV1_transferImpl this
@@ -343,6 +346,8 @@ amulet_transferFactoryV1_transferImpl
   -> [Party]
   -> Api.Token.TransferInstructionV1.TransferFactory_Transfer
   -> Update Api.Token.TransferInstructionV1.TransferInstructionResult
+amulet_transferFactoryV1_transferImpl this actors arg | arg.transfer.receiver == lockManagerParty =
+  governanceLock_transferFactoryV1_transferImpl this.dso actors arg
 amulet_transferFactoryV1_transferImpl this actors arg = do
   let Api.Token.TransferInstructionV1.TransferFactory_Transfer {expectedAdmin, transfer, extraArgs} = arg
   let dso = this.dso
@@ -378,6 +383,8 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
   -- meta: no extra account information allowed, as Amulet only supports basic accounts
   ensureNoAccountMeta "transfer" "sender" transfer.meta
   ensureNoAccountMeta "transfer" "receiver" transfer.meta
+  -- meta: the reason must not look like a CIP memo, e.g. the memo of a governance lock
+  require "Transfer reason must not start with a cip-<number>/memo prefix" (not $ reasonIsCipMemo transfer.meta)
 
   case optPreapprovalCid of
     _ | transfer.receiver `elem` actors -> do

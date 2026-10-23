@@ -13,7 +13,7 @@ data-dependencies:
 - ../dars/splice-api-token-metadata-v1-1.0.0.dar
 build-options:
   - --explicit-serializable=yes
-  - --target=2.1
+  - --target=2.3
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java

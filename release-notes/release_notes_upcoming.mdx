@@ -63,7 +63,7 @@
 
     | Breaking API Changes | Protocol Changes  | Daml Model Changes |
     | :------------------- | :---------------- | :----------------- |
-    | yes/no               | yes/no            | yes/no             |
+    | no                   | no                | yes                |
 
     Details:
 
@@ -75,13 +75,30 @@
 
     - Daml Model Changes:
 
+      - Add governance locks, which implement on-chain enforcement of Featured App (FA) and Super Validator (SV)
+        locking as specified in [CIP-127](https://github.com/canton-foundation/cips/blob/main/cip-0127/cip-0127.md).
+        This release implements the following increments of the
+        [CIP-127 incremental delivery plan](https://github.com/canton-foundation/cips/blob/main/cip-0127/cip-0127.md#incremental-delivery-plan):
+
+        - Increment 1, compatibility mode for SV and FA locks: wallets create and manage locks via token standard
+          V1 and V2 transfers to the lock manager party, as described in the
+          [compatibility mode section](https://github.com/canton-foundation/cips/blob/main/cip-0127/cip-0127.md#compatibility-mode).
+
+        - Increment 2, provisional FA locks: the Daml model supports provisional FA locks and their conversion
+          into full FA locks via `DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLock`.
+
+        Locks with custom controllers (Increment 3) are not yet supported. All locks are controlled by their owner.
+
+      - Add an optional `governanceLockConfig` field to `AmuletConfig` with the minimum lock amount (default 10,000 CC)
+        and the vesting durations for SV locks (default 365.25 days) and FA locks (default 60 days).
+
       - These changes require a Daml upgrade to the following versions:
 
         | name | version |
         | :--- | :--- |
-        | amulet | XXX |
-        | amuletNameService | XXX |
-        | dsoGovernance | XXX |
-        | validatorLifecycle | XXX |
-        | wallet | XXX |
-        | walletPayments | XXX |
+        | amulet | 0.1.25 |
+        | amuletNameService | 0.1.26 |
+        | dsoGovernance | 0.1.31 |
+        | validatorLifecycle | 0.1.10 |
+        | wallet | 0.1.26 |
+        | walletPayments | 0.1.25 |

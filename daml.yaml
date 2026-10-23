@@ -3,4 +3,4 @@ build-options:
   - --explicit-serializable=yes
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
-  - --target=2.1
+  - --target=2.3

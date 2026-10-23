@@ -19,8 +19,11 @@ module Splice.TokenStandard.Utils.Internal.Conversions (
   providerMetaKey,
   accountIdMetaKey,
 
+  encodeTime,
+  encodeRelTime,
   timeToMeta,
   timeFromMeta,
+  relTimeFromMeta,
   expiresAtToMeta,
   maxTime,
   partiesFromMeta,
@@ -35,6 +38,7 @@ module Splice.TokenStandard.Utils.Internal.Conversions (
   receiverMetaKey,
   reasonFromMeta,
   reasonToMeta,
+  reasonIsCipMemo,
   mkMetaTransferFrom,
   v1HistoryTagAsUnlockV1,
 
@@ -88,14 +92,19 @@ epoch = time (date 1970 Jan 1) 0 0 0
 maxTime : Time
 maxTime = time (date 9999 Dec 31) 23 59 59 `addRelTime` microseconds 999999
 
+encodeRelTime : RelTime -> Text
+encodeRelTime t  = show (convertRelTimeToMicroseconds t)
+
 encodeTime : Time -> Text
 encodeTime t = show (convertRelTimeToMicroseconds(t `subTime` epoch))
 
-decodeTime : Text -> Time
-decodeTime t = case T.parseInt t of
-  Some i -> epoch `addRelTime` (convertMicrosecondsToRelTime i)
-  None -> error ("Cannot parse time " <> t)
+decodeRelTimeMicros : Text -> RelTime
+decodeRelTimeMicros t = case T.parseInt t of
+  Some i -> convertMicrosecondsToRelTime i
+  None -> error ("Cannot parse reltime " <> t)
 
+decodeTime : Text -> Time
+decodeTime t = epoch `addRelTime` (decodeRelTimeMicros t)
 
 -- AnyContractId conversion
 ------------------------------
@@ -126,6 +135,8 @@ timeToMeta field t meta =
 timeFromMeta : Text -> Metadata -> Optional Time
 timeFromMeta field meta = decodeTime <$> TextMap.lookup field meta.values
 
+relTimeFromMeta : Text -> Metadata -> Optional RelTime
+relTimeFromMeta field meta = decodeRelTimeMicros <$> TextMap.lookup field meta.values
 
 -- Account utils
 ----------------
@@ -297,6 +308,16 @@ reasonToMeta : Text -> Metadata -> Metadata
 reasonToMeta reason (Metadata meta)
   | T.isEmpty reason = Metadata meta
   | otherwise = Metadata $ TextMap.insert reasonMetaKey reason meta
+
+-- | Whether the transfer reason starts with a prefix of the form `cip-\d*/memo`.
+--
+-- Normal transfers must not use such memos, so that users cannot mistake
+-- them for memos defined by a CIP, such as the memos of governance locks.
+reasonIsCipMemo : Metadata -> Bool
+reasonIsCipMemo meta =
+  case T.stripPrefix "cip-" (T.asciiToLower $ reasonFromMeta meta) of
+    None -> False
+    Some rest -> "/memo" `T.isPrefixOf` T.dropWhile T.isDigit rest
 
 -- | Metadata to tag a transfer for V1 transaction history parsing.
 mkMetaTransferFrom : Party -> Text -> Metadata

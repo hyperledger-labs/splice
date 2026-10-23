@@ -30,16 +30,21 @@ module Splice.Testing.Registries.AmuletRegistryV2
   , getActiveOpenRoundsSorted
   , advanceToNextRoundChange
   , convertAllFeaturedAppActivityMarkers
+
+  -- ** Utilities
+  , getExternalPartyConfigStateContext
   ) where
 
+import Prelude hiding (forA)
 import DA.Action (unless, when)
 import DA.Date
-import DA.Foldable (forA_)
+import DA.Foldable (fold, forA_)
 import qualified DA.TextMap as TextMap
 import DA.Optional (isSome)
 import DA.List.Total
 import DA.Time
 import DA.Text qualified as T
+import DA.Traversable (forA)
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2 as Api.Token.HoldingV2
@@ -56,6 +61,9 @@ import Splice.Expiry
 import Splice.ExternalPartyConfigState
 import Splice.ExternalPartyAmuletRules
 import Splice.Fees
+import Splice.GovernanceLock
+import Splice.GovernanceLock.Substitution
+import Splice.GovernanceLock.Transfer
 import Splice.Issuance
 import Splice.Schedule
 import Splice.Round
@@ -299,34 +307,77 @@ registryApi_getTransferInstruction_AcceptContext
   : AmuletRegistry -> ContractId TransferInstruction -> Script OpenApiChoiceContext
 registryApi_getTransferInstruction_AcceptContext registry instrCid = do
   transferC <- getExternalPartyConfigStateContext registry
-  Some amuletInstr <- queryContractId @AmuletTransferInstruction registry.dso (coerceContractId instrCid)
-  -- need to disclose the amulet contract, as the receiver has no visibility into it
-  lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso amuletInstr.lockedAmulet
-  pure $ withExtraDisclosures lockedAmuletD transferC
+  amuletTransferInstrC <- registryApi_getTransferFactory_optGetContext @AmuletTransferInstruction registry (coerceContractId instrCid) \amuletInstr -> do
+    -- need to disclose the amulet contract, as the receiver has no visibility into it
+    lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso amuletInstr.lockedAmulet
+    pure $ withExtraDisclosures lockedAmuletD mempty
+  governanceLockTransferC <- registryApi_getTransferInstruction_governanceLockTransfer registry (coerceContractId instrCid)
+  pure $ transferC <> fold amuletTransferInstrC <> fold governanceLockTransferC
 
 registryApi_getTransferInstruction_abortTwoStepTransferContext
   : AmuletRegistry -> ContractId TransferInstruction -> Script OpenApiChoiceContext
 registryApi_getTransferInstruction_abortTwoStepTransferContext registry instrCid = do
-  -- check whether the locked amulet is still active, so that aborts still work
-  -- even if the owner of the LockedAmulet expired it
-  Some amuletInstr <- queryContractId @AmuletTransferInstruction registry.dso (coerceContractId instrCid)
-  optLockedAmulet <- queryContractId @LockedAmulet registry.dso amuletInstr.lockedAmulet
-  let lockedAmuletActive = isSome optLockedAmulet
-  -- this can only happen if the locked amulet already expired
-  now <- getTime
-  unless (lockedAmuletActive || amuletInstr.transfer.executeBefore <= now) $
-    fail "Invariant violation: the locked amulet is archived, but the transfer is not yet expired"
-  -- this context communicates whether to unlock the amulet
-  let expireLockC = OpenApiChoiceContext with
-        disclosures = mempty
-        choiceContext = mkAmuletContext $ TextMap.fromList [(expireLockKey, AV_Bool lockedAmuletActive)]
-  if lockedAmuletActive
-    then do
-      -- disclose the amulet contract, as the caller might not be able to see it
-      lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso amuletInstr.lockedAmulet
-      pure $ withExtraDisclosures lockedAmuletD expireLockC
-    else
-      pure expireLockC
+  amuletTransferInstrC <-  registryApi_getTransferFactory_optGetContext @AmuletTransferInstruction registry (coerceContractId instrCid) \amuletInstr -> do
+    -- check whether the locked amulet is still active, so that aborts still work
+    -- even if the owner of the LockedAmulet expired it
+    optLockedAmulet <- queryContractId @LockedAmulet registry.dso amuletInstr.lockedAmulet
+    let lockedAmuletActive = isSome optLockedAmulet
+    -- this can only happen if the locked amulet already expired
+    now <- getTime
+    unless (lockedAmuletActive || amuletInstr.transfer.executeBefore <= now) $
+      fail "Invariant violation: the locked amulet is archived, but the transfer is not yet expired"
+    -- this context communicates whether to unlock the amulet
+    let expireLockC = OpenApiChoiceContext with
+          disclosures = mempty
+          choiceContext = mkAmuletContext $ TextMap.fromList [(expireLockKey, AV_Bool lockedAmuletActive)]
+    if lockedAmuletActive
+      then do
+        -- disclose the amulet contract, as the caller might not be able to see it
+        lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso amuletInstr.lockedAmulet
+        pure $ withExtraDisclosures lockedAmuletD expireLockC
+      else
+        pure expireLockC
+  governanceLockSubstitutionC <- registryApi_getTransferInstruction_governanceLockSubstitution registry (coerceContractId instrCid)
+  governanceLockTransferC <- registryApi_getTransferInstruction_governanceLockTransfer registry (coerceContractId instrCid)
+  pure $ fold amuletTransferInstrC <> fold governanceLockSubstitutionC <> fold governanceLockTransferC
+
+registryApi_getTransferFactory_optGetContext
+  :  forall t o. (HasEnsure t, Template t)
+  => AmuletRegistry
+  -> ContractId t
+  -> (t -> Script o)
+  -> Script (Optional o)
+registryApi_getTransferFactory_optGetContext registry cid f = do
+  found <- query @t registry.dso
+  forA (lookup cid found) f
+
+registryApi_getTransferInstruction_governanceLockSubstitution
+  : AmuletRegistry -> ContractId GovernanceLockSubstitution -> Script (Optional OpenApiChoiceContext)
+registryApi_getTransferInstruction_governanceLockSubstitution registry substitutionCid = do
+  registryApi_getTransferFactory_optGetContext registry substitutionCid \substitution ->
+    case substitution.lockedAmulet of
+      None -> pure mempty
+      Some lockedAmulet -> do
+        lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso lockedAmulet
+        pure $ withExtraDisclosures lockedAmuletD mempty
+
+registryApi_getTransferInstruction_governanceLockTransfer
+  : AmuletRegistry -> ContractId GovernanceLockTransfer -> Script (Optional OpenApiChoiceContext)
+registryApi_getTransferInstruction_governanceLockTransfer registry lockTransferCid =
+  registryApi_getTransferFactory_optGetContext registry lockTransferCid \lockTransfer -> do
+    -- unlocking the source lock needs the external party config state
+    transferC <- getExternalPartyConfigStateContext registry
+    -- the accept resolves the source locks by key, and the receiver has no visibility into them,
+    -- so disclose the locks and their locked amulets
+    let source = lockTransfer.source
+    locks <- queryAllByKey @GovernanceLock registry.dso source
+    lockD <- case locks of
+      [] -> assertFail $ "Failed to find lock with key " <> show source <> " originating from lock transfer " <> show lockTransferCid
+      _ -> fmap fold $ forA locks \(lockCid, lock) -> do
+        lockD <- queryDisclosure' registry.dso lockCid
+        lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso lock.lockedAmulet
+        pure $ lockD <> lockedAmuletD
+    pure $ withExtraDisclosures lockD transferC
 
 registryApi_getAllocation_abortTwoStepTransferContext
   : AmuletRegistry -> ContractId Allocation -> Script OpenApiChoiceContext
