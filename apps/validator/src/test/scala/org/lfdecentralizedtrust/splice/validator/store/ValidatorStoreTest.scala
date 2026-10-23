@@ -205,19 +205,17 @@ abstract class ValidatorStoreTest extends StoreTestBase with HasExecutionContext
           )
         } yield {
           def expiringContractsAt(timestamp: CantonTimestamp) = store
-            .listExpiringTransferPreapprovals(NonNegativeFiniteDuration.ofSeconds(1))(
+            .listExpiringTransferPreapprovals(NonNegativeFiniteDuration.ofSeconds(2))(
               timestamp,
               PageLimit.tryCreate(10),
             )(TraceContext.empty)
             .futureValue
             .map(_.contract)
 
-          expiringContractsAt(time(1)) should be(empty)
-          expiringContractsAt(time(2)) should contain theSameElementsAs Seq(preapproval1)
-          expiringContractsAt(time(3)) should contain theSameElementsAs Seq(
-            preapproval1,
-            preapproval2,
-          )
+          expiringContractsAt(time(0)) should be(empty)
+          expiringContractsAt(time(1)) should contain theSameElementsAs Seq(preapproval1)
+          expiringContractsAt(time(2)) should contain theSameElementsAs Seq(preapproval2)
+          expiringContractsAt(time(3)) should be(empty)
         }
       }
     }

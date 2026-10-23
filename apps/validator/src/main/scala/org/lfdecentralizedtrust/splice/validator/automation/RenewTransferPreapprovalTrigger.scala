@@ -45,45 +45,51 @@ class RenewTransferPreapprovalTrigger(
         AssignedContract[TransferPreapproval.ContractId, TransferPreapproval]
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    for {
-      validatorWallet <- ValidatorUtil.getValidatorWallet(store, walletManager)
-      expiringPreapproval = task.work.contract
-      newExpiresAt = expiringPreapproval.payload.expiresAt.plus(
-        transferPreapprovalConfig.preapprovalLifetime.asJava
-      )
-      outcome <- validatorWallet.treasury
-        .enqueueAmuletOperation(
-          new CO_RenewTransferPreapproval(
-            expiringPreapproval.contractId,
-            newExpiresAt,
-          )
+    val expiringPreapproval = task.work.contract
+    val minimumSafeExpiry = context.clock.now.plus(context.config.clockSkewAutomationDelay.asJava)
+    if (!expiringPreapproval.payload.expiresAt.isAfter(minimumSafeExpiry.toInstant)) {
+      Future.successful(TaskNoop)
+    } else {
+      for {
+        validatorWallet <- ValidatorUtil.getValidatorWallet(store, walletManager)
+        newExpiresAt = expiringPreapproval.payload.expiresAt.plus(
+          transferPreapprovalConfig.preapprovalLifetime.asJava
         )
-        .flatMap {
-          case successResult: amuletoperationoutcome.COO_RenewTransferPreapproval =>
-            Future.successful(
-              TaskSuccess(
-                s"Renewed transfer pre-approval for party ${expiringPreapproval.payload.receiver} with new expiry at $newExpiresAt: $successResult"
-              )
+        outcome <- validatorWallet.treasury
+          .enqueueAmuletOperation(
+            new CO_RenewTransferPreapproval(
+              expiringPreapproval.contractId,
+              newExpiresAt,
             )
-          case failedOperation: amuletoperationoutcome.COO_Error =>
-            failedOperation.invalidTransferReasonValue match {
-              case fundsError: invalidtransferreason.ITR_InsufficientFunds =>
-                val missingStr = s"(missing ${fundsError.missingAmount} CC)"
-                val msg = s"Insufficient funds for the transfer pre-approval renewal $missingStr"
-                logger.info(msg)
-                Future.failed(Status.ABORTED.withDescription(msg).asRuntimeException())
+          )
+          .flatMap {
+            case successResult: amuletoperationoutcome.COO_RenewTransferPreapproval =>
+              Future.successful(
+                TaskSuccess(
+                  s"Renewed transfer pre-approval for party ${expiringPreapproval.payload.receiver} with new expiry at $newExpiresAt: $successResult"
+                )
+              )
+            case failedOperation: amuletoperationoutcome.COO_Error =>
+              failedOperation.invalidTransferReasonValue match {
+                case fundsError: invalidtransferreason.ITR_InsufficientFunds =>
+                  val missingStr = s"(missing ${fundsError.missingAmount} CC)"
+                  val msg =
+                    s"Insufficient funds for the transfer pre-approval renewal $missingStr"
+                  logger.info(msg)
+                  Future.failed(Status.ABORTED.withDescription(msg).asRuntimeException())
 
-              case otherError =>
-                val msg =
-                  s"Unexpectedly failed to complete transfer pre-approval renewal for ${expiringPreapproval.payload.receiver} due to $otherError"
-                // We report this as INTERNAL, as we don't want to retry on this.
-                Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
+                case otherError =>
+                  val msg =
+                    s"Unexpectedly failed to complete transfer pre-approval renewal for ${expiringPreapproval.payload.receiver} due to $otherError"
+                  // We report this as INTERNAL, as we don't want to retry on this.
+                  Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
 
-            }
-          case unknownResult =>
-            val msg = s"Unexpected amulet-operation result $unknownResult"
-            Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
-        }
-    } yield outcome
+              }
+            case unknownResult =>
+              val msg = s"Unexpected amulet-operation result $unknownResult"
+              Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
+          }
+      } yield outcome
+    }
   }
 }

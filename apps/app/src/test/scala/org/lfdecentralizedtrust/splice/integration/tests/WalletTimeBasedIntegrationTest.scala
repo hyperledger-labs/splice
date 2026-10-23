@@ -264,6 +264,13 @@ class WalletTimeBasedIntegrationTest
           expired.payload.expiresAt should be < getLedgerTime.toInstant
         }
 
+        clue("Renewal automation skips the expired TransferPreapproval") {
+          val renewalTrigger =
+            aliceValidatorBackend.validatorAutomation.trigger[RenewTransferPreapprovalTrigger]
+          renewalTrigger.runOnce().futureValue shouldBe false
+          alicePreapprovals.loneElement.contract.contractId shouldBe initial.contract.contractId
+        }
+
         actAndCheck(
           "Alice creates another TransferPreapprovalProposal",
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
