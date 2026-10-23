@@ -30,6 +30,9 @@ module Splice.Testing.Registries.AmuletRegistryV2
   , getActiveOpenRoundsSorted
   , advanceToNextRoundChange
   , convertAllFeaturedAppActivityMarkers
+
+  -- ** Utilities
+  , getExternalPartyConfigStateContext
   ) where
 
 import DA.Action (unless, when)

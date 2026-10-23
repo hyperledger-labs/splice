@@ -1,7 +1,7 @@
 sdk-version: 3.5.2
 name: splice-wallet-test
 source: daml
-version: 0.1.30
+version: 0.1.31
 dependencies:
   - daml-prim
   - daml-stdlib
@@ -32,4 +32,4 @@ build-options:
   - --explicit-serializable=yes
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
-  - --target=2.1
+  - --target=2.3

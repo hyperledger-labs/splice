@@ -16,7 +16,7 @@ description: |
   as Daml script code can currently not be shared via .dars across SDKs. The dependencies
   are normal .dar files and can be shared by copying the .dars.
   (TODO(#594): remove this limitation)
-version: 1.0.18
+version: 1.0.19
 source: daml
 dependencies:
   - daml-prim
@@ -35,7 +35,7 @@ data-dependencies:
   - ../examples/splice-test-token-v1/.daml/dist/splice-test-token-v1-current.dar
 build-options:
   - --explicit-serializable=yes
-  - --target=2.1
+  - --target=2.3
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
 codegen:

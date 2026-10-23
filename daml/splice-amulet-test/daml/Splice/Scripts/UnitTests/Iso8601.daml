@@ -1,0 +1,94 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.UnitTests.Iso8601 where
+
+import DA.Assert
+import DA.Date
+
+import Daml.Script
+
+import Splice.Iso8601
+
+expectParsed : Text -> Time -> Script ()
+expectParsed input expected = case parseIso8601UtcTime input of
+  Right t -> t === expected
+  Left err -> fail $ "Expected '" <> input <> "' to parse, got error: " <> err
+
+expectError : Text -> Text -> Script ()
+expectError input expected = case parseIso8601UtcTime input of
+  Left err -> err === expected
+  Right t -> fail $ "Expected '" <> input <> "' to fail, got: " <> show t
+
+test_parseIso8601UtcTime_valid : Script ()
+test_parseIso8601UtcTime_valid = do
+  expectParsed "2026-01-01T00:00:00Z" (datetime 2026 Jan 1 0 0 0)
+  expectParsed "1970-01-01T00:00:00Z" (datetime 1970 Jan 1 0 0 0)
+  expectParsed "2026-12-31T23:59:59Z" (datetime 2026 Dec 31 23 59 59)
+  expectParsed "2024-02-29T12:34:56Z" (datetime 2024 Feb 29 12 34 56)
+  expectParsed "0001-10-08T07:08:09Z" (datetime 1 Oct 8 7 8 9)
+
+test_parseIso8601UtcTime_invalidDigit : Script ()
+test_parseIso8601UtcTime_invalidDigit = do
+  expectError "20x6-01-01T00:00:00Z" "Failed to parse year as Int: '20x6'"
+  expectError "2026-0a-01T00:00:00Z" "Failed to parse month as Int: '0a'"
+  expectError "2026-01-0bT00:00:00Z" "Failed to parse day as Int: '0b'"
+  expectError "2026-01-01T0c:00:00Z" "Failed to parse hour as Int: '0c'"
+  expectError "2026-01-01T00:d0:00Z" "Failed to parse minute as Int: 'd0'"
+  expectError "2026-01-01T00:00:0eZ" "Failed to parse second as Int: '0e'"
+
+test_parseIso8601UtcTime_invalidSeparator : Script ()
+test_parseIso8601UtcTime_invalidSeparator = do
+  expectError "2026/01-01T00:00:00Z" "Invalid Time: '2026/01-01T00:00:00Z'"
+  expectError "2026-01/01T00:00:00Z" "Invalid Time: '2026-01/01T00:00:00Z'"
+  expectError "2026-01-01 00:00:00Z" "Invalid Time: '2026-01-01 00:00:00Z'"
+  expectError "2026-01-01t00:00:00Z" "Invalid Time: '2026-01-01t00:00:00Z'"
+  expectError "2026-01-01T00-00:00Z" "Invalid Time: '2026-01-01T00-00:00Z'"
+  expectError "2026-01-01T00:00-00Z" "Invalid Time: '2026-01-01T00:00-00Z'"
+  expectError "2026-01-01T00:00:00z" "Invalid Time: '2026-01-01T00:00:00z'"
+  expectError "2026-01-01T00:00:00+" "Invalid Time: '2026-01-01T00:00:00+'"
+
+test_parseIso8601UtcTime_invalidMonth : Script ()
+test_parseIso8601UtcTime_invalidMonth = do
+  expectError "2026-00-01T00:00:00Z" "Invalid month: 0. Expected a value between 1 and 12"
+  expectError "2026-13-01T00:00:00Z" "Invalid month: 13. Expected a value between 1 and 12"
+  expectError "2026--1-01T00:00:00Z" "Invalid month: -1. Expected a value between 1 and 12"
+
+test_parseIso8601UtcTime_invalidDay : Script ()
+test_parseIso8601UtcTime_invalidDay = do
+  expectError "2026-01-00T00:00:00Z" "Invalid day: 0. Expected a value between 1 and 31"
+  expectError "2026-01-32T00:00:00Z" "Invalid day: 32. Expected a value between 1 and 31"
+  expectError "2026-04-31T00:00:00Z" "Invalid day: 31. Expected a value between 1 and 30"
+  expectError "2026-02-29T00:00:00Z" "Invalid day: 29. Expected a value between 1 and 28"
+  expectError "2024-02-30T00:00:00Z" "Invalid day: 30. Expected a value between 1 and 29"
+  expectError "1900-02-29T00:00:00Z" "Invalid day: 29. Expected a value between 1 and 28"
+  expectParsed "2000-02-29T00:00:00Z" (datetime 2000 Feb 29 0 0 0)
+  expectParsed "2026-04-30T00:00:00Z" (datetime 2026 Apr 30 0 0 0)
+
+test_parseIso8601UtcTime_invalidHour : Script ()
+test_parseIso8601UtcTime_invalidHour = do
+  expectError "2026-01-01T24:00:00Z" "Invalid hour: 24. Expected a value between 0 and 23"
+  expectError "2026-01-01T99:00:00Z" "Invalid hour: 99. Expected a value between 0 and 23"
+  expectError "2026-01-01T-1:00:00Z" "Invalid hour: -1. Expected a value between 0 and 23"
+
+test_parseIso8601UtcTime_invalidMinute : Script ()
+test_parseIso8601UtcTime_invalidMinute = do
+  expectError "2026-01-01T00:60:00Z" "Invalid minute: 60. Expected a value between 0 and 59"
+  expectError "2026-01-01T00:99:00Z" "Invalid minute: 99. Expected a value between 0 and 59"
+
+test_parseIso8601UtcTime_invalidSecond : Script ()
+test_parseIso8601UtcTime_invalidSecond = do
+  expectError "2026-01-01T00:00:60Z" "Invalid second: 60. Expected a value between 0 and 59"
+  expectError "2026-01-01T00:00:99Z" "Invalid second: 99. Expected a value between 0 and 59"
+
+test_parseIso8601UtcTime_tooShort : Script ()
+test_parseIso8601UtcTime_tooShort = do
+  expectError "" "Invalid Time: ''"
+  expectError "2026" "Invalid Time: '2026'"
+  expectError "2026-01-01" "Invalid Time: '2026-01-01'"
+  expectError "2026-01-01T00:00:00" "Invalid Time: '2026-01-01T00:00:00'"
+
+test_parseIso8601UtcTime_tooLong : Script ()
+test_parseIso8601UtcTime_tooLong = do
+  expectError "2026-01-01T00:00:00ZZ" "Invalid Time: '2026-01-01T00:00:00ZZ'"
+  expectError "2026-01-01T00:00:00.000Z" "Invalid Time: '2026-01-01T00:00:00.000Z'"

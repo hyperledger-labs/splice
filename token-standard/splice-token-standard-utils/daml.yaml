@@ -3,7 +3,7 @@
 
 sdk-version: 3.5.2
 name: splice-token-standard-utils
-version: 2.0.0
+version: 2.0.1
 source: daml
 dependencies:
 - daml-prim

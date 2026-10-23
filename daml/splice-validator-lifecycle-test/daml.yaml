@@ -1,7 +1,7 @@
 sdk-version: 3.5.2
 name: splice-validator-lifecycle-test
 source: daml
-version: 0.1.9
+version: 0.1.10
 dependencies:
   - daml-prim
   - daml-stdlib
@@ -13,7 +13,7 @@ build-options:
   - --explicit-serializable=yes
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
-  - --target=2.1
+  - --target=2.3
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java

@@ -19,8 +19,11 @@ module Splice.TokenStandard.Utils.Internal.Conversions (
   providerMetaKey,
   accountIdMetaKey,
 
+  encodeTime,
+  encodeRelTime,
   timeToMeta,
   timeFromMeta,
+  relTimeFromMeta,
   expiresAtToMeta,
   maxTime,
   partiesFromMeta,
@@ -88,14 +91,19 @@ epoch = time (date 1970 Jan 1) 0 0 0
 maxTime : Time
 maxTime = time (date 9999 Dec 31) 23 59 59 `addRelTime` microseconds 999999
 
+encodeRelTime : RelTime -> Text
+encodeRelTime t  = show (convertRelTimeToMicroseconds t)
+
 encodeTime : Time -> Text
 encodeTime t = show (convertRelTimeToMicroseconds(t `subTime` epoch))
 
-decodeTime : Text -> Time
-decodeTime t = case T.parseInt t of
-  Some i -> epoch `addRelTime` (convertMicrosecondsToRelTime i)
+decodeRelTime : Text -> RelTime
+decodeRelTime t = case T.parseInt t of
+  Some i -> convertMicrosecondsToRelTime i
   None -> error ("Cannot parse time " <> t)
 
+decodeTime : Text -> Time
+decodeTime t = epoch `addRelTime` (decodeRelTime t)
 
 -- AnyContractId conversion
 ------------------------------
@@ -126,6 +134,8 @@ timeToMeta field t meta =
 timeFromMeta : Text -> Metadata -> Optional Time
 timeFromMeta field meta = decodeTime <$> TextMap.lookup field meta.values
 
+relTimeFromMeta : Text -> Metadata -> Optional RelTime
+relTimeFromMeta field meta = decodeRelTime <$> TextMap.lookup field meta.values
 
 -- Account utils
 ----------------
