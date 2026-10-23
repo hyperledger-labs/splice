@@ -386,7 +386,7 @@ class DbVotesStoreTest
         }
       }
 
-      "use the history id of the update history as store id" in {
+      "use the id of the TxLog store as store id" in {
         for {
           stores <- mkStores()
         } yield {

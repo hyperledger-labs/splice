@@ -319,7 +319,7 @@ object DbVotesStore {
         }) match {
           case Success(insert) => insert
           case Failure(e) =>
-            // Throwing would stop the ingestion of the whole update history, which can't continue past this update.
+            // Throwing would stop the ingestion of the whole ACS store, which can't continue past this update.
             // Instead, write a row that only identifies the vote, so that it can be fixed later.
             elc.error(
               s"Failed to decode the vote result in update ${tx.getUpdateId} at record time $recordTime. " +
@@ -366,7 +366,7 @@ object DbVotesStore {
     *
     * This should not happen in practice: all SVs are expected to upgrade their apps before a new Daml version
     * is voted in, so every app can decode every vote result that is created. Throwing instead would stop the
-    * ingestion of the whole update history, which is why this only logs an error.
+    * ingestion of the whole ACS store, which is why this only logs an error.
     */
   private def placeholderResult(recordTime: Long): DsoRules_CloseVoteRequestResult = {
     val at = CantonTimestamp.assertFromLong(recordTime).toInstant
