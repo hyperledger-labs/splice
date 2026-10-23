@@ -101,6 +101,10 @@ final class DbMultiDomainAcsStore[TXE] private[db] (
     handleIngestionSummary: IngestionSummary => Unit = _ => (),
     override val defaultLimit: Limit,
     private[db] val acsArchiveConfigOpt: Option[AcsArchiveConfig] = None,
+    /** Sinks that ingest data derived from the transactions, in the same SQL transaction as the ACS and the TxLog.
+      * Requires a TxLog, as the ingestion state of the sinks is tied to the TxLog store.
+      */
+    additionalIngestionSinks: Seq[AdditionalIngestionSink] = Seq.empty,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -114,6 +118,11 @@ final class DbMultiDomainAcsStore[TXE] private[db] (
     with LimitHelpers {
   import DbMultiDomainAcsStore.*
   import MultiDomainAcsStore.*
+
+  require(
+    additionalIngestionSinks.isEmpty || txLogStoreDescriptor.isDefined,
+    "Additional ingestion sinks require a TxLog store",
+  )
   import profile.api.jdbcActionExtensionMethods
 
   private implicit val dbProfile: DbStorage.Profile = storage.profile
@@ -1382,6 +1391,9 @@ final class DbMultiDomainAcsStore[TXE] private[db] (
               storage
                 .queryAndUpdate(ingestTransactionTrees(batch), "ingestTransactionTrees")
                 .map { summaryState =>
+                  transactionsForAdditionalSinks(batch).foreach(transactions =>
+                    additionalIngestionSinks.foreach(_.onTransactionCommitted(transactions))
+                  )
                   val lastTree = batch.batch.last.tree
                   val synchronizerIdToRecordTime = batch.batch
                     .groupBy(_.synchronizerId)
@@ -1581,6 +1593,19 @@ final class DbMultiDomainAcsStore[TXE] private[db] (
       ).map(_ => summary)
     }
 
+    /** The transactions of the batch that are passed to the additional ingestion sinks.
+      * Like for the TxLog, events imported from the ACS are not included.
+      */
+    private def transactionsForAdditionalSinks(
+        trees: IngestTransactionTreesBatch
+    ): Option[NonEmptyList[Transaction]] =
+      NonEmptyList.fromList(
+        trees.batch.toVector
+          .map(_.tree)
+          .filter(tree => !tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX))
+          .toList
+      )
+
     private def ingestTransactionTrees(
         trees: IngestTransactionTreesBatch
     )(implicit tc: TraceContext) = {
@@ -1633,6 +1658,10 @@ final class DbMultiDomainAcsStore[TXE] private[db] (
             .parse(tree.tree, tree.synchronizerId, logger)
             .map(tree.tree.getRecordTime -> (_, tree.tree.getOffset, tree.synchronizerId))
         )
+      val additionalIngestionActions: Seq[PreparedIngestionAction] =
+        transactionsForAdditionalSinks(trees).toList.flatMap(transactions =>
+          additionalIngestionSinks.flatMap(_.prepareBatch(txLogStoreId, transactions))
+        )
       val synchronizerIdsToMinRecordTime =
         trees.batch.groupBy(_.synchronizerId).map { case (synchronizerId, batch) =>
           synchronizerId -> batch.map(_.tree.getRecordTime).minimumBy(_.toEpochMilli)
@@ -1679,6 +1708,7 @@ final class DbMultiDomainAcsStore[TXE] private[db] (
             summary,
           )
         }*)
+        _ <- DBIO.seq(additionalIngestionActions.map(_.action)*)
         _ <- DBIO.seq(synchronizerIdsToMinRecordTime.toSeq.map {
           case (synchronizerId, recordTime) =>
             doInitializeFirstIngestedUpdate(

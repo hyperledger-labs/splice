@@ -125,18 +125,18 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.UpdateHistoryBulkStorage.
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.{
+  ActiveVotesStore,
   AppStore,
   AppStoreWithIngestion,
+  HistoricalVotesStore,
   PageLimit,
   TimestampWithMigrationId,
+  UpdateHistory,
   VoteResultsFilters,
-  VotesStore,
 }
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
-import org.lfdecentralizedtrust.splice.store.UpdateHistory
 
-import java.lang.IllegalStateException
 import scala.collection.immutable.SortedMap
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
@@ -175,6 +175,7 @@ class HttpScanHandler(
     appActivityStore: AppActivityStore,
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
+    historicalVotesStore: HistoricalVotesStore,
     bulkStorage: Option[BulkStorageReader],
     scanApiMetrics: ScanHttpApiMetrics,
     dsoAnsResolver: DsoAnsResolver,
@@ -203,7 +204,7 @@ class HttpScanHandler(
   private val store = storeWithIngestion.store
 
   override protected val workflowId: String = this.getClass.getSimpleName
-  override protected val votesStore: VotesStore = store
+  override protected val activeVotesStore: ActiveVotesStore = store
   override protected val validatorLicensesStore: AppStore = store
 
   private val initializedBftSequencersCache
@@ -2134,7 +2135,7 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.listAmuletPriceVotes") { _ => _ =>
       for {
-        amuletPriceVotes <- votesStore.listAmuletPriceVotes()
+        amuletPriceVotes <- activeVotesStore.listAmuletPriceVotes()
       } yield ScanResource.ListAmuletPriceVotesResponse.OK(
         definitions.ListAmuletPriceVotesResponse(
           amuletPriceVotes.map(_.toHttp).toVector
@@ -2161,7 +2162,7 @@ class HttpScanHandler(
       val limit = PageLimit.tryCreate(body.limit.intValue)
       val after = body.pageToken.map(_.longValue)
       for {
-        page <- votesStore.listVoteRequestResults(
+        page <- historicalVotesStore.listVoteRequestResults(
           VoteResultsFilters(
             body.actionName,
             body.accepted,
@@ -2203,7 +2204,7 @@ class HttpScanHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.countVoteRequestResults") { _ => _ =>
       for {
-        count <- votesStore.countVoteRequestResults(
+        count <- historicalVotesStore.countVoteRequestResults(
           VoteResultsFilters(
             body.actionName,
             body.accepted,
