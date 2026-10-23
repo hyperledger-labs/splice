@@ -131,6 +131,7 @@ let
     pre-commit
     python3
     python3Packages.dockerfile-parse
+    python3Packages.gitpython
     ripgrep
     sbt
     scala_2_13

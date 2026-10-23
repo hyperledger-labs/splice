@@ -30,6 +30,7 @@ esac
 
 FETCH_TIMEOUT_SECONDS=${FETCH_TIMEOUT_SECONDS:-300}
 git_fetch() {
+  # full-history-ok: depth_args bounds the history unless FETCH_GIT_REFS is none, in which case nothing is fetched
   timeout --kill-after=30 "$FETCH_TIMEOUT_SECONDS" git fetch --no-tags --force "${depth_args[@]}" "$@"
 }
 

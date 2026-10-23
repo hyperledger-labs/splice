@@ -58,6 +58,7 @@ if [ "${CI-}" ==  true ]; then
   git remote set-url origin "https://${GH_USER}:${GH_TOKEN}@github.com/DACH-NY/canton-network-node.git"
 fi
 
+# full-history-ok: resolves an arbitrary, possibly abbreviated revision below; no in-repo CI caller
 git fetch origin --recurse-submodules=no
 git_commit=$(git rev-parse --verify "${git_revision}")
 echo "updating deployment branch for cluster ${cluster_name} to ${git_commit}"
