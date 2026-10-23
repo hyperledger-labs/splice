@@ -1,0 +1,115 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Unit tests for the memo tag parser used by the token standard V1 compat mode.
+module Splice.Scripts.UnitTests.TrafficPurchaseMemo where
+
+import DA.Assert ((===))
+
+import Daml.Script
+
+import Splice.Testing.Utils (trafficPurchaseMemoPrefix)
+
+import Splice.DecentralizedSynchronizer (MemberTrafficPurchase(..), TrafficPurchaseMemo(..), parseTrafficPurchaseMemo, trafficPurchaseReason)
+
+sender : Party
+sender =
+  let Some p = partyFromText "alice::1220000000000000000000000000000000000000000000000000000000000000abcd"
+  in p
+
+testMemberId : Text
+testMemberId = "PAR::alice-participant::1220abcd"
+
+testSynchronizerId : Text
+testSynchronizerId = "decentralized-synchronizer-id-0"
+
+expectedMemo : TrafficPurchaseMemo
+expectedMemo = TrafficPurchaseMemo with
+  memberId = testMemberId
+  synchronizerId = testSynchronizerId
+  migrationId = 3
+  forfeitValidatorRewardCoupon = False
+
+memoParams : Text
+memoParams =
+  "member-id=" <> testMemberId <>
+  "&synchronizer-id=" <> testSynchronizerId <>
+  "&migration-id=3"
+
+completeMemo : Text
+completeMemo = trafficPurchaseMemoPrefix <> memoParams
+
+parse : Text -> Either Text TrafficPurchaseMemo
+parse = parseTrafficPurchaseMemo
+
+isRejected : Either Text TrafficPurchaseMemo -> Bool
+isRejected result = case result of
+  Left _ -> True
+  Right _ -> False
+
+test_parseMemo_complete : Script ()
+test_parseMemo_complete = script do
+  parse completeMemo === Right expectedMemo
+
+test_trafficPurchaseReason_includesPurchasedTraffic : Script ()
+test_trafficPurchaseReason_includesPurchasedTraffic = script do
+  let purchase = MemberTrafficPurchase with
+        provider = sender
+        memberId = testMemberId
+        synchronizerId = testSynchronizerId
+        migrationId = 3
+        trafficAmount = 1_000_000
+  trafficPurchaseReason purchase ===
+    "cip-128/memo:purchased-traffic-bytes=1000000&" <> memoParams
+
+test_parseMemo_keyOrderIrrelevant : Script ()
+test_parseMemo_keyOrderIrrelevant = script do
+  let reordered =
+        trafficPurchaseMemoPrefix <> "migration-id=3" <>
+        "&synchronizer-id=" <> testSynchronizerId <>
+        "&member-id=" <> testMemberId
+  parse reordered === Right expectedMemo
+
+test_parseMemo_forfeitValidatorRewardCoupon : Script ()
+test_parseMemo_forfeitValidatorRewardCoupon = script do
+  parse completeMemo === Right expectedMemo
+  parse (completeMemo <> "&forfeit-validator-reward-coupon=true") ===
+    Right (expectedMemo with forfeitValidatorRewardCoupon = True)
+  parse (completeMemo <> "&forfeit-validator-reward-coupon=false") === Right expectedMemo
+  parse (completeMemo <> "&forfeit-validator-reward-coupon=yes") ===
+    Left "Expected true or false for forfeit-validator-reward-coupon in traffic purchase memo, got: yes"
+  assertMsg "duplicate forfeit key is rejected" $ isRejected $
+    parse $ completeMemo <> "&forfeit-validator-reward-coupon=true&forfeit-validator-reward-coupon=true"
+
+test_parseMemo_rejectsMissingPrefix : Script ()
+test_parseMemo_rejectsMissingPrefix = script do
+  parse memoParams === Left ("Traffic purchase memo must start with " <> trafficPurchaseMemoPrefix)
+  parse (" " <> completeMemo) === Left ("Traffic purchase memo must start with " <> trafficPurchaseMemoPrefix)
+
+test_parseMemo_rejectsMissingKey : Script ()
+test_parseMemo_rejectsMissingKey = script do
+  parse (trafficPurchaseMemoPrefix <> "member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId) ===
+    Left "Missing key in traffic purchase memo: migration-id"
+
+test_parseMemo_rejectsUnknownKey : Script ()
+test_parseMemo_rejectsUnknownKey = script do
+  assertMsg "unknown key is rejected" $ isRejected $ parse $ completeMemo <> "&trafficUnit=MB"
+
+test_parseMemo_rejectsDuplicateKey : Script ()
+test_parseMemo_rejectsDuplicateKey = script do
+  assertMsg "duplicate key is rejected" $ isRejected $ parse $ completeMemo <> "&migration-id=4"
+
+test_parseMemo_rejectsMalformedField : Script ()
+test_parseMemo_rejectsMalformedField = script do
+  assertMsg "field without a value is rejected" $ isRejected $ parse $ completeMemo <> "&migration"
+  assertMsg "field with two separators is rejected" $
+    isRejected $ parse $ trafficPurchaseMemoPrefix <> "member-id=a=b&synchronizer-id=s&migration-id=0"
+  assertMsg "empty memo is rejected" $ isRejected $ parse ""
+  assertMsg "prefix without parameters is rejected" $ isRejected $ parse trafficPurchaseMemoPrefix
+
+test_parseMemo_rejectsNonIntegerValues : Script ()
+test_parseMemo_rejectsNonIntegerValues = script do
+  assertMsg "non-integer migrationId is rejected" $
+    isRejected $ parse $
+      trafficPurchaseMemoPrefix <> "member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId <>
+      "&migration-id=latest"

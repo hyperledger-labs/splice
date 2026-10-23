@@ -155,6 +155,9 @@ instance Monoid Metadata  where
 externalPartyConfigStateContextKey : Text
 externalPartyConfigStateContextKey = "external-party-config-state"
 
+openRoundContextKey : Text
+openRoundContextKey = "open-round"
+
 featuredAppRightContextKey : Text
 featuredAppRightContextKey = "featured-app-right"
 

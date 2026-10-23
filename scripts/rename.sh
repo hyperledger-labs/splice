@@ -1200,7 +1200,7 @@ function subcmd_no_illegal_daml_references() {
       '(?<![a-z])cc(?!(e233922|ou|ept|essor|g[.]github))'
       'global(?!(ly|[.]))' # TODO (DACH-NY/canton-network-node#17137): revisit
       'CC(?!(OUNT))'
-      '(?<!(Map|Set)[.])(?<!sequencer )member(?!(ship| of|Id|.*[tT]raffic))'
+      '(?<!(Map|Set)[.])(?<!sequencer )member(?!(ship| of|Id|-id|.*[tT]raffic))'
       # Allow only Dso as in DsoRules in comments
       '[-][-] .*Dso(?!(Rules))(?!(Expire))'
       # Disallow dso in comments other than dsoParty

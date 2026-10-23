@@ -51,6 +51,7 @@ import Splice.TokenStandard.Utils qualified as TSU
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletTransferInstruction
+import Splice.AmuletConfig (AmuletConfig, USD)
 import Splice.AmuletRules
 import Splice.Expiry
 import Splice.ExternalPartyConfigState
@@ -113,6 +114,7 @@ data AmuletRegistryConfig = AmuletRegistryConfig
     initialAmuletPrice : Decimal
     demoTime : Time
     dsoPartyName : Text
+    amuletConfig : AmuletConfig USD
   deriving (Eq, Show, Serializable)
 
 -- | Recommended default configuration for setting up the mock amulet registry.
@@ -121,6 +123,7 @@ defaultAmuletRegistryConfig = AmuletRegistryConfig with
   initialAmuletPrice = 0.5 -- a non-zero price that still makes it easy to reason about fees and amounts
   demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
   dsoPartyName = "dso-party"
+  amuletConfig = defaultAmuletConfig
 
 -- | Initialize the mock amulet registry.
 initialize : AmuletRegistryConfig -> Script AmuletRegistry
@@ -134,7 +137,7 @@ initialize config = do
         instrumentId = amuletInstrumentIdV2 dso
 
   let defaultAmuletConfigSchedule = Schedule with
-        initialValue = defaultAmuletConfig
+        initialValue = config.amuletConfig
         futureValues = []
 
   _ <- submit dso $ createCmd AmuletRules with
@@ -243,6 +246,10 @@ registryApi_getTransferFactory
 registryApi_getTransferFactory registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
   transferC <- getExternalPartyConfigStateContext registry
+  openRoundC <-
+    if arg.transfer.receiver.owner == Some trafficPurchaseReceiver
+      then getOpenRoundContext registry
+      else pure emptyOpenApiChoiceContext
   let isSelfTransfer = arg.transfer.sender.owner == arg.transfer.receiver.owner
   (optPreapproval, preapprovalC) <-
     case arg.transfer.receiver.owner of
@@ -252,7 +259,7 @@ registryApi_getTransferFactory registry arg = do
     None -> pure emptyOpenApiChoiceContext
     Some preapproval -> getFeaturedAppRightContext registry preapproval.provider
   let fullContext = withExtraDisclosures extAmuletRulesD
-        (transferC <> preapprovalC <> featuredAppRightC)
+        (transferC <> openRoundC <> preapprovalC <> featuredAppRightC)
   pure EnrichedFactoryChoice with
     factoryCid = toInterfaceContractId @TransferFactory extAmuletRulesCid
     arg = arg with extraArgs = arg.extraArgs with context = fullContext.choiceContext
@@ -418,6 +425,15 @@ lookupPreapprovalWithContext registry receiver = do
           choiceContext = mkAmuletContext $
             TextMap.fromList [(transferPreapprovalContextKey, AV_ContractId (coerceContractId preapprovalCid))]
         )
+
+getOpenRoundContext : AmuletRegistry -> Script OpenApiChoiceContext
+getOpenRoundContext registry = do
+  (openRoundCid, _) <- getLatestOpenRound registry
+  openRoundD <- queryDisclosure' @OpenMiningRound registry.dso openRoundCid
+  pure OpenApiChoiceContext with
+    choiceContext = mkAmuletContext $ TextMap.fromList
+        [(openRoundContextKey, AV_ContractId $ coerceContractId openRoundCid)]
+    disclosures = openRoundD
 
 getFeaturedAppRightContext : AmuletRegistry -> Party -> Script OpenApiChoiceContext
 getFeaturedAppRightContext registry provider = do

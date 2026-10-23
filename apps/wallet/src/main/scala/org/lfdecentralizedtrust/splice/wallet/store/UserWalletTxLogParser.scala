@@ -685,6 +685,32 @@ class UserWalletTxLogParser(
                 )
             }
 
+          case DirectTokenStandardTransfer(node)
+              if node.argument.value.transfer.receiver == TokenStandardMetadata.trafficPurchaseReceiver =>
+            now(
+              State.fromTrafficPurchaseTransfer(
+                tree,
+                exercised,
+                sender = node.argument.value.transfer.sender,
+                transferMeta = node.argument.value.transfer.meta,
+                resultMeta = node.result.value.meta,
+              )
+            )
+
+          case DirectTokenStandardTransferV2(node)
+              if node.argument.value.transfer.receiver.owner.toScala
+                .contains(TokenStandardMetadata.trafficPurchaseReceiver) =>
+            val admin = node.argument.value.transfer.instrumentId.admin
+            now(
+              State.fromTrafficPurchaseTransfer(
+                tree,
+                exercised,
+                sender = node.argument.value.transfer.sender.owner.toScala.getOrElse(admin),
+                transferMeta = node.argument.value.transfer.meta,
+                resultMeta = node.result.value.meta,
+              )
+            )
+
           case DirectTokenStandardTransfer(node) =>
             // TODO(tech-debt): deduplicate with the V2 version
             defer {
@@ -1920,30 +1946,70 @@ object UserWalletTxLogParser {
         event: ExercisedEvent,
     ): State = {
       val sender = node.argument.value.provider
-      // Hack to grab the DSO party-id from the balance changes, which list both sender and the DSO
-      val receivers = node.result.value.summary.balanceChanges.keySet().asScala.toSeq.collect {
-        case party if party != sender => PartyAndAmount(party, BigDecimal(0.0))
-      }
       val summary = node.result.value.summary
       val netSenderInput = summary.inputAmuletAmount - summary.holdingFees
       val senderBalanceChange = BigDecimal(summary.senderChangeAmount) - netSenderInput
 
+      trafficPurchaseEntry(
+        tx,
+        event,
+        sender,
+        senderBalanceChange,
+        summary.holdingFees,
+        BigDecimal(summary.inputAppRewardAmount),
+        BigDecimal(summary.inputValidatorRewardAmount),
+        summary.inputDevelopmentFundAmount.toScala.map(BigDecimal(_)),
+        "",
+      )
+    }
+
+    def fromTrafficPurchaseTransfer(
+        tx: Transaction,
+        event: ExercisedEvent,
+        sender: String,
+        transferMeta: splice.api.token.metadatav1.Metadata,
+        resultMeta: splice.api.token.metadatav1.Metadata,
+    ): State = {
+      val burned = resultMeta.values.asScala
+        .get(TokenStandardMetadata.burnedMetaKey)
+        .fold(BigDecimal(0))(BigDecimal(_))
+      trafficPurchaseEntry(
+        tx,
+        event,
+        sender,
+        -burned,
+        BigDecimal(0),
+        BigDecimal(0),
+        BigDecimal(0),
+        None,
+        transferMeta.values.asScala.getOrElse(TokenStandardMetadata.reasonMetaKey, ""),
+      )
+    }
+
+    private def trafficPurchaseEntry(
+        tx: Transaction,
+        event: ExercisedEvent,
+        sender: String,
+        senderAmount: BigDecimal,
+        holdingFees: BigDecimal,
+        appRewardsUsed: BigDecimal,
+        validatorRewardsUsed: BigDecimal,
+        developmentFundCouponsUsed: Option[BigDecimal],
+        description: String,
+    ): State = {
       val newEntry = TransferTxLogEntry(
         eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
         subtype = Some(TransferTransactionSubtype.ExtraTrafficPurchase.toProto),
         date = Some(tx.getEffectiveAt),
-        sender = Some(PartyAndAmount(sender, senderBalanceChange)),
-        receivers = receivers,
-        senderHoldingFees = node.result.value.summary.holdingFees,
-        appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
-        validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
-        developmentFundCouponsUsed =
-          node.result.value.summary.inputDevelopmentFundAmount.toScala.map(BigDecimal(_)),
+        sender = Some(PartyAndAmount(sender, senderAmount)),
+        receivers = Seq.empty,
+        senderHoldingFees = holdingFees,
+        appRewardsUsed = appRewardsUsed,
+        validatorRewardsUsed = validatorRewardsUsed,
+        developmentFundCouponsUsed = developmentFundCouponsUsed,
+        description = description,
       )
-
-      State(
-        entries = immutable.Queue(newEntry)
-      )
+      State(entries = immutable.Queue(newEntry))
     }
 
     def fromCreateExternalPartySetupProposal(

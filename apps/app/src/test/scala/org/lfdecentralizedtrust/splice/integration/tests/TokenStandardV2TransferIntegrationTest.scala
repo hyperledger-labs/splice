@@ -24,7 +24,11 @@ import org.lfdecentralizedtrust.splice.scan.automation.{
   AcsSnapshotTrigger,
 }
 import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
-import org.lfdecentralizedtrust.splice.util.WalletTestUtil
+import org.lfdecentralizedtrust.splice.util.{
+  SynchronizerFeesTestUtil,
+  TokenStandardMetadata,
+  WalletTestUtil,
+}
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
@@ -33,6 +37,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
   TxLogEntry,
 }
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
+import com.digitalasset.canton.topology.PartyId
 
 import java.time.Instant
 import java.util.UUID
@@ -47,7 +52,8 @@ class TokenStandardV2TransferIntegrationTest
     with HasActorSystem
     with HasExecutionContext
     with TokenStandardTest
-    with TokenStandardV2TestUtil {
+    with TokenStandardV2TestUtil
+    with SynchronizerFeesTestUtil {
 
   override def environmentDefinition: EnvironmentDefinition = {
     EnvironmentDefinition
@@ -551,6 +557,77 @@ class TokenStandardV2TransferIntegrationTest
       )
     }
 
+    "buy traffic through a transfer to the traffic purchase receiver" in { implicit env =>
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(100)
+
+      val memberId = aliceValidatorBackend.participantClient.id
+      val synchronizerId = activeSynchronizerId
+      val minimumTrafficAmount = Math.max(
+        sv1ScanBackend
+          .getAmuletConfigAsOf(env.environment.clock.now)
+          .decentralizedSynchronizer
+          .fees
+          .minTopupAmount
+          .toLong,
+        1_000_000L,
+      )
+      val (_, minimumCostAmulet) = computeSynchronizerFees(minimumTrafficAmount)
+      val spentAmuletAmount = minimumCostAmulet * 2
+      val purchasedTrafficAmount = computeTrafficForAmuletAmount(spentAmuletAmount)
+      val memo =
+        s"cip-128/memo:member-id=${memberId.toProtoPrimitive}" +
+          s"&synchronizer-id=${synchronizerId.toProtoPrimitive}" +
+          s"&migration-id=${sv1ScanBackend.getMigrationId()}"
+      val purchasedTrafficBefore = getTotalPurchasedTraffic(memberId, synchronizerId)
+      val balanceBefore = aliceWalletClient.balance().unlockedQty
+
+      val (result, _) = actAndCheck(
+        "Alice buys traffic via a V2 transfer to the traffic purchase receiver",
+        aliceWalletClient.createTokenStandardTransferV2(
+          PartyId.tryFromProtoPrimitive(TokenStandardMetadata.trafficPurchaseReceiver),
+          spentAmuletAmount,
+          memo,
+          CantonTimestamp.now().plusSeconds(3600L),
+          UUID.randomUUID().toString,
+        ),
+      )(
+        "The DSO sees the purchased traffic",
+        _ =>
+          getTotalPurchasedTraffic(
+            memberId,
+            synchronizerId,
+          ) shouldBe purchasedTrafficBefore + purchasedTrafficAmount,
+      )
+      inside(result.output) { case members.TransferInstructionCompleted(value) =>
+        value.receiverHoldingCids shouldBe empty
+      }
+      balanceBefore - aliceWalletClient.balance().unlockedQty shouldBe spentAmuletAmount
+
+      clue("Alice's validator gets a validator reward coupon for the purchase") {
+        eventually() {
+          aliceValidatorWalletClient
+            .listValidatorRewardCoupons()
+            .filter(_.payload.user == aliceParty.toProtoPrimitive)
+            .map(coupon => BigDecimal(coupon.payload.amount)) should contain(spentAmuletAmount)
+        }
+      }
+
+      checkTxHistory(
+        aliceWalletClient,
+        Seq(
+          { case logEntry: TransferTxLogEntry =>
+            logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.ExtraTrafficPurchase.toProto
+            logEntry.description shouldBe memo
+            logEntry.receivers shouldBe empty
+            logEntry.sender.value.amount shouldBe -spentAmuletAmount
+          },
+          { case logEntry: BalanceChangeTxLogEntry =>
+            logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
+          },
+        ),
+      )
+    }
   }
 
 }

@@ -32,6 +32,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.*
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
 import org.lfdecentralizedtrust.splice.wallet.automation.SubscriptionReadyForPaymentTrigger
@@ -129,6 +130,21 @@ abstract class ExpiryWithMinimalVettedPackagesIntegrationTestBase
             )
           )
         )(c)
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+          // Use a version that supports downgrading ExternalPartyConfigState
+          _.copy(initialPackageConfig =
+            InitialPackageConfig(
+              amuletVersion = "0.1.24",
+              amuletNameServiceVersion = "0.1.25",
+              dsoGovernanceVersion = "0.1.30",
+              validatorLifecycleVersion = "0.1.9",
+              walletVersion = "0.1.25",
+              walletPaymentsVersion = "0.1.24",
+            )
+          )
+        )(config)
       )
 
   protected val danglingSubscriptionCid = new Subscription.ContractId("00" * 33 + "01")

@@ -29,6 +29,8 @@ import Splice.AmuletAllocation as AmuletAllocationV1
 import Splice.AmuletAllocationV2 as AmuletAllocationV2
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
+import Splice.DecentralizedSynchronizer (MemberTrafficPurchase(..), parseTrafficPurchaseMemo)
+import Splice.Round (OpenMiningRound(..))
 import Splice.Types
 import Splice.Util
 
@@ -141,7 +143,7 @@ template ExternalPartyAmuletRules
         admin = dso
         meta = emptyMetadata
 
-      transferFactory_transferExtraObservers = transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl
+      transferFactory_transferExtraObservers = trafficPurchase_transferExtraObservers
 
       transferFactory_transferImpl =
         transferFactoryV2_transferDefaultImplUsingV1 $ amulet_transferFactoryV1_transferImpl this
@@ -335,6 +337,23 @@ data TransferCommand_ExpireResult = TransferCommand_ExpireResult
   deriving (Show, Eq, Serializable)
 
 
+-- Traffic purchases in token standard V1 compatibility mode
+-------------------------------------------------------------
+
+-- | Party used for traffic purchase via a V1 transfer
+trafficPurchaseReceiver : Party
+trafficPurchaseReceiver =
+  fromSomeNote "trafficPurchaseReceiver: invalid party" $
+  partyFromText "cip-128_traffic-purchase::1220000000000000000000000000000000000000000000000000000000000000abcd"
+
+
+-- | Choice observers are informees and no participant hosts the traffic purchase sentinel,
+-- so it must be dropped from the observers of a V2 transfer.
+trafficPurchase_transferExtraObservers : V2.TransferFactory_Transfer -> [Party]
+trafficPurchase_transferExtraObservers arg =
+  filter (/= trafficPurchaseReceiver) (transferFactoryV2_publicAsset_transferExtraObserversDefaultImpl arg)
+
+
 -- Token standard transfer factory
 ----------------------------------
 
@@ -368,7 +387,7 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
   assertDeadlineExceeded "transfer.requestedAt" transfer.requestedAt
   -- executeBefore: must be in the future, but not too far
   assertWithinDeadline "transfer.executeBefore" transfer.executeBefore
-  (_, configState) <- getExternalPartyConfigStateFromChoiceContext dso arg.extraArgs.context
+  (configStateCid, configState) <- getExternalPartyConfigStateFromChoiceContext dso arg.extraArgs.context
   let configAmulet = transferConfigAmuletFromExternalPartyConfigState configState
   let transferLifetime = transfer.executeBefore `subTime` transfer.requestedAt
   require' ("transferLifetime", transferLifetime) isLessOrEqualR
@@ -379,7 +398,47 @@ amulet_transferFactoryV1_transferImpl this actors arg = do
   ensureNoAccountMeta "transfer" "sender" transfer.meta
   ensureNoAccountMeta "transfer" "receiver" transfer.meta
 
-  case optPreapprovalCid of
+  if transfer.receiver == trafficPurchaseReceiver then do
+    -- TODO(#7561): accept a RegisteredSynchronizer to support dedicated synchronizers.
+    purchaseMemo <- case parseTrafficPurchaseMemo (reasonFromMeta transfer.meta) of
+      Left err -> fail err
+      Right memo -> pure memo
+    trafficConfig <- case trafficPurchaseConfigFromConfigState configState of
+      None -> fail "The referenced ExternalPartyConfigState carries no traffic purchase configuration"
+      Some trafficConfig -> pure trafficConfig
+    paymentContext <- unfeaturedPaymentContextFromChoiceContext dso arg.extraArgs.context
+    csum <- summarizeAndValidateExternalPartyContext paymentContext dso transfer.sender
+    require "Traffic price must be positive" (trafficConfig.trafficPrice > 0.0)
+    burnRewardPolicy <-
+      if purchaseMemo.forfeitValidatorRewardCoupon
+        then pure SkipValidatorRewardCoupon
+        else do
+          optOpenRoundCid <- lookupFromContextU @(ContractId OpenMiningRound) arg.extraArgs.context openRoundContextKey
+          openRoundCid <- case optOpenRoundCid of
+            None -> fail $
+              "Traffic purchase needs an OpenMiningRound under the choice context key " <> openRoundContextKey <>
+              " to issue the validator reward coupon; set forfeit-validator-reward-coupon=true in the memo to purchase without it"
+            Some cid -> pure cid
+          openRound <- fetchChecked (ForDso dso) openRoundCid
+          assertDeadlineExceeded "openRound.opensAt" openRound.opensAt
+          pure (IssueValidatorRewardCoupon openRound.round)
+    let trafficCostUsd = transfer.amount * csum.amuletPrice
+        purchase = MemberTrafficPurchase with
+          provider = transfer.sender
+          memberId = purchaseMemo.memberId
+          synchronizerId = purchaseMemo.synchronizerId
+          migrationId = purchaseMemo.migrationId
+          trafficAmount = floor (trafficCostUsd * 1e6 / trafficConfig.trafficPrice)
+    inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) transfer.inputHoldingCids
+    result <- buyMemberTraffic (toInterfaceContractId configStateCid) csum trafficConfig purchase
+      (transfer.amount, trafficCostUsd) inputs
+      burnRewardPolicy
+    pure Api.Token.TransferInstructionV1.TransferInstructionResult with
+      senderChangeCids = toInterfaceContractId <$> optionalToList result.transferResult.senderChangeAmulet
+      output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
+        receiverHoldingCids = []
+      meta = result.meta
+  else case optPreapprovalCid of
     _ | transfer.receiver `elem` actors -> do
       -- self-transfer or sender+receiver authorized
       paymentContext <- unfeaturedPaymentContextFromChoiceContext dso arg.extraArgs.context

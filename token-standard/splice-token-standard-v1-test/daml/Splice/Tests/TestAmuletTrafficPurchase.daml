@@ -1,0 +1,249 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Tests for buying synchronizer traffic via token standard V1 transfer compatible mode
+module Splice.Tests.TestAmuletTrafficPurchase where
+
+import DA.Assert ((===))
+import qualified DA.TextMap as TextMap
+import DA.Time
+
+import Daml.Script
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+
+import Splice.Amulet (ValidatorRewardCoupon(..))
+import Splice.Amulet.TokenApiUtils (externalPartyConfigStateContextKey, getFromContext, openRoundContextKey, reasonMetaKey)
+import Splice.DecentralizedSynchronizer (MemberTraffic(..))
+import Splice.ExternalPartyAmuletRules (trafficPurchaseReceiver)
+import Splice.ExternalPartyConfigState (ExternalPartyConfigState(..))
+import Splice.Round (OpenMiningRound(..))
+
+import Splice.Testing.Utils
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultAmuletConfig)
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+
+oneMegabyte : Int
+oneMegabyte = 1_000_000
+
+oneMegabyteCostUsd : Decimal
+oneMegabyteCostUsd = 1.0
+
+oneMegabyteCostAmulet : Decimal
+oneMegabyteCostAmulet = 2.0
+
+initialTap : Decimal
+initialTap = 50.0
+
+testMemberId : Text
+testMemberId = "PAR::alice-participant::1220abcd"
+
+testSynchronizerId : Text
+testSynchronizerId = "decentralized-synchronizer-id-0"
+
+defaultMemoTag : Text
+defaultMemoTag =
+  trafficPurchaseMemoPrefix <> "member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId <> "&migration-id=0"
+
+defaultReason : Text
+defaultReason =
+  "cip-128/memo:purchased-traffic-bytes=1000000&member-id=" <> testMemberId <> "&synchronizer-id=" <> testSynchronizerId <> "&migration-id=0"
+
+data TestSetup = TestSetup with
+  registry : AmuletRegistry.AmuletRegistry
+  alice : Party
+  defaultTransfer : Api.Token.TransferInstructionV1.Transfer
+
+setupTestWith : AmuletRegistry.AmuletRegistryConfig -> Script TestSetup
+setupTestWith registryConfig = do
+  registry <- AmuletRegistry.initialize registryConfig
+  alice <- allocatePartyExact "alice"
+  AmuletRegistry.tapFaucet registry alice initialTap
+  aliceHoldingCids <- WalletClient.listHoldingCids alice registry.instrumentId
+
+  now <- getTime
+  let defaultTransfer = Api.Token.TransferInstructionV1.Transfer with
+        sender = alice
+        receiver = trafficPurchaseReceiver
+        amount = oneMegabyteCostAmulet
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = now `addRelTime` days 1
+        inputHoldingCids = aliceHoldingCids
+        meta = memoTagMeta defaultMemoTag
+  pure TestSetup with ..
+
+setupTest : Script TestSetup
+setupTest = setupTestWith AmuletRegistry.defaultAmuletRegistryConfig
+
+memoTagMeta : Text -> Metadata
+memoTagMeta memoTag = Metadata with
+  values = TextMap.fromList [(reasonMetaKey, memoTag)]
+
+submitTrafficPurchase
+  : TestSetup -> EnrichedFactoryChoice TransferFactory TransferFactory_Transfer
+  -> Script TransferInstructionResult
+submitTrafficPurchase TestSetup{..} enrichedChoice =
+  submitWithDisclosures' alice enrichedChoice.disclosures $
+    exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+submitTrafficPurchaseMustFailWith
+  : FailureStatusCheck -> TestSetup -> EnrichedFactoryChoice TransferFactory TransferFactory_Transfer
+  -> Script ()
+submitTrafficPurchaseMustFailWith check TestSetup{..} enrichedChoice =
+  submitWithDisclosuresMustFail'' check alice enrichedChoice.disclosures $
+    exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+buyTraffic : TestSetup -> Api.Token.TransferInstructionV1.Transfer -> Script TransferInstructionResult
+buyTraffic setup transfer =
+  transferFactoryChoice setup.registry transfer >>= submitTrafficPurchase setup
+
+buyTrafficMustFailWith : FailureStatusCheck -> TestSetup -> Api.Token.TransferInstructionV1.Transfer -> Script ()
+buyTrafficMustFailWith check setup transfer =
+  transferFactoryChoice setup.registry transfer >>= submitTrafficPurchaseMustFailWith check setup
+
+transferFactoryChoice
+  : AmuletRegistry.AmuletRegistry -> Api.Token.TransferInstructionV1.Transfer
+  -> Script (EnrichedFactoryChoice TransferFactory TransferFactory_Transfer)
+transferFactoryChoice registry transfer =
+  RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer
+    extraArgs = emptyExtraArgs
+
+dropOpenRound
+  : EnrichedFactoryChoice TransferFactory TransferFactory_Transfer
+  -> EnrichedFactoryChoice TransferFactory TransferFactory_Transfer
+dropOpenRound choice = choice with
+  arg.extraArgs.context.values = TextMap.delete openRoundContextKey choice.arg.extraArgs.context.values
+
+-- Happy
+--------
+
+test_trafficPurchase_burnsFullAmountAndCreatesMemberTraffic : Script ()
+test_trafficPurchase_burnsFullAmountAndCreatesMemberTraffic = script do
+  setup@TestSetup{..} <- setupTest
+
+  result <- buyTraffic setup defaultTransfer
+
+  TransferInstructionResult_Completed [] <- pure result.output
+  TextMap.lookup reasonMetaKey result.meta.values === Some defaultReason
+  [changeHoldingCid] <- pure result.senderChangeCids
+  WalletClient.checkHolding alice changeHoldingCid (initialTap - oneMegabyteCostAmulet)
+  WalletClient.checkBalance alice registry.instrumentId (initialTap - oneMegabyteCostAmulet)
+
+  [(_, traffic)] <- query @MemberTraffic registry.dso
+  traffic.memberId === testMemberId
+  traffic.synchronizerId === testSynchronizerId
+  traffic.migrationId === 0
+  traffic.totalPurchased === oneMegabyte
+  traffic.numPurchases === 1
+  traffic.usdSpent === oneMegabyteCostUsd
+  traffic.amuletSpent === oneMegabyteCostAmulet
+
+test_trafficPurchase_spendsEntireInputWithoutChange : Script ()
+test_trafficPurchase_spendsEntireInputWithoutChange = script do
+  setup@TestSetup{..} <- setupTest
+  result <- buyTraffic setup defaultTransfer with amount = initialTap
+  result.senderChangeCids === []
+  WalletClient.checkBalance alice registry.instrumentId 0.0
+  [(_, traffic)] <- query @MemberTraffic registry.dso
+  traffic.totalPurchased === 25_000_000
+  traffic.amuletSpent === initialTap
+  traffic.usdSpent === 25.0
+
+test_trafficPurchase_mintsValidatorRewardCoupon : Script ()
+test_trafficPurchase_mintsValidatorRewardCoupon = script do
+  setup@TestSetup{..} <- setupTest
+  enrichedChoice <- transferFactoryChoice registry defaultTransfer
+  let context = enrichedChoice.arg.extraArgs.context
+  Right openRoundCid <- pure $ getFromContext @(ContractId OpenMiningRound) context openRoundContextKey
+  Right configStateCid <- pure $ getFromContext @(ContractId ExternalPartyConfigState) context externalPartyConfigStateContextKey
+  Some openRound <- queryContractId registry.dso openRoundCid
+  Some configState <- queryContractId registry.dso configStateCid
+  _ <- submitTrafficPurchase setup enrichedChoice
+  [(_, coupon)] <- query @ValidatorRewardCoupon registry.dso
+  coupon.user === alice
+  coupon.amount === oneMegabyteCostAmulet
+  coupon.round === openRound.round
+  assertMsg "coupon round differs from the holding fee round" $
+    coupon.round /= configState.holdingFeesOpenRoundNumber
+
+test_trafficPurchase_forfeitsValidatorRewardCoupon : Script ()
+test_trafficPurchase_forfeitsValidatorRewardCoupon = script do
+  setup@TestSetup{..} <- setupTest
+  let transfer = defaultTransfer with
+        meta = memoTagMeta (defaultMemoTag <> "&forfeit-validator-reward-coupon=true")
+  enrichedChoice <- dropOpenRound <$> transferFactoryChoice registry transfer
+  _ <- submitTrafficPurchase setup enrichedChoice
+  coupons <- query @ValidatorRewardCoupon registry.dso
+  coupons === []
+  [(_, traffic)] <- query @MemberTraffic registry.dso
+  traffic.totalPurchased === oneMegabyte
+
+test_trafficPurchase_acceptsMemoTagInAnyOrder : Script ()
+test_trafficPurchase_acceptsMemoTagInAnyOrder = script do
+  setup@TestSetup{..} <- setupTest
+  let memoTag =
+        trafficPurchaseMemoPrefix <> "migration-id=0&synchronizer-id=" <> testSynchronizerId <> "&member-id=" <> testMemberId
+  result <- buyTraffic setup defaultTransfer with meta = memoTagMeta memoTag
+  TextMap.lookup reasonMetaKey result.meta.values === Some defaultReason
+
+  [(_, traffic)] <- query @MemberTraffic registry.dso
+  traffic.memberId === testMemberId
+  traffic.totalPurchased === oneMegabyte
+
+-- Unhappy
+----------
+
+test_trafficPurchase_rejectsUnknownSynchronizer : Script ()
+test_trafficPurchase_rejectsUnknownSynchronizer = script do
+  setup@TestSetup{..} <- setupTest
+  buyTrafficMustFailWith
+    (expectErrorId "splice.lfdecentralizedtrust.org/unknown-synchronizer")
+    setup defaultTransfer with
+      meta = memoTagMeta (trafficPurchaseMemoPrefix <> "member-id=" <> testMemberId <> "&synchronizer-id=unknown-synchronizer&migration-id=0")
+
+test_trafficPurchase_rejectsAmountBelowMinTopup : Script ()
+test_trafficPurchase_rejectsAmountBelowMinTopup = script do
+  setup@TestSetup{..} <- setupTest
+  buyTrafficMustFailWith
+    (expectErrorId "splice.lfdecentralizedtrust.org/insufficient-topup-amount")
+    setup defaultTransfer with
+      amount = oneMegabyteCostAmulet - 0.000001
+
+rejectsNonPositiveTrafficPrice : Decimal -> Script ()
+rejectsNonPositiveTrafficPrice trafficPrice = script do
+  let config = AmuletRegistry.defaultAmuletRegistryConfig with
+        amuletConfig = defaultAmuletConfig with
+          decentralizedSynchronizer = defaultAmuletConfig.decentralizedSynchronizer with
+            fees = defaultAmuletConfig.decentralizedSynchronizer.fees with
+              extraTrafficPrice = trafficPrice
+  setup@TestSetup{..} <- setupTestWith config
+  buyTrafficMustFailWith
+    (expectMessageContains "Traffic price must be positive")
+    setup defaultTransfer
+
+test_trafficPurchase_rejectsZeroTrafficPrice : Script ()
+test_trafficPurchase_rejectsZeroTrafficPrice = rejectsNonPositiveTrafficPrice 0.0
+
+test_trafficPurchase_rejectsNegativeTrafficPrice : Script ()
+test_trafficPurchase_rejectsNegativeTrafficPrice = rejectsNonPositiveTrafficPrice (-1.0)
+
+test_trafficPurchase_rejectsMissingOpenRoundWithoutForfeit : Script ()
+test_trafficPurchase_rejectsMissingOpenRoundWithoutForfeit = script do
+  setup@TestSetup{..} <- setupTest
+  enrichedChoice <- dropOpenRound <$> transferFactoryChoice registry defaultTransfer
+  submitTrafficPurchaseMustFailWith (expectMessageContains "forfeit-validator-reward-coupon=true") setup enrichedChoice
+
+test_trafficPurchase_rejectsExpiredTransfer : Script ()
+test_trafficPurchase_rejectsExpiredTransfer = script do
+  setup@TestSetup{..} <- setupTest
+  now <- getTime
+  buyTrafficMustFailWith
+    (expectMessageContains "transfer.executeBefore")
+    setup defaultTransfer with
+      executeBefore = now `addRelTime` seconds (-1)
