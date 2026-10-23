@@ -178,17 +178,17 @@ class DbSvSvStoreTest
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    val store = new DbSvSvStore(
-      SvStore.Key(storeSvParty, dsoParty),
-      storage,
-      loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      0,
-      participantId = mkParticipantId("SvSvStoreTest"),
-      IngestionConfig(),
-      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-    )(parallelExecutionContext, implicitly, implicitly)
     for {
+      store <- DbSvSvStore.create(
+        SvStore.Key(storeSvParty, dsoParty),
+        storage,
+        loggerFactory,
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+        0,
+        participantId = mkParticipantId("SvSvStoreTest"),
+        IngestionConfig(),
+        defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+      )(parallelExecutionContext, implicitly, implicitly, implicitly)
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize(mockLedgerConnection())
       _ <- store.multiDomainAcsStore.testIngestionSink
         .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)

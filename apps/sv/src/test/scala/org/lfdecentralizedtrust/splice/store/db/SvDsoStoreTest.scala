@@ -52,6 +52,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
   InMemoryUnavailablePartiesStore,
@@ -1954,7 +1955,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listMemberTrafficContracts(
-            goodMember,
+            StoreMemberId(goodMember),
             dummyDomain,
             PageLimit.tryCreate(100),
           )
@@ -1980,7 +1981,7 @@ abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.getTotalPurchasedMemberTraffic(
-            goodMember,
+            StoreMemberId(goodMember),
             dummyDomain,
           )
         } yield result shouldBe (1 to 3).sum.toLong
@@ -2352,17 +2353,17 @@ class DbSvDsoStoreTest
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    val store = new DbSvDsoStore(
-      SvStore.Key(storeSvParty, dsoParty),
-      storage,
-      loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId,
-      participantId = mkParticipantId("SvDsoStoreTest"),
-      IngestionConfig(),
-      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-    )(parallelExecutionContext, implicitly, implicitly)
     for {
+      store <- DbSvDsoStore.create(
+        SvStore.Key(storeSvParty, dsoParty),
+        storage,
+        loggerFactory,
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+        domainMigrationId,
+        participantId = mkParticipantId("SvDsoStoreTest"),
+        IngestionConfig(),
+        defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+      )(parallelExecutionContext, implicitly, implicitly, implicitly)
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize(mockLedgerConnection())
       _ <- store.multiDomainAcsStore.testIngestionSink
         .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)

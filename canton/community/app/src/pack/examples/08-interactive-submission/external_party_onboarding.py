@@ -13,7 +13,8 @@ from com.daml.ledger.api.v2.admin import (
     party_management_service_pb2_grpc,
     party_management_service_pb2
 )
-from com.digitalasset.canton.protocol.v30 import topology_pb2
+from com.digitalasset.canton.protocol.v30 import topology_pb2 as topology_v30_pb2
+from com.digitalasset.canton.protocol.v31 import topology_pb2 as topology_v31_pb2
 from com.digitalasset.canton.crypto.v30 import crypto_pb2
 from com.daml.ledger.api.v2 import crypto_pb2 as ledger_api_crypto_pb2
 from interactive_topology_util import (
@@ -23,21 +24,25 @@ from interactive_topology_util import (
     sign_hash,
 )
 
+
 def build_serialized_transaction_and_hash(
-    mapping: topology_pb2.TopologyMapping,
+    mapping,
+    protocol_version: str,
 ) -> (bytes, bytes):
     """
     Generates a serialized topology transaction and its corresponding hash.
 
     Args:
-        mapping (topology_pb2.TopologyMapping): The topology mapping to be serialized.
+        mapping: The topology mapping to be serialized.
+        protocol_version: The protocol version of the synchronizer
 
     Returns:
         tuple: A tuple containing:
             - bytes: The serialized transaction.
             - bytes: The SHA-256 hash of the serialized transaction.
     """
-    transaction = serialize_topology_transaction(mapping)
+    transaction = serialize_topology_transaction(mapping, serial=1, protocol_version=protocol_version)
+
     transaction_hash = compute_sha256_canton_hash(11, transaction)
     return transaction, transaction_hash
 
@@ -49,6 +54,7 @@ def onboard_external_party(
     confirming_threshold: int,
     synchronizer_id: str,
     channel: Channel,
+    protocol_version: str,
 ) -> (EllipticCurvePrivateKey, str):
     """
     Onboard a new external party.
@@ -60,6 +66,7 @@ def onboard_external_party(
         confirming_threshold (int): Minimum number of confirmations that must be received from the confirming participants to authorize a transaction.
         synchronizer_id (str): ID of the synchronizer on which the party will be registered.
         channel (grpc.Channel): gRPC channel to one of the confirming participants Admin API.
+        protocol_version: The protocol version of the synchronizer
 
     Returns:
         tuple: A tuple containing:
@@ -109,29 +116,49 @@ def onboard_external_party(
     # This means those participants are not allowed to submit transactions on behalf of this party but will validate transactions
     # on behalf of the party by confirming or rejecting them according to the ledger model. They also records transaction for that party on the ledger.
     # It also contains the protocol signing keys and signing threshold for the party
-    confirming_participants_hosting = []
-    for confirming_participant_id in confirming_participant_ids:
-        confirming_participants_hosting.append(
-            topology_pb2.PartyToParticipant.HostingParticipant(
+    # Both v30 and v31 use the v30 ParticipantPermission; v31 additionally sets the hosting state of each participant
+    if protocol_version == "dev" or int(protocol_version) >= 37:
+        confirming_participants_hosting = [
+            topology_v31_pb2.PartyToParticipant.HostingParticipant(
                 participant_uid=confirming_participant_id,
-                permission=topology_pb2.Enums.ParticipantPermission.PARTICIPANT_PERMISSION_CONFIRMATION,
+                permission=topology_v30_pb2.Enums.ParticipantPermission.PARTICIPANT_PERMISSION_CONFIRMATION,
+                state=topology_v31_pb2.PartyToParticipant.HostingParticipant.HostingState.HOSTING_STATE_ACTIVE,
+            )
+            for confirming_participant_id in confirming_participant_ids
+        ]
+        party_to_participant_mapping = topology_v31_pb2.TopologyMapping(
+            party_to_participant=topology_v31_pb2.PartyToParticipant(
+                party=party_id,
+                threshold=confirming_threshold,
+                participants=confirming_participants_hosting,
+                party_signing_keys= crypto_pb2.SigningKeysWithThreshold(
+                    keys = [signing_public_key],
+                    threshold=1,
+                ),
             )
         )
-    party_to_participant_mapping = topology_pb2.TopologyMapping(
-        party_to_participant=topology_pb2.PartyToParticipant(
-            party=party_id,
-            threshold=confirming_threshold,
-            participants=confirming_participants_hosting,
-            party_signing_keys= crypto_pb2.SigningKeysWithThreshold(
-                # This is the same key the party id was generated from, and is consequently
-                # used both as the namespace key and protocol signing key
-                keys = [signing_public_key],
-                threshold=1,
+    else:
+        confirming_participants_hosting = [
+            topology_v30_pb2.PartyToParticipant.HostingParticipant(
+                participant_uid=confirming_participant_id,
+                permission=topology_v30_pb2.Enums.ParticipantPermission.PARTICIPANT_PERMISSION_CONFIRMATION,
+            )
+            for confirming_participant_id in confirming_participant_ids
+        ]
+        party_to_participant_mapping = topology_v30_pb2.TopologyMapping(
+            party_to_participant=topology_v30_pb2.PartyToParticipant(
+                party=party_id,
+                threshold=confirming_threshold,
+                participants=confirming_participants_hosting,
+                party_signing_keys= crypto_pb2.SigningKeysWithThreshold(
+                    keys = [signing_public_key],
+                    threshold=1,
+                )
             )
         )
-    )
+
     (party_to_participant_transaction, party_to_participant_transaction_hash) = (
-        build_serialized_transaction_and_hash(party_to_participant_mapping)
+        build_serialized_transaction_and_hash(party_to_participant_mapping, protocol_version)
     )
 
     signature = sign_hash(private_key, party_to_participant_transaction_hash)
@@ -145,7 +172,7 @@ def onboard_external_party(
                         ledger_api_crypto_pb2.Signature(
                             signature=signature,
                             signed_by=public_key_fingerprint,
-                            signing_algorithm_spec = ledger_api_crypto_pb2.SIGNING_KEY_SPEC_EC_P256,
+                            signing_algorithm_spec=ledger_api_crypto_pb2.SIGNING_KEY_SPEC_EC_P256,
                             format=ledger_api_crypto_pb2.CRYPTO_KEY_FORMAT_DER,
                         )
                     ],

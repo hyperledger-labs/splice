@@ -1239,6 +1239,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         activeAtOffset =
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.end(),
         streamContinuationToken = None,
+        includeIncompleteReassignments = true,
       )
     )
 

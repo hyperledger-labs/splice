@@ -2114,18 +2114,18 @@ class DbUserWalletStoreTest
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    val store = new DbUserWalletStore(
-      key = storeKey(endUserParty),
-      storage = storage,
-      loggerFactory = loggerFactory,
-      retryProvider =
-        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      migrationId,
-      participantId = mkParticipantId("UserWalletStoreTest"),
-      IngestionConfig(),
-      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-    )
     for {
+      store <- DbUserWalletStore.create(
+        key = storeKey(endUserParty),
+        storage = storage,
+        loggerFactory = loggerFactory,
+        retryProvider =
+          RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+        migrationId,
+        participantId = mkParticipantId("UserWalletStoreTest"),
+        IngestionConfig(),
+        defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+      )
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize(mockLedgerConnection())
       _ <- store.multiDomainAcsStore.testIngestionSink
         .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)

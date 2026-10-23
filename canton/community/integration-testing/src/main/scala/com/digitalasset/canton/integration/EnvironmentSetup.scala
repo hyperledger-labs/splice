@@ -52,9 +52,17 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
   protected[integration] def registerPlugin(plugin: BaseEnvironmentSetupPlugin[C, E]): Unit =
     plugins = plugins :+ plugin
 
-  // TODO(#35929) Remove the feature flag after fixing the failures
-  protected val enableAcsDigestConsistencyCheck: Boolean = false
+  protected val enableAcsDigestConsistencyCheck: Boolean = true
   protected val acsDigestConsistencyCheckTimeout: Timeout = Timeout(Span(60, Seconds))
+
+  override protected def beforeAll(): Unit = {
+    plugins.foreach(_.beforeTests())
+    super.beforeAll()
+  }
+
+  override protected def afterAll(): Unit =
+    try super.afterAll()
+    finally plugins.foreach(_.afterTests())
 
   /** Provide an environment for an individual test either by reusing an existing one or creating a
     * new one depending on the approach being used.

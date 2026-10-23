@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{ExternalPartyWalletStore, W
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{blocking, ExecutionContext}
+import scala.util.Failure
 import scala.util.control.NonFatal
 
 /** Manages all services comprising an external party wallets. */
@@ -64,10 +65,12 @@ class ExternalPartyWalletManager(
 
   // Note: putIfAbsent() eagerly evaluates the value to be inserted, but we only want to start
   // the new service if there is no existing service for the party yet.
-  // Accessing a concurrent map while modifying it is safe, so we only need to synchronize adding parties.
+  // Accessing a concurrent map while modifying it is safe, so we only need to synchronize adding
+  // and removing parties.
   private[this] def addExternalPartytWallet(
       externalParty: PartyId,
-      createWallet: PartyId => (RetryProvider, ExternalPartyWalletService),
+      externalPartyRetryProvider: RetryProvider,
+      externalPartyStore: ExternalPartyWalletStore,
   ): Option[(RetryProvider, ExternalPartyWalletService)] = blocking {
     mutex.exclusive {
       if (externalPartyWalletsMap.contains(externalParty)) {
@@ -79,7 +82,11 @@ class ExternalPartyWalletManager(
         logger.debug(
           show"Creating wallet service and retry provider for external party ${externalParty}."
         )(TraceContext.empty)
-        val externalPartyWallet = createWallet(externalParty)
+        val externalPartyWallet = createExternalPartytWallet(
+          externalParty,
+          externalPartyRetryProvider,
+          externalPartyStore,
+        )
         externalPartyWalletsMap.put(externalParty, externalPartyWallet): Unit
         Some(externalPartyWallet)
       }
@@ -120,60 +127,87 @@ class ExternalPartyWalletManager(
     */
   final def getOrCreateWallet(
       party: PartyId
-  ): UnlessShutdown[Boolean] = {
+  )(implicit tc: TraceContext): FutureUnlessShutdown[Boolean] = {
     if (retryProvider.isClosing) {
-      UnlessShutdown.AbortedDueToShutdown
+      FutureUnlessShutdown.abortedDueToShutdown
+    } else if (externalPartyWalletsMap.contains(party)) {
+      logger.debug(
+        show"Wallet for external party ${party} already exists, not creating a new one."
+      )
+      FutureUnlessShutdown.pure(false)
     } else {
-
-      val externalPartyRetryProviderAndWalletService =
-        addExternalPartytWallet(party, createExternalPartytWallet)
-
-      // There might have been a concurrent call to .close() that missed the above addition of this externalParty
-      if (retryProvider.isClosing) {
-        logger.debug(
-          show"Detected race between adding wallet for party ${party} and shutdown: closing wallet."
-        )(TraceContext.empty)
-        externalPartyRetryProviderAndWalletService.foreach {
-          case (externalPartyRetryProvider, walletService) =>
-            try externalPartyRetryProvider.close()
-            finally walletService.close()
+      val key = ExternalPartyWalletStore.Key(
+        dsoParty = store.walletKey.dsoParty,
+        store.walletKey.validatorParty,
+        party,
+      )
+      val partyLoggerFactory = loggerFactory.append("externalParty", key.externalParty.toString)
+      val externalPartyRetryProvider =
+        RetryProvider(
+          partyLoggerFactory,
+          retryProvider.timeouts,
+          retryProvider.futureSupervisor,
+          retryProvider.metricsFactory,
+        )
+      val partyStoreF = ExternalPartyWalletStore(
+        key,
+        storage,
+        partyLoggerFactory,
+        externalPartyRetryProvider,
+        migrationId,
+        participantId,
+        automationConfig.ingestion,
+        params.defaultLimit,
+      ).transform {
+        case Failure(e) =>
+          externalPartyRetryProvider.close()
+          Failure(e)
+        case success => success
+      }
+      FutureUnlessShutdown.outcomeF(partyStoreF).flatMap { partyStore =>
+        // If creating the service fails, the store and the retry provider are closed there
+        val externalPartyRetryProviderAndWalletService =
+          addExternalPartytWallet(party, externalPartyRetryProvider, partyStore)
+        if (externalPartyRetryProviderAndWalletService.isEmpty) {
+          // Lost a race with a concurrent creation of the same party's wallet
+          try partyStore.close()
+          finally externalPartyRetryProvider.close()
         }
-        UnlessShutdown.AbortedDueToShutdown
-      } else {
-        UnlessShutdown.Outcome(externalPartyRetryProviderAndWalletService.isDefined)
+
+        // There might have been a concurrent call to .close() that missed the above addition of this externalParty
+        if (retryProvider.isClosing) {
+          logger.debug(
+            show"Detected race between adding wallet for party ${party} and shutdown: closing wallet."
+          )
+          externalPartyRetryProviderAndWalletService.foreach {
+            case (externalPartyRetryProvider, walletService) =>
+              try externalPartyRetryProvider.close()
+              finally walletService.close()
+          }
+          FutureUnlessShutdown.abortedDueToShutdown
+        } else {
+          FutureUnlessShutdown.pure(externalPartyRetryProviderAndWalletService.isDefined)
+        }
       }
     }
   }
 
   private def createExternalPartytWallet(
-      externalParty: PartyId
+      externalParty: PartyId,
+      externalPartyRetryProvider: RetryProvider,
+      externalPartyStore: ExternalPartyWalletStore,
   ): (RetryProvider, ExternalPartyWalletService) = {
-    val key = ExternalPartyWalletStore.Key(
-      dsoParty = store.walletKey.dsoParty,
-      store.walletKey.validatorParty,
-      externalParty,
-    )
-    val partyLoggerFactory = loggerFactory.append("externalParty", key.externalParty.toString)
-    val externalPartyRetryProvider =
-      RetryProvider(
-        partyLoggerFactory,
-        retryProvider.timeouts,
-        retryProvider.futureSupervisor,
-        retryProvider.metricsFactory,
-      )
+    val partyLoggerFactory = loggerFactory.append("externalParty", externalParty.toString)
     val walletService =
       try {
         new ExternalPartyWalletService(
           ledgerClient,
-          key,
+          externalPartyStore,
           automationConfig,
           clock,
           domainTimeSync,
-          storage,
           externalPartyRetryProvider,
           partyLoggerFactory,
-          migrationId,
-          participantId,
           params,
           scanConnection,
           packageVersionSupport,

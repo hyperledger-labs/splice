@@ -18,9 +18,9 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   ClosedMiningRoundTxLogEntry,
   ErrorTxLogEntry,
   OpenMiningRoundTxLogEntry,
+  TransferCommandTxLogEntry,
   TxLogEntry,
   VoteRequestTxLogEntry,
-  TransferCommandTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.store.{Accepted, StoreErrors, VoteRequestOutcome}
 import org.lfdecentralizedtrust.splice.store.db.{
@@ -30,9 +30,10 @@ import org.lfdecentralizedtrust.splice.store.db.{
   TxLogRowData,
 }
 import org.lfdecentralizedtrust.splice.util.Contract
-import com.digitalasset.canton.topology.{SynchronizerId, Member, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.data.CantonTimestamp
 import io.circe.Json
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 object ScanTables extends AcsTables {
 
@@ -45,7 +46,7 @@ object ScanTables extends AcsTables {
       featuredAppRightProvider: Option[PartyId] = None,
       ansEntryName: Option[String] = None,
       ansEntryOwner: Option[PartyId] = None,
-      memberTrafficMember: Option[Member] = None,
+      memberTrafficMember: Option[StoreMemberId] = None,
       memberTrafficDomain: Option[SynchronizerId] = None,
       totalTrafficPurchased: Option[Long] = None,
       validatorLicenseRoundsCollected: Option[Long] = None,

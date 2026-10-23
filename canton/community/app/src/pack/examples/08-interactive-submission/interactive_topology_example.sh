@@ -5,7 +5,45 @@
 
 set -euo pipefail  # Exit on error, prevent unset vars, fail pipeline on first error
 
-# Setup
+# Source the utility script
+source "$(dirname "$0")/utils.sh"
+
+PROTOCOL_VERSION="37"
+POSITIONAL_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --protocol-version)
+      PROTOCOL_VERSION="$2"
+      shift 2
+      ;;
+    *)
+      POSITIONAL_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ ${#POSITIONAL_ARGS[@]} -gt 2 ]]; then
+  echo "Error: unexpected argument ${POSITIONAL_ARGS[2]}, use --protocol-version to set the protocol version"
+  exit 1
+fi
+
+# Read GRPC_ENDPOINT and SYNCHRONIZER_ID from arguments
+GRPC_ENDPOINT="${POSITIONAL_ARGS[0]:-"localhost:$(jq -r .participant1.adminApi canton_ports.json)"}"
+SYNCHRONIZER_ID="${POSITIONAL_ARGS[1]:-}"
+
+PROTO_VERSION=$(get_topology_version_number "$PROTOCOL_VERSION")
+
+# Read SYNCHRONIZER_ID from the environment or from the file if not provided as an argument
+if [ -z "$SYNCHRONIZER_ID" ]; then
+  if [ -f "synchronizer_id" ]; then
+    SYNCHRONIZER_ID=$(<synchronizer_id)
+  else
+    echo "Error: SYNCHRONIZER_ID is not set and synchronizer_id file is not found."
+    exit 1
+  fi
+fi
+
 # [start-docs-entry: set buf image path]
 CURRENT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd)
 BUF_PROTO_IMAGE="$CURRENT_DIR/interactive_topology_buf_image.json.gz"
@@ -25,30 +63,13 @@ fi
 (
   cd "$ROOT_PATH" &&
   buf build \
-      --type "com.digitalasset.canton.protocol.v30.TopologyTransaction" \
+      --type "com.digitalasset.canton.protocol.v${PROTO_VERSION}.TopologyTransaction" \
       --type "com.digitalasset.canton.version.v1.UntypedVersionedMessage" \
       --type "com.digitalasset.canton.protocol.v30.SignedTopologyTransaction" \
       -o "$BUF_PROTO_IMAGE"
 )
 export BUF_PROTO_IMAGE
 # [end-docs-entry: build buf image]
-
-# Source the utility script
-source "$(dirname "$0")/utils.sh"
-
-# Read GRPC_ENDPOINT and SYNCHRONIZER_ID from arguments
-GRPC_ENDPOINT="${1:-"localhost:$(jq -r .participant1.adminApi canton_ports.json)"}"
-SYNCHRONIZER_ID="${2:-}"
-
-# Read SYNCHRONIZER_ID from the environment or from the file if not provided as an argument
-if [ -z "$SYNCHRONIZER_ID" ]; then
-  if [ -f "synchronizer_id" ]; then
-    SYNCHRONIZER_ID=$(<synchronizer_id)
-  else
-    echo "Error: SYNCHRONIZER_ID is not set and synchronizer_id file is not found."
-    exit 1
-  fi
-fi
 
 # [start generate keys]
 # Generate an ECDSA private key and extract its public key
@@ -77,7 +98,7 @@ transaction=$(build_topology_transaction "$mapping" "$serial")
 
 # [start build versioned transaction]
 serialized_versioned_transaction_file="versioned_topology_transaction.binpb"
-serialize_topology_transaction "$transaction" > "$serialized_versioned_transaction_file"
+serialize_topology_transaction "$transaction" "$PROTOCOL_VERSION" > "$serialized_versioned_transaction_file"
 # [end build versioned transaction]
 
 # [start compute transaction hash]

@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.splitwell.automation
 
 import org.apache.pekko.stream.Materializer
 import cats.syntax.apply.*
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import org.lfdecentralizedtrust.splice.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
@@ -14,19 +13,14 @@ import org.lfdecentralizedtrust.splice.automation.{
   TransferFollowTrigger,
   UnassignTrigger,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
 import org.lfdecentralizedtrust.splice.environment.{
-  DarResource,
-  DarResources,
-  PackageIdResolver,
   PackageVersionSupport,
   RetryProvider,
   SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.store.DomainTimeSynchronization
-import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
 import org.lfdecentralizedtrust.splice.splitwell.store.SplitwellStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -151,36 +145,4 @@ object SplitwellAutomationService extends AutomationServiceCompanion {
   override protected[this] def expectedTriggerClasses: Seq[Nothing] =
     Seq.empty
 
-  private val walletPaymentsToSplitwell: Map[PackageVersion, DarResource] =
-    DarResources.splitwell.all.map { pkg =>
-      val walletPayments = pkg.dependencyPackageIds
-        .collectFirst(Function.unlift { pkgId =>
-          DarResources.walletPayments.all.find(_.packageId == pkgId)
-        })
-        .getOrElse(
-          throw new IllegalStateException(
-            s"Splitwell ${pkg.metadata} is missing a dependency on wallet-payments"
-          )
-        )
-      walletPayments.metadata.version -> pkg
-    }.toMap
-
-  private[automation] def extraPackageIdResolver(
-      packageConfig: splice.amuletconfig.PackageConfig,
-      template: QualifiedName,
-  ): Option[String] =
-    Option.when(template.moduleName == "Splice.Splitwell") {
-      val walletVersion = PackageIdResolver.readPackageVersion(
-        packageConfig,
-        PackageIdResolver.Package.SpliceWalletPayments,
-      )
-      walletPaymentsToSplitwell
-        .get(walletVersion)
-        .getOrElse(
-          throw new IllegalStateException(
-            s"wallet-payments version is $walletVersion but there is no splitwell version compiled against that, splitwell is only available for wallet-payments: ${walletPaymentsToSplitwell.keySet}"
-          )
-        )
-        .packageId
-    }
 }

@@ -116,10 +116,6 @@ SEQUENCER_UNKNOWN_RECIPIENTS.*(?:alice-validatorLocalForValidatorReonboardingIT|
 Instrument rpc\.server\.duration has exceeded the maximum allowed cardinality
 Too many log messages detected
 
-# TODO(DACH-NY/canton-network-internal#7516): Figure out where this is coming from
-Instrument daml\.sequencer\.block\.(events|event-bytes) has exceeded the maximum allowed cardinality
-
-
 # TODO(#655) Figure out why this happens
 Thread starvation or clock leap detected
 
@@ -230,3 +226,4 @@ SERVER_OVERLOADED.*Reached the limit of concurrent requests for.*DownloadTopolog
 sequenced.*but rejected.*during topology validation
 
 Not accepting submission as aggregation ID.*is already marked as delivered
+SEQUENCER_AGGREGATE_SUBMISSION_ALREADY_SENT

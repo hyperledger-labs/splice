@@ -4,30 +4,28 @@
 package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.data.*
-import com.digitalasset.canton.LfPackageId
+import cats.syntax.functor.*
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
+import com.digitalasset.canton.participant.metrics.ReassignmentMetrics
 import com.digitalasset.canton.participant.protocol.ProcessingSteps
 import com.digitalasset.canton.participant.protocol.conflictdetection.ActivenessResult
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.*
-import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentValidationError.ReassigningParticipantsMismatch
 import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentValidation.{
   CommonUnassignmentValidator,
   ReassigningParticipantUnassignmentValidator,
   ReassigningParticipantValidation,
   ValidationErrorOr,
 }
-import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentValidationError.PackageIdUnknownOrUnvetted
 import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentValidationResult.ReassigningParticipantValidationResult
-import com.digitalasset.canton.participant.protocol.submission.UsableSynchronizers
 import com.digitalasset.canton.participant.protocol.validation.AuthenticationValidator
-import com.digitalasset.canton.protocol.{LfContractId, Stakeholders}
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ContractValidator
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
+import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.concurrent.ExecutionContext
 
@@ -35,6 +33,7 @@ private[reassignment] class UnassignmentValidation(
     participantId: ParticipantId,
     contractValidator: ContractValidator,
     getTopologyAtTs: GetTopologyAtTimestamp,
+    reassignmentMetrics: ReassignmentMetrics,
 )(implicit val ec: ExecutionContext, traceContext: TraceContext) {
 
   def perform(
@@ -59,6 +58,7 @@ private[reassignment] class UnassignmentValidation(
             participantId,
             contractValidator,
             getTopologyAtTs,
+            reassignmentMetrics,
           ).performValidations(
             parsedRequest
           )
@@ -87,11 +87,16 @@ private[reassignment] class UnassignmentValidation(
 }
 
 private[reassignment] object UnassignmentValidation {
+
   type ValidationErrorOr[A] = EitherT[
     FutureUnlessShutdown,
     ReassignmentProcessorError,
     A,
   ]
+
+  private def validationErrorFromUnitEither[A](f: EitherT[FutureUnlessShutdown, A, Unit])(implicit
+      ec: ExecutionContext
+  ): ValidationErrorOr[Option[A]] = EitherT.right(f.value.map(e => e.swap.toOption))
 
   class CommonUnassignmentValidator(
       val activenessF: FutureUnlessShutdown[ActivenessResult],
@@ -105,7 +110,7 @@ private[reassignment] object UnassignmentValidation {
     ): ValidationErrorOr[Option[ReassignmentValidationError]] = {
       val fullTree = parsedRequest.fullViewTree
 
-      EitherT.right(
+      validationErrorFromUnitEither(
         ReassignmentValidation
           .checkSubmitter(
             ReassignmentRef(fullTree.contracts.contractIds.toSet),
@@ -114,8 +119,6 @@ private[reassignment] object UnassignmentValidation {
             participantId = fullTree.submitterMetadata.submittingParticipant,
             stakeholders = fullTree.contracts.stakeholders.all,
           )
-          .value
-          .map(_.swap.toOption)
       )
     }
 
@@ -135,84 +138,91 @@ private[reassignment] object UnassignmentValidation {
           ReassignmentValidation.checkStakeholders(parsedRequest.fullViewTree)
         )
       } yield ()
+      packageVettingErrors <- checkSourcePackagesVetted(
+        parsedRequest.fullViewTree,
+        Source(parsedRequest.snapshot.ipsSnapshot),
+      )
       submitterCheckResult <- checkSubmitterCheckResult(parsedRequest)
       // check multi-synchronizer flag is enabled on the source synchronizer
-      multiSynchronizerCheckResult <- EitherT.right(
+      multiSynchronizerCheckResult <- validationErrorFromUnitEither(
         ReassignmentValidation
           .checkMultiSynchronizerEnabled(
             topologySnapshot = parsedRequest.snapshot.ipsSnapshot,
             stakeholders = parsedRequest.fullViewTree.stakeholders,
             psid = parsedRequest.fullViewTree.sourceSynchronizer.unwrap,
           )
-          .value
-          .map(_.swap.toOption)
       )
     } yield UnassignmentValidationResult.CommonValidationResult(
       activenessResult,
       participantSignatureVerificationResult,
       contractAuthenticationResultF,
+      packageVettingErrors,
       submitterCheckResult,
       multiSynchronizerCheckResult,
     )
+
+    // check the package of the template is vetted
+    private def checkSourcePackagesVetted(
+        fullTree: FullUnassignmentTree,
+        sourceTopology: Source[TopologySnapshot],
+    ): ValidationErrorOr[Option[ReassignmentValidationError]] =
+      if (fullTree.sourceSynchronizer.unwrap.protocolVersion > ProtocolVersion.v36)
+        validationErrorFromUnitEither(
+          ReassignmentValidation
+            .checkPackagesVetted(
+              stakeholders = fullTree.contracts.stakeholders,
+              contractIds = fullTree.contracts.contractIds.toSet,
+              packageIds = fullTree.contracts.sourcePackageIds.unwrap,
+              topologySnapshot = sourceTopology.unwrap,
+              synchronizerId = fullTree.sourceSynchronizer.unwrap,
+            )
+        )
+      else
+        EitherT.rightT(None)
   }
 
   final class ReassigningParticipantUnassignmentValidator(
       val participantId: ParticipantId,
       val contractValidator: ContractValidator,
       val getTopologyAtTs: GetTopologyAtTimestamp,
+      val reassignmentMetrics: ReassignmentMetrics,
   )(implicit val executionContext: ExecutionContext, val traceContext: TraceContext) {
 
+    /** Returns the assignment exclusivity deadline up to protocol version 36, and None from
+      * protocol version 37.
+      */
     private def checkAssignmentExclusivity(
         fullTree: FullUnassignmentTree,
         targetTopology: Target[TopologySnapshot],
     ): ValidationErrorOr[Option[Target[CantonTimestamp]]] =
-      ProcessingSteps
-        .getAssignmentExclusivity(targetTopology, fullTree.targetTimestamp)
-        .map(Option(_))
-        .leftMap[ReassignmentProcessorError](
-          ReassignmentParametersError(fullTree.targetSynchronizer.unwrap, _)
-        )
-
-    private def checkPackagesVetted(
-        stakeholders: Stakeholders,
-        contractIds: Set[LfContractId],
-        packageIds: Set[LfPackageId],
-        topologySnapshot: TopologySnapshot,
-        synchronizerId: PhysicalSynchronizerId,
-    ): ValidationErrorOr[Option[ReassignmentValidationError]] =
-      EitherT.right(
-        UsableSynchronizers
-          .checkPackagesVetted(
-            synchronizerId,
-            topologySnapshot,
-            stakeholders.all.map(_ -> packageIds).toMap,
-            topologySnapshot.referenceTime,
-          )
-          .value
-          .map(
-            _.swap.toOption.map(u =>
-              PackageIdUnknownOrUnvetted(contractIds, u.unknownTo, synchronizerId)
-            )
-          )
+      if (
+        ReassignmentValidation.isAssignmentExclusivityEnforced(fullTree.targetSynchronizer.unwrap)
       )
+        ProcessingSteps
+          .getAssignmentExclusivity(targetTopology, fullTree.targetTimestamp)
+          .map(Option(_))
+          .leftMap[ReassignmentProcessorError](
+            ReassignmentParametersError(fullTree.targetSynchronizer.unwrap, _)
+          )
+      else EitherT.rightT(None)
 
     // check the package of the template is vetted
     private def checkTargetPackagesVetted(
         fullTree: FullUnassignmentTree,
         targetTopology: Target[TopologySnapshot],
     ): ValidationErrorOr[Option[ReassignmentValidationError]] =
-      checkPackagesVetted(
-        stakeholders = fullTree.contracts.stakeholders,
-        // TODO(#29199): Use target package IDs
-        contractIds = fullTree.contracts.contractIds.toSet,
-        packageIds = fullTree.contracts.packageIds,
-        topologySnapshot = targetTopology.unwrap,
-        synchronizerId = fullTree.targetSynchronizer.unwrap,
+      validationErrorFromUnitEither(
+        ReassignmentValidation.checkPackagesVetted(
+          stakeholders = fullTree.contracts.stakeholders,
+          contractIds = fullTree.contracts.contractIds.toSet,
+          packageIds = fullTree.contracts.targetPackageIds.unwrap,
+          topologySnapshot = targetTopology.unwrap,
+          synchronizerId = fullTree.targetSynchronizer.unwrap,
+        )
       )
 
-    // check the reassigning participants from the request match the computed reassigning participants
+    // check the declared reassigning participants are included in the computed ones and sufficient
     // check all stakeholders are hosted on active participants
-    // check the recipients from the request match the computed recipients
     private def checkReassigningParticipants(
         parsedRequest: ParsedReassignmentRequest[FullUnassignmentTree],
         targetTopology: Target[TopologySnapshot],
@@ -223,23 +233,12 @@ private[reassignment] object UnassignmentValidation {
             parsedRequest.fullViewTree.contracts.stakeholders,
             Source(parsedRequest.snapshot.ipsSnapshot),
             targetTopology,
-          ).compute.value
+          ).checkSufficient(
+            parsedRequest.fullViewTree.reassigningParticipants,
+            ReassignmentRef(parsedRequest.fullViewTree.contracts.contractIds.toSet),
+          ).value
         )
-        .map {
-          case Right(contractReassigningParticipants) =>
-            val fullViewTree = parsedRequest.fullViewTree
-            val requestReassigningParticipants = fullViewTree.reassigningParticipants
-            Option.when(contractReassigningParticipants != requestReassigningParticipants)(
-              ReassigningParticipantsMismatch(
-                reassignmentRef =
-                  ReassignmentRef.ContractIdRef(fullViewTree.contracts.contractIds.toSet),
-                expected = contractReassigningParticipants,
-                declared = requestReassigningParticipants,
-              )
-            )
-          case Left(rve) =>
-            Some(rve)
-        }
+        .map(_.swap.toOption)
 
     private def computeReassigningParticipantValidationResult(
         parsedRequest: ParsedReassignmentRequest[FullUnassignmentTree],
@@ -247,18 +246,28 @@ private[reassignment] object UnassignmentValidation {
     ): ValidationErrorOr[ReassigningParticipantValidationResult] =
       for {
         participantsErrors <- checkReassigningParticipants(parsedRequest, targetTopology)
-        vettingErrors <- checkTargetPackagesVetted(parsedRequest.fullViewTree, targetTopology)
+        packageVettingErrors <- checkTargetPackagesVetted(
+          parsedRequest.fullViewTree,
+          targetTopology,
+        )
         // check multi-synchronizer flag is enabled on the target synchronizer
-        multiSynchronizerCheckResult <- EitherT.right(
+        multiSynchronizerCheckResult <- validationErrorFromUnitEither(
           ReassignmentValidation
             .checkMultiSynchronizerEnabled(
               topologySnapshot = targetTopology.unwrap,
               stakeholders = parsedRequest.fullViewTree.stakeholders,
               psid = parsedRequest.fullViewTree.targetSynchronizer.unwrap,
             )
-            .value
-            .map(_.swap.toOption)
         )
+
+        contractSerializationErrors <- validationErrorFromUnitEither(
+          ReassignmentValidation.validateMaxSerializationVersion(
+            parsedRequest.fullViewTree.reassignmentRef,
+            parsedRequest.fullViewTree.targetSynchronizer,
+            parsedRequest.fullViewTree.contracts,
+          )
+        )
+
       } yield {
         val contractAuthenticationResultF =
           ReassignmentValidation.authenticateContractsAgainstTarget(
@@ -267,9 +276,27 @@ private[reassignment] object UnassignmentValidation {
           )
         ReassigningParticipantValidationResult(
           contractAuthenticationResultF,
-          participantsErrors.toList ++ vettingErrors.toList ++ multiSynchronizerCheckResult.toList,
+          Seq(
+            participantsErrors,
+            packageVettingErrors,
+            multiSynchronizerCheckResult,
+            contractSerializationErrors,
+          ).flatten,
         )
       }
+
+    private def recordLocalTargetTsLag(
+        fullViewTree: FullUnassignmentTree,
+        targetTopology: Target[TopologySnapshot],
+    ): Unit = {
+      val lag = fullViewTree.targetTimestamp.unwrap - targetTopology.unwrap.timestamp
+      reassignmentMetrics.localTargetTimestampLag.update(math.max(0L, lag.toMillis))(
+        ReassignmentMetrics.synchronizers(
+          fullViewTree.sourceSynchronizer.map(_.logical),
+          fullViewTree.targetSynchronizer.map(_.logical),
+        )
+      )
+    }
 
     def performValidations(
         parsedRequest: ParsedReassignmentRequest[FullUnassignmentTree]
@@ -290,7 +317,8 @@ private[reassignment] object UnassignmentValidation {
                 ),
               )
             ),
-          targetTopology =>
+          targetTopology => {
+            recordLocalTargetTsLag(fullViewTree, targetTopology)
             for {
               assignmentExclusivity <- checkAssignmentExclusivity(fullViewTree, targetTopology)
               reassigningParticipantValidationResult <-
@@ -298,12 +326,18 @@ private[reassignment] object UnassignmentValidation {
             } yield ReassigningParticipantValidation(
               assignmentExclusivity,
               reassigningParticipantValidationResult,
-            ),
+            )
+          },
         )
     }
 
   }
 
+  /** @param assignmentExclusivity
+    *   before this time (measured on the target synchronizer), only the submitter of the
+    *   unassignment can initiate the assignment; None when the target synchronizer runs protocol
+    *   version 37 or higher, or when its topology is unknown
+    */
   private[reassignment] final case class ReassigningParticipantValidation(
       assignmentExclusivity: Option[Target[CantonTimestamp]],
       reassigningParticipantValidationResult: UnassignmentValidationResult.ReassigningParticipantValidationResult,

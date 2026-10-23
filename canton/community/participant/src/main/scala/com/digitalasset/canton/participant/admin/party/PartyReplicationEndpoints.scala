@@ -30,11 +30,12 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.processing.EffectiveTime
 import com.digitalasset.canton.topology.transaction.{
-  ParticipantPermission as TopologyParticipantPermission,
   PartyToParticipant,
   SingleTransactionSignature,
   TopologyChangeOp,
   TopologyTransaction,
+  TopologyTransactionDeserializationContext,
+  ParticipantPermission as TopologyParticipantPermission,
 }
 import com.digitalasset.canton.topology.{
   ParticipantId,
@@ -45,6 +46,7 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherUtil.RichEither
+import com.digitalasset.canton.version.ProtocolVersionValidation
 import com.google.protobuf.duration.Duration
 import io.grpc.{Status, StatusRuntimeException}
 import org.apache.pekko.actor.ActorSystem
@@ -292,7 +294,7 @@ class PartyReplicationEndpointsImpl(
         ),
       )
 
-      // TODO(#33640) – Use configurable size to limit the unbounded signature collection (once it is available)
+      // TODO(#33975) – Use configurable size to limit the unbounded signature collection (once it is available)
       _ <- EitherT.cond[FutureUnlessShutdown](
         request.signatures.sizeIs <= 10,
         (),
@@ -319,7 +321,10 @@ class PartyReplicationEndpointsImpl(
       genericTx <- EitherT.fromEither[FutureUnlessShutdown](
         TopologyTransaction
           .fromByteString(
-            expectedProtocolVersion = protocolVersion,
+            ProtocolVersionValidation(protocolVersion),
+            TopologyTransactionDeserializationContext(
+              connectedSynchronizer.staticSynchronizerParameters.synchronizerLimits
+            ),
             txBytes,
           )
           .leftMap(err =>

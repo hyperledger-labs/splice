@@ -381,10 +381,15 @@ function subcmd_apply_validator(){
     _needs_auth0_sv_management_api_creds
 
     _production_gate
+
+    export SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME="${1:-validator-runbook}"
+    case "${SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME}" in
+        -*) _error "Invalid validator name: ${SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME}" ;;
+    esac
+    _info "Applying validator '${SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME}'"
+
     _prompt_to_confirm
     _cluster_must_exist
-
-    export SPLICE_VALIDATOR_RUNBOOK_VALIDATOR_NAME="validator-runbook"
 
     _uses_pulumi_stack validator-runbook
 

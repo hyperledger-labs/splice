@@ -60,6 +60,7 @@ import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
   DsoInfo,
+  DsoInfoV1,
   FactoryChoiceWithDisclosures,
   TemplateJsonDecoder,
 }
@@ -184,6 +185,15 @@ class BftScanConnection(
     bftCall(
       _.getDsoInfo(),
       "getDsoInfo",
+    )
+
+  override def getDsoInfoV1()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[DsoInfoV1] =
+    bftCall(
+      _.getDsoInfoV1(),
+      "getDsoInfoV1",
     )
 
   override def getDsoRules(

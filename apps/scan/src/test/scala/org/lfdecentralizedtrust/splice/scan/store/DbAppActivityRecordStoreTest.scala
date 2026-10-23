@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 import scala.concurrent.Future
 
@@ -507,7 +508,7 @@ class DbAppActivityRecordStoreTest
       val ts1 = CantonTimestamp.now()
       val ts2 = ts1.plusSeconds(1L)
       for {
-        (appStore, verdictStore) <- newStores()
+        (_, verdictStore) <- newStores()
         accepted = mkVerdict(
           verdictStore,
           updateId,
@@ -555,7 +556,7 @@ class DbAppActivityRecordStoreTest
       val ts1 = CantonTimestamp.now()
       val ts2 = ts1.plusSeconds(1L)
       for {
-        (appStore, verdictStore) <- newStores()
+        (_, verdictStore) <- newStores()
         rejected = mkVerdict(
           verdictStore,
           updateId,
@@ -1328,7 +1329,7 @@ class DbAppActivityRecordStoreTest
         storage,
         migrationId,
         s"app_activity_test_$n",
-        participantId,
+        StoreMemberId(participantId),
         dsoParty,
         BackfillingRequirement.BackfillingNotRequired,
         internedStringStore(storage),
@@ -1364,7 +1365,7 @@ class DbAppActivityRecordStoreTest
         storage,
         migrationId,
         "app_activity_combined_test",
-        participantId,
+        StoreMemberId(participantId),
         dsoParty,
         BackfillingRequirement.BackfillingNotRequired,
         internedStringStore(storage),

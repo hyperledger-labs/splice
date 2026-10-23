@@ -164,8 +164,13 @@ endpoint header found"). The same advertised endpoint is *also* reused for conne
 Trigger: the out-module wants to reach a peer (initial peers on `Start`, an admin `AddEndpoint`, or
 just the first `Multicast` to a node it isn't connected to yet). It calls
 `p2pConnectionState.addNetworkRefIfMissing(addressId){ … }{ createNetworkRef }`, which (for a new
-peer) spawns a **connection-managing actor** (`PekkoP2PGrpcNetworkManager.createNetworkRef`). That
-actor immediately sends itself `Initialize` to connect **eagerly**, before any message is queued.
+peer) spawns a **connection-managing actor** (`PekkoP2PGrpcNetworkManager.createNetworkRef`). The
+actor is spawned **parked and inert**; only once the network ref has been published into the
+connection state does the out-module call `startConnection()`, which sends the actor `Initialize` to
+connect **eagerly**, before any message is queued. This **two-phase start** lets a speculative or
+superseded ref (one that lost a race to a concurrent modification for the same address) be closed
+without its parked actor ever touching the connection state, avoiding cleanup of state now owned by
+the winning ref.
 
 The flow is, end to end, *dial → channel → stream → mutual authentication → bind identity → usable*.
 Authentication (§2) is steps 5–7 here, inline:
@@ -173,7 +178,8 @@ Authentication (§2) is steps 5–7 here, inline:
 ```
 out-module          conn-mgr actor         P2PGrpcConnectionManager            remote peer (B)
    │  createNetworkRef                                                              │
-   ├───────────────► (spawn) ──Initialize──►                                        │
+   ├───────────────► (spawn, parked)                                                │
+   │  startConnection ──Initialize──►                                               │
    │                          getPeerSenderOrStartConnection(Endpoint(ep))          │
  1 │                                   │  no sender yet → connectIfNeeded(ep)        │
    │                                   │  state: ∅ → Connecting                      │
@@ -312,6 +318,9 @@ once identity is known (§2):
   **single** `P2PNetworkRef`, preferring one already bound to the `nodeId` (typically the incoming
   connection), and returns the now-orphaned refs to `close()`. This is why a node may briefly hold
   two refs and then drop one — visible in the `BeforeAndAfter` state logs.
+  Ref consolidation is independent of sender selection: an outgoing ref can survive even when an
+  incoming sender wins, because sending through the ref resolves the currently registered sender.
+  The ref therefore does not carry connection direction; the winning `PeerSender` does.
 
 **Convergence is probabilistic, not deterministic.** The referee is purely local first-come; there
 is **no global tiebreaker** (e.g. "the lower `SequencerId` keeps its outgoing connection"). For a
@@ -445,9 +454,8 @@ all under `P2PConnectionManagementConfig`.
   The stored `node_id` is deliberately *ignored* when (re)establishing outgoing connectivity, both on
   this path and in `connectInitialNodes`: connections are always ensured by **endpoint**, because the
   peer must re-authenticate (§2) before it is addressable by node id again. Asserting a stored
-  association upfront would register the network ref under the node id, which
-  `addNetworkRefIfMissing` treats as *incoming* (`isOutgoingConnection = false`), and would make the
-  endpoint report `Authenticated` as soon as its gRPC channel is up but before any authentication —
+  association upfront would register the network ref under the node id and would make the
+  endpoint report `Authenticated` as soon as its gRPC channel is up but before any authentication,
   inflating `maxNodesContemporarilyAuthenticated` and potentially starting Availability/Consensus
   below their quorum of genuinely authenticated nodes. The persisted node id is for operator
   visibility (`Admin.ListConfiguredEndpoints`) only; durable identity pinning is tracked by #34191.
@@ -642,10 +650,19 @@ replace the stored set at startup.
 - **Admin**: `Admin.GetStatus` → `SequencerBftAdminData.PeerNetworkStatus` (per-endpoint health:
   `Authenticated(sequencerId)` / `Unauthenticated` / `Disconnected` / `UnknownEndpoint`, plus
   incoming-only entries), surfaced via the sequencer BFT admin API.
+  For endpoint entries, `isOutgoing` reads the registered sender's direction. Without a sender, it
+  returns `true` only when the endpoint has a network ref, representing an outgoing/pending attempt;
+  unknown or association-only endpoints return `false`. This fallback also applies during teardown
+  when a ref temporarily outlives an incoming sender, so it is not evidence of an active outgoing
+  transport.
 - **Metrics** (`core/modules/p2p/P2PMetrics.scala` → `BftOrderingMetrics.p2p`): connected &
   authenticated gauges; send/receive bytes & messages (labelled by peer and target/source module);
   `sendsRetried`; network-write & gRPC latencies; and the `security.noncompliant` identity-
   equivocation / wrong-`sentBy` counters.
+  The `authenticated-endpoint` gauge labels authenticated endpoints as
+  `url (sequencerId, outgoing = true/false)`, using the same sender-derived direction as admin status.
+  Incoming connections without a known endpoint use only the sequencer ID as the endpoint label.
+  The `unauthenticated-endpoint` and `disconnected-endpoint` gauges use the endpoint URL.
 
 ### Standalone mode
 `bindings/p2p/grpc/standalone/P2PGrpcStandaloneBftOrderingService.scala` exposes a different service

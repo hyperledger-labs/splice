@@ -16,7 +16,11 @@ import com.digitalasset.canton.ledger.error.PackageServiceErrors
 import com.digitalasset.canton.ledger.participant.state.PackageDescription
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.CantonPackageServiceError.PackageRemovalErrorCode
 import com.digitalasset.canton.participant.admin.CantonPackageServiceError.PackageRemovalErrorCode.{
@@ -47,13 +51,14 @@ import com.digitalasset.canton.util.PackageConsumer.PackageResolver
 import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
 import com.digitalasset.canton.{LedgerSubmissionId, LfPackageId, ProtoDeserializationError, config}
 import com.digitalasset.daml.lf.archive
-import com.digitalasset.daml.lf.archive.{DamlLf, DarParser, Error as LfArchiveError}
+import com.digitalasset.daml.lf.archive.{DamlLf, DarDecoder, DarParser, Error as LfArchiveError}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.engine.Engine
 import com.digitalasset.daml.lf.language.Ast.Package
 import com.google.protobuf.ByteString
 import slick.jdbc.GetResult
 
+import java.nio.file.Path
 import java.util.UUID
 import java.util.zip.ZipInputStream
 import scala.concurrent.ExecutionContext
@@ -696,6 +701,7 @@ object PackageService {
     def unwrap: String = value.unwrap
     def toProtoPrimitive: String = value.toProtoPrimitive
     def str: String = value.str
+    def toLfPackageId: LfPackageId = LfPackageId.assertFromString(value.unwrap)
   }
 
   object DarMainPackageId {
@@ -716,6 +722,17 @@ object PackageService {
 
     def fromProtoPrimitive(str: String): Either[ProtoDeserializationError, DarMainPackageId] =
       create(str).leftMap(err => ProtoDeserializationError.StringConversionError(err))
+
+    def fromDarPath(darPath: Path): Either[String, DarMainPackageId] =
+      DarDecoder
+        .readArchiveFromFile(darPath.toFile)
+        .leftMap(_.msg)
+        .flatMap(dar => create(dar.main._1))
+
+    def tryFromDarPath(darPath: Path): DarMainPackageId =
+      fromDarPath(darPath)
+        .leftMap(errMsg => throw new IllegalArgumentException(errMsg))
+        .merge
   }
 
   final case class DarDescription(
@@ -723,18 +740,13 @@ object PackageService {
       description: String255,
       name: String255,
       version: String255,
-  ) extends PrettyPrinting {
+  ) extends PrettyPrintingFromCompanion {
 
-    override protected def pretty: Pretty[DarDescription] = prettyOfClass(
-      param("dar-id", _.mainPackageId.unwrap.readableHash),
-      param("name", _.name.str.unquoted),
-      param("version", _.version.str.unquoted),
-      param("description", _.description.str.unquoted),
-    )
+    override def prettyCompanion: PrettyPrintingCompanion[DarDescription] = DarDescription
 
   }
 
-  object DarDescription {
+  object DarDescription extends PrettyPrintingCompanion[DarDescription] {
     implicit val getResult: GetResult[DarDescription] =
       GetResult(r =>
         DarDescription(
@@ -744,6 +756,13 @@ object PackageService {
           version = String255.tryCreate(r.<<),
         )
       )
+
+    override protected val pretty: Pretty[DarDescription] = prettyOfClass(
+      param("dar-id", _.mainPackageId.unwrap.readableHash),
+      param("name", _.name.str.unquoted),
+      param("version", _.version.str.unquoted),
+      param("description", _.description.str.unquoted),
+    )
   }
 
   final case class Dar(descriptor: DarDescription, bytes: Array[Byte]) {

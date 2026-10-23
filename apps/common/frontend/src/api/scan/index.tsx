@@ -3,7 +3,6 @@
 import { ScanClientProvider, useScanClient } from './ScanClientContext';
 import useAmuletPrice, { useAmuletPriceFromOpenRounds } from './useAmuletPrice';
 import useBackfillingStatus from './useBackfillingStatus';
-import useDsoInfo from './useDsoInfo';
 import useGetAmuletRules from './useGetAmuletRules';
 import useGetAnsRules, { useGetAnsRulesFromResponse } from './useGetAnsRules';
 import useGetDsoPartyId from './useGetDsoPartyId';
@@ -38,5 +37,4 @@ export {
   useLookupAnsEntryByParty,
   useLookupAnsEntryByPartyFromResponse,
   useOpenRounds,
-  useDsoInfo,
 };

@@ -51,7 +51,7 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
   "A wallet" should {
 
     "handle app and validator rewards that are collected" in { implicit env =>
-      val (alice, bob) = onboardAliceAndBob()
+      val (_, bob) = onboardAliceAndBob()
       waitForWalletUser(aliceValidatorWalletClient)
       waitForWalletUser(bobValidatorWalletClient)
 

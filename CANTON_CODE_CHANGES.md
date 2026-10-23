@@ -20,7 +20,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Removed a trailing comma in many places because the CC Scala compiler doesn't like it (e.g. `.authorize(op, domain, mediator, side, key.some, )` -> `.authorize(op, domain, mediator, side, key.some)`)
 * Added `org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition` to `BaseIntegrationTest.scala`
 * Added `resetRetriesAfter` option to `Backoff` retry policy
-* Changed default concurrency limit in `ConcurrencyEnvironmentLimit` to 1
+* Changed default concurrency limit in `ConcurrentEnvironmentLimiter` to 1
 * LogReporter logs location, message and throwable on TestFailed event.
 * Added an optional `darFile` parameter to `ParticipantAdminCommands.UploadDar` so we can more conveniently upload DARs from weird locations (like JARs).
 * `ParticipantAdminCommands.ImportPartyAcs` now takes an InputStream instead of a file for greater versatility.
@@ -39,3 +39,8 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added support for `damlDependencies` in SBT DamlPlugin
 - Added logic to DamlPlugin to support data-dependency paths compatible with Daml Studio & SBT
 * Changed cache detection logic for `damlBuild` in SBT DamlPlugin to file-hash instead of the default modification time.
+* Replaced the `SequencerConfig` with a placeholder due to a missing project dependency on `community-reference-sequencer`
+* Added `org.lfdecentralizedtrust.splice` to `logback-test.xml`
+* `DbStorageSetup.useTestContainer` also uses the Postgres provided by CI instead of a test container when running on GitHub Actions (`GITHUB_ACTION` set).
+* The participant admin workflow Daml projects (`canton-builtin-admin-workflow-ping`, `canton-builtin-admin-workflow-acs-replication-alpha`) set `sdk-version` and `--target=2.1` in their `daml.yaml`.
+  Upstream uses `override-components` with `$DAML_VERSION` and `--target=2.2`; with our dpm SDK bundle this fails both when `DAML_VERSION` is unset and when it is set (dpm does not allow mixing components and an SDK bundle).

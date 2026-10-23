@@ -6,8 +6,9 @@ package com.digitalasset.canton.data
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.*
+import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.crypto.{HashOps, HashPurpose, Salt}
-import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrintingCompanion}
 import com.digitalasset.canton.protocol.{v30, *}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{ProtoConverter, ProtocolVersionedMemoizedEvidence}
@@ -17,6 +18,7 @@ import com.digitalasset.canton.validation.{
   ProtoUnvalidatedSeq,
   ProtoUnvalidatedString,
   ProtoValidation,
+  ValidationParam,
 }
 import com.digitalasset.canton.version.*
 import com.digitalasset.daml.lf.data.Ref
@@ -54,43 +56,9 @@ final case class SubmitterMetadata private (
     SubmissionTrackerData(submittingParticipant, maxSequencingTime)
   )
 
-  override protected def pretty: Pretty[SubmitterMetadata] = prettyOfClass(
-    param("act as", _.actAs),
-    param("user id", _.userId),
-    param("command id", _.commandId),
-    param("submitting participant", _.submittingParticipant),
-    param("salt", _.salt),
-    paramIfDefined("submission id", _.submissionId),
-    param("deduplication period", _.dedupPeriod),
-    param("max sequencing time", _.maxSequencingTime),
-    paramIfDefined("external authorization", _.externalAuthorization),
-  )
+  override def prettyCompanion: PrettyPrintingCompanion[SubmitterMetadata] = SubmitterMetadata
 
   @transient override protected lazy val companionObj: SubmitterMetadata.type = SubmitterMetadata
-
-  protected def toProtoV30: v30.SubmitterMetadata = v30.SubmitterMetadata(
-    actAs = actAs.toSeq.map(_.toProtoUnvalidated),
-    userId = userId.toProtoPrimitive,
-    commandId = commandId.toProtoPrimitive,
-    submittingParticipantUid = submittingParticipant.uid.toProtoPrimitive,
-    salt = Some(salt.toProtoV30),
-    submissionId = submissionId.getOrElse("").toProtoUnvalidated,
-    dedupPeriod = Some(SerializableDeduplicationPeriod(dedupPeriod).toProtoV30),
-    maxSequencingTime = maxSequencingTime.toProtoPrimitive,
-    externalAuthorization = externalAuthorization.map(_.toProtoV30),
-  )
-
-  protected def toProtoV31: v31.SubmitterMetadata = v31.SubmitterMetadata(
-    actAs = actAs.toSeq.map(_.toProtoUnvalidated),
-    userId = userId.toProtoPrimitive,
-    commandId = commandId.toProtoPrimitive,
-    submittingParticipantUid = submittingParticipant.uid.toProtoPrimitive,
-    salt = Some(salt.toProtoV30),
-    submissionId = submissionId.getOrElse("").toProtoUnvalidated,
-    dedupPeriod = Some(SerializableDeduplicationPeriod(dedupPeriod).toProtoV30),
-    maxSequencingTime = maxSequencingTime.toProtoPrimitive,
-    externalAuthorization = externalAuthorization.map(_.toProtoV31),
-  )
 
   protected def toProtoV32: v32.SubmitterMetadata = v32.SubmitterMetadata(
     actAs = actAs.toSeq.map(_.toProtoUnvalidated),
@@ -115,22 +83,27 @@ object SubmitterMetadata
     extends VersioningCompanionContextMemoization[
       SubmitterMetadata,
       SubmitterMetadataDeserializationContext,
-    ] {
+    ]
+    with PrettyPrintingCompanion[SubmitterMetadata] {
   override val name: String = "SubmitterMetadata"
 
+  override protected val pretty: Pretty[SubmitterMetadata] = prettyOfClass(
+    param("act as", _.actAs),
+    param("user id", _.userId),
+    param("command id", _.commandId),
+    param("submitting participant", _.submittingParticipant),
+    param("salt", _.salt),
+    paramIfDefined("submission id", _.submissionId),
+    param("deduplication period", _.dedupPeriod),
+    param("max sequencing time", _.maxSequencingTime),
+    paramIfDefined("external authorization", _.externalAuthorization),
+  )
+
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.SubmitterMetadata)(
-      supportedProtoVersionMemoizedPVV(_)(fromProtoV30),
-      _.toProtoV30,
-    ),
-    ProtoVersion(31) -> VersionedProtoCodec(ProtocolVersion.v35)(v31.SubmitterMetadata)(
-      supportedProtoVersionMemoizedPVV(_)(fromProtoV31),
-      _.toProtoV31,
-    ),
     ProtoVersion(32) -> VersionedProtoCodec(ProtocolVersion.v36)(v32.SubmitterMetadata)(
       supportedProtoVersionMemoizedPVV(_)(fromProtoV32),
       _.toProtoV32,
-    ),
+    )
   )
 
   def apply(
@@ -167,105 +140,37 @@ object SubmitterMetadata
       salt: Salt,
       maxSequencingTime: CantonTimestamp,
       externalAuthorization: Option[ExternalAuthorization],
+      protocolLimits: TransactionProtocolLimits,
       protocolVersion: ProtocolVersion,
-  ): Either[String, SubmitterMetadata] =
-    NonEmpty.from(submitterActAs.toSet).toRight("The actAs set must not be empty.").map {
-      actAsNes =>
-        SubmitterMetadata(
-          actAsNes, // Canton ignores SubmitterInfo.readAs per https://github.com/digital-asset/daml/pull/12136
-          UserId(submitterUserId),
-          CommandId(submitterCommandId),
-          submittingParticipant,
-          salt,
-          submitterSubmissionId,
-          submitterDeduplicationPeriod,
-          maxSequencingTime,
-          externalAuthorization,
-          hashOps,
-          protocolVersion,
+  ): Either[String, SubmitterMetadata] = {
+    val protocolVersionValidation = ProtocolVersionValidation.PV(protocolVersion)
+    val maxActAs = protocolLimits.maxActAs
+
+    for {
+      _ <- ProtoValidation
+        .validateCondition(
+          protocolVersionValidation,
+          ValidationParam(ProtocolVersion.v36 -> maxActAs),
+        )(
+          max => submitterActAs.sizeIs <= max.value,
+          max =>
+            InvariantViolation("act_as", s"size of ${submitterActAs.size} exceeds limit of $max"),
         )
-    }
-
-  private def fromProtoV30(
-      pvv: ProtocolVersionValidation,
-      context: SubmitterMetadataDeserializationContext,
-      metaDataP: v30.SubmitterMetadata,
-  )(
-      bytes: ByteString
-  ): ParsingResult[SubmitterMetadata] = {
-    val SubmitterMetadataDeserializationContext(hashOps, synchronizerLimits) = context
-    val v30.SubmitterMetadata(
-      saltOP,
-      actAsP,
-      userIdP,
-      commandIdP,
-      submittingParticipantUidP,
-      submissionIdP,
-      dedupPeriodOP,
-      maxSequencingTimeOP,
-      externalAuthorizationOP,
-    ) = metaDataP
-
-    for {
-      externalAuthorizationO <- externalAuthorizationOP.traverse(
-        ExternalAuthorization.fromProtoV30(pvv, _)
-      )
-      rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
-      result <- fromProto(pvv, hashOps, synchronizerLimits, bytes)(
-        saltOP,
-        actAsP,
-        userIdP,
-        commandIdP,
-        submittingParticipantUidP,
-        submissionIdP,
-        dedupPeriodOP,
-        maxSequencingTimeOP,
-        externalAuthorizationO,
-        rpv,
-      )
-
-    } yield result
-
-  }
-
-  private def fromProtoV31(
-      pvv: ProtocolVersionValidation,
-      context: SubmitterMetadataDeserializationContext,
-      metaDataP: v31.SubmitterMetadata,
-  )(
-      bytes: ByteString
-  ): ParsingResult[SubmitterMetadata] = {
-    val SubmitterMetadataDeserializationContext(hashOps, synchronizerLimits) = context
-    val v31.SubmitterMetadata(
-      saltOP,
-      actAsP,
-      userIdP,
-      commandIdP,
-      submittingParticipantUidP,
-      submissionIdP,
-      dedupPeriodOP,
-      maxSequencingTimeOP,
-      externalAuthorizationOP,
-    ) = metaDataP
-
-    for {
-      externalAuthorizationO <- externalAuthorizationOP.traverse(
-        ExternalAuthorization.fromProtoV31(pvv, _)
-      )
-      rpv <- protocolVersionRepresentativeFor(ProtoVersion(31))
-      result <- fromProto(pvv, hashOps, synchronizerLimits, bytes)(
-        saltOP,
-        actAsP,
-        userIdP,
-        commandIdP,
-        submittingParticipantUidP,
-        submissionIdP,
-        dedupPeriodOP,
-        maxSequencingTimeOP,
-        externalAuthorizationO,
-        rpv,
-      )
-    } yield result
+        .leftMap(_.message)
+      actAsNes <- NonEmpty.from(submitterActAs.toSet).toRight("The actAs set must not be empty.")
+    } yield SubmitterMetadata(
+      actAsNes, // Canton ignores SubmitterInfo.readAs per https://github.com/digital-asset/daml/pull/12136
+      UserId(submitterUserId),
+      CommandId(submitterCommandId),
+      submittingParticipant,
+      salt,
+      submitterSubmissionId,
+      submitterDeduplicationPeriod,
+      maxSequencingTime,
+      externalAuthorization,
+      hashOps,
+      protocolVersion,
+    )
   }
 
   private def fromProtoV32(
@@ -336,9 +241,12 @@ object SubmitterMetadata
 
       maxActAs = synchronizerLimits.transactionProtocolLimits.maxActAs
       actAs <- ProtoValidation
-        .validateThen(actAsP, "act_as", pvv, maxActAs.value)(
-          ProtoConverter.parseLfPartyId
-        )
+        .validateThen(
+          actAsP,
+          "act_as",
+          pvv,
+          ValidationParam(ProtocolVersion.v36 -> maxActAs),
+        )(ProtoConverter.parseLfPartyId)
       userId <- ProtoValidation.validateThen(userIdP, "userId", pvv)((s, _) =>
         UserId
           .fromProtoPrimitive(s)

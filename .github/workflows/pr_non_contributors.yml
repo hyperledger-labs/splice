@@ -2,7 +2,7 @@ name: CI on PRs from forks
 on:
   pull_request_target:
     types: [ opened, synchronize, reopened ]
-    branches: [ main, 'staging-*' ] # Only run on PRs with `main` or `staging` branches as their base
+    branches: [ main, 'staging-*', 'feature-*' ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref }}

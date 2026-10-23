@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.sv.store
 
+import com.digitalasset.canton.tracing.TraceContext
+
 import cats.implicits.toTraverseOps
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
@@ -48,11 +50,11 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
@@ -890,8 +892,12 @@ trait SvDsoStore
       )
     } yield unclaimedRewards map (_.contract)
 
-  def listMemberTrafficContracts(memberId: Member, synchronizerId: SynchronizerId, limit: Limit)(
-      implicit tc: TraceContext
+  def listMemberTrafficContracts(
+      memberId: StoreMemberId,
+      synchronizerId: SynchronizerId,
+      limit: Limit,
+  )(implicit
+      tc: TraceContext
   ): Future[
     Seq[Contract[
       splice.decentralizedsynchronizer.MemberTraffic.ContractId,
@@ -953,8 +959,8 @@ trait SvDsoStore
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]]
 
-  def getTotalPurchasedMemberTraffic(memberId: Member, synchronizerId: SynchronizerId)(implicit
-      tc: TraceContext
+  def getTotalPurchasedMemberTraffic(memberId: StoreMemberId, synchronizerId: SynchronizerId)(
+      implicit tc: TraceContext
   ): Future[Long]
 
   def lookupVoteByThisSvAndVoteRequestWithOffset(
@@ -1212,8 +1218,9 @@ object SvDsoStore {
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
-  ): SvDsoStore = {
-    new DbSvDsoStore(
+      tc: TraceContext,
+  ): Future[SvDsoStore] = {
+    DbSvDsoStore.create(
       key,
       storage,
       loggerFactory,
@@ -1488,7 +1495,7 @@ object SvDsoStore {
               // we ignore cases where the member id is invalid instead of throwing an exception
               // to avoid killing the entire ingestion pipeline as a result
               _ => None,
-              Some(_),
+              member => Some(StoreMemberId(member)),
             ),
           memberTrafficDomain = Some(SynchronizerId.tryFromString(contract.payload.synchronizerId)),
           totalTrafficPurchased = Some(contract.payload.totalPurchased),

@@ -251,13 +251,13 @@ class SV1Initializer(
       ).tupled
       storeKey = SvStore.Key(svParty, dsoParty)
       domainMigrationId <- resolveDomainMigrationId(Future.successful(0L))
-      svStore = newSvStore(
+      svStore <- newSvStore(
         storeKey,
         domainMigrationId,
         participantId,
         svAcsStoreDescriptorUserVersion,
       )
-      dsoStore = newDsoStore(
+      dsoStore <- newDsoStore(
         svStore.key,
         domainMigrationId,
         participantId,
@@ -457,7 +457,7 @@ class SV1Initializer(
           )
         )
         val initialValues =
-          DynamicSynchronizerParameters.initialValues(synchronizerNode.config.protocolVersion)
+          DynamicSynchronizerParameters.initialValues(sv1Config.initialProtocolVersion)
         val values = initialValues.tryUpdate(
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
@@ -521,15 +521,9 @@ class SV1Initializer(
                     TopologyStoreId.Authorized,
                   )
                   mediatorIdentity <- synchronizerNode.mediatorAdminConnection
-                    .getOrGenerateIdentityTransactions(
-                      mediatorId,
-                      synchronizerNode.config.protocolVersion,
-                    )
+                    .generateOnboardingTopologyTransactions(sv1Config.initialProtocolVersion)
                   sequencerIdentity <- synchronizerNode.sequencerAdminConnection
-                    .getOrGenerateIdentityTransactions(
-                      sequencerId,
-                      synchronizerNode.config.protocolVersion,
-                    )
+                    .generateOnboardingTopologyTransactions(sv1Config.initialProtocolVersion)
                 } yield participantIdentity ++ mediatorIdentity ++ sequencerIdentity,
                 participantAdminConnection.proposeInitialDomainParameters(
                   synchronizerId,
@@ -566,7 +560,10 @@ class SV1Initializer(
                   )
               _ <- synchronizerNode.sequencerAdminConnection.initializeFromBeginning(
                 StoredTopologyTransactions(bootstrapTransactions),
-                synchronizerNode.staticSynchronizerParameters(NonNegativeInt.zero),
+                synchronizerNode.staticSynchronizerParameters(
+                  NonNegativeInt.zero,
+                  sv1Config.initialProtocolVersion,
+                ),
               )
             } yield (),
             logger,

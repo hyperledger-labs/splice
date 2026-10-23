@@ -7,13 +7,17 @@ import cats.syntax.reducible.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.protocol.{SynchronizerLimits, v30}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
-import com.digitalasset.canton.validation.ProtoValidation
-import com.digitalasset.canton.version.ProtocolVersionValidation
+import com.digitalasset.canton.validation.{ProtoValidation, ValidationParam}
+import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
 import com.digitalasset.nonempty.NonEmpty
 
 /** A tree representation of the recipients for a batch. Each member receiving the batch should see
@@ -23,13 +27,9 @@ import com.digitalasset.nonempty.NonEmpty
 final case class RecipientsTree(
     recipientGroup: NonEmpty[Set[Recipient]],
     children: Seq[RecipientsTree],
-) extends PrettyPrinting {
+) extends PrettyPrintingFromCompanion {
 
-  override protected def pretty: Pretty[RecipientsTree] =
-    prettyOfClass(
-      param("recipient group", _.recipientGroup.toList),
-      paramIfNonEmpty("children", _.children),
-    )
+  override def prettyCompanion: PrettyPrintingCompanion[RecipientsTree] = RecipientsTree
 
   lazy val allRecipients: NonEmpty[Set[Recipient]] = {
     val tail: Set[Recipient] = children.flatMap(t => t.allRecipients).toSet
@@ -81,7 +81,13 @@ final case class RecipientsTree(
   }
 }
 
-object RecipientsTree {
+object RecipientsTree extends PrettyPrintingCompanion[RecipientsTree] {
+  override protected val pretty: Pretty[RecipientsTree] =
+    prettyOfClass(
+      param("recipient group", _.recipientGroup.toList),
+      paramIfNonEmpty("children", _.children),
+    )
+
   def ofRecipients(
       recipientGroup: NonEmpty[Set[Recipient]],
       children: Seq[RecipientsTree],
@@ -113,14 +119,18 @@ object RecipientsTree {
       for {
         _ <- ProtoValidation.validateCondition(
           pvv,
-          currentDepth <= maxRecipientsTreeDepth.value,
-          InvariantViolation("recipients_tree", s"depth exceeds maximum of $maxRecipientsTreeDepth"),
+          ValidationParam(ProtocolVersion.v36 -> maxRecipientsTreeDepth),
+        )(
+          maxDepth => currentDepth <= maxDepth.value,
+          maxDepth => InvariantViolation("recipients_tree", s"depth exceeds maximum of $maxDepth"),
         )
         members <- ProtoValidation.validateThen(
           treeProto.recipients,
           "RecipientsTreeProto.recipients",
           pvv,
-          maxRecipientsPerRecipientsTreeLevel.value,
+          ValidationParam(
+            ProtocolVersion.v36 -> maxRecipientsPerRecipientsTreeLevel
+          ),
         )(Recipient.fromProtoPrimitive)
         recipientsNonEmpty <- NonEmpty
           .from(members)
@@ -135,7 +145,9 @@ object RecipientsTree {
             treeProto.children,
             "children",
             pvv,
-            maxChildrenPerRecipientsTreeLevel.value,
+            ValidationParam(
+              ProtocolVersion.v36 -> maxChildrenPerRecipientsTreeLevel
+            ),
           )
           .flatMap(_.toList.traverse(go(_, currentDepth + 1)))
       } yield RecipientsTree(

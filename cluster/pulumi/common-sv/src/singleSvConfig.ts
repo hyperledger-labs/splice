@@ -21,6 +21,8 @@ import { TopologySnapshotSchema } from './config';
 import {
   CloudSqlWithOverrideConfigSchema,
   PhysicalSynchronizersConfigOverridesSchema,
+  SvCantonBftConfig,
+  SvCantonBftConfigSchema,
   SvMediatorConfig,
   SvMediatorConfigSchema,
   SvSequencerConfig,
@@ -166,6 +168,7 @@ const SingleSvConfigSchema = z
     participant: SvParticipantConfigSchema.optional(),
     sequencer: SvSequencerConfigSchema.prefault({}),
     mediator: SvMediatorConfigSchema.prefault({}),
+    cantonBft: SvCantonBftConfigSchema.optional(),
     physicalSynchronizerOverrides: PhysicalSynchronizersConfigOverridesSchema.prefault({}),
     appsPg: AppsPgConfigSchema.optional(),
     svApp: SvAppConfigSchema.optional(),
@@ -211,23 +214,31 @@ const SingleSvConfigSchema = z
     versionOverride: CnChartVersionSchema.optional(),
   })
   .strict()
-  .transform(({ physicalSynchronizerOverrides, sequencer, mediator, ...svConfig }) => {
+  .transform(({ physicalSynchronizerOverrides, sequencer, mediator, cantonBft, ...svConfig }) => {
     // Implicit config merging is confusing but for now I don't really see a better way of introducting these overrides.
     // Perhaps a proper revisit of the synchronizerMigration config structure will lead to a better solution here.
     const physicalSynchronizers = DecentralizedSynchronizerUpgradeConfig.allMigrations.map(
-      migration => [
-        migration.id,
-        {
-          mediator: mergeConfigFragments(
-            mediator,
-            physicalSynchronizerOverrides[migration.id]?.mediator || {}
-          ) as SvMediatorConfig,
-          sequencer: mergeConfigFragments(
-            sequencer,
-            physicalSynchronizerOverrides[migration.id]?.sequencer || {}
-          ) as SvSequencerConfig,
-        },
-      ]
+      migration => {
+        const mergedSequencer = mergeConfigFragments(
+          sequencer,
+          physicalSynchronizerOverrides[migration.id]?.sequencer || {}
+        ) as SvSequencerConfig;
+        return [
+          migration.id,
+          {
+            mediator: mergeConfigFragments(
+              mediator,
+              physicalSynchronizerOverrides[migration.id]?.mediator || {}
+            ) as SvMediatorConfig,
+            sequencer: mergedSequencer,
+            cantonBft: mergeConfigFragments(
+              _.pick(mergedSequencer, ['cloudSql', 'splicePostgres']),
+              cantonBft || {},
+              physicalSynchronizerOverrides[migration.id]?.cantonBft || {}
+            ) as SvCantonBftConfig,
+          },
+        ];
+      }
     );
     return {
       ...svConfig,

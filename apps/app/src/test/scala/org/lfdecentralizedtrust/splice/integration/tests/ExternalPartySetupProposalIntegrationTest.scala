@@ -34,10 +34,12 @@ import org.lfdecentralizedtrust.splice.validator.automation.RenewTransferPreappr
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import monocle.macros.syntax.lens.*
 
 import java.time.Instant
 import java.util.UUID
+import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -146,7 +148,7 @@ class ExternalPartySetupProposalIntegrationTest
   "TransferPreapproval allows to transfer between externally signed parties" taggedAs (org.lfdecentralizedtrust.splice.util.Tags.SpliceAmulet_0_1_9) in {
     implicit env =>
       // Onboard and Create/Accept ExternalPartySetupProposal for Alice
-      val onboardingAlice @ OnboardingResult(aliceParty, alicePublicKey, alicePrivateKey) =
+      val onboardingAlice @ OnboardingResult(aliceParty, _, _) =
         onboardExternalParty(aliceValidatorBackend, Some("aliceExternal"))
       aliceValidatorBackend.participantClient.parties
         .hosted(filterParty =
@@ -256,6 +258,42 @@ class ExternalPartySetupProposalIntegrationTest
               aliceParty,
               c => c.data.provider == aliceParty.toProtoPrimitive,
             ) should have length (1),
+      )
+  }
+
+  "Wallet automation starts for external parties with signing keys embedded in PartyToParticipant" in {
+    implicit env =>
+      val onboarding = onboardExternalPartyWithEmbeddedKeys(aliceValidatorBackend)
+      val synchronizerStore = TopologyStoreId.Synchronizer(decentralizedSynchronizerId)
+      eventually() {
+        aliceValidatorBackend.participantClient.topology.party_to_participant_mappings
+          .list(
+            synchronizerStore,
+            filterParty = onboarding.party.filterString,
+          )
+          .loneElement
+          .item
+          .partySigningKeysWithThreshold should not be empty
+      }
+      // The point of this test is to cover parties without a PartyToKeyMapping
+      @nowarn("cat=deprecation")
+      val partyToKeyMappings =
+        aliceValidatorBackend.participantClient.topology.party_to_key_mappings.list(
+          synchronizerStore,
+          filterParty = onboarding.party.filterString,
+        )
+      partyToKeyMappings shouldBe empty
+      aliceValidatorWalletClient.tap(10.0)
+      actAndCheck(
+        s"Setup external party ${onboarding.party} on alice validator",
+        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, onboarding),
+      )(
+        s"Wallet automation for ${onboarding.party} is started",
+        _ =>
+          aliceValidatorBackend.appState.walletManager
+            .valueOrFail("WalletManager is expected to be defined")
+            .externalPartyWalletManager
+            .lookupExternalPartyWallet(onboarding.party) should not be empty,
       )
   }
 

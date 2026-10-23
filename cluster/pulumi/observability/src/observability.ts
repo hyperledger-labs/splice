@@ -62,7 +62,10 @@ function istioVirtualService(
   ns: k8s.core.v1.Namespace,
   name: string,
   serviceName: string,
-  servicePort: number
+  servicePort: number,
+  opts: {
+    uriPrefix?: string;
+  } = {}
 ) {
   const host = pulumi.interpolate`${serviceName}.${ns.metadata.name}.svc.cluster.local`;
   new k8s.apiextensions.CustomResource(
@@ -108,7 +111,10 @@ function istioVirtualService(
         gateways: ['cluster-ingress/cn-http-gateway'],
         http: [
           {
-            match: [{ port: 443 }, { port: 80 }],
+            match: [{ port: 443 }, { port: 80 }].map(match => ({
+              ...match,
+              ...(opts.uriPrefix ? { uri: { prefix: opts.uriPrefix } } : {}),
+            })),
             route: [
               {
                 destination: {
@@ -139,9 +145,21 @@ function istioVirtualService(
   );
 }
 
+// Exposes the pushgateway through the cluster ingress.
+// Access is governed by the gateway default policies.
+// Pushes from inside the cluster bypass the ingress gateway, so they keep
+// working without any change.
+function exposePushgatewayExternally(ns: k8s.core.v1.Namespace) {
+  istioVirtualService(ns, 'pushgateway', pushgatewayServiceName, pushgatewayServicePort, {
+    uriPrefix: '/metrics',
+  });
+}
+
 const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
+const pushgatewayServiceName = 'prometheus-pushgateway';
+const pushgatewayServicePort = 9091;
 const shouldIgnoreNoDataOrDataSourceError = clusterIsResetPeriodically;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -622,6 +640,9 @@ export function configureObservability(namespace: ExactNamespace): pulumi.Resour
       },
       maxHistory: HELM_MAX_HISTORY_SIZE,
     });
+    if (prometheusConfig.pushgatewayExternalAccess.enabled) {
+      exposePushgatewayExternally(namespace.ns);
+    }
   }
 
   return prometheusStack;
@@ -1078,40 +1099,20 @@ function createGrafanaAlerting(namespace: Input<string>) {
               '$SEQUENCER_CLIENT_DELAY_THRESHOLD_SECONDS',
               monitoringConfig.alerting.alerts.sequencerClientDelay.seconds.toString()
             ),
-            ...(monitoringConfig.alerting.alerts.acsCommitments.usePv36Metrics
-              ? {
-                  'acs_commitment_deleted_alerts.yaml': readGrafanaAlertingFile(
-                    'acs_commitment_deleted.yaml'
-                  ),
-                  'acs_commitment_pv36_alerts.yaml': readGrafanaAlertingFile(
-                    'acs_commitment_pv36_alerts.yaml'
-                  )
-                    .replaceAll(
-                      '$ACS_COMMITMENT_CHECKPOINT_DELAY_THRESHOLD_SECONDS',
-                      monitoringConfig.alerting.alerts.acsCommitments.checkpointDelay.seconds.toString()
-                    )
-                    .replaceAll(
-                      '$ACS_COMMITMENT_DELAY_THRESHOLD_SECONDS',
-                      monitoringConfig.alerting.alerts.acsCommitments.completedDelay.seconds.toString()
-                    ),
-                }
-              : {
-                  'acs_commitment_alerts.yaml': readGrafanaAlertingFile(
-                    'acs_commitment_alerts.yaml'
-                  )
-                    .replaceAll(
-                      '$ACS_COMMITMENT_CHECKPOINT_DELAY_THRESHOLD_SECONDS',
-                      monitoringConfig.alerting.alerts.acsCommitments.checkpointDelay.seconds.toString()
-                    )
-                    .replaceAll(
-                      '$ACS_COMMITMENT_DELAY_THRESHOLD_SECONDS',
-                      monitoringConfig.alerting.alerts.acsCommitments.completedDelay.seconds.toString()
-                    )
-                    .replaceAll(
-                      '$ACS_COMMITMENT_COMPUTE_DURATION_THRESHOLD_SECONDS',
-                      monitoringConfig.alerting.alerts.acsCommitments.computeDuration.seconds.toString()
-                    ),
-                }),
+            'acs_commitment_deleted_alerts.yaml': readGrafanaAlertingFile(
+              'acs_commitment_deleted.yaml'
+            ),
+            'acs_commitment_pv36_alerts.yaml': readGrafanaAlertingFile(
+              'acs_commitment_pv36_alerts.yaml'
+            )
+              .replaceAll(
+                '$ACS_COMMITMENT_CHECKPOINT_DELAY_THRESHOLD_SECONDS',
+                monitoringConfig.alerting.alerts.acsCommitments.checkpointDelay.seconds.toString()
+              )
+              .replaceAll(
+                '$ACS_COMMITMENT_DELAY_THRESHOLD_SECONDS',
+                monitoringConfig.alerting.alerts.acsCommitments.completedDelay.seconds.toString()
+              ),
             'sequencer_connection_pool_alerts.yaml': readGrafanaAlertingFile(
               'sequencer_connection_pool_alerts.yaml'
             ),

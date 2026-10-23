@@ -92,18 +92,23 @@ abstract class BaseSequencer(
                 estimatedSequencingTime.getOrElse(clock.now),
               )
               .leftMap(e => SubmissionRequestRefused(e))
-            isMemberEnabled <- EitherT.right[SequencerDeliverError](
-              isEnabled(submission.sender)
+            isMemberActive <- EitherT.right[SequencerDeliverError](
+              isActive(submission.sender)
             )
             _ <- EitherT.cond[FutureUnlessShutdown](
-              isMemberEnabled,
+              isMemberActive,
               (),
               SubmissionRequestRefused(
-                s"Member ${submission.sender} is disabled at the sequencer"
+                s"Member ${submission.sender} is not active at the sequencer"
               ),
             )
           } yield ()
-      validateET.flatMap(_ => sendAsyncSignedInternal(signedSubmission))
+      validateET.flatMap(_ => sendAsyncSignedInternal(signedSubmission)).leftMap { rej =>
+        logger.debug(
+          s"Rejecting submission request (${signedSubmission.content.messageId}) synchronously: " + rej
+        )
+        rej
+      }
     }
 
   override def acknowledgeSigned(signedAcknowledgeRequest: SignedContent[AcknowledgeRequest])(
@@ -121,10 +126,7 @@ abstract class BaseSequencer(
       EitherTUtil.unitUS
     } else {
       for {
-        estimatedSequencingTime <-
-          if (protocolVersion >= ProtocolVersion.v35)
-            EitherT.rightT[FutureUnlessShutdown, String](None)
-          else EitherT.right(sequencingTime).map(ts => Some(ts.getOrElse(clock.now)))
+        estimatedSequencingTime <- EitherT.rightT[FutureUnlessShutdown, String](None)
         _ <- signatureVerifier.verifyAcknowledgeRequestSignature(
           signedAcknowledgeRequest,
           HashPurpose.AcknowledgementSignature,

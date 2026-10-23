@@ -94,7 +94,7 @@ case class EnvironmentDefinition(
       .withMultiSyncFeatureFlag()
       .withTrafficTopupsEnabled
       .withInitialPackageVersions
-      .withProtocolVersion(ProtocolVersion.v36)
+      .withProtocolVersion(ProtocolVersion.v37)
       .withProtocolVersionFromEnv
       .withEagerAppActivityMarkerConversion
 
@@ -178,10 +178,8 @@ case class EnvironmentDefinition(
 
   def withProtocolVersion(protocolVersion: ProtocolVersion): EnvironmentDefinition =
     addConfigTransforms((_, config) =>
-      ConfigTransforms.updateAllSvAppConfigs_(
-        updateAllSynchronizerNodeConfigs(
-          _.focus(_.protocolVersion).replace(protocolVersion)
-        )
+      ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+        _.focus(_.initialProtocolVersion).replace(protocolVersion)
       )(config)
     )
 

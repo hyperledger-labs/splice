@@ -13,6 +13,7 @@ import com.typesafe.config.Config
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.{IngestionConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.InternedStringStore
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
 import pureconfig.ConfigReader
@@ -52,7 +53,7 @@ class UpdateHistoryIngestionPerformanceTest(
       storage = storage,
       domainMigrationId = migrationId,
       storeName = this.getClass.getName,
-      participantId = mkParticipantId(this.getClass.getSimpleName),
+      participantId = StoreMemberId(mkParticipantId(this.getClass.getSimpleName)),
       updateStreamParty = dsoParty,
       backfillingRequired = UpdateHistory.BackfillingRequirement.BackfillingNotRequired,
       internedStringStore = InternedStringStore.createWithoutWarmup(

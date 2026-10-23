@@ -41,6 +41,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore.{
 }
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.InternedStringStore
 import org.lfdecentralizedtrust.splice.util.{DarUtil, WalletTestUtil}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -140,7 +141,7 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
           storage,
           0L,
           "batch_hash_equiv_test",
-          participantId,
+          StoreMemberId(participantId),
           svParty,
           BackfillingRequirement.BackfillingNotRequired,
           InternedStringStore.createWithoutWarmup(

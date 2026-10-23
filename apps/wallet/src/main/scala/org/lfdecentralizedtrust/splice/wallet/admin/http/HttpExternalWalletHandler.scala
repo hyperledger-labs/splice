@@ -47,7 +47,7 @@ class HttpExternalWalletHandler(
   override def createTransferOffer(respond: r0.CreateTransferOfferResponse.type)(
       request: d0.CreateTransferOfferRequest
   )(tuser: WalletUserRequest): Future[r0.CreateTransferOfferResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    implicit val WalletUserRequest(_, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.createTransferOffer") { _ => _ =>
       userWallet.store
         .getLatestTransferOfferEventByTrackingId(request.trackingId)
@@ -117,7 +117,7 @@ class HttpExternalWalletHandler(
   )()(
       tuser: WalletUserRequest
   ): Future[r0.ListTransferOffersResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    implicit val WalletUserRequest(_, userWallet, traceContext) = tuser
     listContracts(
       transferOffersCodegen.TransferOffer.COMPANION,
       userWallet.store,
@@ -130,7 +130,7 @@ class HttpExternalWalletHandler(
   )(
       trackingId: String
   )(tuser: WalletUserRequest): Future[r0.GetTransferOfferStatusResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    implicit val WalletUserRequest(_, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.getTransferOfferStatus") { _ => _ =>
       for {
         txLogEntry <- userWallet.store.getLatestTransferOfferEventByTrackingId(trackingId)
@@ -149,7 +149,7 @@ class HttpExternalWalletHandler(
   override def createBuyTrafficRequest(respond: r0.CreateBuyTrafficRequestResponse.type)(
       request: d0.CreateBuyTrafficRequest
   )(tuser: WalletUserRequest): Future[r0.CreateBuyTrafficRequestResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    implicit val WalletUserRequest(_, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.createBuyTrafficRequest") { _ => _ =>
       val synchronizerId = Codec.tryDecode(Codec.SynchronizerId)(request.domainId)
       val receivingValidator = Codec.tryDecode(Codec.Party)(request.receivingValidatorPartyId)
@@ -267,7 +267,7 @@ class HttpExternalWalletHandler(
       respond: r0.GetBuyTrafficRequestStatusResponse.type
   )(trackingId: String)(tuser: WalletUserRequest): Future[r0.GetBuyTrafficRequestStatusResponse] = {
 
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    implicit val WalletUserRequest(_, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.getBuyTrafficRequestStatus") { _ => _ =>
       for {
         txLogEntry <- userWallet.store.getLatestBuyTrafficRequestEventByTrackingId(trackingId)

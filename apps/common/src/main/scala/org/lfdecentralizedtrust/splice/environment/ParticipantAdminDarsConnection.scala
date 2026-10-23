@@ -174,13 +174,6 @@ trait ParticipantAdminDarsConnection {
     }
   }
 
-  def lookupDar(mainPackageId: String)(implicit
-      traceContext: TraceContext
-  ): Future[Option[ByteString]] =
-    runCmd(
-      ParticipantAdminConnection.LookupDarByteString(mainPackageId)
-    )
-
   private def removeDarsFromVettingState(
       dars: Seq[DarResource],
       currentVetting: VettedPackages,

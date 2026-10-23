@@ -23,8 +23,8 @@ object TraceContextGrpc {
 
   /** Value of the trace context in a call's [[io.grpc.CallOptions]].
     *
-    * Unlike [[TraceContextKey]], call options travel with the stub value rather than with the
-    * thread, so they survive arbitrary thread hops and `Future` composition.
+    * Unlike `TraceContextKey`, call options travel with the stub value rather than with the thread,
+    * so they survive arbitrary thread hops and `Future` composition.
     */
   val TraceContextOptionsKey: CallOptions.Key[TraceContext] =
     CallOptions.Key.create[TraceContext]("traceContext")

@@ -64,6 +64,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.I
   ResumeAtOffset,
   UpdateHistoryInitAtLatestPrunedOffset,
 }
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 abstract class ScanStoreTest
     extends StoreTestBase
@@ -118,7 +119,7 @@ abstract class ScanStoreTest
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.getTotalPurchasedMemberTraffic(
-            goodMember,
+            StoreMemberId(goodMember),
             dummyDomain,
           )
         } yield result shouldBe (1 to 3).sum.toLong
@@ -1628,21 +1629,20 @@ class DbScanStoreTest
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    val store = new DbScanStore(
-      key = ScanStore.Key(dsoParty),
-      storage,
-      loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId,
-      participantId = mkParticipantId("ScanStoreTest"),
-      IngestionConfig(),
-      new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, timeouts),
-      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-      acsStoreDescriptorUserVersion,
-      txLogStoreDescriptorUserVersion,
-    )(parallelExecutionContext, implicitly, implicitly)
-
     for {
+      store <- DbScanStore.create(
+        key = ScanStore.Key(dsoParty),
+        storage,
+        loggerFactory,
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+        domainMigrationId,
+        participantId = mkParticipantId("ScanStoreTest"),
+        IngestionConfig(),
+        new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, timeouts),
+        defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+        acsStoreDescriptorUserVersion,
+        txLogStoreDescriptorUserVersion,
+      )(parallelExecutionContext, implicitly, implicitly, implicitly)
       initializeResult <- store.multiDomainAcsStore.testIngestionSink.initialize(
         mockLedgerConnection()
       )
@@ -1679,7 +1679,7 @@ class DbScanStoreTest
         storage.underlying, // not under test
         migrationId,
         "update_history_scan_store_test",
-        mkParticipantId("whatever"),
+        StoreMemberId(mkParticipantId("whatever")),
         dsoParty,
         BackfillingRequirement.BackfillingNotRequired,
         internedStringStore(storage),

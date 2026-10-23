@@ -1283,7 +1283,6 @@ lazy val `apps-common` =
           "com.google.api.grpc",
           "proto-google-common-protos",
         )),
-        kubernetes_client,
         Dependencies.daml_lf_validation,
         scalatestScalacheck % Test,
         CantonDependencies.pekko_http_testkit % Test,
@@ -2484,7 +2483,6 @@ lazy val `apps-app`: Project =
       libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.44.0" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       libraryDependencies += auth0,
-      libraryDependencies += kubernetes_client,
       libraryDependencies += "com.monovore" %% "decline" % "2.5.0" % "test",
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(
@@ -2585,8 +2583,6 @@ updateTestConfigForParallelRuns := {
   def isWithDockerWithSimtimeCantonTest(name: String): Boolean =
     Seq("ScanTimeBasedIntegrationTest", "ScanNewNetworkBackfillingTimeBasedIntegrationTest")
       .exists(name.contains)
-  def isCometBftTest(name: String): Boolean =
-    name contains "CometBft"
   def isDynamicSynchronizerParamsReconciliationTest(name: String): Boolean =
     name contains "DynamicSynchronizerParamsReconciliationTimeBasedIntegrationTest"
   def isLSUTest(name: String): Boolean =
@@ -2643,13 +2639,7 @@ updateTestConfigForParallelRuns := {
     (
       "Preflight tests against core nodes",
       "test-full-class-names-core-preflight.log",
-      (t: String) =>
-        isCoreDeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t) && !isCometBftTest(t),
-    ),
-    (
-      "Preflight tests against core nodes for cometBft",
-      "test-full-class-names-core-preflight-cometbft.log",
-      (t: String) => isCoreDeploymentPreflightIntegrationTest(t) && isCometBftTest(t),
+      (t: String) => isCoreDeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t),
     ),
     (
       "Preflight tests against validator1",
@@ -2664,13 +2654,7 @@ updateTestConfigForParallelRuns := {
     (
       "Preflight tests against runbook SV",
       "test-full-class-names-sv-preflight.log",
-      (t: String) =>
-        isRunbookSvPreflightIntegrationTest(t) && !isNonDevNetTest(t) && !isCometBftTest(t),
-    ),
-    (
-      "Preflight tests against runbook SV for cometBft",
-      "test-full-class-names-sv-preflight-cometbft.log",
-      (t: String) => isRunbookSvPreflightIntegrationTest(t) && isCometBftTest(t),
+      (t: String) => isRunbookSvPreflightIntegrationTest(t) && !isNonDevNetTest(t),
     ),
     (
       "Non-DevNet Preflight tests against runbook SV",
@@ -2701,11 +2685,6 @@ updateTestConfigForParallelRuns := {
       "tests using docker images",
       "test-full-class-names-docker-based.log",
       (t: String) => isDockerComposeBasedTest(t),
-    ),
-    (
-      "tests with wall clock time using CometBFT",
-      "test-cometbft-full-class-names.log",
-      (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t) && isCometBftTest(t),
     ),
     (
       "tests to check logical sync roll-forward upgrade",

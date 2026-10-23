@@ -63,7 +63,7 @@ object ParticipantTopologyTerminateProcessing {
   )
 
   def relevantMappingsForEffectiveStateChanges(pv: ProtocolVersion): Seq[TopologyMapping.Code] =
-    if (pv >= ProtocolVersion.acsCommitmentRedesign)
+    if (pv >= ProtocolVersion.v36)
       Seq(
         TopologyMapping.Code.PartyToParticipant,
         TopologyMapping.Code.SynchronizerTrustCertificate,
@@ -125,10 +125,7 @@ class ParticipantTopologyTerminateProcessing(
           )
         events = effectiveStateChanges.headOption.flatMap(getNewEvents)
 
-        _ <-
-          if (store.protocolVersion >= ProtocolVersion.v35) {
-            events.traverse(processPartyHostingEvents)
-          } else { FutureUnlessShutdown.unit }
+        _ <- events.traverse(processPartyHostingEvents)
 
         _ <- FutureUnlessShutdown.lift(
           events

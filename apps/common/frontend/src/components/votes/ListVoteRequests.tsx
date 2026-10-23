@@ -120,6 +120,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
     : [];
   const votesQuery = votesHooks.useListVotes(voteRequestIds);
   const dsoInfosQuery = votesHooks.useDsoInfos();
+  const svInfoQuery = votesHooks.useSvInfo();
 
   const [voteRequestModalState, setVoteRequestModalState] = useState<VoteRequestModalState>({
     open: false,
@@ -141,7 +142,7 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
     setVoteResultModalState({ open: false });
   };
 
-  const svPartyId = dsoInfosQuery.data?.svPartyId;
+  const svPartyId = svInfoQuery.data?.svPartyId;
 
   const getMemberName = useCallback(
     (partyId: string) => {
@@ -157,11 +158,21 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
       : new Set();
   }, [votesQuery.data, svPartyId]);
 
-  if (listVoteRequestsQuery.isLoading || dsoInfosQuery.isLoading || votesQuery.isLoading) {
+  if (
+    listVoteRequestsQuery.isLoading ||
+    dsoInfosQuery.isLoading ||
+    svInfoQuery.isLoading ||
+    votesQuery.isLoading
+  ) {
     return <Loading />;
   }
 
-  if (listVoteRequestsQuery.isError || dsoInfosQuery.isError || votesQuery.isError) {
+  if (
+    listVoteRequestsQuery.isError ||
+    dsoInfosQuery.isError ||
+    svInfoQuery.isError ||
+    votesQuery.isError
+  ) {
     return <p>Error, something went wrong.</p>;
   }
 

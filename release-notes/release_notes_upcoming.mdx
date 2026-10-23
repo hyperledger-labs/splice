@@ -2,6 +2,14 @@
 
 {/* Add all release notes in this section */}
 
+  - Docker Compose deployments and localnet
+
+    - **Breaking** The Docker Compose deployments (validator, sv and localnet) now set the default Postgres version to 18.
+      Additionally, due to [upstream image's changes](https://github.com/docker-library/postgres/pull/1259) the data volume is now mounted to `/var/lib/postgresql` instead of `/var/lib/postgresql/data`.
+      You should [upgrade](https://docs.canton.network/global-synchronizer/production-operations/validator-postgres-migration),
+      as the previous default (14) is reaching end-of-life on November 12, 2026 and won't be supported by Splice nor receive updates from upstream Postgres.
+      If you cannot yet upgrade, you must restore the previous volume in `compose.yaml` AND change the Postgres version in the `.env` file back to `14.24-trixie@sha256:8ab94f61668dc73bbab4dc13273ff2fc37e635536af62aef5306a49a9682a446`.
+
   - Scan App
 
     - The following request fields now have a `maxItems` bound of 1000; requests exceeding it are rejected with 400:
@@ -12,6 +20,12 @@
       - `/v0/holdings/summary`, `/v1/holdings/summary`: `owner_party_ids`
       - `/v0/voterequest`: `vote_request_contract_ids`
       - `/v0/validators/validator-faucets`: `validator_ids`
+
+    - Add `/v1/dso`, which returns the same DSO information as `/v0/dso` without the
+      `sv_user` and `sv_party_id` fields of the SV operating the Scan instance, so that
+      responses match across Scan instances. `/v0/dso` is now deprecated.
+
+    - Add `/v0/sv-info`, which returns the `sv_user` and `sv_party_id` of the SV operating the Scan instance.
 
   - SV App
 
@@ -24,6 +38,18 @@
     - **Breaking**: The Grafana dashboards in the release bundle now use the V2 resource format.
       Upgrade to Grafana 13 or newer before importing them.
       Dashboard UIDs are unchanged, so existing dashboard links will keep working.
+
+  - Validator app
+
+     - Add `/v1/scan-proxy/dso`, which serves the DSO information from Scan's `/v1/dso`.
+       `/v0/scan-proxy/dso` is deprecated: it fails when the validator is connected to more than one Scan
+       instance, as the `sv_user` and `sv_party_id` fields differ between Scan instances.
+
+     - The validator now starts automation external parties with keys embedded in a
+       `PartyToParticipant` mapping by default. The prior behavior can
+       be restored with the
+       `canton.validator-apps.validator_backend.support-embedded-party-signing-keys = false` but it is recommended to instead make sure that the
+       `ValidatorRight` contracts are [configured such that they won't start automation](https://docs.canton.network/global-synchronizer/production-operations/scalability#bypassing-the-limit).
 
 ## Upcoming for next minor release (template):
 

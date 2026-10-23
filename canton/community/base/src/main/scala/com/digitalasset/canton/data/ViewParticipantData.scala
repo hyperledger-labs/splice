@@ -5,7 +5,6 @@ package com.digitalasset.canton.data
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.ActionDescription.{
@@ -14,12 +13,12 @@ import com.digitalasset.canton.data.ActionDescription.{
   FetchActionDescription,
 }
 import com.digitalasset.canton.data.ViewParticipantData.{InvalidViewParticipantData, RootAction}
-import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrintingCompanion}
 import com.digitalasset.canton.protocol.ContractIdSyntax.*
-import com.digitalasset.canton.protocol.{v30, v31, *}
+import com.digitalasset.canton.protocol.{v30, *}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{ProtoConverter, ProtocolVersionedMemoizedEvidence}
-import com.digitalasset.canton.util.EitherUtil
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.validation.ProtoUnvalidated.syntax.*
 import com.digitalasset.canton.validation.{
   ProtoUnvalidatedSeq,
@@ -38,7 +37,6 @@ import com.digitalasset.canton.{
   LfPartyId,
   LfVersioned,
   ProtoDeserializationError,
-  checked,
 }
 import com.digitalasset.daml.lf.data.Bytes
 import com.digitalasset.daml.lf.transaction.ExternalCallResult
@@ -111,9 +109,7 @@ final case class ViewParticipantData private (
       _ <- checkCoreInputs
       _ <- checkSubviewCoreOverlap
       _ <- checkExternalCallResults
-      _ <- checkLegacyKeyResolution
       _ <- checkMaxSerializationVersion(protocolVersion)
-      _ <- checkKeyResolution(protocolVersion)
       _ <- rootActionE
     } yield this
 
@@ -180,32 +176,6 @@ final case class ViewParticipantData private (
         }
       } yield ()
 
-  private def legacyIsAssignedKeyInconsistent(
-      keyWithResolution: (LfGlobalKey, LfVersioned[KeyResolutionWithMaintainers])
-  ): Boolean = {
-    val (key, LfVersioned(_, keyResolution)) = keyWithResolution
-    keyResolution.contracts.exists { (cid: LfContractId) =>
-      val inconsistent = for {
-        inputContract <- coreInputs.get(cid)
-        declaredKey <- inputContract.contract.metadata.maybeKey
-      } yield declaredKey != key
-      inconsistent.getOrElse(true)
-    }
-  }
-
-  private def checkLegacyKeyResolution: Either[String, Unit] =
-    if (
-      representativeProtocolVersion <=
-        ViewParticipantData.protocolVersionRepresentativeFor(ProtocolVersion.v34)
-    ) {
-      val keyInconsistencies = keyResolution.filter(legacyIsAssignedKeyInconsistent)
-      Either.cond(
-        keyInconsistencies.isEmpty,
-        (),
-        show"Inconsistencies for resolved keys: $keyInconsistencies",
-      )
-    } else Right(())
-
   private def checkMaxSerializationVersion(
       protocolVersion: ProtocolVersion
   ): Either[String, Unit] = {
@@ -265,13 +235,6 @@ final case class ViewParticipantData private (
         )
       case _ => Right(())
     }
-
-  private def checkKeyResolution(protocolVersion: ProtocolVersion): Either[String, Unit] =
-    Either.cond(
-      !(protocolVersion < ProtocolVersion.v35 && keyResolution.nonEmpty),
-      (),
-      s"Keys not supported in $protocolVersion, but found ${keyResolution.size} keys.",
-    )
 
   private lazy val rootActionE: Either[String, RootAction] =
     actionDescription match {
@@ -386,41 +349,6 @@ final case class ViewParticipantData private (
   @transient override protected lazy val companionObj: ViewParticipantData.type =
     ViewParticipantData
 
-  private def tryToProtoV30RollbackContext: Option[v30.ViewParticipantData.RollbackContext] =
-    rollbackContext match {
-      case pathRollbackContext: PathRollbackContext =>
-        if (pathRollbackContext.isEmpty) None else Some(pathRollbackContext.toProtoV30)
-      case _ =>
-        throw new IllegalStateException(
-          s"Unexpected rollback context type ${rollbackContext.getClass} in ViewParticipantData"
-        )
-    }
-
-  private[ViewParticipantData] def toProtoV30: v30.ViewParticipantData = v30.ViewParticipantData(
-    coreInputs = coreInputs.values.map(_.toProtoV30).toSeq,
-    createdCore = createdCore.map(_.toProtoV30),
-    createdInSubviewArchivedInCore =
-      createdInSubviewArchivedInCore.toSeq.map(_.toProtoPrimitive.toProtoUnvalidated),
-    resolvedKeys =
-      Seq.empty[v30.ViewParticipantData.ResolvedKey], // Always empty, see checkKeyResolution
-    actionDescription = Some(actionDescription.toProtoV30),
-    rollbackContext = checked(tryToProtoV30RollbackContext),
-    salt = Some(salt.toProtoV30),
-  )
-
-  private[ViewParticipantData] def toProtoV31: v31.ViewParticipantData = v31.ViewParticipantData(
-    coreInputs = coreInputs.values.map(_.toProtoV30).toSeq,
-    createdCore = createdCore.map(_.toProtoV30),
-    createdInSubviewArchivedInCore =
-      createdInSubviewArchivedInCore.toSeq.map(_.toProtoPrimitive.toProtoUnvalidated),
-    resolvedKeys = keyResolution.toList.map { case (k, v) =>
-      KeyResolutionWithMaintainers.toProtoV31(k, v)
-    },
-    actionDescription = Some(actionDescription.toProtoV31),
-    rollbackContext = checked(tryToProtoV30RollbackContext),
-    salt = Some(salt.toProtoV30),
-  )
-
   private[ViewParticipantData] def toProtoV32: v32.ViewParticipantData = v32.ViewParticipantData(
     coreInputs = coreInputs.values.map(_.toProtoV30).toSeq,
     createdCore = createdCore.map(_.toProtoV31),
@@ -440,21 +368,8 @@ final case class ViewParticipantData private (
 
   override def hashPurpose: HashPurpose = HashPurpose.ViewParticipantData
 
-  override protected def pretty: Pretty[ViewParticipantData] = prettyOfClass(
-    paramIfNonEmpty("core inputs", _.coreInputs),
-    paramIfNonEmpty("created core", _.createdCore),
-    paramIfNonEmpty("created in subview, archived in core", _.createdInSubviewArchivedInCore),
-    paramIfNonEmpty("resolved keys", _.keyResolution),
-    param("action description", _.actionDescription),
-    paramIfTrue("rolled back", _.rollbackContext.inRollback),
-    param("salt", _.salt),
-    paramIfNonEmpty(
-      "external call results",
-      _.externalCallResults.map(result =>
-        s"${result.result.extensionId}:${result.result.functionId}@${result.exerciseIndex.unwrap}.${result.callIndex.unwrap}".unquoted
-      ),
-    ),
-  )
+  override def prettyCompanion: PrettyPrintingCompanion[ViewParticipantData] =
+    ViewParticipantData
 
   /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
   @VisibleForTesting
@@ -483,8 +398,25 @@ final case class ViewParticipantData private (
 }
 
 object ViewParticipantData
-    extends VersioningCompanionContextMemoization[ViewParticipantData, (HashOps, ProtocolVersion)] {
+    extends VersioningCompanionContextMemoization[ViewParticipantData, (HashOps, ProtocolVersion)]
+    with PrettyPrintingCompanion[ViewParticipantData] {
   override val name: String = "ViewParticipantData"
+
+  override protected val pretty: Pretty[ViewParticipantData] = prettyOfClass(
+    paramIfNonEmpty("core inputs", _.coreInputs),
+    paramIfNonEmpty("created core", _.createdCore),
+    paramIfNonEmpty("created in subview, archived in core", _.createdInSubviewArchivedInCore),
+    paramIfNonEmpty("resolved keys", _.keyResolution),
+    param("action description", _.actionDescription),
+    paramIfTrue("rolled back", _.rollbackContext.inRollback),
+    param("salt", _.salt),
+    paramIfNonEmpty(
+      "external call results",
+      _.externalCallResults.map(result =>
+        s"${result.result.extensionId}:${result.result.functionId}@${result.exerciseIndex.unwrap}.${result.callIndex.unwrap}".unquoted
+      ),
+    ),
+  )
 
   // Inline context helper: forwards the negotiated pv (for content validation) alongside the
   // deserialization context (HashOps, ProtocolVersion).
@@ -496,18 +428,10 @@ object ViewParticipantData
   }
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.ViewParticipantData)(
-      supportedProtoVersionMemoizedPVV(_)(ic(fromProtoV30)),
-      _.toProtoV30,
-    ),
-    ProtoVersion(31) -> VersionedProtoCodec(ProtocolVersion.v35)(v31.ViewParticipantData)(
-      supportedProtoVersionMemoizedPVV(_)(ic(fromProtoV31)),
-      _.toProtoV31,
-    ),
     ProtoVersion(32) -> VersionedProtoCodec(ProtocolVersion.v36)(v32.ViewParticipantData)(
       supportedProtoVersionMemoizedPVV(_)(ic(fromProtoV32)),
       _.toProtoV32,
-    ),
+    )
   )
 
   /** Like [[create]], but throws InvalidViewParticipantData instead of returning `Left` when the
@@ -563,126 +487,6 @@ object ViewParticipantData
       externalCallResults,
     )(hashOps, protocolVersionRepresentativeFor(protocolVersion), deserializedFrom = None)
       .validated(protocolVersion)
-
-  private def fromProtoV30(
-      pvv: ProtocolVersionValidation,
-      hashOps: HashOps,
-      protocolVersion: ProtocolVersion,
-      dataP: v30.ViewParticipantData,
-  )(
-      bytes: ByteString
-  ): ParsingResult[ViewParticipantData] = {
-    val v30.ViewParticipantData(
-      saltP,
-      coreInputsP,
-      createdCoreP,
-      createdInSubviewArchivedInCoreP,
-      resolvedKeysP,
-      actionDescriptionP,
-      rbContextP,
-    ) = dataP
-
-    for {
-      actionDescription <- ProtoConverter
-        .required("action_description", actionDescriptionP)
-        .flatMap(ActionDescription.fromProtoV30(pvv, _))
-      rollbackContext <- PathRollbackContext
-        .fromProtoV30(pvv, rbContextP)
-        .leftMap(_.inField("rollback_context"))
-      resolvedKeysSeqP <- ProtoValidation
-        .validateLength(
-          resolvedKeysP,
-          "resolved_keys",
-          pvv,
-          ProtoValidation.MaxCollectionSize,
-        )
-      _ <- EitherUtil.condUnit( // Invariant violation, see checkKeyResolution
-        resolvedKeysSeqP.isEmpty,
-        InvariantViolation(Some("resolved-keys"), "Unexpected contract keys"),
-      )
-      createdCore <- ProtoValidation
-        .validateLengthThen(
-          createdCoreP,
-          "created_core",
-          pvv,
-          ProtoValidation.MaxCollectionSize,
-        )((element, _) => CreatedContract.fromProtoV30(element))
-      viewParticipantData <- fromProto(
-        pvv,
-        hashOps,
-        Map.empty,
-        actionDescription,
-        rollbackContext,
-        createdCore,
-        protocolVersion,
-        bytes,
-      )(
-        saltP,
-        coreInputsP,
-        createdInSubviewArchivedInCoreP,
-        Seq.empty,
-      )
-    } yield {
-      viewParticipantData
-    }
-  }
-
-  private def fromProtoV31(
-      pvv: ProtocolVersionValidation,
-      hashOps: HashOps,
-      protocolVersion: ProtocolVersion,
-      dataP: v31.ViewParticipantData,
-  )(
-      bytes: ByteString
-  ): ParsingResult[ViewParticipantData] = {
-    val v31.ViewParticipantData(
-      saltP,
-      coreInputsP,
-      createdCoreP,
-      createdInSubviewArchivedInCoreP,
-      resolvedKeysP,
-      actionDescriptionP,
-      rbContextP,
-    ) = dataP
-
-    for {
-      keyResolution <- ProtoValidation
-        .validateLengthThen(
-          resolvedKeysP,
-          "resolved_keys",
-          pvv,
-          ProtoValidation.MaxCollectionSize,
-        )((element, _) => KeyResolutionWithMaintainers.fromProtoV31(pvv, element))
-      actionDescription <- ProtoConverter
-        .required("action_description", actionDescriptionP)
-        .flatMap(ActionDescription.fromProtoV31(pvv, _))
-      rollbackContext <- PathRollbackContext
-        .fromProtoV30(pvv, rbContextP)
-        .leftMap(_.inField("rollback_context"))
-      createdCore <- ProtoValidation
-        .validateLengthThen(
-          createdCoreP,
-          "created_core",
-          pvv,
-          ProtoValidation.MaxCollectionSize,
-        )((element, _) => CreatedContract.fromProtoV30(element))
-      viewParticipantData <- fromProto(
-        pvv,
-        hashOps,
-        keyResolution.toMap,
-        actionDescription,
-        rollbackContext,
-        createdCore,
-        protocolVersion,
-        bytes,
-      )(
-        saltP,
-        coreInputsP,
-        createdInSubviewArchivedInCoreP,
-        Seq.empty,
-      )
-    } yield viewParticipantData
-  }
 
   private def fromProtoV32(
       pvv: ProtocolVersionValidation,

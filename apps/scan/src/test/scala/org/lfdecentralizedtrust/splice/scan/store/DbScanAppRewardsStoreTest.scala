@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnles
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore.RewardHash
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.Future
@@ -1328,7 +1329,7 @@ class DbScanAppRewardsStoreTest
         storage,
         migrationId,
         s"app_rewards_test_$n",
-        participantId,
+        StoreMemberId(participantId),
         dsoParty,
         BackfillingRequirement.BackfillingNotRequired,
         internedStringStore(storage),

@@ -107,7 +107,12 @@ final class GrpcParticipantRepairService(
         .toRight(RepairServiceError.InvalidArgument.Error("Missing contract ids to purge"))
 
       _ <- sync.repairService
-        .purgeContracts(synchronizerAlias, cidsNE, request.ignoreAlreadyPurged)
+        .purgeContracts(
+          synchronizerAlias,
+          cidsNE,
+          request.ignoreAlreadyPurged,
+          request.forceRepairWhenTopologyTransactionAtLedgerEnd,
+        )
         .leftMap(RepairServiceError.ContractPurgeError.Error(synchronizerAlias, _))
     } yield ()
 
@@ -223,6 +228,7 @@ final class GrpcParticipantRepairService(
           Set[LfPartyId],
           RepresentativePackageIdOverride,
           SynchronizerId,
+          Boolean, // forceRepairWhenTopologyTransactionAtLedgerEnd
       )
 
     def extractImportArgs(
@@ -257,6 +263,7 @@ final class GrpcParticipantRepairService(
         excludedStakeholders.toSet,
         representativePackageIdOverride,
         synchronizerId,
+        request.forceRepairWhenTopologyTransactionAtLedgerEnd,
       )
 
       resultE
@@ -283,6 +290,7 @@ final class GrpcParticipantRepairService(
                 excludedStakeholders,
                 representativePackageIdOverride,
                 synchronizerId,
+                forceRepairWhenTopologyTransactionAtLedgerEnd,
               ),
               source,
             ) =>
@@ -311,6 +319,8 @@ final class GrpcParticipantRepairService(
             sync.getPackageMetadataSnapshot,
             representativePackageIdOverride,
             workflowIdPrefix = workFlowIdPrefix,
+            forceRepairWhenTopologyTransactionAtLedgerEnd =
+              forceRepairWhenTopologyTransactionAtLedgerEnd,
           )
           EitherTUtil.toFutureUnlessShutdown(
             resultEUS.bimap(
@@ -344,7 +354,14 @@ final class GrpcParticipantRepairService(
           } yield Target(conf))
         _ <- EitherT(
           sync
-            .migrateSynchronizer(sourceSynchronizerAlias, conf, force = request.force)
+            .migrateSynchronizer(
+              sourceSynchronizerAlias,
+              conf,
+              force = request.force,
+              forceRepairWhenTopologyTransactionAtLedgerEnd =
+                request.forceRepairWhenTopologyTransactionAtLedgerEnd,
+              evalAcsCommitmentProcessorManagerO.map(_.value),
+            )
             .leftMap(_.asGrpcError.getStatus.getDescription)
             .value
             .onShutdown {
@@ -427,6 +444,8 @@ final class GrpcParticipantRepairService(
               sourceSynchronizer = sourceSynchronizerId,
               targetSynchronizer = targetSynchronizerId,
               skipInactive = request.skipInactive,
+              forceRepairWhenTopologyTransactionAtLedgerEnd =
+                request.forceRepairWhenTopologyTransactionAtLedgerEnd,
             )
             .leftMap[RepairServiceError](RepairServiceError.ContractAssignationChangeError.Error(_))
       }
@@ -544,6 +563,8 @@ final class GrpcParticipantRepairService(
         reassignmentId,
         sourceSynchronizerId,
         targetSynchronizerId,
+        forceRepairWhenTopologyTransactionAtLedgerEnd =
+          request.forceRepairWhenTopologyTransactionAtLedgerEnd,
       )
 
     } yield RollbackUnassignmentResponse()

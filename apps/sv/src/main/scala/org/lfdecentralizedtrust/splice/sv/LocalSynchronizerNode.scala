@@ -95,15 +95,18 @@ class LocalSynchronizerNode(
       : Option[org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig] =
     config.sequencer.pruning
 
-  def staticSynchronizerParameters(serial: NonNegativeInt): StaticSynchronizerParameters = {
+  def staticSynchronizerParameters(
+      serial: NonNegativeInt,
+      protocolVersion: ProtocolVersion,
+  ): StaticSynchronizerParameters = {
     SynchronizerParametersConfig(synchronizerLimits =
       config.synchronizerLimits
         .map(_.toInternal)
-        .filter(_ => config.protocolVersion >= ProtocolVersion.v36)
+        .filter(_ => protocolVersion >= ProtocolVersion.v36)
     )
       .toStaticSynchronizerParameters(
         CryptoConfig(provider = CryptoProvider.Jce),
-        config.protocolVersion,
+        protocolVersion,
         config.serial
           .getOrElse(serial),
       )
@@ -195,10 +198,11 @@ class LocalSynchronizerNode(
   }
 
   def addLocalMediatorIdentityIfRequired(
-      synchronizerId: SynchronizerId
+      synchronizerId: SynchronizerId,
+      protocolVersion: ProtocolVersion,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     onMediatorNotInitialized {
-      addMediatorIdentityTransactions(synchronizerId)
+      addMediatorIdentityTransactions(synchronizerId, protocolVersion)
     }
   }
 
@@ -223,14 +227,14 @@ class LocalSynchronizerNode(
   }
 
   private def addMediatorIdentityTransactions(
-      synchronizerId: SynchronizerId
+      synchronizerId: SynchronizerId,
+      protocolVersion: ProtocolVersion,
   )(implicit traceContext: TraceContext) = {
     logger.info("Adding mediator identity transactions")
     for {
       mediatorId <- mediatorAdminConnection.getMediatorId
-      identity <- mediatorAdminConnection.getOrGenerateIdentityTransactions(
-        mediatorId,
-        config.protocolVersion,
+      identity <- mediatorAdminConnection.generateOnboardingTopologyTransactions(
+        protocolVersion
       )
       _ <- addIdentityTransactions(
         "mediator",
@@ -365,6 +369,7 @@ class LocalSynchronizerNode(
   def addLocalSequencerIdentityIfRequired(
       synchronizerAlias: SynchronizerAlias,
       synchronizerId: SynchronizerId,
+      protocolVersion: ProtocolVersion,
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider
       .getValueWithRetries(
@@ -380,6 +385,7 @@ class LocalSynchronizerNode(
           addLocalSequencerIdentity(
             synchronizerAlias,
             synchronizerId,
+            protocolVersion,
           )
         case Right(NodeStatus.Success(_)) =>
           logger.info("Sequencer identity is already added")
@@ -389,15 +395,15 @@ class LocalSynchronizerNode(
   private def addLocalSequencerIdentity(
       synchronizerAlias: SynchronizerAlias,
       synchronizerId: SynchronizerId,
+      protocolVersion: ProtocolVersion,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info(
       s"Adding sequencer identity transactions for domain ${synchronizerAlias.toProtoPrimitive}"
     )
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
-      identity <- sequencerAdminConnection.getOrGenerateIdentityTransactions(
-        sequencerId,
-        config.protocolVersion,
+      identity <- sequencerAdminConnection.generateOnboardingTopologyTransactions(
+        protocolVersion
       )
       _ <- addIdentityTransactions(
         "sequencer",

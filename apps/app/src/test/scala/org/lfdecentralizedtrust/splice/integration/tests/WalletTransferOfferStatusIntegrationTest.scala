@@ -317,7 +317,7 @@ class WalletTransferOfferStatusIntegrationTest
 
       aliceWalletClient.tap(100.0)
 
-      val (_, _) = actAndCheck(
+      actAndCheck(
         "Alice creates a transfer offer with a ridiculously low expiry",
         aliceWalletClient.createTransferOffer(
           bobUserParty,

@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTestWithIsolatedEnvironment,
   SpliceTestConsoleEnvironment,
 }
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.config.CantonBftPeerConfig
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
@@ -109,6 +110,11 @@ class ScanIntegrationTest
     val scan = sv1ScanBackend.getDsoInfo()
     val svDsoInfo = sv1Backend.getDsoInfo()
     scan shouldBe svDsoInfo
+    sv1ScanBackend.getDsoInfoV1() shouldBe svDsoInfo.toV1
+    sv1ScanBackend.getSvInfo() shouldBe HttpScanAppClient.SvInfo(
+      svDsoInfo.svUser,
+      svDsoInfo.svParty,
+    )
     val dsoParty = scan.dsoParty
     clue("Returns physical synchronizer id") {
       sv1ScanBackend.getActivePhysicalSynchronizerSerial() shouldBe NonNegativeInt.zero

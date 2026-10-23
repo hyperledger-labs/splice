@@ -21,6 +21,8 @@ import com.digitalasset.canton.ledger.participant.state.SequencedEventUpdate
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.ParticipantNodeParameters
+import com.digitalasset.canton.participant.metrics.ReassignmentMetrics
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
   ActivenessCheck,
@@ -47,6 +49,7 @@ import com.digitalasset.canton.participant.store.ActiveContractStore.{
   ReassignedAway,
 }
 import com.digitalasset.canton.participant.sync.SyncEphemeralState
+import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.Phase37Processor.PublishUpdateViaRecordOrderPublisher
 import com.digitalasset.canton.protocol.messages.*
@@ -60,7 +63,7 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.EitherTUtil.{condUnitET, ifThenET}
+import com.digitalasset.canton.util.EitherTUtil.condUnitET
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.{ContractValidator, MonadUtil}
 import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
@@ -80,6 +83,8 @@ private[reassignment] class UnassignmentProcessingSteps(
     override protected val contractValidator: ContractValidator,
     clock: Clock,
     val protocolVersion: Source[ProtocolVersion],
+    reassignmentMetrics: ReassignmentMetrics,
+    participantNodeParameters: ParticipantNodeParameters,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
     extends ReassignmentProcessingSteps[
@@ -160,7 +165,7 @@ private[reassignment] class UnassignmentProcessingSteps(
           .map(Right(_).withLeft[ReassignmentProcessorError])
       )
 
-      contractCounters <- (MonadUtil.sequentialTraverse(contractIds) { contractId =>
+      contractCounters <- MonadUtil.sequentialTraverse(contractIds) { contractId =>
         for {
           contract <- ephemeralState.contractLookup
             .lookup(contractId)
@@ -192,13 +197,13 @@ private[reassignment] class UnassignmentProcessingSteps(
             .getOrElse(contractId, contract.templateId.packageId)
           targetValidationPackageId = targetValidationPackageIds
             .getOrElse(contractId, contract.templateId.packageId)
-        } yield (
+        } yield ContractReassignment(
           contract,
           Source(sourceValidationPackageId),
           Target(targetValidationPackageId),
           newReassignmentCounter,
         )
-      })
+      }
       contracts <- EitherT.fromEither[FutureUnlessShutdown] {
         ContractsReassignmentBatch
           .create(contractCounters)
@@ -318,6 +323,9 @@ private[reassignment] class UnassignmentProcessingSteps(
           rootHash,
           validated.request.mkReassignmentId,
         )
+      _ = reassignmentMetrics.submitted.inc()(
+        ReassignmentMetrics.unassignment(psid.map(_.logical), targetSynchronizer.map(_.logical))
+      )
     } yield (
       ReassignmentsSubmission(
         Batch.of(protocolVersion.unwrap, messages*),
@@ -377,13 +385,12 @@ private[reassignment] class UnassignmentProcessingSteps(
   ] = {
     val message = envelope.protocolMessage
 
-    def deserializeTree(bytes: ByteString): Either[DeserializationError, FullUnassignmentTree] =
+    def deserializeTree(bytes: ByteString): Either[DeserializationError, FullUnassignmentTree] = {
+      val sourcePVV = protocolVersion.map(ProtocolVersionValidation.PV(_))
       FullUnassignmentTree
-        .fromByteString(
-          sourceSnapshot.pureCrypto,
-          protocolVersion.map(ProtocolVersionValidation.PV(_)),
-        )(bytes)
+        .fromByteString(sourceSnapshot.pureCrypto, sourcePVV)(bytes)
         .leftMap(e => DefaultDeserializationError(e.toString))
+    }
 
     EncryptedViewMessage
       .decryptFor(
@@ -391,7 +398,6 @@ private[reassignment] class UnassignmentProcessingSteps(
         sessionKeyStore,
         message,
         participantId,
-        protocolVersion.value,
       )(deserializeTree)
       .flatMap { multiView =>
         EitherT.cond[FutureUnlessShutdown](
@@ -468,6 +474,11 @@ private[reassignment] class UnassignmentProcessingSteps(
     val fullTree: FullUnassignmentTree = parsedRequest.fullViewTree
     val requestCounter = parsedRequest.rc
 
+    reassignmentMetrics.requests.inc()(ReassignmentMetrics.unassignmentRequest)
+    reassignmentMetrics.batchSize.update(fullTree.contracts.contractIds.size)(
+      ReassignmentMetrics.unassignmentRequest
+    )
+
     reassignmentCoordination.addPendingUnassignment(
       parsedRequest.reassignmentId,
       fullTree.sourceSynchronizer.map(_.logical),
@@ -477,6 +488,7 @@ private[reassignment] class UnassignmentProcessingSteps(
       participantId,
       contractValidator,
       reassignmentCoordination,
+      reassignmentMetrics,
     )
 
     for {
@@ -633,21 +645,35 @@ private[reassignment] class UnassignmentProcessingSteps(
           rejected(ErrorDetails.fromLocalError(rejection))
 
         case (_: Verdict.Approve, _) =>
+          unassignmentValidationResult.alarmIfActivenessCheckFailed(
+            requestId,
+            participantNodeParameters.crashAfterFailedValidation,
+          )
           val commitSet = unassignmentValidationResult.commitSet
           val commitSetFO = Some(FutureUnlessShutdown.pure(commitSet))
           val unassignmentData = unassignmentValidationResult.unassignmentData
           for {
-            _ <- ifThenET(isReassigningParticipant) {
-              reassignmentCoordination.addUnassignmentRequest(unassignmentData)
-            }
+            storedInReassignmentStore <-
+              if (isReassigningParticipant)
+                alarmOnUnknownTarget("storing unassignment data")(
+                  reassignmentCoordination.addUnassignmentRequest(unassignmentData)
+                )
+              else EitherT.pure[FutureUnlessShutdown, ReassignmentProcessorError](false)
             _ = reassignmentCoordination.completeUnassignment(
               unassignmentValidationResult.reassignmentId,
               unassignmentValidationResult.sourceSynchronizer,
             )
+            _ = if (storedInReassignmentStore)
+              reassignmentMetrics.finalized.inc()(
+                ReassignmentMetrics.unassignment(
+                  unassignmentValidationResult.sourceSynchronizer.map(_.logical),
+                  unassignmentValidationResult.targetSynchronizer.map(_.logical),
+                )
+              )
 
             notInitiator = pendingSubmissionData.isEmpty
             _ <-
-              if (notInitiator && isReassigningParticipant)
+              if (notInitiator && storedInReassignmentStore)
                 triggerAssignmentWhenExclusivityTimeoutExceeded(pendingRequestData)
               else EitherT.pure[FutureUnlessShutdown, ReassignmentProcessorError](())
 
@@ -656,6 +682,7 @@ private[reassignment] class UnassignmentProcessingSteps(
                 participantId,
                 requestId.unwrap,
                 trafficCost,
+                storedInReassignmentStore = storedInReassignmentStore,
               )
           } yield CommitAndStoreContractsAndPublishEvent(
             commitSetFO,
@@ -710,9 +737,32 @@ private[reassignment] class UnassignmentProcessingSteps(
           pendingRequestData.submitterMetadata,
           participantId,
           t0,
+          pendingRequestData.requestId.unwrap,
+          participantNodeParameters.reassignmentsConfig,
+          clock,
         )
 
     } yield automaticAssignment
+  }
+
+  /** An unknown target synchronizer looks like malicious behaviour: alarm and skip the write rather
+    * than fail the request. Returns whether the write happened.
+    */
+  private[this] def alarmOnUnknownTarget(skipped: String)(
+      result: EitherT[FutureUnlessShutdown, ReassignmentProcessorError, Unit]
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, Boolean] = {
+    def alarm(error: ReassignmentProcessorError): Either[ReassignmentProcessorError, Boolean] = {
+      SyncServiceAlarm.Warn(s"${error.message}. Skipping $skipped.").report()
+      Right(false)
+    }
+
+    EitherT(result.value.map {
+      case Left(error: UnknownSynchronizer) => alarm(error)
+      case Left(error: UnknownPhysicalSynchronizer) => alarm(error)
+      case outcome => outcome.map(_ => true)
+    })
   }
 
   override def localRejectFromActivenessCheck(

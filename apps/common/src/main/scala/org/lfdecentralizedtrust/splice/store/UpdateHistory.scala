@@ -52,7 +52,7 @@ import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.pretty.Pretty.{param, prettyOfClass}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.{GetResult, JdbcProfile}
@@ -81,6 +81,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 import scala.util.Try
 
@@ -106,7 +107,7 @@ class UpdateHistory private (
     storage: DbStorage,
     val domainMigrationId: Long,
     storeName: String,
-    participantId: ParticipantId,
+    participantId: StoreMemberId,
     val updateStreamParty: PartyId,
     val backfillingRequired: BackfillingRequirement,
     internedStringStore: InternedStringStore,
@@ -982,37 +983,6 @@ class UpdateHistory private (
       .queryAndUpdate(
         deleteAction.transactionally,
         "deleteAcsSnapshotsAfter",
-      )
-  }
-
-  def verifyNoRolledBackAcsSnapshots(
-      historyId: Long,
-      migrationId: Long,
-      recordTime: CantonTimestamp,
-  )(implicit tc: TraceContext): Future[Unit] = {
-    val action = sql"""
-          select snapshot_record_time from acs_snapshot
-          where history_id = $historyId and migration_id = $migrationId and snapshot_record_time > $recordTime
-        """
-      .as[CantonTimestamp]
-      .map(times =>
-        if (times.length > 0) {
-          throw new IllegalStateException(
-            s"Found acs snapshots at $times for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime, " +
-              "but the configuration says the domain was paused during the migration. " +
-              "Check the domain migration configuration and the content of the update history database"
-          )
-        } else {
-          logger.debug(
-            s"No updates found for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime"
-          )
-        }
-      )
-
-    storage
-      .query(
-        action,
-        "verifyNoRolledBackAcsSnapshots",
       )
   }
 
@@ -2504,7 +2474,7 @@ object UpdateHistory {
       storage: DbStorage,
       domainMigrationId: Long,
       storeName: String,
-      participantId: ParticipantId,
+      participantId: StoreMemberId,
       updateStreamParty: PartyId,
       backfillingRequired: BackfillingRequirement,
       internedStringStore: InternedStringStore,

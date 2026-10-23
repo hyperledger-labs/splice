@@ -39,6 +39,7 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   PerTableAcsSnapshot,
 }
 import org.lfdecentralizedtrust.splice.scan.config.AnalyzableTimeWindowConfig
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 
 trait AcsSnapshotStoreTest
     extends StoreTestBase
@@ -244,7 +245,7 @@ trait AcsSnapshotStoreTest
             omr2,
             timestamp2,
           )
-          lastSnapshot <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp2)
+          _ <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp2)
           _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp2)
           result <- queryAll(store, timestamp2)
         } yield result.createdEventsInPage.map(_.event.getContractId) should be(
@@ -711,7 +712,7 @@ trait AcsSnapshotStoreTest
             Seq(owner, holder),
           )
           _ <- store.insertNewSnapshot(nextTable, DefaultMigrationId, timestamp1)
-          _result <- store.getHoldingsState(
+          _ <- store.getHoldingsState(
             DefaultMigrationId,
             timestamp1,
             None,
@@ -1365,7 +1366,7 @@ trait AcsSnapshotStoreTest
         storage.underlying, // not under test
         migrationId,
         "update_history_acs_snapshot_test",
-        mkParticipantId(participantId),
+        StoreMemberId(mkParticipantId(participantId)),
         dsoParty,
         backfillingRequired,
         internedStringStore(storage),

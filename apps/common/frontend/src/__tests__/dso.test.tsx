@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { DsoInfo, theme } from '@canton-network/splice-common-frontend';
+import { DsoInfo, SvInfo, theme } from '@canton-network/splice-common-frontend';
 import { Contract } from '@canton-network/splice-common-frontend-utils';
 import { dsoInfo } from '@canton-network/splice-common-test-handlers';
 import { QueryClient, QueryClientProvider, onlineManager, useQuery } from '@tanstack/react-query';
@@ -16,9 +16,12 @@ import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 
 import DsoViewPrettyJSON from '../components/Dso';
 
-const makeDsoInfo = (): DsoInfo => ({
+const makeSvInfo = (): SvInfo => ({
   svUser: dsoInfo.sv_user,
   svPartyId: dsoInfo.sv_party_id,
+});
+
+const makeDsoInfo = (): DsoInfo => ({
   dsoPartyId: dsoInfo.dso_party_id,
   votingThreshold: BigInt(dsoInfo.voting_threshold),
   amuletRules: Contract.decodeOpenAPI(dsoInfo.amulet_rules.contract, AmuletRules),
@@ -32,6 +35,11 @@ const TestDso: React.FC = () => {
     queryFn: async () => makeDsoInfo(),
     initialData: makeDsoInfo(),
   });
+  const svInfoQuery = useQuery({
+    queryKey: ['svInfo'],
+    queryFn: async () => makeSvInfo(),
+    initialData: makeSvInfo(),
+  });
   const cometBftNodeDebugQuery = useQuery<CometBftNodeDumpOrErrorResponse>({
     queryKey: ['cometBftDebug'],
     queryFn: async () => {
@@ -41,6 +49,7 @@ const TestDso: React.FC = () => {
   return (
     <DsoViewPrettyJSON
       dsoInfoQuery={dsoInfoQuery}
+      svInfoQuery={svInfoQuery}
       cometBftNodeDebugQuery={cometBftNodeDebugQuery}
     />
   );

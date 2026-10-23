@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.performance.tests
 
+import com.digitalasset.canton.tracing.TraceContext
+
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -53,8 +55,8 @@ class ScanStoreIngestionPerformanceTest(
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
-    Future.successful(
-      new DbScanStore(
+    DbScanStore
+      .create(
         ScanStore.Key(dsoParty),
         storage,
         loggerFactory,
@@ -66,8 +68,8 @@ class ScanStoreIngestionPerformanceTest(
         IngestionConfig(),
         new DbScanStoreMetrics(NoOpMetricsFactory, loggerFactory, timeouts),
         defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-      )(ec, templateJsonDecoder, closeContext).multiDomainAcsStore
-    )
+      )(ec, templateJsonDecoder, closeContext, TraceContext.empty)
+      .map(_.multiDomainAcsStore)
   }
 
 }

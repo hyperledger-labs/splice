@@ -95,7 +95,7 @@ class SqlIndexInitializationTrigger(
       tc: TraceContext
   ): Future[Seq[SqlIndexInitializationTrigger.Task]] = {
     storage.dbConfig match {
-      case postgresConfig: DbConfig.Postgres =>
+      case _: DbConfig.Postgres =>
         nextTask(remainingActions.get())
           .failOnShutdownToAbortException("Retrieve SqlIndexInitializationTrigger tasks")
       case _ =>

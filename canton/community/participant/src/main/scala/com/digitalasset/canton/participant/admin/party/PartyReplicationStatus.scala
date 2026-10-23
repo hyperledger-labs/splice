@@ -4,33 +4,34 @@
 package com.digitalasset.canton.participant.admin.party
 
 import cats.syntax.traverse.*
+import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{
   Pretty,
-  PrettyPrinting,
   PrettyPrintingCompanion,
   PrettyPrintingFromCompanion,
 }
 import com.digitalasset.canton.participant.admin.party.PartyReplicationStatus.{
   AcsIndexingProgress,
-  AcsReplicationProgress,
-  AgreementStatus,
   Disconnected,
-  EphemeralSequencerChannelProgress,
   PartyReplicationAuthorization,
   PartyReplicationError,
   PartyReplicationFailed,
+  ReplicationMode,
   ReplicationParams,
 }
 import com.digitalasset.canton.participant.admin.party.PartyReplicator.AddPartyRequestId
-import com.digitalasset.canton.participant.protocol.party.{
-  PartyReplicationFileImporter,
-  PartyReplicationProcessor,
+import com.digitalasset.canton.participant.admin.party.acsreplication.AcsReplicationStatus
+import com.digitalasset.canton.participant.admin.party.acsreplication.AcsReplicationStatus.{
+  AcsReplicationProgress,
+  EphemeralSequencerChannelProgress,
 }
+import com.digitalasset.canton.participant.protocol.party.acsreplication.AcsReplicationProcessor
 import com.digitalasset.canton.participant.protocol.v30
-import com.digitalasset.canton.protocol.{LfContractId, v30 as v30Topology}
+import com.digitalasset.canton.participant.protocol.v30.PartyReplicationStatus.ReplicationMode as ProtoReplicationMode
+import com.digitalasset.canton.protocol.v30 as v30Topology
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.*
@@ -38,7 +39,6 @@ import com.digitalasset.canton.topology.processing.EffectiveTime
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.version.*
-import com.digitalasset.canton.{ProtoDeserializationError, RepairCounter}
 import io.scalaland.chimney.dsl.*
 
 /** Internal state representation of the party replication process. Refer to party_replication.proto
@@ -46,18 +46,19 @@ import io.scalaland.chimney.dsl.*
   */
 final case class PartyReplicationStatus(
     params: ReplicationParams,
-    agreementStatus: AgreementStatus,
     authorizationO: Option[PartyReplicationAuthorization],
     replicationO: Option[AcsReplicationProgress],
+    acsReplicationStatusO: Option[AcsReplicationStatus],
     indexingO: Option[AcsIndexingProgress],
     hasCompleted: Boolean,
+    replicationMode: ReplicationMode,
     errorO: Option[PartyReplicationError],
 )(
     override val representativeProtocolVersion: RepresentativeProtocolVersion[
       PartyReplicationStatus.type
     ]
 ) extends HasProtocolVersionedWrapper[PartyReplicationStatus]
-    with PrettyPrinting {
+    with PrettyPrintingFromCompanion {
   @transient override protected lazy val companionObj: PartyReplicationStatus.type =
     PartyReplicationStatus
 
@@ -67,26 +68,27 @@ final case class PartyReplicationStatus(
   )
 
   def setProcessor(
-      processor: PartyReplicationProcessor
+      processor: AcsReplicationProcessor
   ): PartyReplicationStatus = modifyReplication {
-    case None => AcsReplicationProgress.initialize(processor)
+    case None => AcsReplicationProgress.initialize(Some(processor))
     case Some(previous) =>
       EphemeralSequencerChannelProgress(
         previous.processedContractCount,
         previous.nextPersistenceCounter,
+        previous.acsHashO,
         previous.fullyProcessedAcs,
-        processor,
+        Some(processor),
       )
   }
 
-  def setAgreementStatus(newAgreementStatus: AgreementStatus): PartyReplicationStatus =
-    copy(agreementStatus = newAgreementStatus)(representativeProtocolVersion)
   def setAuthorization(newAuthorization: PartyReplicationAuthorization): PartyReplicationStatus =
     copy(authorizationO = Some(newAuthorization))(representativeProtocolVersion)
   def modifyReplication(
       modify: Option[AcsReplicationProgress] => AcsReplicationProgress
   ): PartyReplicationStatus =
     copy(replicationO = Some(modify(replicationO)))(representativeProtocolVersion)
+  def setReplication(newReplication: Option[AcsReplicationProgress]): PartyReplicationStatus =
+    copy(replicationO = newReplication)(representativeProtocolVersion)
   def setIndexing(): PartyReplicationStatus =
     copy(indexingO =
       Some(
@@ -106,19 +108,10 @@ final case class PartyReplicationStatus(
   ): PartyReplicationStatus = copy(errorO = modify(errorO))(representativeProtocolVersion)
   def setTopologySerial(serial: PositiveInt): PartyReplicationStatus =
     copy(params = params.copy(serial = serial))(representativeProtocolVersion)
-
-  def ensureCanSetAgreement(paramsReceived: ReplicationParams): Either[String, Unit] = for {
-    _ <- Either.cond(
-      agreementStatus.isEmpty,
-      (),
-      s"Party replication ${params.requestId} already has an agreement $agreementStatus",
-    )
-    _ <- Either.cond(
-      paramsReceived == params,
-      (),
-      s"The party replication ${params.requestId} agreement parameters received $paramsReceived do not match the locally stored agreement parameters $params",
-    )
-  } yield ()
+  def setAcsReplicationStatus(
+      acsReplicationStatus: Option[AcsReplicationStatus]
+  ): PartyReplicationStatus =
+    copy(acsReplicationStatusO = acsReplicationStatus)(representativeProtocolVersion)
 
   /** Indicates whether party replication is active and expected to be progressing, i.e. whether
     * monitoring for progress and initiating state transitions are needed in contrast to having
@@ -131,29 +124,22 @@ final case class PartyReplicationStatus(
 
   def toProtoV30: v30.PartyReplicationStatus = v30.PartyReplicationStatus(
     Some(params.toProtoV30),
-    agreementStatus.toProtoV30,
     authorizationO.map(_.toProtoV30),
     replicationO.map(_.toProtoV30),
     indexingO.map(_.toProtoV30),
     hasCompleted = hasCompleted,
     errorO.map(_.toProtoV30),
+    acsReplicationStatusO.map(_.toProtoV30),
+    replicationMode.toProtoV30,
   )
 
-  override protected def pretty: Pretty[PartyReplicationStatus] = {
-    import com.digitalasset.canton.logging.pretty.PrettyInstances.*
-    prettyOfClass(
-      param("params", _.params),
-      param("agreement", _.agreementStatus),
-      paramIfDefined("authorization", _.authorizationO),
-      paramIfDefined("replication", _.replicationO),
-      paramIfDefined("indexing", _.indexingO),
-      paramIfDefined("error", _.errorO),
-      paramIfTrue("complete", _.hasCompleted),
-    )
-  }
+  override def prettyCompanion: PrettyPrintingCompanion[PartyReplicationStatus] =
+    PartyReplicationStatus
 }
 
-object PartyReplicationStatus extends VersioningCompanion[PartyReplicationStatus] {
+object PartyReplicationStatus
+    extends VersioningCompanion[PartyReplicationStatus]
+    with PrettyPrintingCompanion[PartyReplicationStatus] {
 
   override val name: String = "PartyReplicationStatus"
 
@@ -167,48 +153,88 @@ object PartyReplicationStatus extends VersioningCompanion[PartyReplicationStatus
     ),
   )
 
+  override protected val pretty: Pretty[PartyReplicationStatus] = {
+    import com.digitalasset.canton.logging.pretty.PrettyInstances.*
+    prettyOfClass(
+      param("params", _.params),
+      paramIfDefined("authorization", _.authorizationO),
+      paramIfDefined("replication", _.replicationO),
+      paramIfDefined("acsReplicationStatus", _.acsReplicationStatusO),
+      paramIfDefined("indexing", _.indexingO),
+      paramIfDefined("error", _.errorO),
+      paramIfTrue("complete", _.hasCompleted),
+      param("replicationMode", _.replicationMode),
+    )
+  }
+
   def fromProtoV30(
       proto: v30.PartyReplicationStatus
   ): ParsingResult[PartyReplicationStatus] = for {
     rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
     parametersP <- ProtoConverter.required("parameters", proto.parameters)
     parameters <- ReplicationParams.fromProtoV30(parametersP)
-    agreement <- AgreementStatus.fromProtoV30(proto.agreementStatus)
     authorizationO <- proto.authorization.traverse(PartyReplicationAuthorization.fromProtoV30)
     replicationO <- proto.replication.traverse(AcsReplicationProgress.fromProtoV30)
+    acsReplicationO <- proto.acsReplicationStatus.traverse(AcsReplicationStatus.fromProtoV30)
     indexingO <- proto.indexing.traverse(AcsIndexingProgress.fromProtoV30)
     hasCompleted = proto.hasCompleted
     errorO <- proto.errorMessage.traverse(PartyReplicationError.fromProtoV30)
+    replicationMode <- ReplicationMode.fromProtoV30(proto.replicationMode)
   } yield PartyReplicationStatus(
     parameters,
-    agreement,
     authorizationO,
     replicationO,
+    acsReplicationO,
     indexingO,
     hasCompleted,
+    replicationMode,
     errorO,
   )(rpv)
 
   def apply(
       params: ReplicationParams,
       pv: ProtocolVersion,
-      agreementStatus: AgreementStatus = AgreementStatus.NotProposed,
       authorizationO: Option[PartyReplicationAuthorization] = None,
       replicationO: Option[AcsReplicationProgress] = None,
+      acsReplicationO: Option[AcsReplicationStatus] = None,
       indexingO: Option[AcsIndexingProgress] = None,
       hasCompleted: Boolean = false,
       errorO: Option[PartyReplicationError] = None,
+      replicationMode: ReplicationMode,
   ): PartyReplicationStatus = PartyReplicationStatus(
     params,
-    agreementStatus,
     authorizationO,
     replicationO,
+    acsReplicationO,
     indexingO,
     hasCompleted,
+    replicationMode,
     errorO,
   )(
     protocolVersionRepresentativeFor(pv)
   )
+
+  def fromAcsReplicationStatus(
+      acsReplicationStatus: AcsReplicationStatus
+  ): PartyReplicationStatus = {
+    val params = ReplicationParams.fromAcsReplicationStatus(acsReplicationStatus)
+    PartyReplicationStatus(
+      params,
+      authorizationO = acsReplicationStatus.partyToParticipantTopologyTransaction.map(
+        PartyReplicationAuthorization.fromAcsPartyToParticipantTopologyTransaction
+      ),
+      replicationO = acsReplicationStatus.replicationO,
+      acsReplicationStatusO = Some(acsReplicationStatus),
+      indexingO = None,
+      hasCompleted = acsReplicationStatus.hasCompleted,
+      replicationMode = ReplicationMode.SequencerChannel,
+      errorO = acsReplicationStatus.errorO.map(PartyReplicationError.fromAcsReplicationError),
+    )(
+      protocolVersionRepresentativeFor(
+        acsReplicationStatus.representativeProtocolVersion.representative
+      )
+    )
+  }
 
   final case class ReplicationParams(
       requestId: AddPartyRequestId,
@@ -218,7 +244,7 @@ object PartyReplicationStatus extends VersioningCompanion[PartyReplicationStatus
       targetParticipantId: ParticipantId,
       serial: PositiveInt,
       participantPermission: ParticipantPermission,
-  ) extends PrettyPrinting {
+  ) extends PrettyPrintingFromCompanion {
     def toProtoV30: v30.PartyReplicationStatus.ReplicationParameters =
       v30.PartyReplicationStatus.ReplicationParameters(
         requestId.toHexString,
@@ -242,21 +268,10 @@ object PartyReplicationStatus extends VersioningCompanion[PartyReplicationStatus
           v30Topology.Enums.ParticipantPermission.PARTICIPANT_PERMISSION_OBSERVATION
       }
 
-    override protected def pretty: Pretty[ReplicationParams] = {
-      import com.digitalasset.canton.logging.pretty.PrettyInstances.*
-      prettyOfClass(
-        param("request", _.requestId),
-        param("party", _.partyId),
-        param("synchronizer", _.synchronizerId),
-        param("source participant", _.sourceParticipantId),
-        param("target participant", _.targetParticipantId),
-        param("serial", _.serial),
-        param("permission", _.participantPermission.showType),
-      )
-    }
+    override def prettyCompanion: PrettyPrintingCompanion[ReplicationParams] = ReplicationParams
   }
 
-  object ReplicationParams {
+  object ReplicationParams extends PrettyPrintingCompanion[ReplicationParams] {
     def fromProtoV30(
         proto: v30.PartyReplicationStatus.ReplicationParameters
     ): ParsingResult[ReplicationParams] = for {
@@ -319,138 +334,48 @@ object PartyReplicationStatus extends VersioningCompanion[PartyReplicationStatus
         proto,
       )
 
-    def fromAgreementParams(agreement: PartyReplicationAgreementParams): ReplicationParams =
-      agreement.transformInto[ReplicationParams]
-  }
+    def fromAcsReplicationStatus(
+        acsReplicationStatus: AcsReplicationStatus
+    ): ReplicationParams = acsReplicationStatus.params
+      .into[ReplicationParams]
+      .withFieldConst(
+        _.serial,
+        acsReplicationStatus.partyToParticipantTopologyTransaction
+          .map(_.topologySerial)
+          .getOrElse(PositiveInt.one),
+      )
+      .transform
 
-  sealed trait AgreementStatus extends PrettyPrintingFromCompanion with Product with Serializable {
-    def toProtoV30: v30.PartyReplicationStatus.AgreementStatus
-    def isEmpty: Boolean
-  }
-
-  object AgreementStatus {
-    case object NotProposed extends AgreementStatus {
-      override def toProtoV30: v30.PartyReplicationStatus.AgreementStatus.NotProposed =
-        v30.PartyReplicationStatus.AgreementStatus.NotProposed(
-          v30.PartyReplicationStatus.AgreementNotProposed()
-        )
-
-      override val isEmpty: Boolean = true
-
-      override def prettyCompanion: PrettyPrintingCompanion[NotProposed.this.type] =
-        NotProposedPrettyPrintingCompanion
+    override protected val pretty: Pretty[ReplicationParams] = {
+      import com.digitalasset.canton.logging.pretty.PrettyInstances.*
+      prettyOfClass(
+        param("request", _.requestId),
+        param("party", _.partyId),
+        param("synchronizer", _.synchronizerId),
+        param("source participant", _.sourceParticipantId),
+        param("target participant", _.targetParticipantId),
+        param("serial", _.serial),
+        param("permission", _.participantPermission.showType),
+      )
     }
-
-    private object NotProposedPrettyPrintingCompanion
-        extends PrettyPrintingCompanion[NotProposed.type] {
-      override protected val pretty: Pretty[NotProposed.type] = prettyOfObject[NotProposed.type]
-    }
-
-    case object Proposed extends AgreementStatus {
-      override def toProtoV30: v30.PartyReplicationStatus.AgreementStatus.Proposed =
-        v30.PartyReplicationStatus.AgreementStatus.Proposed(
-          v30.PartyReplicationStatus.AgreementProposed()
-        )
-
-      override val isEmpty: Boolean = true
-
-      override def prettyCompanion: PrettyPrintingCompanion[Proposed.this.type] =
-        ProposedPrettyPrintingCompanion
-    }
-
-    private object ProposedPrettyPrintingCompanion extends PrettyPrintingCompanion[Proposed.type] {
-      override protected val pretty: Pretty[Proposed.type] = prettyOfObject[Proposed.type]
-    }
-
-    final case class Exists(
-        // daml agreement contract id to be archived upon completion or disruptions
-        damlAgreementContractId: LfContractId,
-        sequencerId: SequencerId,
-    ) extends AgreementStatus {
-      override def toProtoV30: v30.PartyReplicationStatus.AgreementStatus.Exists =
-        v30.PartyReplicationStatus.AgreementStatus.Exists(
-          v30.PartyReplicationStatus.AgreementExists(
-            damlAgreementContractId.coid,
-            sequencerId.uid.toProtoPrimitive,
-          )
-        )
-
-      override val isEmpty: Boolean = false
-
-      override def prettyCompanion: PrettyPrintingCompanion[Exists] =
-        Exists
-    }
-
-    object Exists extends PrettyPrintingCompanion[Exists] {
-      override protected val pretty: Pretty[Exists] = {
-        import com.digitalasset.canton.logging.pretty.PrettyInstances.*
-        prettyOfClass(
-          param("contract id", _.damlAgreementContractId),
-          param("sequencer", _.sequencerId),
-        )
-      }
-    }
-
-    case object NotNeeded extends AgreementStatus {
-      override def toProtoV30: v30.PartyReplicationStatus.AgreementStatus.NotNeeded =
-        v30.PartyReplicationStatus.AgreementStatus.NotNeeded(
-          v30.PartyReplicationStatus.AgreementNotNeeded()
-        )
-
-      override val isEmpty: Boolean = true
-
-      override def prettyCompanion: PrettyPrintingCompanion[NotNeeded.this.type] =
-        NotNeededPrettyPrintingCompanion
-    }
-
-    private object NotNeededPrettyPrintingCompanion
-        extends PrettyPrintingCompanion[NotNeeded.type] {
-      override protected val pretty: Pretty[NotNeeded.type] = prettyOfObject[NotNeeded.type]
-    }
-
-    def fromProtoV30(
-        proto: v30.PartyReplicationStatus.AgreementStatus
-    ): ParsingResult[AgreementStatus] =
-      proto match {
-        case v30.PartyReplicationStatus.AgreementStatus.NotProposed(_) =>
-          Right(AgreementStatus.NotProposed)
-        case v30.PartyReplicationStatus.AgreementStatus.Proposed(_) =>
-          Right(AgreementStatus.Proposed)
-        case v30.PartyReplicationStatus.AgreementStatus.Exists(exists) =>
-          for {
-            contractId <- ProtoConverter.parseLfContractId(exists.contractId)
-            sequencerId <- UniqueIdentifier
-              .fromProtoPrimitive(exists.sequencerUid, "sequencer_uid")
-              .map(SequencerId(_))
-          } yield Exists(contractId, sequencerId)
-        case v30.PartyReplicationStatus.AgreementStatus.NotNeeded(_) =>
-          Right(AgreementStatus.NotNeeded)
-        case v30.PartyReplicationStatus.AgreementStatus.Empty =>
-          Left(ProtoDeserializationError.FieldNotSet("agreement_status"))
-      }
-
   }
 
   final case class PartyReplicationAuthorization(
       onboardingAt: EffectiveTime,
       isOnboardingFlagCleared: Boolean,
-  ) extends PrettyPrinting {
+  ) extends PrettyPrintingFromCompanion {
     def toProtoV30: v30.PartyReplicationStatus.PartyReplicationAuthorization =
       v30.PartyReplicationStatus.PartyReplicationAuthorization(
         Some(onboardingAt.value.toProtoTimestamp),
         isOnboardingFlagCleared,
       )
 
-    override protected def pretty: Pretty[PartyReplicationAuthorization] = {
-      import com.digitalasset.canton.logging.pretty.PrettyInstances.*
-      prettyOfClass(
-        param("onboarding at", _.onboardingAt.value),
-        paramIfTrue("onboarding cleared", _.isOnboardingFlagCleared),
-      )
-    }
+    override def prettyCompanion: PrettyPrintingCompanion[PartyReplicationAuthorization] =
+      PartyReplicationAuthorization
   }
 
-  object PartyReplicationAuthorization {
+  object PartyReplicationAuthorization
+      extends PrettyPrintingCompanion[PartyReplicationAuthorization] {
     def fromProtoV30(
         proto: v30.PartyReplicationStatus.PartyReplicationAuthorization
     ): ParsingResult[PartyReplicationAuthorization] =
@@ -461,112 +386,29 @@ object PartyReplicationStatus extends VersioningCompanion[PartyReplicationStatus
         EffectiveTime(onboardingAt),
         proto.isOnboardingFlagCleared,
       )
-  }
 
-  sealed trait AcsReplicationProgress extends PrettyPrinting {
-    def processedContractCount: NonNegativeLong
-    def nextPersistenceCounter: RepairCounter
-    def fullyProcessedAcs: Boolean
-    def processorO: Option[PartyReplicationProcessor]
-    def fileImporterO: Option[PartyReplicationFileImporter]
-
-    def toProtoV30: v30.PartyReplicationStatus.AcsReplicationProgress =
-      v30.PartyReplicationStatus.AcsReplicationProgress(
-        processedContractCount.unwrap,
-        nextPersistenceCounter.unwrap,
-        fullyProcessedAcs,
+    def fromAcsPartyToParticipantTopologyTransaction(
+        acsReplicationAuthorization: AcsReplicationStatus.PartyToParticipantTopologyTransaction
+    ): PartyReplicationAuthorization =
+      PartyReplicationAuthorization(
+        acsReplicationAuthorization.validFrom,
+        isOnboardingFlagCleared = !acsReplicationAuthorization.isOnboarding,
       )
 
-    override protected def pretty: Pretty[AcsReplicationProgress] = {
+    override protected val pretty: Pretty[PartyReplicationAuthorization] = {
       import com.digitalasset.canton.logging.pretty.PrettyInstances.*
       prettyOfClass(
-        param("contracts", _.processedContractCount),
-        param("next counter", _.nextPersistenceCounter),
-        paramIfTrue("fully replicated", _.fullyProcessedAcs),
-        paramIfDefined("processor", _.processorO.map(_.showType)),
+        param("onboarding at", _.onboardingAt.value),
+        paramIfTrue("onboarding cleared", _.isOnboardingFlagCleared),
       )
     }
-  }
-
-  /** PersistentProgress contains the db-persisted portion of the ACS replication progress. Before
-    * the progress needs to be updated, this case class needs to be turned into one of the ephemeral
-    * AcsReplicationProgress case classes.
-    */
-  final case class PersistentProgress(
-      processedContractCount: NonNegativeLong,
-      nextPersistenceCounter: RepairCounter,
-      fullyProcessedAcs: Boolean,
-  ) extends AcsReplicationProgress {
-    override def processorO: Option[PartyReplicationProcessor] = None
-    override def fileImporterO: Option[PartyReplicationFileImporter] = None
-  }
-
-  /** EphemeralSequencerChannelProgress holds the ephemeral sequencer channel based ACS replication
-    * status of a party replication source or target participant processor.
-    */
-  final case class EphemeralSequencerChannelProgress(
-      processedContractCount: NonNegativeLong,
-      nextPersistenceCounter: RepairCounter,
-      fullyProcessedAcs: Boolean,
-      processor: PartyReplicationProcessor,
-  ) extends AcsReplicationProgress {
-    override def processorO: Option[PartyReplicationProcessor] = Some(processor)
-    override def fileImporterO: Option[PartyReplicationFileImporter] = None
-  }
-
-  /** EphemeralFileImporterProgress holds the ephemeral file-based ACS import status of a party
-    * replication target participant.
-    */
-  final case class EphemeralFileImporterProgress(
-      processedContractCount: NonNegativeLong,
-      nextPersistenceCounter: RepairCounter,
-      fullyProcessedAcs: Boolean,
-      fileImporter: PartyReplicationFileImporter,
-  ) extends AcsReplicationProgress {
-    override def processorO: Option[PartyReplicationProcessor] = None
-    override def fileImporterO: Option[PartyReplicationFileImporter] = Some(fileImporter)
-  }
-
-  object AcsReplicationProgress {
-    def fromProtoV30(
-        proto: v30.PartyReplicationStatus.AcsReplicationProgress
-    ): ParsingResult[PersistentProgress] = for {
-      replicatedContractCount <- ProtoConverter.parseNonNegativeLong(
-        "replicated_contract_count",
-        proto.processedContractCount,
-      )
-      nextPersistenceCounter <- ProtoConverter.parseNonNegativeLong(
-        "next_persistence_counter",
-        proto.nextPersistenceCounter,
-      )
-    } yield PersistentProgress(
-      replicatedContractCount,
-      RepairCounter(nextPersistenceCounter.unwrap),
-      proto.fullyProcessedAcs,
-    )
-
-    def initialize(processor: PartyReplicationProcessor): AcsReplicationProgress =
-      EphemeralSequencerChannelProgress(
-        NonNegativeLong.zero,
-        RepairCounter.Genesis,
-        fullyProcessedAcs = false,
-        processor,
-      )
-
-    def initialize(fileImporter: PartyReplicationFileImporter): AcsReplicationProgress =
-      EphemeralFileImporterProgress(
-        NonNegativeLong.zero,
-        RepairCounter.Genesis,
-        fullyProcessedAcs = false,
-        fileImporter,
-      )
   }
 
   final case class AcsIndexingProgress(
       indexedContractActivationChangeCount: NonNegativeLong,
       nextIndexingCounter: NonNegativeLong,
       indexingAlmostDoneWatermarkO: Option[NonNegativeLong],
-  ) extends PrettyPrinting {
+  ) extends PrettyPrintingFromCompanion {
 
     /** Because completing indexing during party replication is a moving target in the face of
       * transactions running concurrently to party replication, check if the watermark tracking the
@@ -584,17 +426,10 @@ object PartyReplicationStatus extends VersioningCompanion[PartyReplicationStatus
         indexingAlmostDoneWatermarkO.map(_.unwrap),
       )
 
-    override protected def pretty: Pretty[AcsIndexingProgress] = {
-      import com.digitalasset.canton.logging.pretty.PrettyInstances.*
-      prettyOfClass(
-        param("change count", _.indexedContractActivationChangeCount),
-        param("next counter", _.nextIndexingCounter),
-        paramIfDefined("almost done watermark", _.indexingAlmostDoneWatermarkO),
-      )
-    }
+    override def prettyCompanion: PrettyPrintingCompanion[AcsIndexingProgress] = AcsIndexingProgress
   }
 
-  object AcsIndexingProgress {
+  object AcsIndexingProgress extends PrettyPrintingCompanion[AcsIndexingProgress] {
     def fromProtoV30(
         proto: v30.PartyReplicationStatus.AcsIndexingProgress
     ): ParsingResult[AcsIndexingProgress] =
@@ -614,12 +449,22 @@ object PartyReplicationStatus extends VersioningCompanion[PartyReplicationStatus
         nextIndexingCounter,
         lastFullDrainCountO,
       )
+
+    override protected val pretty: Pretty[AcsIndexingProgress] = {
+      import com.digitalasset.canton.logging.pretty.PrettyInstances.*
+      prettyOfClass(
+        param("change count", _.indexedContractActivationChangeCount),
+        param("next counter", _.nextIndexingCounter),
+        paramIfDefined("almost done watermark", _.indexingAlmostDoneWatermarkO),
+      )
+    }
   }
 
-  sealed trait PartyReplicationError extends PrettyPrinting {
+  sealed trait PartyReplicationError extends PrettyPrintingFromCompanion {
     def message: String
     def toProtoV30: v30.PartyReplicationStatus.PartyReplicationError
-    override protected def pretty: Pretty[PartyReplicationError] = prettyOfString(_.message)
+    override def prettyCompanion: PrettyPrintingCompanion[PartyReplicationError] =
+      PartyReplicationError
   }
 
   final case class Disconnected(message: String) extends PartyReplicationError {
@@ -638,7 +483,7 @@ object PartyReplicationStatus extends VersioningCompanion[PartyReplicationStatus
       )
   }
 
-  object PartyReplicationError {
+  object PartyReplicationError extends PrettyPrintingCompanion[PartyReplicationError] {
     def fromProtoV30(
         proto: v30.PartyReplicationStatus.PartyReplicationError
     ): ParsingResult[PartyReplicationError] = {
@@ -657,5 +502,65 @@ object PartyReplicationStatus extends VersioningCompanion[PartyReplicationStatus
         proto.errorType,
       )
     }
+
+    def fromAcsReplicationError(
+        acsReplicationError: AcsReplicationStatus.AcsReplicationError
+    ): PartyReplicationError =
+      acsReplicationError match {
+        case AcsReplicationStatus.Disconnected(message) => Disconnected(message)
+        case AcsReplicationStatus.AcsReplicationFailed(message) =>
+          PartyReplicationFailed(message)
+      }
+
+    override protected val pretty: Pretty[PartyReplicationError] = prettyOfString(_.message)
+  }
+
+  sealed trait ReplicationMode extends PrettyPrintingFromCompanion with Product with Serializable {
+    def toProtoV30: v30.PartyReplicationStatus.ReplicationMode
+  }
+
+  object ReplicationMode {
+    case object File extends ReplicationMode {
+      override def toProtoV30: v30.PartyReplicationStatus.ReplicationMode =
+        v30.PartyReplicationStatus.ReplicationMode.REPLICATION_MODE_FILE
+
+      override def prettyCompanion: PrettyPrintingCompanion[File.this.type] =
+        FilePrettyPrintingCompanion
+    }
+
+    private object FilePrettyPrintingCompanion extends PrettyPrintingCompanion[File.type] {
+      override protected val pretty: Pretty[File.type] = prettyOfObject[File.type]
+    }
+
+    case object SequencerChannel extends ReplicationMode {
+      override def toProtoV30: v30.PartyReplicationStatus.ReplicationMode =
+        v30.PartyReplicationStatus.ReplicationMode.REPLICATION_MODE_SEQUENCER_CHANNEL
+
+      override def prettyCompanion: PrettyPrintingCompanion[SequencerChannel.type] =
+        SequencerChannelPrintingCompanion
+    }
+
+    private object SequencerChannelPrintingCompanion
+        extends PrettyPrintingCompanion[SequencerChannel.type] {
+      override protected val pretty: Pretty[SequencerChannel.type] =
+        prettyOfObject[SequencerChannel.type]
+    }
+
+    def fromProtoV30(
+        proto: v30.PartyReplicationStatus.ReplicationMode
+    ): ParsingResult[ReplicationMode] =
+      ProtoConverter.parseEnum[ReplicationMode, ProtoReplicationMode](
+        {
+          case ProtoReplicationMode.REPLICATION_MODE_FILE => Right(Some(File))
+          case ProtoReplicationMode.REPLICATION_MODE_SEQUENCER_CHANNEL =>
+            Right(Some(SequencerChannel))
+          case ProtoReplicationMode.REPLICATION_MODE_UNSPECIFIED =>
+            Left(ProtoDeserializationError.FieldNotSet("replication_mode"))
+          case ProtoReplicationMode.Unrecognized(unknown) =>
+            Left(ProtoDeserializationError.UnrecognizedEnum("replication_mode", unknown))
+        },
+        "replication_mode",
+        proto,
+      )
   }
 }

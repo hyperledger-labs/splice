@@ -3,6 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.splitwell.store.db
 
+import com.digitalasset.canton.tracing.TraceContext
+
+import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore
+
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import org.lfdecentralizedtrust.splice.automation.TransferFollowTrigger
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
@@ -28,14 +32,74 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DbSplitwellStore(
+object DbSplitwellStore {
+
+  /** Looks up the store ids, and creates the store. */
+  def create(
+      key: SplitwellStore.Key,
+      dsoPartyId: PartyId,
+      domainConfig: SplitwellSynchronizerConfig,
+      storage: DbStorage,
+      loggerFactory: NamedLoggerFactory,
+      retryProvider: RetryProvider,
+      domainMigrationId: Long,
+      participantId: ParticipantId,
+      ingestionConfig: IngestionConfig,
+      defaultLimit: Limit,
+  )(implicit
+      ec: ExecutionContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+      closeContext: CloseContext,
+      tc: TraceContext,
+  ): Future[DbSplitwellStore] =
+    DbMultiDomainAcsStore
+      .lookupStoreIds(storage, acsStoreDescriptor(key, participantId), None)
+      .map { storeIds =>
+        new DbSplitwellStore(
+          key = key,
+          dsoPartyId = dsoPartyId,
+          domainConfig = domainConfig,
+          storage = storage,
+          loggerFactory = loggerFactory,
+          retryProvider = retryProvider,
+          domainMigrationId = domainMigrationId,
+          participantId = participantId,
+          ingestionConfig = ingestionConfig,
+          storeIds,
+          defaultLimit = defaultLimit,
+        )
+      }
+
+  // Any change in the store descriptor will lead to previously deployed applications
+  // forgetting all persisted data once they upgrade to the new version.
+  // WARNING: Reinitializing the acs store is a very expensive operation, as it currently fetches the full
+  // unfiltered ACS from the participant, irrespective of the filter defined by `acsContractFilter`.
+  // This may lead to the entire app being unavailable or not working properly until the full ACS has been ingested.
+  // Do not modify any part of the store descriptor unless you are sure that the resulting downtime is acceptable.
+  // If you do modify it, make sure to very clearly document in the release notes that there will be planned downtime,
+  // and notify the person coordinating the deployment.
+  def acsStoreDescriptor(
+      key: SplitwellStore.Key,
+      participantId: ParticipantId,
+  ): StoreDescriptor =
+    StoreDescriptor(
+      version = 2,
+      name = "DbSplitwellStore",
+      party = key.providerParty,
+      participant = participantId,
+      key = Map(
+        "providerParty" -> key.providerParty.toProtoPrimitive
+      ),
+    )
+}
+
+class DbSplitwellStore private (
     override val key: SplitwellStore.Key,
     override val dsoPartyId: PartyId,
     override protected[this] val domainConfig: SplitwellSynchronizerConfig,
@@ -45,6 +109,7 @@ class DbSplitwellStore(
     domainMigrationId: Long,
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
+    storeIds: DbMultiDomainAcsStore.StoreIds,
     override val defaultLimit: Limit,
 )(implicit
     override protected val ec: ExecutionContext,
@@ -54,25 +119,10 @@ class DbSplitwellStore(
       storage = storage,
       acsTableName = SplitwellTables.acsTableName,
       interfaceViewsTableNameOpt = None,
-      // Any change in the store descriptor will lead to previously deployed applications
-      // forgetting all persisted data once they upgrade to the new version.
-      // WARNING: Reinitializing the acs store is a very expensive operation, as it currently fetches the full
-      // unfiltered ACS from the participant, irrespective of the filter defined by `acsContractFilter`.
-      // This may lead to the entire app being unavailable or not working properly until the full ACS has been ingested.
-      // Do not modify any part of the store descriptor unless you are sure that the resulting downtime is acceptable.
-      // If you do modify it, make sure to very clearly document in the release notes that there will be planned downtime,
-      // and notify the person coordinating the deployment.
-      acsStoreDescriptor = StoreDescriptor(
-        version = 2,
-        name = "DbSplitwellStore",
-        party = key.providerParty,
-        participant = participantId,
-        key = Map(
-          "providerParty" -> key.providerParty.toProtoPrimitive
-        ),
-      ),
+      acsStoreDescriptor = DbSplitwellStore.acsStoreDescriptor(key, participantId),
+      storeIds = storeIds,
       migrationId = domainMigrationId,
-      ingestionConfig,
+      ingestionConfig = ingestionConfig,
     )
     with AcsTables
     with AcsQueries

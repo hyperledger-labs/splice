@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IM
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement.NeedsBackfilling
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsInterfaceViewRowData,
@@ -571,7 +572,7 @@ class TxLogBackfillingStoreTest
         storage,
         migrationId,
         "TxLogBackfillingStoreTest",
-        participantId,
+        StoreMemberId(participantId),
         party,
         backfillingRequired,
         internedStringStore(storage),
@@ -599,21 +600,23 @@ class TxLogBackfillingStoreTest
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    new DbMultiDomainAcsStore(
-      storage,
-      acsTableName,
-      txLogTableName,
-      None,
-      storeDescriptor(acsId, participantId),
-      txLogId.map(storeDescriptor(_, participantId)),
-      loggerFactory,
-      filter,
-      testTxLogConfig,
-      migrationId,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      IngestionConfig(),
-      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-    )
+    DbMultiDomainAcsStore
+      .create(
+        storage,
+        acsTableName,
+        txLogTableName,
+        None,
+        storeDescriptor(acsId, participantId),
+        txLogId.map(storeDescriptor(_, participantId)),
+        loggerFactory,
+        filter,
+        testTxLogConfig,
+        migrationId,
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+        IngestionConfig(),
+        defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+      )
+      .futureValue
   }
 
   override protected def cleanDb(

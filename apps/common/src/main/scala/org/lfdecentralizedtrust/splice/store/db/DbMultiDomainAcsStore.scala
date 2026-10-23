@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.store.db
 
+import com.digitalasset.canton.tracing.TraceContext
+
 import cats.data.{NonEmptyList, NonEmptyVector, OptionT}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
@@ -38,7 +40,6 @@ import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.showPretty
 
 import java.util.concurrent.atomic.AtomicReference
@@ -76,13 +77,15 @@ import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnles
 import java.lang
 import java.time.Instant
 
-final class DbMultiDomainAcsStore[TXE](
+final class DbMultiDomainAcsStore[TXE] private[db] (
     private[db] val storage: DbStorage,
     private[db] val acsTableName: String,
     txLogTableNameOpt: Option[String],
     interfaceViewsTableNameOpt: Option[String],
     private[db] val acsStoreDescriptor: StoreDescriptor,
     txLogStoreDescriptor: Option[StoreDescriptor],
+    /** The ids of the descriptors, see [[DbMultiDomainAcsStore.lookupStoreIds]]. */
+    storeIds: DbMultiDomainAcsStore.StoreIds,
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter[
       ? <: AcsRowData,
@@ -123,21 +126,9 @@ final class DbMultiDomainAcsStore[TXE](
 
   private val state = new AtomicReference[State](State.empty())
 
-  def acsStoreId: AcsStoreId =
-    state
-      .get()
-      .acsStoreId
-      .getOrElse(throw new RuntimeException("Using acsStoreId before it was assigned"))
-  def txLogStoreId: TxLogStoreId = {
-    if (txLogStoreDescriptor.isDefined) {
-      state
-        .get()
-        .txLogStoreId
-        .getOrElse(throw new RuntimeException("Using txLogStoreId before it was assigned"))
-    } else {
-      throw new RuntimeException("This store is not using a TxLog")
-    }
-  }
+  val acsStoreId: AcsStoreId = storeIds.acsStoreId
+  def txLogStoreId: TxLogStoreId =
+    storeIds.txLogStoreId.getOrElse(throw new RuntimeException("This store is not using a TxLog"))
 
   private[this] def txLogTableName =
     txLogTableNameOpt.getOrElse(throw new RuntimeException("This store doesn't use a TxLog"))
@@ -572,7 +563,7 @@ final class DbMultiDomainAcsStore[TXE](
   override lazy val destinationHistory
       : HistoryBackfilling.DestinationHistory[UpdateHistoryResponse] =
     new HistoryBackfilling.DestinationHistory[UpdateHistoryResponse] {
-      override def isReady: Boolean = state.get().txLogStoreId.isDefined
+      override def isReady: Boolean = state.get().initialized
 
       override def backfillingInfo(implicit
           tc: TraceContext
@@ -954,19 +945,17 @@ final class DbMultiDomainAcsStore[TXE](
   override lazy val ingestionSink: IngestionSink = new MultiDomainAcsStore.IngestionSink {
     override def ingestionFilter: IngestionFilter = contractFilter.ingestionFilter
 
-    private[this] def initializeDescriptor(
-        descriptor: StoreDescriptor
+    private[this] def initializeIngestionState(
+        storeId: Int
     )(implicit
         traceContext: TraceContext
     ): Future[InitializeDescriptorResult[Int]] = {
       for {
-        newStoreId <- StoreDescriptorStore.getStoreIdForDescriptor(descriptor, storage)
-
         _ <- storage
           .update(
             sql"""
              insert into store_last_ingested_offsets (store_id, migration_id)
-             values (${newStoreId}, ${domainMigrationId})
+             values (${storeId}, ${domainMigrationId})
              on conflict do nothing
              """.asUpdate,
             "initializeDescriptor.3",
@@ -977,17 +966,17 @@ final class DbMultiDomainAcsStore[TXE](
             sql"""
              select last_ingested_offset
              from store_last_ingested_offsets
-             where store_id = ${newStoreId} and migration_id = $domainMigrationId
+             where store_id = ${storeId} and migration_id = $domainMigrationId
              """.as[Option[String]].headOption,
             "initializeDescriptor.4",
           )
           .getOrRaise(
-            new RuntimeException(s"No row for $newStoreId found, which was just inserted!")
+            new RuntimeException(s"No row for $storeId found, which was just inserted!")
           )
           .map(_.map(LegacyOffset.Api.assertFromStringToLong(_)))
       } yield lastIngestedOffset match {
-        case Some(offset) => StoreHasData(newStoreId, offset)
-        case None => StoreHasNoData(newStoreId)
+        case Some(offset) => StoreHasData(storeId, offset)
+        case None => StoreHasNoData(storeId)
       }
     }
 
@@ -996,26 +985,18 @@ final class DbMultiDomainAcsStore[TXE](
         mat: Materializer,
     ): Future[IngestionStart] = {
       for {
-        acsInitResult <- initializeDescriptor(acsStoreDescriptor).map(AcsStoreId.subst)
-        txLogInitResult <- txLogStoreDescriptor match {
-          case Some(descriptor) => initializeDescriptor(descriptor).map(TxLogStoreId.subst)
+        acsInitResult <- initializeIngestionState(AcsStoreId.unwrap(acsStoreId))
+          .map(AcsStoreId.subst)
+        txLogInitResult <- storeIds.txLogStoreId match {
+          case Some(id) =>
+            initializeIngestionState(TxLogStoreId.unwrap(id)).map(TxLogStoreId.subst)
           case None => Future.successful(StoreNotUsed[TxLogStoreId]())
         }
       } yield {
-        def initState(
-            acsStoreId: AcsStoreId,
-            txLogStoreId: Option[TxLogStoreId],
-            lastIngestedOffset: Option[Long],
-        ): Unit = {
+        def initState(lastIngestedOffset: Option[Long]): Unit = {
           // Note: IngestionSink.initialize() may be called multiple times for the same store instance,
           // if for example the ingestion loop restarts.
-          val oldState = state.getAndUpdate(
-            _.withInitialState(
-              acsStoreId = acsStoreId,
-              txLogStoreId = txLogStoreId,
-              lastIngestedOffset = lastIngestedOffset,
-            )
-          )
+          val oldState = state.getAndUpdate(_.withInitialState(lastIngestedOffset))
           lastIngestedOffset.foreach(oldState.signalOffsetChanged)
         }
 
@@ -1033,7 +1014,7 @@ final class DbMultiDomainAcsStore[TXE](
               s"ACS offset $acsOffset is out of sync with TxLog offset $txLogOffset. " +
                 "This should never happen, as we ingest into both stores in one SQL transaction.",
             )
-            initState(acsStoreId, Some(txLogStoreId), Some(acsOffset))
+            initState(Some(acsOffset))
             finishedAcsIngestion.trySuccess(()).discard
             IngestionStart.ResumeAtOffset(
               acsOffset
@@ -1044,7 +1025,7 @@ final class DbMultiDomainAcsStore[TXE](
                 s"TxLog store $txLogStoreDescriptor with id $txLogStoreId has not ingested any data, presumably because it was reset. " +
                 s"Resuming ingestion at offset $acsOffset, TxLog backfilling will start restoring previous entries."
             )
-            initState(acsStoreId, Some(txLogStoreId), Some(acsOffset))
+            initState(Some(acsOffset))
             finishedAcsIngestion.trySuccess(()).discard
             IngestionStart.ResumeAtOffset(
               acsOffset
@@ -1054,7 +1035,7 @@ final class DbMultiDomainAcsStore[TXE](
               s"Acs store $acsStoreDescriptor with id $acsStoreId has ingested data in migration $domainMigrationId up to offset $acsOffset. " +
                 s"Resuming ingestion at offset $acsOffset."
             )
-            initState(acsStoreId, None, Some(acsOffset))
+            initState(Some(acsOffset))
             finishedAcsIngestion.trySuccess(()).discard
             IngestionStart.ResumeAtOffset(
               acsOffset
@@ -1065,7 +1046,7 @@ final class DbMultiDomainAcsStore[TXE](
                 s"Acs store $acsStoreDescriptor with id $acsStoreId has not ingested any data, presumably because it was reset. " +
                 s"Initializing the ACS at offset $txLogOffset, and resuming ingestion from there."
             )
-            initState(acsStoreId, Some(txLogStoreId), Some(txLogOffset))
+            initState(Some(txLogOffset))
             IngestionStart.InitializeAcsAtOffset(txLogOffset)
           case (StoreHasNoData(acsStoreId), StoreHasNoData(txLogStoreId)) =>
             logger.info(
@@ -1074,7 +1055,7 @@ final class DbMultiDomainAcsStore[TXE](
                 s"Either both stores were reset, or the app is starting for the first time on this migration." +
                 s"Initializing the ACS at an offset chosen by the ingestion service, and resuming ingestion from there."
             )
-            initState(acsStoreId, Some(txLogStoreId), None)
+            initState(None)
             IngestionStart.InitializeAcsAtLatestOffset
           case (StoreHasNoData(acsStoreId), StoreNotUsed()) =>
             logger.info(
@@ -1082,7 +1063,7 @@ final class DbMultiDomainAcsStore[TXE](
                 s"Either the store was reset, or the app is starting for the first time on this migration." +
                 s"Initializing the ACS at an offset chosen by the ingestion service, and resuming ingestion from there."
             )
-            initState(acsStoreId, None, None)
+            initState(None)
             IngestionStart.InitializeAcsAtLatestOffset
         }
       }
@@ -2234,8 +2215,85 @@ final class DbMultiDomainAcsStore[TXE](
 
 object DbMultiDomainAcsStore {
 
-  /** @param acsStoreId The primary key of this stores ACS entry in the store_descriptors table
-    * @param txLogStoreId The primary key of this stores TxLog entry in the store_descriptors table
+  /** The ids of the store descriptors of a [[DbMultiDomainAcsStore]]. */
+  final case class StoreIds(acsStoreId: AcsStoreId, txLogStoreId: Option[TxLogStoreId])
+
+  /** Creates a store, after looking up (or allocating) the ids of its descriptors.
+    * Stores that wrap a [[DbMultiDomainAcsStore]] in a [[DbAppStore]] look up the ids with [[lookupStoreIds]] instead,
+    * as they construct the store while constructing themselves.
+    */
+  def create[TXE](
+      storage: DbStorage,
+      acsTableName: String,
+      txLogTableNameOpt: Option[String],
+      interfaceViewsTableNameOpt: Option[String],
+      acsStoreDescriptor: StoreDescriptor,
+      txLogStoreDescriptor: Option[StoreDescriptor],
+      loggerFactory: NamedLoggerFactory,
+      contractFilter: MultiDomainAcsStore.ContractFilter[
+        ? <: AcsRowData,
+        ? <: AcsInterfaceViewRowData,
+      ],
+      txLogConfig: TxLogStore.Config[TXE],
+      domainMigrationId: Long,
+      retryProvider: RetryProvider,
+      ingestionConfig: IngestionConfig,
+      handleIngestionSummary: IngestionSummary => Unit = _ => (),
+      defaultLimit: Limit,
+      acsArchiveConfigOpt: Option[AcsArchiveConfig] = None,
+  )(implicit
+      ec: ExecutionContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+      closeContext: CloseContext,
+      tc: TraceContext,
+  ): Future[DbMultiDomainAcsStore[TXE]] =
+    lookupStoreIds(storage, acsStoreDescriptor, txLogStoreDescriptor).map { storeIds =>
+      new DbMultiDomainAcsStore[TXE](
+        storage,
+        acsTableName,
+        txLogTableNameOpt,
+        interfaceViewsTableNameOpt,
+        acsStoreDescriptor,
+        txLogStoreDescriptor,
+        storeIds,
+        loggerFactory,
+        contractFilter,
+        txLogConfig,
+        domainMigrationId,
+        retryProvider,
+        ingestionConfig,
+        handleIngestionSummary,
+        defaultLimit,
+        acsArchiveConfigOpt,
+      )
+    }
+
+  /** Looks up (or allocates) the ids of the given descriptors. Must be called before constructing the store,
+    * which needs the ids for its queries.
+    */
+  private[splice] def lookupStoreIds(
+      storage: DbStorage,
+      acsStoreDescriptor: StoreDescriptor,
+      txLogStoreDescriptor: Option[StoreDescriptor],
+  )(implicit
+      ec: ExecutionContext,
+      closeContext: CloseContext,
+      tc: TraceContext,
+  ): Future[StoreIds] =
+    for {
+      acsId <- futureUnlessShutdownToFuture(
+        StoreDescriptorStore.getStoreIdForDescriptor(acsStoreDescriptor, storage)
+      )
+      txLogId <- txLogStoreDescriptor match {
+        case Some(descriptor) =>
+          futureUnlessShutdownToFuture(
+            StoreDescriptorStore.getStoreIdForDescriptor(descriptor, storage)
+          ).map(id => Some(TxLogStoreId(id)))
+        case None => Future.successful(None)
+      }
+    } yield StoreIds(AcsStoreId(acsId), txLogId)
+
+  /** @param initialized Whether `IngestionSink.initialize()` has been called
     * @param offset The last ingested offset, if any
     * @param offsetChanged A promise that is not yet completed, and will be completed the next time the offset changes
     * @param offsetIngestionsToSignal A map from offsets to promises. The keys are offsets that are not ingested yet.
@@ -2245,19 +2303,14 @@ object DbMultiDomainAcsStore {
     * @param recordTimeWaiters Pending promises keyed by (synchronizerId, recordTime) that are completed when the corresponding record time is ingested.
     */
   private case class State(
-      acsStoreId: Option[AcsStoreId],
-      txLogStoreId: Option[TxLogStoreId],
+      initialized: Boolean,
       offset: Option[Long],
       offsetChanged: Promise[Unit],
       offsetIngestionsToSignal: SortedMap[Long, Promise[Unit]],
       lastIngestedRecordTimes: Map[SynchronizerId, CantonTimestamp],
       recordTimeWaiters: Map[SynchronizerId, SortedMap[CantonTimestamp, Promise[Unit]]],
   ) {
-    def withInitialState(
-        acsStoreId: AcsStoreId,
-        txLogStoreId: Option[TxLogStoreId],
-        lastIngestedOffset: Option[Long],
-    ): State = {
+    def withInitialState(lastIngestedOffset: Option[Long]): State = {
       assert(
         !offset.exists(inMemoryOffset =>
           lastIngestedOffset.exists(dbOffset => inMemoryOffset > dbOffset)
@@ -2266,8 +2319,7 @@ object DbMultiDomainAcsStore {
       )
       val nextOffsetChanged = if (offset == lastIngestedOffset) offsetChanged else Promise[Unit]()
       this.copy(
-        acsStoreId = Some(acsStoreId),
-        txLogStoreId = txLogStoreId,
+        initialized = true,
         offset = lastIngestedOffset,
         offsetChanged = nextOffsetChanged,
       )
@@ -2382,8 +2434,7 @@ object DbMultiDomainAcsStore {
   }
   private object State {
     def empty(): State = State(
-      acsStoreId = None,
-      txLogStoreId = None,
+      initialized = false,
       offset = None,
       offsetChanged = Promise(),
       offsetIngestionsToSignal = SortedMap.empty,

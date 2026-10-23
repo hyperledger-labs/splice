@@ -7,14 +7,11 @@ import better.files.File
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.cloud.storage.Blob
-import io.circe.Decoder
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.BackupDumpConfig
 
-import java.io.FileNotFoundException
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Path, Paths}
-import scala.util.Try
 
 object BackupDump {
 
@@ -80,11 +77,6 @@ object BackupDump {
     f
   }
 
-  def fileExists(path: Path): Boolean = {
-    import better.files.File
-    File(path).exists
-  }
-
   def getBlobs(
       config: BackupDumpConfig,
       offset: String,
@@ -102,22 +94,6 @@ object BackupDump {
         throw Status.UNIMPLEMENTED
           .withDescription("Topology snapshot works only with GCP buckets")
           .asRuntimeException()
-    }
-  }
-
-  def readFromPath[T: Decoder](path: Path): Try[T] = Try {
-    val dumpFile = better.files.File(path)
-    if (!dumpFile.exists) {
-      throw new FileNotFoundException(s"Failed to find dump file at $path")
-    } else {
-      val jsonString: String = dumpFile.contentAsString(StandardCharsets.UTF_8)
-      io.circe.parser.decode[T](jsonString) match {
-        case Left(error) =>
-          throw new IllegalArgumentException(
-            s"Failed to parse dump file at $path: $error"
-          )
-        case Right(dump) => dump
-      }
     }
   }
 

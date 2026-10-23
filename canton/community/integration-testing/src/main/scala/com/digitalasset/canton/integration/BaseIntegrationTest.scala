@@ -127,7 +127,7 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
   def assertPingSucceeds(
       sender: ParticipantReference,
       receiver: ParticipantReference,
-      timeoutMillis: Long = 20000,
+      timeoutMillis: Long = 30000,
       synchronizerId: Option[SynchronizerId] = None,
       id: String = "",
   ): Assertion =
