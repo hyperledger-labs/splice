@@ -1,0 +1,29 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  - it: helm template should not fail with required values supplied
+    set:
+      imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
+      nodeName: "mock"
+      sv1:
+        nodeId: "mock-sv1"
+        publicKey: "mock-public-key"
+        externalAddress: "mock.example.com:26656"
+        keyAddress: "mock-key-address"
+      node:
+        id: "mock-node"
+        identifier: "mock-node"
+        externalAddress: "mock.example.com:26656"
+        privateKey: "mock-private-key"
+        validator:
+          keyAddress: "mock-validator-key-address"
+          privateKey: "mock-validator-private-key"
+          publicKey: "mock-validator-public-key"
+      genesis:
+        chainId: "mock-chain"
+      watchdog:
+        sequencerMetricsUrl: "http://example.com/sequencer"
+        mediatorMetricsUrl: "http://example.com/mediator"
+    asserts:
+      - notFailedTemplate: {}

@@ -176,6 +176,77 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "at '/synchronizers/successor': additional properties 'notAValidKey' not allowed"
+  - it: "fails when an unknown key is set under synchronizers.legacy"
+    set:
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      synchronizers:
+        current:
+          sequencer: "current-sequencer-address"
+          mediator: "current-mediator-address"
+        legacy:
+          sequencer: "legacy-sequencer-address"
+          mediator: "legacy-mediator-address"
+          notAValidKey: "boom"
+      participantAddress: "mock-address"
+      persistence:
+        host: mock-pg-host
+        schema: scan
+      maxDarVersion: 1.0.0
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/synchronizers/legacy': additional properties 'notAValidKey' not allowed"
+  - it: "fails when an unknown key is set directly under synchronizers"
+    set:
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      synchronizers:
+        current:
+          sequencer: "current-sequencer-address"
+          mediator: "current-mediator-address"
+        notAValidKey: "boom"
+      participantAddress: "mock-address"
+      persistence:
+        host: mock-pg-host
+        schema: scan
+      maxDarVersion: 1.0.0
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/synchronizers': additional properties 'notAValidKey' not allowed"
+  - it: "fails when an unknown key is set under synchronizers.current.cantonBft"
+    set:
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      synchronizers:
+        current:
+          sequencer: "current-sequencer-address"
+          mediator: "current-mediator-address"
+          cantonBft:
+            p2pUrl: "http://bft-p2p-current:1234"
+            notAValidKey: "boom"
+      participantAddress: "mock-address"
+      persistence:
+        host: mock-pg-host
+        schema: scan
+      maxDarVersion: 1.0.0
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/synchronizers/current/cantonBft': additional properties 'notAValidKey' not allowed"
   - it: "sets legacy synchronizer"
     set:
       spliceInstanceNames:

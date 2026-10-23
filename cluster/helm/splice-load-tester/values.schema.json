@@ -1,9 +1,49 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
+  "unevaluatedProperties": false,
   "properties": {
     "serviceAccountName": {
       "type": "string"
+    },
+    "imageRepo": {
+      "type": "string"
+    },
+    "imageName": {
+      "type": "string"
+    },
+    "imageDigests": {
+      "type": "object"
+    },
+    "imagePullPolicy": {
+      "type": "string"
+    },
+    "config": {
+      "type": "string"
+    },
+    "prometheusRw": {
+      "type": "string"
+    },
+    "resources": {
+      "type": "object"
+    },
+    "enableReloader": {
+      "type": "boolean"
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "splice-util-lib": {
+      "type": "object"
+    },
+    "cluster": {
+      "type": "object"
     },
     "automountServiceAccountToken": {
       "type": "boolean"

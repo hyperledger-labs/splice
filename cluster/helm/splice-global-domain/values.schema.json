@@ -1,9 +1,88 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
+  "unevaluatedProperties": false,
   "properties": {
     "serviceAccountName": {
       "type": "string"
+    },
+    "imageRepo": {
+      "type": "string"
+    },
+    "splice-util-lib": {
+      "type": "object"
+    },
+    "imageDigests": {
+      "type": "object"
+    },
+    "imagePullPolicy": {
+      "type": "string"
+    },
+    "defaultJvmOptions": {
+      "type": "string"
+    },
+    "additionalEnvVars": {
+      "type": "array"
+    },
+    "enableReloader": {
+      "type": "boolean"
+    },
+    "enableAntiAffinity": {
+      "type": "boolean"
+    },
+    "enableHealthProbes": {
+      "type": "boolean"
+    },
+    "enablePostgresMetrics": {
+      "type": "boolean"
+    },
+    "logLevel": {
+      "type": "string"
+    },
+    "logLevelStdout": {
+      "type": "string"
+    },
+    "apiRequestLogLevel": {
+      "type": "string"
+    },
+    "logAsyncFlush": {
+      "type": "boolean"
+    },
+    "livenessProbeInitialDelaySeconds": {
+      "type": "integer"
+    },
+    "priorityClassName": {
+      "type": "string"
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "pod": {
+      "type": "object"
+    },
+    "resources": {
+      "type": "object"
+    },
+    "metrics": {
+      "type": "object"
+    },
+    "pvc": {
+      "type": "object"
+    },
+    "mediator": {
+      "type": "object"
+    },
+    "sequencer": {
+      "type": "object"
+    },
+    "cluster": {
+      "type": "object"
     },
     "automountServiceAccountToken": {
       "type": "boolean"

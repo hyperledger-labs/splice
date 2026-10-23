@@ -1,6 +1,7 @@
 {
-  "$schema": "http://json-schema.org/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
+  "unevaluatedProperties": false,
   "required": ["imageName"],
   "properties": {
     "securityContexts": {
@@ -29,6 +30,88 @@
     },
     "serviceAccountName": {
       "type": "string"
+    },
+    "cometBFT": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "connectionUri": {
+          "type": "string"
+        },
+        "externalGovernanceKey": {
+          "type": "boolean"
+        },
+        "secretOverrides": {
+          "type": "object",
+          "properties": {
+            "governancePublicKey": {
+              "type": "string"
+            },
+            "governancePrivateKey": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "pod": {
+      "type": "object"
+    },
+    "service": {
+      "type": "object"
+    },
+    "logLevel": {
+      "type": "string"
+    },
+    "logLevelStdout": {
+      "type": "string"
+    },
+    "apiRequestLogLevel": {
+      "type": "string"
+    },
+    "logAsyncFlush": {
+      "type": "boolean"
+    },
+    "additionalEnvVars": {
+      "type": "array"
+    },
+    "enableReloader": {
+      "type": "boolean"
+    },
+    "rollForwardLsu": {
+      "type": "object"
+    },
+    "persistentDataPvc": {
+      "type": "object"
+    },
+    "periodicTopologySnapshotConfig": {
+      "type": "object"
+    },
+    "maxVettingDelay": {
+      "type": "string"
+    },
+    "initialAmuletPrice": {
+      "type": "string"
+    },
+    "initialRound": {
+      "type": "integer"
+    },
+    "initialPackageConfigJson": {
+      "type": "string"
+    },
+    "delegatelessAutomationExpectedTaskDuration": {
+      "type": "string"
+    },
+    "delegatelessAutomationExpiredRewardCouponBatchSize": {
+      "type": ["integer", "string"]
+    },
+    "delegatelessAutomationExpiredRewardCouponNumBatches": {
+      "type": ["integer", "string"]
+    },
+    "splice-util-lib": {
+      "type": "object"
     },
     "automountServiceAccountToken": {
       "type": "boolean"
@@ -70,6 +153,9 @@
     "permissionedSynchronizer": {
       "type": "boolean",
       "description": "Whether to enable permissioned synchronizer features"
+    },
+    "cluster": {
+      "type": "object"
     }
   },
   "allOf": [
@@ -254,6 +340,7 @@
         },
         "domain": {
           "type": "object",
+          "additionalProperties": false,
           "required": [
             "sequencerPublicUrl",
             "sequencerAddress",
@@ -271,6 +358,7 @@
             },
             "sequencerPruningConfig": {
               "type": "object",
+              "additionalProperties": false,
               "properties": {
                 "enabled": {
                   "type": "boolean"
@@ -654,6 +742,7 @@
         },
         "sequencerPruningConfig": {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "enabled": {
               "type": "boolean"
@@ -671,6 +760,7 @@
         },
         "cometBFT": {
           "type": "object",
+          "additionalProperties": false,
           "required": ["enabled"],
           "properties": {
             "enabled": {

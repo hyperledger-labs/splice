@@ -58,6 +58,11 @@
     please also duplicate this template (if it's not duplicated already),
     update the yes/no columns, and write up the corresponding details. */}
 
+  - Helm charts
+
+    - The values schemas on all Helm charts now enforce `unevaluatedProperties: false`:
+      Top-level Helm values keys that are unknown (i.e., not part of the schema) will now will cause `helm template` / `lint` / `install` to fail.
+
 
   - Summary of Breaking Changes:
 

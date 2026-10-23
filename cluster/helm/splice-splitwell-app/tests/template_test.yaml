@@ -1,0 +1,12 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  - it: helm template should not fail with required values supplied
+    set:
+      imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
+      imageName: "splitwell-app"
+      defaultJvmOptions: "-Xmx1g"
+      scanAddress: "http://scan:8080"
+    asserts:
+      - notFailedTemplate: {}

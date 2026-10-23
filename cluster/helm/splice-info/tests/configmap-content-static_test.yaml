@@ -62,3 +62,45 @@ tests:
       - equal:
           path: data["index.html"]
           value: '{"deploymentInfo":{"configDigest":{"allowed-ip-ranges":"md5:d41d8cd98f00b204e9800998ecf8427e","approved-sv-id-values":"sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},"network":"dev","sv":{"version":"0.3.3"},"synchronizer":{"current":{"chainIdSuffix":"id0","migrationId":4,"synchronizerSerialId":6,"version":"0.3.3"},"legacy":{"chainIdSuffix":"id9","migrationId":4,"synchronizerSerialId":5,"version":"0.3.2"},"successor":{"chainIdSuffix":"id1","migrationId":4,"synchronizerSerialId":7,"version":"0.3.4"}}}}'
+
+  - it: "fails when an unknown key is set under deploymentDetails.synchronizer.current"
+    set:
+      deploymentDetails:
+        network: "dev"
+        configDigest:
+          allowedIpRanges:
+            type: "md5"
+            value: "d41d8cd98f00b204e9800998ecf8427e"
+          approvedSvIdentities:
+            type: "sha256"
+            value: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        synchronizer:
+          current:
+            chainIdSuffix: "id0"
+            migrationId: 4
+            synchronizerSerialId: 5
+            notAValidKey: "boom"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/deploymentDetails/synchronizer/current': additional properties 'notAValidKey' not allowed"
+
+  - it: "fails when an unknown key is set directly under deploymentDetails.synchronizer"
+    set:
+      deploymentDetails:
+        network: "dev"
+        configDigest:
+          allowedIpRanges:
+            type: "md5"
+            value: "d41d8cd98f00b204e9800998ecf8427e"
+          approvedSvIdentities:
+            type: "sha256"
+            value: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        synchronizer:
+          current:
+            chainIdSuffix: "id0"
+            migrationId: 4
+            synchronizerSerialId: 5
+          notAValidKey: "boom"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/deploymentDetails/synchronizer': additional properties 'notAValidKey' not allowed"

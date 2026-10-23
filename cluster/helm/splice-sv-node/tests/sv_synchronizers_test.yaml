@@ -363,3 +363,60 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "at '/synchronizers/successor': additional properties 'notAValidKey' not allowed"
+
+  - it: "fails when an unknown key is set under synchronizers.legacy"
+    set:
+      synchronizers:
+        current:
+          sequencerPublicUrl: "https://sequencer1.test.com"
+          sequencerAddress: "sequencer1-address"
+          mediatorAddress: "mediator1-address"
+        legacy:
+          sequencerPublicUrl: "https://sequencer0.test.com"
+          sequencerAddress: "sequencer0-address"
+          mediatorAddress: "mediator0-address"
+          notAValidKey: "boom"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/synchronizers/legacy': additional properties 'notAValidKey' not allowed"
+
+  - it: "fails when an unknown key is set directly under synchronizers"
+    set:
+      synchronizers:
+        current:
+          sequencerPublicUrl: "https://sequencer1.test.com"
+          sequencerAddress: "sequencer1-address"
+          mediatorAddress: "mediator1-address"
+        notAValidKey: "boom"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/synchronizers': additional properties 'notAValidKey' not allowed"
+
+  - it: "fails when an unknown key is set under synchronizers.current.sequencerPruningConfig"
+    set:
+      synchronizers:
+        current:
+          sequencerPublicUrl: "https://sequencer1.test.com"
+          sequencerAddress: "sequencer1-address"
+          mediatorAddress: "mediator1-address"
+          sequencerPruningConfig:
+            enabled: false
+            notAValidKey: "boom"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/synchronizers/current/sequencerPruningConfig': additional properties 'notAValidKey' not allowed"
+
+  - it: "fails when an unknown key is set under synchronizers.current.cometBFT"
+    set:
+      synchronizers:
+        current:
+          sequencerPublicUrl: "https://sequencer1.test.com"
+          sequencerAddress: "sequencer1-address"
+          mediatorAddress: "mediator1-address"
+          cometBFT:
+            enabled: true
+            connectionUri: "http://cometbft.test.com:26657"
+            notAValidKey: "boom"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/synchronizers/current/cometBFT': additional properties 'notAValidKey' not allowed"

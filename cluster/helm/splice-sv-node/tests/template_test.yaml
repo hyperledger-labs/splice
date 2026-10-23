@@ -1,0 +1,43 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  - it: helm template should not fail with required values supplied
+    set:
+      imageName: "sv-app"
+      imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
+      defaultJvmOptions: "-Xmx1g"
+      auth:
+        audience: "https://example.com"
+        jwksUrl: "https://example.com/jwks"
+        targetAudience: "https://example.com"
+      scan:
+        publicUrl: "https://scan.example.com"
+        internalUrl: "http://scan:8080"
+      nodeIdentifier: "sv-1"
+      onboardingName: "sv1"
+      participantAddress: "http://participant:8080"
+      persistence:
+        databaseName: "cantonnet_sv"
+        schema: "sv"
+        host: "postgres"
+        port: 5432
+        user: "cnadmin"
+        secretName: "postgres-secrets"
+        initImageName: "postgres:14"
+      spliceInstanceNames:
+        networkName: "Canton Network"
+        networkFaviconUrl: "https://example.com/favicon.ico"
+        amuletName: "Amulet"
+        amuletNameAcronym: "AMT"
+        nameServiceName: "Canton Name Service"
+        nameServiceNameAcronym: "CNS"
+      synchronizers:
+        current:
+          sequencerPublicUrl: "https://sequencer.example.com"
+          sequencerAddress: "http://sequencer:8080"
+          mediatorAddress: "http://mediator:8080"
+          sequencerPruningConfig:
+            enabled: false
+    asserts:
+      - notFailedTemplate: {}

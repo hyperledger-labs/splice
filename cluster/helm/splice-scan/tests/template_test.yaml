@@ -1,0 +1,27 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  - it: helm template should not fail with required values supplied
+    set:
+      imageName: "scan-app"
+      participantAddress: "http://participant:8080"
+      sequencerAddress: "http://sequencer:8080"
+      mediatorAddress: "http://mediator:8080"
+      persistence:
+        databaseName: "cantonnet_scan"
+        schema: "scan"
+        host: "postgres"
+        port: 5432
+        user: "cnadmin"
+        secretName: "postgres-secrets"
+        initImageName: "postgres:14"
+      spliceInstanceNames:
+        networkName: "Canton Network"
+        networkFaviconUrl: "https://example.com/favicon.ico"
+        amuletName: "Amulet"
+        amuletNameAcronym: "AMT"
+        nameServiceName: "Canton Name Service"
+        nameServiceNameAcronym: "CNS"
+    asserts:
+      - notFailedTemplate: {}

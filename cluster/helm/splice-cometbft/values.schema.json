@@ -1,6 +1,7 @@
 {
-  "$schema": "http://json-schema.org/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
+  "unevaluatedProperties": false,
   "required": [
     "imageName"
   ],
@@ -33,6 +34,81 @@
     },
     "imageName": {
       "type": "string"
+    },
+    "imageRepo": {
+      "type": "string"
+    },
+    "splice-util-lib": {
+      "type": "object"
+    },
+    "imageDigests": {
+      "type": "object"
+    },
+    "imagePullPolicy": {
+      "type": "string"
+    },
+    "enableReloader": {
+      "type": "boolean"
+    },
+    "enableAntiAffinity": {
+      "type": "boolean"
+    },
+    "logLevel": {
+      "type": "string"
+    },
+    "extraLogLevelFlags": {
+      "type": "string"
+    },
+    "livenessProbeInitialDelaySeconds": {
+      "type": "integer"
+    },
+    "priorityClassName": {
+      "type": "string"
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "pod": {
+      "type": "object"
+    },
+    "resources": {
+      "type": "object"
+    },
+    "metrics": {
+      "type": "object"
+    },
+    "istioVirtualService": {
+      "type": "object"
+    },
+    "db": {
+      "type": "object"
+    },
+    "node": {
+      "type": "object"
+    },
+    "nodeName": {
+      "type": "string"
+    },
+    "peers": {
+      "type": ["array", "null"]
+    },
+    "sv1": {
+      "type": "object"
+    },
+    "mempool": {
+      "type": "object"
+    },
+    "stateSync": {
+      "type": "object"
+    },
+    "cluster": {
+      "type": "object"
     },
     "serviceAccountName": {
       "type": "string"

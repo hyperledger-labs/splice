@@ -1,0 +1,27 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  - it: helm template should not fail with required values supplied
+    set:
+      imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
+      imageName: "participant-app"
+      defaultJvmOptions: "-Xmx1g"
+      participantAdminUserNameFrom:
+        secretKeyRef:
+          key: "ledger-api-user"
+          name: "splice-app-sv-ledger-api-auth"
+          optional: false
+      auth:
+        jwksUrl: "https://example.com/jwks"
+        targetAudience: "https://example.com"
+      persistence:
+        databaseName: "cantonnet_participant"
+        schema: "participant"
+        host: "postgres"
+        port: 5432
+        user: "cnadmin"
+        secretName: "postgres-secrets"
+        initImageName: "postgres:14"
+    asserts:
+      - notFailedTemplate: {}

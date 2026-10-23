@@ -1,6 +1,7 @@
 {
-  "$schema": "http://json-schema.org/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
+  "unevaluatedProperties": false,
   "required": [
     "defaultJvmOptions",
     "imageRepo",
@@ -32,6 +33,48 @@
     },
     "serviceAccountName": {
       "type": "string"
+    },
+    "additionalEnvVars": {
+      "type": "array"
+    },
+    "enableReloader": {
+      "type": "boolean"
+    },
+    "extraInitContainers": {
+      "type": "array"
+    },
+    "extraVolumes": {
+      "type": "array"
+    },
+    "extraVolumeMounts": {
+      "type": "array"
+    },
+    "jsonApiServerPathPrefix": {
+      "type": "string"
+    },
+    "kms": {
+      "type": "object"
+    },
+    "pvc": {
+      "type": "object"
+    },
+    "logLevel": {
+      "type": "string"
+    },
+    "logLevelStdout": {
+      "type": "string"
+    },
+    "apiRequestLogLevel": {
+      "type": "string"
+    },
+    "logAsyncFlush": {
+      "type": "boolean"
+    },
+    "splice-util-lib": {
+      "type": "object"
+    },
+    "cluster": {
+      "type": "object"
     },
     "automountServiceAccountToken": {
       "type": "boolean"

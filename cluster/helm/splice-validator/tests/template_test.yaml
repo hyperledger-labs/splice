@@ -1,0 +1,37 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  - it: helm template should not fail with required values supplied
+    set:
+      imageName: "validator-app"
+      imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
+      defaultJvmOptions: "-Xmx1g"
+      enableWallet: true
+      migration:
+        attachPvc: true
+      nodeIdentifier: "validator-1"
+      persistence:
+        databaseName: "cantonnet_validator"
+        schema: "validator"
+        host: "postgres"
+        port: 5432
+        user: "cnadmin"
+        secretName: "postgres-secrets"
+        initImageName: "postgres:14"
+      spliceInstanceNames:
+        networkName: "Canton Network"
+        networkFaviconUrl: "https://example.com/favicon.ico"
+        amuletName: "Amulet"
+        amuletNameAcronym: "AMT"
+        nameServiceName: "Canton Name Service"
+        nameServiceNameAcronym: "CNS"
+      validatorWalletUser: "user1"
+      svValidator: true
+      topup:
+        enabled: false
+      auth:
+        audience: "https://example.com"
+        jwksUrl: "https://example.com/jwks"
+    asserts:
+      - notFailedTemplate: {}

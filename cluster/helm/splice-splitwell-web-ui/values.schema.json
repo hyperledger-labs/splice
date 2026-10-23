@@ -1,6 +1,7 @@
 {
-  "$schema": "http://json-schema.org/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
+  "unevaluatedProperties": false,
   "required": ["imageName"],
   "properties": {
     "securityContexts": {
@@ -23,6 +24,36 @@
     },
     "serviceAccountName": {
       "type": "string"
+    },
+    "imageRepo": {
+      "type": "string"
+    },
+    "splice-util-lib": {
+      "type": "object"
+    },
+    "imageDigests": {
+      "type": "object"
+    },
+    "clusterUrl": {
+      "type": "string"
+    },
+    "cluster": {
+      "type": "object"
+    },
+    "resources": {
+      "type": "object"
+    },
+    "enableReloader": {
+      "type": "boolean"
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
     },
     "automountServiceAccountToken": {
       "type": "boolean"

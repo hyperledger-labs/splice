@@ -589,6 +589,25 @@ tests:
       - notExists:
           path: spec.template.spec.priorityClassName
 
+  - it: "fails when an unknown key is set under synchronizer"
+    set:
+      synchronizer:
+        connectionType: "trust-single"
+        url: "https://new-sequencer.mock.com"
+        notAValidKey: "boom"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/synchronizer': additional properties 'notAValidKey' not allowed"
+
+  - it: "fails when an unknown key is set under scanClient"
+    set:
+      scanClient:
+        scanType: "trust-single"
+        scanAddress: "https://single.scan.url:5004"
+        notAValidKey: "boom"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/scanClient': additional properties 'notAValidKey' not allowed"
   - it: "overrides Deployment name and labels when appLabels.validatorApp is set"
     set:
       appLabels.validatorApp: "custom-validator"
