@@ -73,20 +73,27 @@ abstract class BaseStorePerformanceTest(
     */
   protected val dbMetricsFactory: NanoTimerMetricsFactory = new NanoTimerMetricsFactory
 
-  /** Sum of all recorded DB executor execution times (both read and write queues),
-    * in nanoseconds. The time is monotonically increasing. We need to snapshot
-    * before/after an operation to find the duration of an operation.
+  /** Monotonic sequence number of DB query samples recorded so far. Snapshot before an operation
+    * and pass to [[dbExecWindow]] afterwards to get stats for exactly that operation's window.
     */
-  protected def totalDbExecTimeNs: Long =
-    dbMetricsFactory.totalNanos(_.endsWith("exectime"))
+  protected def dbExecSeq: Long = dbMetricsFactory.currentSeq
 
-  /** Number of DB query executions recorded so far (diagnostic: how many queries ran). */
-  protected def totalDbExecCount: Long =
-    dbMetricsFactory.totalCount(_.endsWith("exectime"))
-
-  /** Largest single DB query execution time so far, in ns (diagnostic: one big query vs many). */
-  protected def maxDbExecNs: Long =
-    dbMetricsFactory.maxNanos(_.endsWith("exectime"))
+  /** Stats for all `exectime` DB query samples recorded since `afterSeq` (i.e. during one
+    * operation): total/count/max in ns, plus a per-callsite breakdown.
+    */
+  protected def dbExecWindow(afterSeq: Long): DbExecWindow = {
+    val window = dbMetricsFactory.windowSamples(afterSeq, _.endsWith("exectime"))
+    DbExecWindow(
+      count = window.size.toLong,
+      totalNanos = window.map(_.nanos).sum,
+      maxNanos = window.map(_.nanos).maxOption.getOrElse(0L),
+      breakdown = window
+        .groupBy(_.callsite)
+        .view
+        .mapValues(ss => (ss.size.toLong, ss.map(_.nanos).sum))
+        .toMap,
+    )
+  }
 
   /** A short name for this test, used as the metrics file name and Pushgateway label. */
   protected def testName: String = this.getClass.getSimpleName.stripSuffix("$")
@@ -303,64 +310,72 @@ abstract class BaseStorePerformanceTest(
   }
 }
 
-/** A metrics factory that preserves nanosecond precision for timers.
+/** Stats for the DB `exectime` samples recorded during a single operation window. */
+final case class DbExecWindow(
+    count: Long,
+    totalNanos: Long,
+    maxNanos: Long,
+    breakdown: Map[String, (Long, Long)],
+)
+
+/** One recorded query execution. `callsite` is the `query` label set by the query cost tracker. */
+final case class DbQuerySample(timerName: String, callsite: String, nanos: Long, seq: Long)
+
+/** A metrics factory that preserves nanosecond precision for timers and keeps a monotonic log of
+  * individual query samples, so per-operation windows (count / total / max / per-callsite) can be
+  * computed by sequence number. `InMemoryMetricsFactory` truncates timer samples to whole
+  * milliseconds, which would floor all sub-millisecond DB queries to 0.
   */
 class NanoTimerMetricsFactory extends InMemoryMetricsFactory {
-  private val nanoTimers = scala.collection.concurrent.TrieMap[MetricName, NanoTimer]()
+  import java.util.concurrent.atomic.AtomicLong
+
+  private val samples = new java.util.concurrent.ConcurrentLinkedQueue[DbQuerySample]()
+  private val seqGen = new AtomicLong(0)
+  private val timers = scala.collection.concurrent.TrieMap[MetricName, NanoTimer]()
 
   override def timer(info: MetricInfo)(implicit context: MetricsContext): Timer =
-    nanoTimers.getOrElseUpdate(info.name, new NanoTimer(info))
+    timers.getOrElseUpdate(info.name, new NanoTimer(info))
 
-  /** Total nanoseconds recorded across all timers whose metric name matches `nameFilter`. */
-  def totalNanos(nameFilter: String => Boolean): Long =
-    matching(nameFilter).map(_.totalNanos.get()).sum
+  /** Current highest sample sequence number. */
+  def currentSeq: Long = seqGen.get()
 
-  /** Number of samples (individual query executions) recorded across matching timers. */
-  def totalCount(nameFilter: String => Boolean): Long =
-    matching(nameFilter).map(_.count.get()).sum
-
-  /** Largest single recorded sample (in ns) across matching timers. */
-  def maxNanos(nameFilter: String => Boolean): Long =
-    matching(nameFilter).map(_.maxNanos).maxOption.getOrElse(0L)
-
-  private def matching(nameFilter: String => Boolean): Iterator[NanoTimer] =
-    nanoTimers.iterator.collect { case (name, timer) if nameFilter(name.toString) => timer }
-}
-
-/** A [[Timer]] that accumulates the total recorded duration in nanoseconds, plus the sample count
-  * and largest single sample (for diagnosing whether DB time is one big query or many small ones).
-  */
-final class NanoTimer(override val info: MetricInfo) extends Timer {
-  val totalNanos = new java.util.concurrent.atomic.AtomicLong(0)
-  val count = new java.util.concurrent.atomic.AtomicLong(0)
-  private val maxNanosRef = new java.util.concurrent.atomic.AtomicLong(0)
-
-  def maxNanos: Long = maxNanosRef.get()
-
-  private def record(nanos: Long): Unit = {
-    val _ = totalNanos.addAndGet(nanos)
-    val _ = count.incrementAndGet()
-    val _ = maxNanosRef.accumulateAndGet(nanos, Math.max)
+  /** All samples recorded after `afterSeq` whose timer name matches `nameFilter`, in order. */
+  def windowSamples(afterSeq: Long, nameFilter: String => Boolean): Seq[DbQuerySample] = {
+    import scala.jdk.CollectionConverters.*
+    samples.iterator().asScala.filter(s => s.seq > afterSeq && nameFilter(s.timerName)).toSeq
   }
 
-  override def update(duration: Long, unit: java.util.concurrent.TimeUnit)(implicit
-      context: MetricsContext
-  ): Unit = record(unit.toNanos(duration))
-
-  override def update(duration: java.time.Duration)(implicit context: MetricsContext): Unit =
-    record(duration.toNanos)
-
-  override def time[T](call: => T)(implicit context: MetricsContext): T = {
-    val start = System.nanoTime()
-    try call
-    finally record(System.nanoTime() - start)
+  private def record(timerName: String, callsite: String, nanos: Long): Unit = {
+    val _ = samples.add(DbQuerySample(timerName, callsite, nanos, seqGen.incrementAndGet()))
   }
 
-  override def startAsync()(implicit context: MetricsContext): Timer.TimerHandle = {
-    val start = System.nanoTime()
-    new Timer.TimerHandle {
-      override def stop()(implicit context: MetricsContext): Unit =
-        record(System.nanoTime() - start)
+  /** A [[Timer]] that appends each recorded sample (with its `query` callsite label) to the
+    * factory's shared sample log.
+    */
+  private final class NanoTimer(override val info: MetricInfo) extends Timer {
+    private val name = info.name.toString
+    private def callsiteOf(context: MetricsContext): String =
+      context.labels.getOrElse("query", "<none>")
+
+    override def update(duration: Long, unit: java.util.concurrent.TimeUnit)(implicit
+        context: MetricsContext
+    ): Unit = record(name, callsiteOf(context), unit.toNanos(duration))
+
+    override def update(duration: java.time.Duration)(implicit context: MetricsContext): Unit =
+      record(name, callsiteOf(context), duration.toNanos)
+
+    override def time[T](call: => T)(implicit context: MetricsContext): T = {
+      val start = System.nanoTime()
+      try call
+      finally record(name, callsiteOf(context), System.nanoTime() - start)
+    }
+
+    override def startAsync()(implicit context: MetricsContext): Timer.TimerHandle = {
+      val start = System.nanoTime()
+      new Timer.TimerHandle {
+        override def stop()(implicit stopContext: MetricsContext): Unit =
+          record(name, callsiteOf(context.merge(stopContext)), System.nanoTime() - start)
+      }
     }
   }
 }
