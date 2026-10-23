@@ -157,6 +157,7 @@ class PackageVetting(
       domainId: SynchronizerId,
       additionalPackagesToUnvet: Map[PackageName, Set[PackageVersion]],
       currentPackageConfig: PackageConfig,
+      pendingPackageConfigs: Seq[PackageConfig],
       maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
   )(implicit tc: TraceContext): Future[Unit] = {
     for {
@@ -172,7 +173,7 @@ class PackageVetting(
         enableUnsupportedDarsUnvetting,
         latestPackagesOnly,
         additionalPackagesToUnvet,
-        PackageIdResolver.toPackageConfigMap(currentPackageConfig),
+        (currentPackageConfig +: pendingPackageConfigs).map(PackageIdResolver.toPackageConfigMap),
       )
       _ <- unvetPackages(
         domainId,
