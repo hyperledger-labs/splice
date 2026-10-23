@@ -1154,35 +1154,6 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         with TopologyManagerError
   }
 
-  @Explanation("It was not possible to generate a new key.")
-  @Resolution("Verify the parameters used for generating the key.")
-  object KeyGenerationError
-      extends ErrorCode(
-        id = "TOPOLOGY_CANNOT_GENERATE_KEY",
-        ErrorCategory.InvalidGivenCurrentSystemStateOther,
-      ) {
-    final case class Encryption(err: EncryptionKeyGenerationError)(implicit
-        val loggingContext: ErrorLoggingContext
-    ) extends CantonError.Impl(
-          cause = s"Failed to generate encryption key: $err"
-        )
-        with TopologyManagerError
-
-    final case class Signing(err: SigningKeyGenerationError)(implicit
-        val loggingContext: ErrorLoggingContext
-    ) extends CantonError.Impl(
-          cause = s"Failed to generate signing key: $err"
-        )
-        with TopologyManagerError
-
-    final case class InvalidName(err: String)(implicit
-        val loggingContext: ErrorLoggingContext
-    ) extends CantonError.Impl(
-          cause = s"Invalid key name: $err"
-        )
-        with TopologyManagerError
-  }
-
   abstract class SynchronizerErrorGroup extends ErrorGroup()
 
   abstract class ParticipantErrorGroup extends ErrorGroup()

@@ -769,13 +769,6 @@ object GrpcStreamingUtils {
       errorLoggingContext: ErrorLoggingContext
   ): Future[Unit] =
     withCallStreamObserverG(observer)(Future.unit)(handler)
-
-  def withCallStreamObserverF[R](
-      observer: StreamObserver[R]
-  )(handler: CallStreamObserver[R] => Future[Unit])(implicit
-      errorLoggingContext: ErrorLoggingContext
-  ): Future[Unit] =
-    withCallStreamObserverG(observer)(Future.unit)(handler)
 }
 // Define a type class for converting ByteString to the generic type T
 trait FromByteString[T] {

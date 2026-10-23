@@ -30,7 +30,7 @@ import java.net.URI
 import java.time.{Instant, Duration as JDuration}
 import java.util.UUID
 import scala.annotation.nowarn
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.Duration
 
 /** Collects instances of [[Pretty]] for common types.
   */

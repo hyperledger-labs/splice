@@ -764,7 +764,7 @@ object ParticipantAdminCommands {
     }
 
     final case class ImportPartyAcs(
-        file: File,
+        inputStream: java.io.InputStream,
         synchronizerId: SynchronizerId,
         workflowIdPrefix: String,
         contractImportMode: ContractImportMode,
@@ -806,7 +806,7 @@ object ParticipantAdminCommands {
               partyId = Option.when(isFirst)(party.map(_.toProtoPrimitive)).flatten,
             )
           },
-          new FileInputStream(file),
+          inputStream,
         )
       }
 

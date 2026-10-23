@@ -4,6 +4,7 @@
 package com.digitalasset.canton.console.commands
 
 import better.files.File
+import cats.syntax.either.*
 import cats.syntax.foldable.*
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
 import com.digitalasset.canton.admin.api.client.data.{
@@ -26,6 +27,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.grpc.OutputFileStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
+  ActiveContract,
   ContractImportMode,
   RepairContract,
   RepresentativePackageIdOverride,
