@@ -74,6 +74,17 @@ runs:
       shell: bash
       run: |
         latest_release=$(cat "LATEST_RELEASE")
+        # `git diff <commit> -- <paths>` compares trees, so the release-line tip is enough.
+        # Without --filter, git 2.43 resends the tip's full tree (~100 MB) into a shallow clone.
+        for attempt in {1..3}; do
+          if git fetch --no-tags --depth=1 --filter=blob:none origin "refs/heads/release-line-${latest_release}:refs/remotes/origin/release-line-${latest_release}"; then
+            break
+          elif [ "$attempt" -eq 3 ]; then
+            echo "Fetching release-line-${latest_release} failed"
+            exit 1
+          fi
+          sleep 5
+        done
         base=$(git rev-parse origin/release-line-"${latest_release}")
         changed=$(git diff --name-only $base -- ${{ inputs.skip_if_files_changed }})
         if [ -n "$changed" ]; then

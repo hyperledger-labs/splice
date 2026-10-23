@@ -55,6 +55,10 @@ runs:
       shell: bash
       run: ./.github/actions/scripts/common_setup.sh
 
+    - name: Report git size
+      shell: bash
+      run: ./.github/actions/scripts/report_git_size.sh
+
     - name: Set up Nix (Self hosted)
       uses: ./.github/actions/nix/setup_nix
       with:
