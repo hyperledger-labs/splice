@@ -150,7 +150,6 @@ monitoring:
       sequencerClientDelay:
         seconds: 90
       acsCommitments:
-        usePv36Metrics: false
         checkpointDelay:
           # Usually every 30s but while the commitment every 30min gets computed
           # it gets blocked so we allow up to 40min

@@ -147,8 +147,6 @@ monitoring:
     enableNoDataAlerts: true
     enableExtraHighPrioAlerts: true
     alerts:
-      acsCommitments:
-        usePv36Metrics: true
       cloudSql:
         maintenance: true
       svNames:
