@@ -12,7 +12,6 @@ import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.SynchronizerSuccessor
 import com.digitalasset.canton.logging.pretty.{
   Pretty,
-  PrettyPrinting,
   PrettyPrintingCompanion,
   PrettyPrintingFromCompanion,
 }
@@ -38,13 +37,17 @@ sealed trait Identity
     extends HasUniqueIdentifier
     with Product
     with Serializable
-    with PrettyPrinting {
+    with PrettyPrintingFromCompanion {
   def toProtoPrimitive: String = uid.toProtoPrimitive
 
   /** returns the string representation used in console filters (maps to the uid) */
   def filterString: String = uid.toProtoPrimitive
 
-  override protected def pretty: Pretty[this.type] = prettyOfParam(_.uid)
+  override def prettyCompanion: PrettyPrintingCompanion[this.type] = Identity
+}
+
+object Identity extends PrettyPrintingCompanion[Identity] {
+  override protected val pretty: Pretty[Identity] = prettyOfParam(_.uid)
 }
 
 sealed trait NodeIdentity extends Identity {
@@ -94,13 +97,15 @@ sealed trait Member extends Identity with Product with Serializable {
       s"${code.threeLetterId.unwrap}${UniqueIdentifier.delimiter}${uid.toProtoPrimitive}"
     )
 
-  override protected def pretty: Pretty[Member] =
+  override def prettyCompanion: PrettyPrintingCompanion[Member] = Member
+}
+
+object Member extends PrettyPrintingCompanion[Member] {
+
+  override protected val pretty: Pretty[Member] =
     prettyOfString(inst =>
       inst.code.threeLetterId.unwrap + UniqueIdentifier.delimiter + inst.uid.show
     )
-}
-
-object Member {
 
   def fromProtoPrimitive_(member: String): Either[String, Member] = {
     // The first three letters of the string identify the type of member
@@ -158,7 +163,7 @@ object Member {
 
 sealed trait Synchronizer
     extends HasUniqueIdentifier
-    with PrettyPrinting
+    with PrettyPrintingFromCompanion
     with Product
     with Serializable {
 
@@ -387,19 +392,13 @@ final case class PhysicalSynchronizerId(
 
   /** Synchronizer identifier to use for the computation of the external signing hash
     */
-  def forExternalTransactionHashing: Synchronizer =
-    if (protocolVersion <= ProtocolVersion.v34) logical
-    // TODO(i30737): From PV35, we use the physical synchronizer ID to maintain deduplication guarantees during LSU.
-    // This will likely be revised when the mediator transaction data is migrated during LSUs
-    else this
+  // TODO(i30737): Change again to logical once mediator state is transferred
+  def forExternalTransactionHashing: Synchronizer = this
 
   override def toProtoPrimitive: String = toLengthLimitedString.unwrap
 
-  override protected def pretty: Pretty[PhysicalSynchronizerId] =
-    prettyOfString(id =>
-      id.logical.show ++ PhysicalSynchronizerId.primaryDelimiter ++ id.protocolVersion.show ++
-        PhysicalSynchronizerId.secondaryDelimiter ++ id.serial.show
-    )
+  override def prettyCompanion: PrettyPrintingCompanion[PhysicalSynchronizerId] =
+    PhysicalSynchronizerId
 
   def incrementSerial: Either[InvariantViolation, PhysicalSynchronizerId] =
     serial.increment.map(next => this.copy(serial = next.toNonNegative))
@@ -408,9 +407,15 @@ final case class PhysicalSynchronizerId(
     OpaquePhysicalSynchronizerId(logical, serial, protocolVersion.v)
 }
 
-object PhysicalSynchronizerId {
+object PhysicalSynchronizerId extends PrettyPrintingCompanion[PhysicalSynchronizerId] {
   private[topology] val primaryDelimiter: String = "::" // Between lsid and suffix
   private[topology] val secondaryDelimiter: String = "-" // Between components of the suffix
+
+  override protected val pretty: Pretty[PhysicalSynchronizerId] =
+    prettyOfString(id =>
+      id.logical.show ++ PhysicalSynchronizerId.primaryDelimiter ++ id.protocolVersion.show ++
+        PhysicalSynchronizerId.secondaryDelimiter ++ id.serial.show
+    )
 
   def apply(
       synchronizerId: SynchronizerId,

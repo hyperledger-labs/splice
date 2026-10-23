@@ -11,16 +11,14 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.ViewType
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.protocol.SynchronizerParameters.MaxRequestSize
 import com.digitalasset.canton.protocol.ViewHash
-import com.digitalasset.canton.protocol.messages.{
-  EncryptedMultipleViews,
-  EncryptedMultipleViewsMessage,
-  EncryptedSingleViewMessage,
-  EncryptedView,
-  EncryptedViewMessage,
-}
+import com.digitalasset.canton.protocol.messages.{EncryptedMultipleViews, EncryptedViewMessage}
 import com.digitalasset.canton.sequencing.protocol.Recipients
 import com.digitalasset.canton.store.ConfirmationRequestSessionKeyStore
 import com.digitalasset.canton.store.SessionKeyStore.RecipientGroup
@@ -28,7 +26,7 @@ import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{MaxBytesToDecompress, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
+import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.ExecutionContext
@@ -54,10 +52,7 @@ object EncryptedViewMessageFactory {
       ],
   )
 
-  /** Creates a message with a single view:
-    *   - [[com.digitalasset.canton.protocol.messages.EncryptedSingleViewMessage]] for pv34-
-    *   - [[com.digitalasset.canton.protocol.messages.EncryptedMultipleViewsMessage]] for pv35+
-    *     (even though it contains only one view)
+  /** Creates a message with a single view
     */
   def encryptView[VT <: ViewType](viewType: VT)(
       viewTree: viewType.View,
@@ -69,22 +64,13 @@ object EncryptedViewMessageFactory {
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, EncryptedViewMessage[VT]] =
-    if (protocolVersion >= ProtocolVersion.v35) {
-      encryptGroupedViews(viewType)(
-        NonEmpty.mk(Seq, viewTree),
-        viewKeyData,
-        submittingParticipantSignature,
-        cryptoSnapshot,
-        protocolVersion,
-      ).widen[EncryptedViewMessage[VT]]
-    } else
-      encryptNonGroupedView(viewType)(
-        viewTree,
-        viewKeyData,
-        submittingParticipantSignature,
-        cryptoSnapshot,
-        protocolVersion,
-      ).widen[EncryptedViewMessage[VT]]
+    encryptGroupedViews(viewType)(
+      NonEmpty.mk(Seq, viewTree),
+      viewKeyData,
+      submittingParticipantSignature,
+      cryptoSnapshot,
+      protocolVersion,
+    ).widen[EncryptedViewMessage[VT]]
 
   /** Creates a single message with multiple views (for pv35+)
     *
@@ -101,7 +87,7 @@ object EncryptedViewMessageFactory {
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, EncryptedMultipleViewsMessage[
+  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, EncryptedViewMessage[
     VT
   ]] = {
     def createMultiView()(implicit
@@ -144,7 +130,7 @@ object EncryptedViewMessageFactory {
           )
       )
       multiView <- createMultiView()
-    } yield EncryptedMultipleViewsMessage[VT](
+    } yield EncryptedViewMessage[VT](
       multiView,
       viewTrees.map(_.viewHash),
       sessionKeyRandomnessMapNE,
@@ -164,129 +150,6 @@ object EncryptedViewMessageFactory {
         .findDynamicSynchronizerParameters()
     ).map(_.parameters.maxRequestSize)
       .leftMap(error => UnableToGetDynamicSynchronizerParameters(error, cryptoSnapshot.psid))
-
-  private def encryptNonGroupedView[VT <: ViewType](viewType: VT)(
-      viewTree: viewType.View,
-      viewKeyData: (SymmetricKey, Seq[AsymmetricEncrypted[SecureRandomness]]),
-      submittingParticipantSignature: Signature,
-      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      protocolVersion: ProtocolVersion,
-  )(implicit
-      traceContext: TraceContext,
-      ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, EncryptedSingleViewMessage[
-    VT
-  ]] = for {
-    maxRequestSize <- getMaxRequestSize(cryptoSnapshot)
-    singleMessage <- doEncryptNonGroupedView(viewType)(
-      viewTree,
-      viewKeyData,
-      submittingParticipantSignature,
-      cryptoSnapshot,
-      maxRequestSize,
-      cryptoSnapshot.pureCrypto.defaultSymmetricKeyScheme,
-      protocolVersion,
-    )
-  } yield singleMessage
-
-  /** Creates multiple messages: one for each view (for pv34-)
-    */
-  private[submission] def encryptNonGroupedViews[VT <: ViewType](viewType: VT)(
-      viewTreesWithRecipients: NonEmpty[Seq[(Recipients, viewType.View)]],
-      viewKeyDataMap: ViewKeyDataMap,
-      submittingParticipantSignature: Signature,
-      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      protocolVersion: ProtocolVersion,
-      parallel: Boolean,
-  )(implicit
-      traceContext: TraceContext,
-      ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, NonEmpty[Seq[
-    EncryptedSingleViewMessage[
-      VT
-    ],
-  ]]] = {
-    val viewEncryptionScheme = cryptoSnapshot.pureCrypto.defaultSymmetricKeyScheme
-
-    for {
-      maxRequestSize <- getMaxRequestSize(cryptoSnapshot)
-      messages <-
-        if (parallel)
-          MonadUtil.parTraverseWithLimit(cryptoSnapshot.pureCrypto.encryptionParallelism)(
-            viewTreesWithRecipients
-          ) { case (recipients, view) =>
-            doEncryptNonGroupedView(viewType)(
-              view,
-              viewKeyDataMap.keyAndEncryptedRandomnessByRecipients(recipients),
-              submittingParticipantSignature,
-              cryptoSnapshot,
-              maxRequestSize,
-              viewEncryptionScheme,
-              protocolVersion,
-            )
-          }
-        else
-          MonadUtil.sequentialTraverse(viewTreesWithRecipients) { case (recipients, view) =>
-            doEncryptNonGroupedView(viewType)(
-              view,
-              viewKeyDataMap.keyAndEncryptedRandomnessByRecipients(recipients),
-              submittingParticipantSignature,
-              cryptoSnapshot,
-              maxRequestSize,
-              viewEncryptionScheme,
-              protocolVersion,
-            )
-          }
-    } yield NonEmptyUtil.fromUnsafe(
-      messages
-    ) // We know it's non empty, since we started with a NonEmpty instance as input
-  }
-
-  private def doEncryptNonGroupedView[VT <: ViewType](viewType: VT)(
-      viewTree: viewType.View,
-      viewKeyData: (SymmetricKey, Seq[AsymmetricEncrypted[SecureRandomness]]),
-      submittingParticipantSignature: Signature,
-      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      maxRequestSize: MaxRequestSize,
-      viewEncryptionScheme: SymmetricKeyScheme,
-      protocolVersion: ProtocolVersion,
-  )(implicit
-      ec: ExecutionContext
-  ): EitherT[FutureUnlessShutdown, EncryptedViewMessageCreationError, EncryptedSingleViewMessage[
-    VT
-  ]] = {
-    val (sessionKey, sessionKeyRandomnessMap) = viewKeyData
-
-    val sessionKeyRandomnessMapNEResult = EitherT.fromEither[FutureUnlessShutdown](
-      NonEmpty
-        .from(sessionKeyRandomnessMap)
-        .toRight(
-          UnableToDetermineSessionKeyRandomness(
-            "The session key randomness map is empty"
-          )
-        )
-    )
-
-    for {
-      sessionKeyRandomnessMapNE <- sessionKeyRandomnessMapNEResult
-      encryptedView <- EitherT.fromEither[FutureUnlessShutdown](
-        EncryptedView
-          .compressed[VT](cryptoSnapshot.pureCrypto, sessionKey, viewType, protocolVersion)(
-            viewTree,
-            MaxBytesToDecompress(maxRequestSize.value),
-          )
-          .leftMap[EncryptedViewMessageCreationError](FailedToEncryptViewMessage.apply)
-      )
-    } yield EncryptedSingleViewMessage(
-      viewTree.toBeSigned.map(_ => submittingParticipantSignature),
-      viewTree.viewHash,
-      sessionKeyRandomnessMapNE,
-      encryptedView,
-      viewTree.psid,
-      viewEncryptionScheme,
-      protocolVersion,
-    )
-  }
 
   final case class ViewParticipantsKeysAndParentRecipients(
       informeeParticipants: NonEmpty[Set[ParticipantId]],
@@ -457,7 +320,6 @@ object EncryptedViewMessageFactory {
           informeeParticipants.forgetNE.to(LazyList),
           sessionKeyRandomness,
           cryptoSnapshot,
-          cryptoSnapshot.crypto.staticSynchronizerParameters.enableTransparencyChecks,
         ).map(_.values.toSeq)
       } yield ViewKeyData(sessionKeyRandomness, sessionKey, sessionKeyMap)
 
@@ -617,11 +479,11 @@ object EncryptedViewMessageFactory {
     )
   }
 
-  private def createRandomnessMap(
+  @VisibleForTesting
+  def createRandomnessMap(
       participants: LazyList[ParticipantId],
       randomness: SecureRandomness,
       cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      deterministicEncryption: Boolean,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -630,7 +492,11 @@ object EncryptedViewMessageFactory {
     AsymmetricEncrypted[SecureRandomness],
   ]] =
     cryptoSnapshot
-      .encryptFor(randomness, participants, deterministicEncryption)
+      .encryptFor(
+        randomness,
+        participants,
+        cryptoSnapshot.crypto.staticSynchronizerParameters.enableTransparencyChecks,
+      )
       .leftMap { case (member, error) =>
         UnableToDetermineKey(
           member,
@@ -642,13 +508,18 @@ object EncryptedViewMessageFactory {
   sealed trait EncryptedViewMessageCreationError
       extends Product
       with Serializable
-      with PrettyPrinting
+      with PrettyPrintingFromCompanion
 
   /** Indicates that we could not determine the recipients of the underlying view
     */
   final case class UnableToDetermineRecipients(cause: String)
       extends EncryptedViewMessageCreationError {
-    override protected def pretty: Pretty[UnableToDetermineRecipients] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnableToDetermineRecipients] =
+      UnableToDetermineRecipients
+  }
+
+  object UnableToDetermineRecipients extends PrettyPrintingCompanion[UnableToDetermineRecipients] {
+    override protected val pretty: Pretty[UnableToDetermineRecipients] = prettyOfClass(
       param("cause", _.cause.unquoted)
     )
   }
@@ -659,7 +530,13 @@ object EncryptedViewMessageFactory {
       party: Set[LfPartyId],
       physicalSynchronizerId: PhysicalSynchronizerId,
   ) extends EncryptedViewMessageCreationError {
-    override protected def pretty: Pretty[UnableToDetermineParticipant] =
+    override def prettyCompanion: PrettyPrintingCompanion[UnableToDetermineParticipant] =
+      UnableToDetermineParticipant
+  }
+
+  object UnableToDetermineParticipant
+      extends PrettyPrintingCompanion[UnableToDetermineParticipant] {
+    override protected val pretty: Pretty[UnableToDetermineParticipant] =
       prettyOfClass(unnamedParam(_.party), unnamedParam(_.physicalSynchronizerId))
   }
 
@@ -670,7 +547,12 @@ object EncryptedViewMessageFactory {
       cause: SyncCryptoError,
       physicalSynchronizerId: PhysicalSynchronizerId,
   ) extends EncryptedViewMessageCreationError {
-    override protected def pretty: Pretty[UnableToDetermineKey] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnableToDetermineKey] =
+      UnableToDetermineKey
+  }
+
+  object UnableToDetermineKey extends PrettyPrintingCompanion[UnableToDetermineKey] {
+    override protected val pretty: Pretty[UnableToDetermineKey] = prettyOfClass(
       param("participant", _.participant),
       param("cause", _.cause),
       param("physical synchronizer id", _.physicalSynchronizerId),
@@ -679,14 +561,24 @@ object EncryptedViewMessageFactory {
 
   final case class FailedToCreateEncryptionKey(cause: EncryptionKeyCreationError)
       extends EncryptedViewMessageCreationError {
-    override protected def pretty: Pretty[FailedToCreateEncryptionKey] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[FailedToCreateEncryptionKey] =
+      FailedToCreateEncryptionKey
+  }
+
+  object FailedToCreateEncryptionKey extends PrettyPrintingCompanion[FailedToCreateEncryptionKey] {
+    override protected val pretty: Pretty[FailedToCreateEncryptionKey] = prettyOfClass(
       unnamedParam(_.cause)
     )
   }
 
   final case class FailedToEncryptViewMessage(cause: EncryptionError)
       extends EncryptedViewMessageCreationError {
-    override protected def pretty: Pretty[FailedToEncryptViewMessage] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[FailedToEncryptViewMessage] =
+      FailedToEncryptViewMessage
+  }
+
+  object FailedToEncryptViewMessage extends PrettyPrintingCompanion[FailedToEncryptViewMessage] {
+    override protected val pretty: Pretty[FailedToEncryptViewMessage] = prettyOfClass(
       unnamedParam(_.cause)
     )
   }
@@ -695,7 +587,13 @@ object EncryptedViewMessageFactory {
     */
   final case class UnableToDetermineSessionKeyRandomness(cause: String)
       extends EncryptedViewMessageCreationError {
-    override protected def pretty: Pretty[UnableToDetermineSessionKeyRandomness] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[UnableToDetermineSessionKeyRandomness] =
+      UnableToDetermineSessionKeyRandomness
+  }
+
+  object UnableToDetermineSessionKeyRandomness
+      extends PrettyPrintingCompanion[UnableToDetermineSessionKeyRandomness] {
+    override protected val pretty: Pretty[UnableToDetermineSessionKeyRandomness] = prettyOfClass(
       param("cause", _.cause.unquoted)
     )
   }
@@ -704,7 +602,14 @@ object EncryptedViewMessageFactory {
       error: String,
       synchronizerId: PhysicalSynchronizerId,
   ) extends EncryptedViewMessageCreationError {
-    override protected def pretty: Pretty[UnableToGetDynamicSynchronizerParameters] = prettyOfClass(
+    override def prettyCompanion
+        : PrettyPrintingCompanion[UnableToGetDynamicSynchronizerParameters] =
+      UnableToGetDynamicSynchronizerParameters
+  }
+
+  object UnableToGetDynamicSynchronizerParameters
+      extends PrettyPrintingCompanion[UnableToGetDynamicSynchronizerParameters] {
+    override protected val pretty: Pretty[UnableToGetDynamicSynchronizerParameters] = prettyOfClass(
       param("error", _.error.unquoted),
       param("physical synchronizer id", _.synchronizerId),
     )

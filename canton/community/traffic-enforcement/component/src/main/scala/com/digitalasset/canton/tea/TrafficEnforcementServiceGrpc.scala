@@ -14,13 +14,14 @@ import com.digitalasset.canton.tea.v1.{
   GetAccountResponse,
   PruneEventsRequest,
   PruneEventsResponse,
+  PruneRequest,
+  PruneResponse,
   TrafficServiceGrpc,
   UpdateAccountRequest,
   UpdateAccountResponse,
 }
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
-import com.digitalasset.canton.util.FutureUtil
-import io.grpc.ServerServiceDefinition
+import io.grpc.{ServerServiceDefinition, Status}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -39,8 +40,8 @@ class TrafficEnforcementServiceGrpc(
   ): Future[GetAccountResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     EitherT(
-      FutureUtil
-        .logOnFailureUS(service.getAccount(request), "getAccount failed unexpectedly")
+      service
+        .getAccount(request)
         .map(_.leftMap(_.asGrpcError))
     ).asGrpcResponse
   }
@@ -50,20 +51,28 @@ class TrafficEnforcementServiceGrpc(
   ): Future[UpdateAccountResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     EitherT(
-      FutureUtil
-        .logOnFailureUS(service.updateAccount(request), "updateAccount failed unexpectedly")
+      service
+        .updateAccount(request)
         .map(_.leftMap(_.asGrpcError))
     ).asGrpcResponse
   }
 
-  override def pruneEvents(request: PruneEventsRequest): Future[PruneEventsResponse] = {
+  override def prune(request: PruneRequest): Future[PruneResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     EitherT(
-      FutureUtil
-        .logOnFailureUS(service.pruneEvents(request), "pruneEvents failed unexpectedly")
+      service
+        .prune(request)
         .map(_.leftMap(_.asGrpcError))
     ).asGrpcResponse
   }
+
+  // The participant serves PruneEvents by calling Prune, so this server never receives it.
+  override def pruneEvents(request: PruneEventsRequest): Future[PruneEventsResponse] =
+    Future.failed(
+      Status.UNIMPLEMENTED
+        .withDescription("PruneEvents is not served by the traffic enforcement server")
+        .asRuntimeException()
+    )
 
   override def bindService(): ServerServiceDefinition =
     TrafficServiceGrpc.bindService(this, executionContext)

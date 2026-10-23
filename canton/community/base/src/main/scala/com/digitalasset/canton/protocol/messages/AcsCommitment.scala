@@ -3,9 +3,15 @@
 
 package com.digitalasset.canton.protocol.messages
 
+import cats.syntax.either.*
 import cats.syntax.option.*
 import com.digitalasset.canton.LedgerParticipantId
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.protocol.v32
 import com.digitalasset.canton.serialization.ProtoConverter.{
   ParsingResult,
@@ -15,17 +21,17 @@ import com.digitalasset.canton.serialization.ProtoConverter.{
 import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.util.NoCopy
-import com.digitalasset.canton.validation.ProtoValidation
+import com.digitalasset.canton.validation.{ProtoValidation, ValidationParam}
 import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
   ProtocolVersionValidation,
   RepresentativeProtocolVersion,
-  UnsupportedProtoCodec,
   VersionedProtoCodec,
   VersioningCompanionMemoization,
 }
+import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 
 final case class AcsCommitment private (
@@ -39,7 +45,7 @@ final case class AcsCommitment private (
     override val deserializedFrom: Option[ByteString],
 ) extends HasProtocolVersionedWrapper[AcsCommitment]
     with ProtocolVersionedMemoizedEvidence
-    with PrettyPrinting
+    with PrettyPrintingFromCompanion
     with NoCopy {
 
   @transient override protected lazy val companionObj: AcsCommitment.type = AcsCommitment
@@ -52,7 +58,18 @@ final case class AcsCommitment private (
     digest = digest,
   )
 
-  override lazy val pretty: Pretty[AcsCommitment] =
+  override def prettyCompanion: PrettyPrintingCompanion[AcsCommitment] = AcsCommitment
+
+  override protected[this] def toByteStringUnmemoized: ByteString =
+    super[HasProtocolVersionedWrapper].toByteString
+}
+
+object AcsCommitment
+    extends VersioningCompanionMemoization[AcsCommitment]
+    with PrettyPrintingCompanion[AcsCommitment] {
+  override val name: String = "AcsCommitment"
+
+  override protected val pretty: Pretty[AcsCommitment] =
     prettyOfClass(
       param("psid", _.psid),
       param("sender", _.sender),
@@ -61,21 +78,23 @@ final case class AcsCommitment private (
       param("commitment", _.digest),
     )
 
-  override protected[this] def toByteStringUnmemoized: ByteString =
-    super[HasProtocolVersionedWrapper].toByteString
-}
+  // Size upper bound for SHA-256 hash (32 byte digest + 2 bytes metadata)
+  // of LtHash output value. We set a value of 50 bytes to allow some margin
+  // in case of future changes to the outer digest.
+  val MaxDigestSizeBytes: Int = 50
 
-object AcsCommitment extends VersioningCompanionMemoization[AcsCommitment] {
-  override val name: String = "AcsCommitment"
+  val digestValidationParam: ValidationParam[PositiveInt] =
+    ValidationParam(
+      ProtocolVersion.newBoundsOnPV37 -> PositiveInt.tryCreate(MaxDigestSizeBytes)
+    )
 
   override val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(-1) -> UnsupportedProtoCodec(),
-    ProtoVersion(32) -> VersionedProtoCodec(ProtocolVersion.acsCommitmentRedesign)(
+    ProtoVersion(32) -> VersionedProtoCodec(ProtocolVersion.v36)(
       v32.AcsCommitment
     )(
       supportedProtoVersionMemoizedPVV(_)(fromProtoV32),
       _.toProtoV32,
-    ),
+    )
   )
 
   private def fromProtoV32(
@@ -83,35 +102,46 @@ object AcsCommitment extends VersioningCompanionMemoization[AcsCommitment] {
       protoMsg: v32.AcsCommitment,
   )(
       bytes: ByteString
-  ): ParsingResult[AcsCommitment] = for {
-    synchronizerId <- ProtoValidation.validateThen(
-      protoMsg.physicalSynchronizerId,
-      "physical_synchronizer_id",
-      pvv,
-    )(PhysicalSynchronizerId.fromProtoPrimitive)
-    sender <- ProtoValidation.validateThen(
-      protoMsg.sendingParticipantUid,
-      "sending_participant_uid",
-      pvv,
-    )(parseLfParticipantId)
-    counterparticipant <- ProtoValidation.validateThen(
-      protoMsg.counterparticipantUid,
-      "counterparticipant_uid",
-      pvv,
-    )(parseLfParticipantId)
+  ): ParsingResult[AcsCommitment] =
+    for {
+      synchronizerId <- ProtoValidation.validateThen(
+        protoMsg.physicalSynchronizerId,
+        "physical_synchronizer_id",
+        pvv,
+      )(PhysicalSynchronizerId.fromProtoPrimitive)
 
-    period <- parseRequired(CommitmentPeriod.fromProtoV32, "period", protoMsg.period)
-    rpv <- protocolVersionRepresentativeFor(ProtoVersion(32))
-  } yield AcsCommitment(
-    synchronizerId,
-    sender,
-    counterparticipant,
-    period,
-    protoMsg.digest,
-  )(
-    rpv,
-    bytes.some,
-  )
+      sender <- ProtoValidation.validateThen(
+        protoMsg.sendingParticipantUid,
+        "sending_participant_uid",
+        pvv,
+      )(parseLfParticipantId)
+
+      counterparticipant <- ProtoValidation.validateThen(
+        protoMsg.counterparticipantUid,
+        "counterparticipant_uid",
+        pvv,
+      )(parseLfParticipantId)
+
+      period <- parseRequired(CommitmentPeriod.fromProtoV32, "period", protoMsg.period)
+
+      digest <- ProtoValidation.validateLength(
+        protoMsg.digest,
+        "digest",
+        pvv,
+        digestValidationParam,
+      )
+
+      rpv <- protocolVersionRepresentativeFor(ProtoVersion(32))
+    } yield AcsCommitment(
+      synchronizerId,
+      sender,
+      counterparticipant,
+      period,
+      digest,
+    )(
+      rpv,
+      bytes.some,
+    )
 
   def create(
       synchronizerId: PhysicalSynchronizerId,
@@ -120,15 +150,39 @@ object AcsCommitment extends VersioningCompanionMemoization[AcsCommitment] {
       period: CommitmentPeriod,
       digest: Digest.DigestType,
       protocolVersion: ProtocolVersion,
+  ): Either[String, AcsCommitment] = {
+    val pvv = ProtocolVersionValidation.PV(protocolVersion)
+    ProtoValidation
+      .validateLength(digest, "digest", pvv, digestValidationParam)
+      .leftMap(_.message)
+      .map(
+        AcsCommitment(
+          synchronizerId,
+          sender,
+          counterparticipant,
+          period,
+          _,
+        )(
+          protocolVersionRepresentativeFor(protocolVersion),
+          None,
+        )
+      )
+  }
+
+  @VisibleForTesting
+  private[canton] def createUnsafe(
+      synchronizerId: PhysicalSynchronizerId,
+      sender: LedgerParticipantId,
+      counterparticipant: LedgerParticipantId,
+      period: CommitmentPeriod,
+      digest: ByteString,
+      protocolVersion: ProtocolVersion,
   ): AcsCommitment =
-    AcsCommitment(
+    new AcsCommitment(
       synchronizerId,
       sender,
       counterparticipant,
       period,
       digest,
-    )(
-      protocolVersionRepresentativeFor(protocolVersion),
-      None,
-    )
+    )(protocolVersionRepresentativeFor(protocolVersion), None)
 }

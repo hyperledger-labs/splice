@@ -30,6 +30,11 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag
 import com.digitalasset.canton.util.ReassignmentTag.Target
 
+/** @param assignmentExclusivity
+  *   before this time (measured on the target synchronizer), only the submitter of the unassignment
+  *   can initiate the assignment; set on reassigning participants when the target synchronizer runs
+  *   protocol version 36 or lower, None otherwise
+  */
 final case class UnassignmentValidationResult(
     unassignmentData: UnassignmentData,
     override val rootHash: RootHash,
@@ -51,15 +56,28 @@ final case class UnassignmentValidationResult(
   override def activenessResultIsSuccessful: Boolean =
     commonValidationResult.activenessResult.isSuccessful
 
+  override protected def requestDescription: String = "Unassignment request"
+
   def contracts: ContractsReassignmentBatch = unassignmentData.contractsBatch
 
   def commitSet: CommitSet =
     CommitSet.createForUnassignment(contracts, targetSynchronizer, stakeholders)
 
+  /** @param participantId
+    *   the participant emitting the event
+    * @param recordTime
+    *   record time of the emitted event
+    * @param trafficCost
+    *   traffic cost reported in the completion of the submitting participant
+    * @param storedInReassignmentStore
+    *   whether the reassignment was recorded in the reassignment store, emitted as
+    *   `isReassigningParticipant`
+    */
   def createReassignmentAccepted(
       participantId: ParticipantId,
       recordTime: CantonTimestamp,
       trafficCost: NonNegativeLong,
+      storedInReassignmentStore: Boolean,
   )(implicit
       traceContext: TraceContext
   ): AcsChangeFactory => InternalContractIds => Update.SequencedReassignmentAccepted = {
@@ -88,7 +106,7 @@ final case class UnassignmentValidationResult(
             targetSynchronizer = targetSynchronizer.map(_.logical),
             submitter = Option(submitterMetadata.submitter),
             reassignmentId = reassignmentId,
-            isReassigningParticipant = isReassigningParticipant,
+            isReassigningParticipant = storedInReassignmentStore,
           ),
           reassignment =
             Reassignment.Batch(contracts.contracts.zipWithIndex.map { case (reassign, idx) =>
@@ -120,9 +138,13 @@ object UnassignmentValidationResult {
         ReassignmentValidationError,
         Unit,
       ],
+      packageVettingResult: Option[ReassignmentValidationError],
       submitterCheckResult: Option[ReassignmentValidationError],
       multiSynchronizerFeatureFlagCheckResult: Option[ReassignmentValidationError],
   ) extends ReassignmentValidationResult.CommonValidationResult {
+
+    // The contract must be serializable on the source synchronizer
+    override val contractSerializationResult: Option[ReassignmentValidationError] = None
 
     // During unassignment the reassignment id is computed, rather than being passed in
     // so there's no need to validate it.

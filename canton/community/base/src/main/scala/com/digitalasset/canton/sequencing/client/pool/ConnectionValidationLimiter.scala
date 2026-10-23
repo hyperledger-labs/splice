@@ -12,7 +12,11 @@ import com.digitalasset.canton.lifecycle.{
   PromiseUnlessShutdown,
   UnlessShutdown,
 }
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
@@ -99,8 +103,6 @@ class ConnectionValidationLimiter(
     newState match {
       case ValidationState.Validating(tc, promise) =>
         implicit val traceContext: TraceContext = tc
-
-        logger.debug("Starting validation")
         val validationF =
           validate(traceContext).thereafter { result =>
             logger.debug(s"Validation completed with $result")
@@ -195,11 +197,16 @@ class ConnectionValidationLimiter(
 }
 
 object ConnectionValidationLimiter {
-  private sealed trait ValidationState extends PrettyPrinting with Product with Serializable
-  private object ValidationState {
-    case object Idle extends ValidationState {
-      override protected def pretty: Pretty[Idle.type] = prettyOfObject[Idle.type]
-    }
+  private sealed trait ValidationState
+      extends PrettyPrintingFromCompanion
+      with Product
+      with Serializable {
+    override def prettyCompanion: PrettyPrintingCompanion[ValidationState] = ValidationState
+  }
+  private object ValidationState extends PrettyPrintingCompanion[ValidationState] {
+    override protected val pretty: Pretty[ValidationState] = prettyOfObject[ValidationState]
+
+    case object Idle extends ValidationState
 
     /** @param traceContext
       *   trace context of the currently running validation
@@ -207,9 +214,7 @@ object ConnectionValidationLimiter {
       *   promise for the currently running validation
       */
     final case class Validating(traceContext: TraceContext, promise: PromiseUnlessShutdown[Unit])
-        extends ValidationState {
-      override protected def pretty: Pretty[this.type] = prettyOfObject[this.type]
-    }
+        extends ValidationState
 
     /** @param traceContext
       *   trace context of the scheduled validation
@@ -222,8 +227,6 @@ object ConnectionValidationLimiter {
         traceContext: TraceContext,
         runningP: PromiseUnlessShutdown[Unit],
         scheduledP: PromiseUnlessShutdown[Unit],
-    ) extends ValidationState {
-      override protected def pretty: Pretty[this.type] = prettyOfObject[this.type]
-    }
+    ) extends ValidationState
   }
 }

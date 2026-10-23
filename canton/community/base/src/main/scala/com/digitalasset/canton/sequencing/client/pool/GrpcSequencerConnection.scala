@@ -10,7 +10,11 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.networking.grpc.GrpcError.{
   GrpcClientError,
   GrpcRequestRefusedByServer,
@@ -46,6 +50,8 @@ import com.digitalasset.canton.sequencing.protocol.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.Duration
@@ -65,7 +71,7 @@ class GrpcSequencerConnection(
     protected override val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContextExecutor)
     extends SequencerConnection
-    with PrettyPrinting
+    with PrettyPrintingFromCompanion
     with GrpcClientTransportHelpers {
 
   override val health: SequencerConnectionHealth = underlying.health
@@ -249,23 +255,10 @@ class GrpcSequencerConnection(
   ): EitherT[FutureUnlessShutdown, String, Option[CantonTimestamp]] =
     stub.getTime(timeout, retryPolicy = retryPolicy(retryOnUnavailable = false)).leftMap(_.toString)
 
-  override def downloadTopologyStateForInit(
-      request: TopologyStateForInitRequest,
-      timeout: Duration,
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, TopologyStateForInitResponse] = {
-    logger.debug("Downloading topology state for initialization")
-
-    for {
-      result <- stub.downloadTopologyStateForInit(request, timeout).leftMap(_.toString)
-      storedTxs = result.topologyTransactions.value
-      _ = logger.debug(
-        s"Downloaded topology state for initialization with last change timestamp at ${storedTxs.lastChangeTimestamp}: " +
-          s"${storedTxs.result.size} transactions"
-      )
-    } yield result
-  }
+  override def streamTopologyStateForInit(request: TopologyStateForInitRequest, timeout: Duration)(
+      implicit traceContext: TraceContext
+  ): Either[String, Source[TopologyStateForInitResponse, NotUsed]] =
+    stub.streamTopologyStateForInit(request, timeout).leftMap(_.toString)
 
   override def subscribe[E](
       request: SubscriptionRequest,
@@ -276,11 +269,8 @@ class GrpcSequencerConnection(
   ): Either[String, SequencerSubscription[E]] =
     stub.subscribe(request, handler, timeout).leftMap(_.toString)
 
-  override protected def pretty: Pretty[GrpcSequencerConnection] =
-    prettyOfClass(
-      param("name", _.name.singleQuoted),
-      param("underlying", _.underlying),
-    )
+  override def prettyCompanion: PrettyPrintingCompanion[GrpcSequencerConnection] =
+    GrpcSequencerConnection
 
   override val subscriptionRetryPolicy: SubscriptionErrorRetryPolicy =
     new GrpcSubscriptionErrorRetryPolicy(loggerFactory)
@@ -299,4 +289,12 @@ class GrpcSequencerConnection(
       )
     } yield result
   }
+}
+
+object GrpcSequencerConnection extends PrettyPrintingCompanion[GrpcSequencerConnection] {
+  override protected val pretty: Pretty[GrpcSequencerConnection] =
+    prettyOfClass(
+      param("name", _.name.singleQuoted),
+      param("underlying", _.underlying),
+    )
 }

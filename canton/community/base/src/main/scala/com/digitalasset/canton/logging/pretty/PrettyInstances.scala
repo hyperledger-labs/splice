@@ -16,8 +16,6 @@ import com.digitalasset.canton.util.{HexString, ThrowableUtil}
 import com.digitalasset.canton.{LedgerUserId, LfPartyId, LfTimestamp, LfVersioned, Uninhabited}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{DottedName, PackageId, QualifiedName}
-import com.digitalasset.daml.lf.transaction.LegacyContractStateMachine.ActiveLedgerState
-import com.digitalasset.daml.lf.transaction.LegacyTransactionErrors.*
 import com.digitalasset.daml.lf.transaction.{CreationTime, Versioned}
 import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
@@ -29,7 +27,7 @@ import slick.util.{DumpInfo, Dumpable}
 
 import java.lang.Long as JLong
 import java.net.URI
-import java.time.{Duration as JDuration, Instant}
+import java.time.{Instant, Duration as JDuration}
 import java.util.UUID
 import scala.annotation.nowarn
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -69,6 +67,8 @@ trait PrettyInstances {
   implicit def prettyLong: Pretty[Long] = prettyOfString(_.toString)
 
   implicit def prettyBigDecimal: Pretty[BigDecimal] = prettyOfString(_.toString)
+
+  implicit def prettyBigInt: Pretty[BigInt] = prettyOfString(_.toString)
 
   implicit def prettyJLong: Pretty[JLong] = prettyOfString(_.toString)
 
@@ -309,22 +309,6 @@ trait PrettyInstances {
     unnamedParam(_.value),
     unnamedParam(_.traceContext),
   )
-
-  implicit val prettyKeyInputError: Pretty[KeyInputError] = {
-    case InconsistentContractKeyKIError(e: InconsistentContractKey) =>
-      prettyOfClass[InconsistentContractKey](unnamedParam(_.key)).treeOf(e)
-    case DuplicateContractKeyKIError(e: DuplicateContractKey) =>
-      prettyOfClass[DuplicateContractKey](unnamedParam(_.key)).treeOf(e)
-    case DuplicateContractIdKIError(e: DuplicateContractId) =>
-      prettyOfClass[DuplicateContractId](unnamedParam(_.contractId)).treeOf(e)
-  }
-
-  implicit def prettyActiveLedgerState[T: Pretty]: Pretty[ActiveLedgerState[T]] =
-    prettyOfClass[ActiveLedgerState[T]](
-      param("locallyCreatedThisTimeline", _.locallyCreatedThisTimeline),
-      param("consumedBy", _.consumedBy),
-      param("localActiveKeys", _.localActiveKeys),
-    )
 
   implicit val prettyPort: Pretty[Port] = prettyOfString(_.unwrap.toString)
 

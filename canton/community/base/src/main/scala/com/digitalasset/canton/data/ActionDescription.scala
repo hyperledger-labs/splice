@@ -9,7 +9,11 @@ import com.digitalasset.canton.ProtoDeserializationError.{
   OtherError,
   ValueDeserializationError,
 }
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.protocol.ContractIdSyntax.*
 import com.digitalasset.canton.protocol.LfHashSyntax.*
 import com.digitalasset.canton.protocol.RefIdentifierSyntax.*
@@ -42,7 +46,7 @@ import monocle.{Lens, Prism}
 /** Summarizes the information that is needed in addition to the other fields of
   * [[ViewParticipantData]] for determining the root action of a view.
   */
-sealed trait ActionDescription extends Product with Serializable with PrettyPrinting {
+sealed trait ActionDescription extends Product with Serializable with PrettyPrintingFromCompanion {
 
   /** Whether the root action was a byKey action (exerciseByKey, fetchByKey, lookupByKey) */
   def byKey: Boolean
@@ -50,12 +54,7 @@ sealed trait ActionDescription extends Product with Serializable with PrettyPrin
   /** The node seed for the root action of a view. Empty for fetch and lookupByKey nodes */
   def seedOption: Option[LfHash]
 
-  protected def toProtoDescriptionV30: v30.ActionDescription.Description
-
   protected def toProtoDescriptionV31: v31.ActionDescription.Description
-
-  def toProtoV30: v30.ActionDescription =
-    v30.ActionDescription(description = toProtoDescriptionV30)
 
   def toProtoV31: v31.ActionDescription =
     v31.ActionDescription(description = toProtoDescriptionV31)
@@ -66,8 +65,13 @@ object ActionDescription {
 
   final case class InvalidActionDescription(message: String)
       extends RuntimeException(message)
-      with PrettyPrinting {
-    override protected def pretty: Pretty[InvalidActionDescription] = prettyOfClass(
+      with PrettyPrintingFromCompanion {
+    override def prettyCompanion: PrettyPrintingCompanion[InvalidActionDescription] =
+      InvalidActionDescription
+  }
+
+  object InvalidActionDescription extends PrettyPrintingCompanion[InvalidActionDescription] {
+    override protected val pretty: Pretty[InvalidActionDescription] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }
@@ -283,21 +287,6 @@ object ActionDescription {
     } yield FetchActionDescription(inputContractId, actors, byKey, templateId, interfaceId)
   }
 
-  private[data] def fromProtoV30(
-      pvv: ProtocolVersionValidation,
-      actionDescriptionP: v30.ActionDescription,
-  ): ParsingResult[ActionDescription] = {
-    import v30.ActionDescription.Description.*
-    val v30.ActionDescription(description) = actionDescriptionP
-
-    description match {
-      case Create(create) => fromCreateProtoV30(pvv, create)
-      case Exercise(exercise) => fromExerciseProtoV30(pvv, exercise)
-      case Fetch(fetch) => fromFetchProtoV30(pvv, fetch)
-      case Empty => Left(FieldNotSet("description"))
-    }
-  }
-
   private[data] def fromProtoV31(
       pvv: ProtocolVersionValidation,
       actionDescriptionP: v31.ActionDescription,
@@ -336,13 +325,15 @@ object ActionDescription {
         nodeSeed = seed.toProtoPrimitive,
       )
 
-    override protected def toProtoDescriptionV30: v30.ActionDescription.Description.Create =
-      v30.ActionDescription.Description.Create(toCreateActionDescriptionV30)
-
     override protected def toProtoDescriptionV31: v31.ActionDescription.Description.Create =
       v31.ActionDescription.Description.Create(toCreateActionDescriptionV30)
 
-    override protected def pretty: Pretty[CreateActionDescription] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[CreateActionDescription] =
+      CreateActionDescription
+  }
+
+  object CreateActionDescription extends PrettyPrintingCompanion[CreateActionDescription] {
+    override protected val pretty: Pretty[CreateActionDescription] = prettyOfClass(
       param("contract Id", _.contractId),
       param("seed", _.seed),
     )
@@ -367,9 +358,6 @@ object ActionDescription {
 
     override def seedOption: Option[LfHash] = Some(seed)
 
-    override protected def toProtoDescriptionV30: v30.ActionDescription.Description.Exercise =
-      v30.ActionDescription.Description.Exercise(toExerciseActionDescriptionV30)
-
     override protected def toProtoDescriptionV31: v31.ActionDescription.Description.Exercise =
       v31.ActionDescription.Description.Exercise(toExerciseActionDescriptionV30)
 
@@ -387,17 +375,8 @@ object ActionDescription {
         failed = failed,
       )
 
-    override protected def pretty: Pretty[ExerciseActionDescription] = prettyOfClass(
-      param("input contract id", _.inputContractId),
-      param("template id", _.templateId),
-      paramIfDefined("interface id", _.interfaceId),
-      param("choice", _.choice.unquoted),
-      param("chosen value", _.chosenValue),
-      param("actors", _.actors),
-      paramIfTrue("by key", _.byKey),
-      param("seed", _.seed),
-      paramIfTrue("failed", _.failed),
-    )
+    override def prettyCompanion: PrettyPrintingCompanion[ExerciseActionDescription] =
+      ExerciseActionDescription
 
     /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
     @VisibleForTesting
@@ -428,7 +407,20 @@ object ActionDescription {
 
   }
 
-  object ExerciseActionDescription {
+  object ExerciseActionDescription extends PrettyPrintingCompanion[ExerciseActionDescription] {
+
+    override protected val pretty: Pretty[ExerciseActionDescription] = prettyOfClass(
+      param("input contract id", _.inputContractId),
+      param("template id", _.templateId),
+      paramIfDefined("interface id", _.interfaceId),
+      param("choice", _.choice.unquoted),
+      param("chosen value", _.chosenValue),
+      param("actors", _.actors),
+      paramIfTrue("by key", _.byKey),
+      param("seed", _.seed),
+      paramIfTrue("failed", _.failed),
+    )
+
     def tryCreate(
         inputContractId: LfContractId,
         templateId: LfTemplateId,
@@ -518,13 +510,15 @@ object ActionDescription {
         interfaceId = interfaceId.map(i => new RefIdentifierSyntax(i).toProtoPrimitive),
       )
 
-    override protected def toProtoDescriptionV30: v30.ActionDescription.Description.Fetch =
-      v30.ActionDescription.Description.Fetch(toFetchActionDescriptionV30)
-
     override protected def toProtoDescriptionV31: v31.ActionDescription.Description.Fetch =
       v31.ActionDescription.Description.Fetch(toFetchActionDescriptionV30)
 
-    override protected def pretty: Pretty[FetchActionDescription] = prettyOfClass(
+    override def prettyCompanion: PrettyPrintingCompanion[FetchActionDescription] =
+      FetchActionDescription
+  }
+
+  object FetchActionDescription extends PrettyPrintingCompanion[FetchActionDescription] {
+    override protected val pretty: Pretty[FetchActionDescription] = prettyOfClass(
       param("input contract id", _.inputContractId),
       param("actors", _.actors),
       paramIfTrue("by key", _.byKey),

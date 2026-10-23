@@ -249,10 +249,12 @@ object ProtocolVersion {
       ProtocolVersion(31),
       ProtocolVersion(32),
       ProtocolVersion(33),
+      ProtocolVersion(34),
+      ProtocolVersion(35),
     )
 
   val stable: NonEmpty[List[StableProtocolVersion]] =
-    NonEmpty.mk(List, ProtocolVersion.v34, ProtocolVersion.v35, ProtocolVersion.v36)
+    NonEmpty.mk(List, ProtocolVersion.v36, ProtocolVersion.v37)
 
   // LF versions that should only be used with alpha/beta protocol versions
   val alphaOnlyLfVersions: NonEmpty[List[LanguageVersion]] =
@@ -269,11 +271,13 @@ object ProtocolVersion {
     s"stable protocol versions $stable should be in sync with build info $releaseStable",
   )
 
-  val alpha: List[AlphaProtocolVersion] = List(almostDev)
+  val alpha: List[AlphaProtocolVersion] = List(ProtocolVersion.almostDev)
 
   val beta: List[BetaProtocolVersion] =
     parseFromBuildInfo(BuildInfo.betaProtocolVersions)
       .map(pv => ProtocolVersion.createBeta(pv.v))
+
+  val newBoundsOnPV37: StableProtocolVersion = ProtocolVersion.v37
 
   val supported: NonEmpty[List[ProtocolVersion]] =
     (NonEmpty.mk(List, dev) ++ alpha ++ beta ++ stable).sorted
@@ -302,16 +306,38 @@ object ProtocolVersion {
     *   if the environment variable's value cannot be parsed to a protocol version
     */
   private val CANTON_PROTOCOL_VERSION = "CANTON_PROTOCOL_VERSION"
-  val forSynchronizer: ProtocolVersion =
+  val forSynchronizer: ProtocolVersion = {
+    val shouldPvBeSet =
+      sys.env.contains("CI") && !sys.env.contains("CANTON_AUTOMATIC_PROTOCOL_VERSION")
+
     sys.env
       .get(CANTON_PROTOCOL_VERSION)
-      .orElse(sys.props.get(CANTON_PROTOCOL_VERSION))
-      .map(ProtocolVersion.tryCreate)
-      .getOrElse(ProtocolVersion.latest)
+      .orElse(sys.props.get(CANTON_PROTOCOL_VERSION)) match {
+      case Some(rawPv) =>
+        if (rawPv.nonEmpty)
+          ProtocolVersion.tryCreate(rawPv)
+        else
+          throw new IllegalArgumentException(
+            "CANTON_PROTOCOL_VERSION should be set on CI (except it CANTON_AUTOMATIC_PROTOCOL_VERSION is set)"
+          )
 
-  // TODO(#32229) Remove this once we have a stable protocol version that supports transparency
-  lazy val transparency: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] = dev
+      case None if shouldPvBeSet =>
+        throw new IllegalArgumentException(
+          "CANTON_PROTOCOL_VERSION should be set on CI (except it CANTON_AUTOMATIC_PROTOCOL_VERSION is set)"
+        )
 
+      case None => ProtocolVersion.latest
+    }
+  }
+
+  // TODO(#32229) Remove this once we have a stable protocol version that supports transparency and encryption/decryption with ciphertext IDs
+  lazy val transparencyAndCiphertextId: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
+    dev
+
+  /*
+  Ensure the list of alpha versions is not empty (required for some tests)
+  Very high value that is almost the dev version.
+   */
   lazy val almostDev: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
     ProtocolVersion.createAlpha(Int.MaxValue - 1)
 
@@ -327,13 +353,11 @@ object ProtocolVersion {
   lazy val v36: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
     ProtocolVersion.createStable(36)
 
-  // local storage doesn't depend on a synchronizer with a specific protocol version
-  lazy val acsCommitmentRedesignStorage
-      : ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] = v35
-  lazy val acsCommitmentRedesign: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] = v36
+  lazy val v37: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
+    ProtocolVersion.createStable(37)
 
   // Minimum stable protocol version introduced
-  lazy val minimum: ProtocolVersion = v34
+  lazy val minimum: ProtocolVersion = v36
 
   private def parseFromBuildInfo(pv: Seq[String]): List[ProtocolVersion] =
     pv.map(parseUncheckedS)

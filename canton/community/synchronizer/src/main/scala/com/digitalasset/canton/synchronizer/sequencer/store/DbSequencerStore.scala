@@ -45,9 +45,9 @@ import com.digitalasset.canton.store.db.RequiredTypesCodec.*
 import com.digitalasset.canton.synchronizer.block.UninitializedBlockHeight
 import com.digitalasset.canton.synchronizer.block.update.InFlightAggregations
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
+import com.digitalasset.canton.synchronizer.sequencer.store.MemberLifeCycleStatus
 import com.digitalasset.canton.synchronizer.sequencer.{
   CommitMode,
-  SequencerMemberStatus,
   SequencerPruningStatus,
   SequencerSnapshot,
 }
@@ -173,7 +173,6 @@ class DbSequencerStore(
       senderO: Option[SequencerMemberId] = None,
       recipientsO: Option[NonEmpty[SortedSet[SequencerMemberId]]] = None,
       payloadO: Option[P] = None,
-      topologyTimestampO: Option[CantonTimestamp] = None,
       traceContext: TraceContext,
       // TODO(#15628) We should represent this differently, so that DeliverErrorStoreEvent.fromByteString parameter is always defined as well
       errorO: Option[ByteString],
@@ -199,7 +198,6 @@ class DbSequencerStore(
         messageId,
         recipients,
         payload,
-        topologyTimestampO,
         traceContext,
         trafficReceiptO,
       )
@@ -223,7 +221,6 @@ class DbSequencerStore(
       } yield ReceiptStoreEvent(
         sender,
         messageId,
-        topologyTimestampO,
         traceContext,
         trafficReceiptO,
       )
@@ -241,7 +238,6 @@ class DbSequencerStore(
               messageId,
               members,
               payloadId,
-              topologyTimestampO,
               traceContext,
               trafficReceiptO,
             ) =>
@@ -253,7 +249,6 @@ class DbSequencerStore(
             senderO = Some(sender),
             recipientsO = Some(members),
             payloadO = Some(payloadId),
-            topologyTimestampO = topologyTimestampO,
             traceContext = traceContext,
             errorO = None,
             trafficReceiptO = trafficReceiptO,
@@ -274,7 +269,6 @@ class DbSequencerStore(
         case ReceiptStoreEvent(
               sender,
               messageId,
-              topologyTimestampO,
               traceContext,
               trafficReceiptO,
             ) =>
@@ -288,7 +282,6 @@ class DbSequencerStore(
               Some(NonEmpty(SortedSet, sender)), // must be set for sender to receive value
             traceContext = traceContext,
             errorO = None,
-            topologyTimestampO = topologyTimestampO,
             trafficReceiptO = trafficReceiptO,
           )
       }
@@ -309,7 +302,6 @@ class DbSequencerStore(
 
   private implicit val getDeliverStoreEventRowResult: GetResult[Sequenced[PayloadId]] = {
     val timestampGetter = implicitly[GetResult[CantonTimestamp]]
-    val timestampOGetter = implicitly[GetResult[Option[CantonTimestamp]]]
     val discriminatorGetter = implicitly[GetResult[EventTypeDiscriminator]]
     val messageIdGetter = implicitly[GetResult[Option[MessageId]]]
     val memberIdGetter = implicitly[GetResult[Option[SequencerMemberId]]]
@@ -328,7 +320,6 @@ class DbSequencerStore(
         memberIdGetter(r),
         memberIdNesGetter(r),
         payloadIdGetter(r),
-        timestampOGetter(r),
         traceContextGetter(r).unwrap,
         errorOGetter(r),
         trafficReceipt(r),
@@ -393,7 +384,10 @@ class DbSequencerStore(
       "catchupPayloadCache",
     )
 
-  protected override def registerMemberInternal(member: Member, timestamp: CantonTimestamp)(implicit
+  protected override def registerOnboardingMemberInternal(
+      member: Member,
+      timestamp: CantonTimestamp,
+  )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[RegisteredMember] =
     storage
@@ -404,19 +398,52 @@ class DbSequencerStore(
               sqlu"""merge into sequencer_members using dual
                     on member = $member
                     when not matched then
-                      insert (member, registered_ts) values ($member, $timestamp)
-                  """
+                      insert (member, registered_ts, onboarded_ts, status)
+                      values ($member, null, $timestamp, ${MemberLifeCycleStatus.Onboarding})
+                   """
             case _: Postgres =>
-              sqlu"""insert into sequencer_members (member, registered_ts)
-                  values ($member, $timestamp)
-                  on conflict (member) do nothing
-             """
+              sqlu"""insert into sequencer_members (member, status, registered_ts, onboarded_ts)
+                   values ($member, ${MemberLifeCycleStatus.Onboarding}, null, $timestamp)
+                   on conflict (member) do nothing
+                   """
           }
           registeredMember <-
-            sql"select id, registered_ts, enabled from sequencer_members where member = $member"
-              .as[(SequencerMemberId, CantonTimestamp, Boolean)]
+            sql"select id, registered_ts, status from sequencer_members where member = $member"
+              .as[RegisteredMember]
               .head
-              .map((RegisteredMember.apply _).tupled)
+        } yield (updated, registeredMember),
+        "registeredOnboardingMember",
+      )
+      .map { case (_, member) => member }
+
+  protected override def registerMemberInternal(member: Member, timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[RegisteredMember] =
+    storage
+      .queryAndUpdate(
+        for {
+          updated <- profile match {
+            case _: H2 =>
+              sqlu"""merge into sequencer_members using dual
+                     on member = $member
+                     when not matched then
+                       insert (member, registered_ts, status) values ($member, $timestamp, ${MemberLifeCycleStatus.Active})
+                     when matched and status = ${MemberLifeCycleStatus.Onboarding} then
+                       update set registered_ts = $timestamp, status = ${MemberLifeCycleStatus.Active}
+                  """
+            case _: Postgres =>
+              sqlu"""insert into sequencer_members (member, registered_ts, status)
+                     values ($member, $timestamp, ${MemberLifeCycleStatus.Active})
+                     on conflict (member) do update
+                       set registered_ts = excluded.registered_ts,
+                           status = excluded.status
+                       where sequencer_members.status = ${MemberLifeCycleStatus.Onboarding}
+                  """
+          }
+          registeredMember <-
+            sql"select id, registered_ts, status from sequencer_members where member = $member"
+              .as[RegisteredMember]
+              .head
         } yield (updated, registeredMember),
         "registerMember",
       )(traceContext, closeContext)
@@ -426,10 +453,9 @@ class DbSequencerStore(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[RegisteredMember]] =
     storage.query(
-      sql"""select id, registered_ts, enabled from sequencer_members where member = $member"""
-        .as[(SequencerMemberId, CantonTimestamp, Boolean)]
-        .headOption
-        .map(_.map((RegisteredMember.apply _).tupled)),
+      sql"""select id, registered_ts, status from sequencer_members where member = $member"""
+        .as[RegisteredMember]
+        .headOption,
       functionFullName,
     )
 
@@ -440,18 +466,16 @@ class DbSequencerStore(
       case Some(nonEmptyMembers) =>
         val inClause = DbStorage.toInClause("member", nonEmptyMembers)
         val query =
-          sql"""select id, registered_ts, enabled, member from sequencer_members where """ ++ inClause
+          sql"""select id, registered_ts, status, member from sequencer_members where """ ++ inClause
 
         storage.query(
           query
-            .as[(SequencerMemberId, CantonTimestamp, Boolean, Member)]
+            .as[(RegisteredMember, Member)]
             .map { rows =>
               val initialMap: Map[Member, Option[RegisteredMember]] = members.map(_ -> None).toMap
 
-              rows.foldLeft(initialMap) {
-                case (currentMap, (id, registeredFrom, enabled, member)) =>
-                  val registeredMember = RegisteredMember(id, registeredFrom, enabled)
-                  currentMap.updated(member, registeredMember.some)
+              rows.foldLeft(initialMap) { case (currentMap, (registeredMember, member)) =>
+                currentMap.updated(member, registeredMember.some)
               }
             },
           functionFullName,
@@ -665,9 +689,9 @@ class DbSequencerStore(
     val saveEventSql =
       """insert into sequencer_events (
         |  ts, node_index, event_type, message_id, sender, recipients,
-        |  payload_id, topology_timestamp, trace_context, error, consumed_cost, extra_traffic_consumed, base_traffic_remainder
+        |  payload_id, trace_context, error, consumed_cost, extra_traffic_consumed, base_traffic_remainder
         |)
-        |  values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        |  values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         |  on conflict do nothing""".stripMargin
 
     val eventRows = events.map(DeliverStoreEventRow(instanceIndex, _))
@@ -682,7 +706,6 @@ class DbSequencerStore(
           sender,
           recipients,
           payloadId,
-          topologyTimestampO,
           traceContext,
           errorO,
           trafficReceiptO,
@@ -695,7 +718,6 @@ class DbSequencerStore(
         pp >> sender
         pp >> recipients
         pp >> payloadId
-        pp >> topologyTimestampO
         pp >> SerializableTraceContext(traceContext)
         pp >> errorO
         pp >> trafficReceiptO.map(_.consumedCost)
@@ -962,7 +984,7 @@ class DbSequencerStore(
       } yield {
         preloadedPayloads ++ accessedPayloads ++ cachedPayloads.toMap
       }
-      ret.map(_.map { case (k, v) => (k, v.decodeBatchAndTrim(protocolVersion, member)) })
+      ret.map(_.map { case (k, v) => (k, v.decodeBatchAndTrim(member)) })
     }
     if (recentEvents) {
       // normal read where we'll expect the payload cache to have the data but we also peek into the
@@ -1005,7 +1027,7 @@ class DbSequencerStore(
       (needsLoadingFromDB, loadedFromCache) = attemptedLoadingFromCache.separate
       loadedFromDB <- readPayloadsFromStore(needsLoadingFromDB)
     } yield (preloadedPayloads ++ loadedFromDB ++ loadedFromCache.toMap)
-      .map { case (k, v) => (k, v.decodeBatch(protocolVersion)) }
+      .map { case (k, v) => (k, v.decodeBatch()) }
   }
 
   private def readPayloadsFromStore(payloadIds: Seq[PayloadId])(implicit
@@ -1096,7 +1118,6 @@ class DbSequencerStore(
         topologyClientMemberId: SequencerMemberId
     ): GetResult[Sequenced[PayloadId]] = {
       val timestampGetter = implicitly[GetResult[CantonTimestamp]]
-      val timestampOGetter = implicitly[GetResult[Option[CantonTimestamp]]]
       val discriminatorGetter = implicitly[GetResult[EventTypeDiscriminator]]
       val messageIdGetter = implicitly[GetResult[Option[MessageId]]]
       val memberIdGetter = implicitly[GetResult[Option[SequencerMemberId]]]
@@ -1119,7 +1140,6 @@ class DbSequencerStore(
             Some(NonEmpty(SortedSet, memberId))
           },
           payloadIdGetter(r),
-          timestampOGetter(r),
           traceContextGetter(r).unwrap,
           errorOGetter(r),
           trafficReceipt(r),
@@ -1150,7 +1170,7 @@ class DbSequencerStore(
                 when #$memberContainsBefore $topologyClientMemberId #$memberContainsAfter or #$memberContainsBefore ${SequencerMemberId.Broadcast} #$memberContainsAfter then true
                 else false
               end as addressed_to_sequencer,
-              events.payload_id, events.topology_timestamp,
+              events.payload_id,
               events.trace_context, events.error,
               events.consumed_cost, events.extra_traffic_consumed, events.base_traffic_remainder
             from
@@ -1204,7 +1224,7 @@ class DbSequencerStore(
                 when #$memberContainsBefore $topologyClientMemberId #$memberContainsAfter or #$memberContainsBefore ${SequencerMemberId.Broadcast} #$memberContainsAfter then true
                 else false
               end as addressed_to_sequencer,
-              events.payload_id, events.topology_timestamp,
+              events.payload_id,
               events.trace_context, events.error,
               events.consumed_cost, events.extra_traffic_consumed, events.base_traffic_remainder
             from sequencer_event_recipients recipients
@@ -1262,7 +1282,7 @@ class DbSequencerStore(
     ): SqlStreamingAction[Vector[Sequenced[IdOrPayload]], Sequenced[IdOrPayload], Effect.Read] =
       sql"""
         select events.ts, events.node_index, events.event_type, events.message_id, events.sender,
-          events.recipients, events.payload_id, events.topology_timestamp,
+          events.recipients, events.payload_id,
           events.trace_context, events.error,
           events.consumed_cost, events.extra_traffic_consumed, events.base_traffic_remainder
         from sequencer_events events
@@ -1376,7 +1396,7 @@ class DbSequencerStore(
     }
   }
 
-  /**   - Without filters this returns results for all enabled members, to be used in the sequencer
+  /**   - Without filters this returns results for all active members, to be used in the sequencer
     *     snapshot.
     *   - With `filterForMemberO = Some(member, false)` this returns results for a specific member,
     *     to be used when reading events for the member.
@@ -1406,7 +1426,7 @@ class DbSequencerStore(
 
     (sql"""
             with
-              enabled_members as (
+              active_members as (
                 select
                   member,
                   id,
@@ -1417,7 +1437,7 @@ class DbSequencerStore(
                   -- consider the given timestamp
                   registered_ts <= $beforeInclusive
                   -- no need to consider disabled members since they can't be served events anymore
-                  and enabled = true
+                  and status = ${MemberLifeCycleStatus.Active}
                   """ ++ memberFilter ++ sql"""
               ),
               watermarks as (
@@ -1476,7 +1496,7 @@ class DbSequencerStore(
                )), -- end of greatest
                m.pruned_previous_event_timestamp
              ) previous_ts
-           from enabled_members m""").as[(Member, Option[CantonTimestamp])].map(_.toMap)
+           from active_members m""").as[(Member, Option[CantonTimestamp])].map(_.toMap)
   }
 
   override def deleteEventsPastWatermark(
@@ -1709,8 +1729,9 @@ class DbSequencerStore(
       lowerBoundO <- fetchLowerBound()
       members <- storage.query(
         sql"""
-      select member, id, registered_ts, enabled from sequencer_members where registered_ts <= $now"""
-          .as[(Member, SequencerMemberId, CantonTimestamp, Boolean)],
+      select member, id, registered_ts, status from sequencer_members
+      where registered_ts <= $now or onboarded_ts <= $now"""
+          .as[(Member, RegisteredMember)],
         functionFullName,
       )
       acknowledgements <- latestAcknowledgements()
@@ -1719,12 +1740,12 @@ class DbSequencerStore(
         lowerBound =
           lowerBoundO.map { case (timestamp, _) => timestamp }.getOrElse(CantonTimestamp.Epoch),
         now = now,
-        members = members.view.map { case (member, memberId, registeredAt, enabled) =>
-          SequencerMemberStatus(
+        members = members.view.map { case (member, registeredMember) =>
+          memberStatusAt(
             member,
-            registeredAt,
-            lastAcknowledged = acknowledgements.get(memberId),
-            enabled = enabled,
+            registeredMember,
+            now,
+            acknowledgements.get(registeredMember.memberId),
           )
         }.toSet,
       )
@@ -1778,7 +1799,7 @@ class DbSequencerStore(
   ): FutureUnlessShutdown[Unit] =
     // we assume here that the member is already registered in order to have looked up the memberId
     storage.update_(
-      sqlu"update sequencer_members set enabled = ${false} where id = $member",
+      sqlu"update sequencer_members set status = ${MemberLifeCycleStatus.Disabled} where id = $member",
       functionFullName,
     )
 
@@ -1874,7 +1895,7 @@ class DbSequencerStore(
         //   that reached both the sequencer and the member
         case _ =>
           // We use the looked up event, falling back to the member's registration time
-          Some(latestTopologyTimestampCandidate.getOrElse(registeredMember.registeredFrom))
+          latestTopologyTimestampCandidate.orElse(registeredMember.registeredFrom)
       }
     }
   }

@@ -102,6 +102,10 @@ trait CantonSynchronizerNodeDeprecations {
           to = Seq("unsafe-sequencer-channel-support"),
         )
       )
+      override def deprecatePath: List[DeprecatedConfigPath[?]] = List(
+        // removed as the feature is now always enabled and the flag is no longer needed (https://github.com/DACH-NY/canton/issues/30769)
+        DeprecatedConfigPath[String]("produce-post-ordering-topology-ticks", since = "3.7.0")
+      )
     }
 
   implicit val mediatorConfigReaderDeprecations: DeprecatedFieldsFor[MediatorConfig] =
@@ -156,6 +160,21 @@ trait CantonParticipantNodeDeprecations {
           "traffic-enforcement",
           since = "3.6.0",
           to = Seq("traffic-accounting"),
+        ),
+      )
+
+      override def deprecatePath: List[DeprecatedConfigPath[?]] = List(
+        DeprecatedConfigPath[Boolean](
+          "features.deprecated.enable-deprecated-endpoints-34",
+          since = "3.7.0",
+        ),
+        DeprecatedConfigPath[Boolean](
+          "features.deprecated.enable-deprecated-parameters-34",
+          since = "3.7.0",
+        ),
+        DeprecatedConfigPath[Boolean](
+          "features.deprecated.enable-deprecated-endpoints-35",
+          since = "3.7.0",
         ),
       )
     }

@@ -7,7 +7,11 @@ import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError.ValueConversionError
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveLong
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.time.BftTime
@@ -19,7 +23,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   HowManyCanWeBlacklist,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.SequencingParameters.SegmentLength
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.{v30, v31}
+import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v31
 import com.digitalasset.canton.time.PositiveFiniteDuration
 import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
@@ -55,7 +59,7 @@ final case class SequencingParameters private (
     override val representativeProtocolVersion: RepresentativeProtocolVersion[
       topology.SequencingParameters.type
     ]
-) extends PrettyPrinting
+) extends PrettyPrintingFromCompanion
     with HasProtocolVersionedWrapper[SequencingParameters] {
 
   private val maxRequestsPerBlock = maxBatchesPerBlockProposal * maxRequestsInBatch
@@ -77,12 +81,8 @@ final case class SequencingParameters private (
 
   override protected val companionObj: SequencingParameters.type = SequencingParameters
 
-  override protected def pretty: Pretty[SequencingParameters.this.type] =
-    prettyOfClass(
-      param("pbftViewChangeTimeout", _.pbftViewChangeTimeout),
-      param("segmentLength", _.segmentLength.length.value),
-      param("blacklistConfig", _.blacklistLeaderSelectionPolicyConfig),
-    )
+  override def prettyCompanion: PrettyPrintingCompanion[SequencingParameters] =
+    SequencingParameters
 
   def update(
       pbftViewChangeTimeout: PositiveFiniteDuration = this.pbftViewChangeTimeout,
@@ -109,10 +109,6 @@ final case class SequencingParameters private (
         stricterDetectionOfRequestsPotentiallyChangingOrderingTopology,
     )(representativeProtocolVersion)
 
-  def toProto30: v30.DynamicSequencingParametersPayload = v30.DynamicSequencingParametersPayload(
-    Option(pbftViewChangeTimeout.toProtoPrimitive)
-  )
-
   def toProto31: v31.DynamicSequencingParametersPayload = v31.DynamicSequencingParametersPayload(
     Option(pbftViewChangeTimeout.toProtoPrimitive),
     segmentLength.length.value,
@@ -126,7 +122,16 @@ final case class SequencingParameters private (
   )
 }
 
-object SequencingParameters extends VersioningCompanion[SequencingParameters] {
+object SequencingParameters
+    extends VersioningCompanion[SequencingParameters]
+    with PrettyPrintingCompanion[SequencingParameters] {
+
+  override protected val pretty: Pretty[SequencingParameters] =
+    prettyOfClass(
+      param("pbftViewChangeTimeout", _.pbftViewChangeTimeout),
+      param("segmentLength", _.segmentLength.length.value),
+      param("blacklistConfig", _.blacklistLeaderSelectionPolicyConfig),
+    )
 
   val DefaultPbftViewChangeTimeout: PositiveFiniteDuration =
     PositiveFiniteDuration.tryCreate(Duration.ofSeconds(10))
@@ -164,7 +169,7 @@ object SequencingParameters extends VersioningCompanion[SequencingParameters] {
   val DefaultSegmentLength: SegmentLength = SegmentLength(PositiveLong.tryCreate(10L))
   val DefaultMaxRequestsInBatch: Short = 32
   val DefaultMaxBatchesPerProposal: Short = 16
-  val DefaultstricterDetectionOfRequestsPotentiallyChangingOrderingTopology: Boolean =
+  val DefaultStricterDetectionOfRequestsPotentiallyChangingOrderingTopology: Boolean =
     false
   def Default(implicit synchronizerProtocolVersion: ProtocolVersion): SequencingParameters =
     SequencingParameters(
@@ -176,7 +181,7 @@ object SequencingParameters extends VersioningCompanion[SequencingParameters] {
       DefaultMaxRequestsInBatch,
       DefaultMaxBatchesPerProposal,
       stricterDetectionOfRequestsPotentiallyChangingOrderingTopology =
-        DefaultstricterDetectionOfRequestsPotentiallyChangingOrderingTopology,
+        DefaultStricterDetectionOfRequestsPotentiallyChangingOrderingTopology,
     )(
       protocolVersionRepresentativeFor(synchronizerProtocolVersion)
     )
@@ -190,30 +195,10 @@ object SequencingParameters extends VersioningCompanion[SequencingParameters] {
       DefaultMaxRequestsInBatch,
       DefaultMaxBatchesPerProposal,
       stricterDetectionOfRequestsPotentiallyChangingOrderingTopology =
-        DefaultstricterDetectionOfRequestsPotentiallyChangingOrderingTopology,
+        DefaultStricterDetectionOfRequestsPotentiallyChangingOrderingTopology,
     )(
       protocolVersionRepresentativeFor(synchronizerProtocolVersion)
     )
-
-  def fromProto30(
-      proto: v30.DynamicSequencingParametersPayload
-  ): ParsingResult[SequencingParameters] =
-    for {
-      rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
-      pbftViewChangeTimeout <- PositiveFiniteDuration.fromProtoPrimitiveO("pbftViewChangeTimeout")(
-        proto.pbftViewChangeTimeout
-      )
-    } yield SequencingParameters(
-      pbftViewChangeTimeout,
-      DefaultPbftViewChangeTimeoutStep,
-      DefaultPbftViewChangeTimeoutUpperBound,
-      DefaultSegmentLength,
-      DefaultLeaderSelectionPolicyConfig,
-      DefaultMaxRequestsInBatch,
-      DefaultMaxBatchesPerProposal,
-      stricterDetectionOfRequestsPotentiallyChangingOrderingTopology =
-        DefaultstricterDetectionOfRequestsPotentiallyChangingOrderingTopology,
-    )(rpv)
 
   def fromProto31(
       proto: v31.DynamicSequencingParametersPayload
@@ -269,20 +254,13 @@ object SequencingParameters extends VersioningCompanion[SequencingParameters] {
 
   override def versioningTable: data.topology.SequencingParameters.VersioningTable =
     VersioningTable(
-      ProtoVersion(30) ->
-        VersionedProtoCodec(ProtocolVersion.v34)(
-          v30.DynamicSequencingParametersPayload
-        )(
-          supportedProtoVersion(_)(SequencingParameters.fromProto30),
-          _.toProto30,
-        ),
       ProtoVersion(31) ->
-        VersionedProtoCodec(ProtocolVersion.v35)(
+        VersionedProtoCodec(ProtocolVersion.v36)(
           v31.DynamicSequencingParametersPayload
         )(
           supportedProtoVersion(_)(SequencingParameters.fromProto31),
           _.toProto31,
-        ),
+        )
     )
 
   def create(
@@ -296,7 +274,7 @@ object SequencingParameters extends VersioningCompanion[SequencingParameters] {
       pbftViewChangeTimeoutUpperBound: NonNegativeFiniteDuration =
         DefaultPbftViewChangeTimeoutUpperBound,
       stricterDetectionOfRequestsPotentiallyChangingOrderingTopology: Boolean =
-        DefaultstricterDetectionOfRequestsPotentiallyChangingOrderingTopology,
+        DefaultStricterDetectionOfRequestsPotentiallyChangingOrderingTopology,
   )(implicit synchronizerProtocolVersion: ProtocolVersion): SequencingParameters =
     SequencingParameters(
       pbftViewChangeTimeout,

@@ -9,8 +9,12 @@ import com.digitalasset.canton.ProtoDeserializationError.RefinedDurationConversi
 import com.digitalasset.canton.admin.api.client.data.SequencingParameters
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{Fingerprint, Hash}
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
+import com.digitalasset.canton.protocol.{DynamicSynchronizerParameters, SynchronizerLimits}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -149,6 +153,7 @@ object ListDecentralizedNamespaceDefinitionResult {
       itemProto <- ProtoConverter.required("item", value.item)
       item <- DecentralizedNamespaceDefinition.fromProtoV30(
         ProtocolVersionValidation.AlwaysValidation,
+        SynchronizerLimits.default.topologyLimits,
         itemProto,
       )
     } yield ListDecentralizedNamespaceDefinitionResult(context, item)
@@ -168,7 +173,11 @@ object ListOwnerToKeyMappingResult {
       context <- BaseResult.fromProtoV30(contextProto)
       item <- value.item match {
         case v30.ListOwnerToKeyMappingResponse.Result.Item.V30(i) =>
-          OwnerToKeyMapping.fromProtoV30(ProtocolVersionValidation.AlwaysValidation, i)
+          OwnerToKeyMapping.fromProtoV30(
+            ProtocolVersionValidation.AlwaysValidation,
+            SynchronizerLimits.default.topologyLimits,
+            i,
+          )
         case v30.ListOwnerToKeyMappingResponse.Result.Item.Empty =>
           ProtoConverter.required("item", None)
       }
@@ -190,7 +199,11 @@ object ListPartyToKeyMappingResult {
       context <- BaseResult.fromProtoV30(contextProto)
       item <- value.item match {
         case v30.ListPartyToKeyMappingResponse.Result.Item.V30(i) =>
-          PartyToKeyMapping.fromProtoV30(ProtocolVersionValidation.AlwaysValidation, i)
+          PartyToKeyMapping.fromProtoV30(
+            ProtocolVersionValidation.AlwaysValidation,
+            SynchronizerLimits.default.topologyLimits,
+            i,
+          )
         case v30.ListPartyToKeyMappingResponse.Result.Item.Empty =>
           ProtoConverter.required("item", None)
       }
@@ -284,8 +297,18 @@ object ListPartyToParticipantResult {
       contextProto <- ProtoConverter.required("context", value.context)
       context <- BaseResult.fromProtoV30(contextProto)
       item <- value.item match {
-        case v30.ListPartyToParticipantResponse.Result.Item.V30(i) =>
-          PartyToParticipant.fromProtoV30(ProtocolVersionValidation.AlwaysValidation, i)
+        case v30.ListPartyToParticipantResponse.Result.Item.V30(mappingP) =>
+          PartyToParticipant.fromProtoV30(
+            ProtocolVersionValidation.AlwaysValidation,
+            SynchronizerLimits.default.topologyLimits,
+            mappingP,
+          )
+        case v30.ListPartyToParticipantResponse.Result.Item.V31(mappingP) =>
+          PartyToParticipant.fromProtoV31(
+            ProtocolVersionValidation.AlwaysValidation,
+            SynchronizerLimits.default.topologyLimits,
+            mappingP,
+          )
         case v30.ListPartyToParticipantResponse.Result.Item.Empty =>
           ProtoConverter.required("item", None)
       }
@@ -311,8 +334,13 @@ final case class ListMultiHostingProposal(
     permission: ParticipantPermission,
     otherParticipants: Seq[HostingParticipant],
     threshold: PositiveInt,
-) extends PrettyPrinting {
-  override def pretty: Pretty[ListMultiHostingProposal] =
+) extends PrettyPrintingFromCompanion {
+  override def prettyCompanion: PrettyPrintingCompanion[ListMultiHostingProposal] =
+    ListMultiHostingProposal
+}
+
+object ListMultiHostingProposal extends PrettyPrintingCompanion[ListMultiHostingProposal] {
+  override protected val pretty: Pretty[ListMultiHostingProposal] =
     prettyOfClass(
       param("txHash", _.txHash.hash),
       param("party", _.party),
@@ -320,9 +348,7 @@ final case class ListMultiHostingProposal(
       param("others", _.otherParticipants.map(x => (x.participantId, x.permission.showType)).toMap),
       param("threshold", _.threshold),
     )
-}
 
-object ListMultiHostingProposal {
   def mapFilter(participantId: ParticipantId)(
       result: ListPartyToParticipantResult
   ): Option[ListMultiHostingProposal] =

@@ -6,7 +6,7 @@ package com.digitalasset.canton.protocol.messages
 import com.digitalasset.canton.ProtoDeserializationError.OtherError
 import com.digitalasset.canton.crypto.{HashOps, Signature}
 import com.digitalasset.canton.data.{AssignmentCommonData, AssignmentViewTree, ViewType}
-import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrintingCompanion}
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -17,6 +17,7 @@ import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
+  ProtocolVersionValidation,
   RepresentativeProtocolVersion,
   VersionedProtoCodec,
   VersioningCompanionContext,
@@ -54,12 +55,6 @@ final case class AssignmentMediatorMessage(
 
   override def requestUuid: UUID = commonData.uuid
 
-  override def toProtoSomeEnvelopeContentV30: v30.EnvelopeContent.SomeEnvelopeContent =
-    v30.EnvelopeContent.SomeEnvelopeContent.AssignmentMediatorMessage(toProtoV30)
-
-  override def toProtoSomeEnvelopeContentV31: v31.EnvelopeContent.SomeEnvelopeContent =
-    v31.EnvelopeContent.SomeEnvelopeContent.AssignmentMediatorMessage(toProtoV30)
-
   override def toProtoSomeEnvelopeContentV32: v32.EnvelopeContent.SomeEnvelopeContent =
     v32.EnvelopeContent.SomeEnvelopeContent.AssignmentMediatorMessage(toProtoV30)
 
@@ -73,7 +68,8 @@ final case class AssignmentMediatorMessage(
 
   override def viewType: ViewType = ViewType.AssignmentViewType
 
-  override def pretty: Pretty[AssignmentMediatorMessage] = prettyOfClass(unnamedParam(_.tree))
+  override def prettyCompanion: PrettyPrintingCompanion[AssignmentMediatorMessage] =
+    AssignmentMediatorMessage
 
   @transient override protected lazy val companionObj: AssignmentMediatorMessage.type =
     AssignmentMediatorMessage
@@ -82,17 +78,22 @@ final case class AssignmentMediatorMessage(
 object AssignmentMediatorMessage
     extends VersioningCompanionContext[
       AssignmentMediatorMessage,
-      (HashOps, Target[ProtocolVersion]),
-    ] {
+      (HashOps, Target[ProtocolVersionValidation]),
+    ]
+    with PrettyPrintingCompanion[AssignmentMediatorMessage] {
+
+  override protected val pretty: Pretty[AssignmentMediatorMessage] = prettyOfClass(
+    unnamedParam(_.tree)
+  )
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.AssignmentMediatorMessage)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v36)(v30.AssignmentMediatorMessage)(
       supportedProtoVersion(_)((context, proto) => fromProtoV30(context)(proto)),
       _.toProtoV30,
     )
   )
 
-  def fromProtoV30(context: (HashOps, Target[ProtocolVersion]))(
+  def fromProtoV30(context: (HashOps, Target[ProtocolVersionValidation]))(
       assignmentMediatorMessageP: v30.AssignmentMediatorMessage
   ): ParsingResult[AssignmentMediatorMessage] = {
     val v30.AssignmentMediatorMessage(treePO, submittingParticipantSignaturePO) =

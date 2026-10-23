@@ -37,10 +37,13 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.Bft
   DefaultBlockingDbReadTimeout,
   DefaultConsensusBlockCompletionTimeout,
   DefaultConsensusEmptyBlockCreationTimeout,
+  DefaultConsensusExtraAllowedRetransmissionRequestsPerSecond,
   DefaultConsensusFlushingMinBlocks,
   DefaultConsensusNewEpochTopologyWarnTimeout,
   DefaultConsensusQueueMaxSize,
   DefaultConsensusQueuePerNodeQuota,
+  DefaultConsensusWindowSizeForRetransmissionOfCommitCertificates,
+  DefaultConsensusWindowSizeForStateTransferOfCommitCertificates,
   DefaultDedicatedExecutionContextDivisor,
   DefaultDelayedInitQueueMaxSize,
   DefaultEpochStateTransferHowManyFutureEpochsToDownloadInParallel,
@@ -150,6 +153,17 @@ import scala.util.Random
   *   will be able to decide to flush the segment and complete all slots in parallel if it detects
   *   that a strong quorum of segments are completed while the one it leads is in progress. If fewer
   *   blocks than this are missing, the node will complete them normally one at a time.
+  * @param consensusWindowSizeForRetransmissionOfCommitCertificates
+  *   The maximum number of commit certificates that will be sent in a single retransmission message
+  * @param consensusWindowSizeForStateTransferOfCommitCertificates
+  *   The maximum number of commit certificates that will be sent in a single block transfer (state
+  *   transfer) response message. Only applies to protocol versions that support carrying multiple
+  *   commit certificates per response (i.e., >= 37).
+  * @param consensusExtraAllowedRetransmissionRequestsPerSecond
+  *   The maximum number of retransmission requests that will be allowed per second per node, in
+  *   addition to the always allowed 1 every 3 seconds. Because nodes request missing pre-prepares
+  *   via retransmission requests once a quorum of prepare is reached, the number of requests may
+  *   increase under certain network conditions.
   * @param delayedInitQueueMaxSize
   *   The maximum size of the delayed init queue. This queue is used by modules to save incoming
   *   events in memory while the module is still initializing. Once startup is complete, the module
@@ -271,6 +285,12 @@ final case class BftBlockOrdererConfig(
     consensusEnableLogEndOfEpochProgress: Boolean = false,
     consensusEnableFlushingSegment: Boolean = true,
     consensusFlushingMinBlocks: Int = DefaultConsensusFlushingMinBlocks,
+    consensusWindowSizeForRetransmissionOfCommitCertificates: Option[PositiveInt] =
+      DefaultConsensusWindowSizeForRetransmissionOfCommitCertificates,
+    consensusWindowSizeForStateTransferOfCommitCertificates: Option[PositiveInt] =
+      DefaultConsensusWindowSizeForStateTransferOfCommitCertificates,
+    consensusExtraAllowedRetransmissionRequestsPerSecond: Int =
+      DefaultConsensusExtraAllowedRetransmissionRequestsPerSecond,
     delayedInitQueueMaxSize: Int = DefaultDelayedInitQueueMaxSize,
     epochStateTransferFutureEpochQueueMaxSize: Int = DefaultConsensusQueueMaxSize,
     epochStateTransferFutureEpochQueuePerNodeQuota: Int = DefaultConsensusQueuePerNodeQuota,
@@ -320,13 +340,20 @@ object BftBlockOrdererConfig {
   val DefaultMaxBatchCreationInterval: FiniteDuration = 100.milliseconds
   val DefaultAvailabilityNumberOfAttemptsOfDownloadingOutputFetchBeforeWarning: Int = 5
   val DefaultAvailabilityMaxNonOrderedBatchesPerNode: Short = 1_000
-  val DefaultAvailabilityDisseminationPatience: Option[FiniteDuration] = Some(5.seconds)
+  val DefaultAvailabilityDisseminationPatience: Option[FiniteDuration] = None
   val DefaultAvailabilityMinProposalCreationDelay: FiniteDuration = 250.millis
   val DefaultConsensusQueueMaxSize: Int = 10 * 1_024
   val DefaultConsensusQueuePerNodeQuota: Int = 1_024
   val DefaultConsensusBlockCompletionTimeout: FiniteDuration = 10.seconds
   val DefaultConsensusEmptyBlockCreationTimeout: FiniteDuration = 500.milliseconds
   val DefaultConsensusFlushingMinBlocks = 2
+  val DefaultConsensusWindowSizeForRetransmissionOfCommitCertificates: Option[PositiveInt] = Some(
+    PositiveInt.tryCreate(10)
+  )
+  val DefaultConsensusWindowSizeForStateTransferOfCommitCertificates: Option[PositiveInt] = Some(
+    PositiveInt.tryCreate(10)
+  )
+  val DefaultConsensusExtraAllowedRetransmissionRequestsPerSecond: Int = 2
   val DefaultDelayedInitQueueMaxSize: Int = 1_024
   val DefaultConsensusNewEpochTopologyWarnTimeout: FiniteDuration = 2.seconds
   val DefaultEpochStateTransferHowManyFutureEpochsToDownloadInParallel: NonNegativeLong =
@@ -374,6 +401,8 @@ object BftBlockOrdererConfig {
     *   set of peers that the local node expects to connect to on startup
     * @param overwriteStoredEndpoints
     *   whether the peers in storage should be replaced by this config's peers endpoint on startup
+    * @param transportMetrics
+    *   HTTP/2- and TCP-level transport metrics for P2P gRPC connections (enabled by default)
     */
   final case class P2PNetworkConfig(
       serverEndpoint: P2PServerConfig,
@@ -381,6 +410,33 @@ object BftBlockOrdererConfig {
       connectionManagementConfig: P2PConnectionManagementConfig = P2PConnectionManagementConfig(),
       peerEndpoints: Seq[P2PEndpointConfig] = Seq.empty,
       overwriteStoredEndpoints: Boolean = false,
+      transportMetrics: P2PTransportMetricsConfig = P2PTransportMetricsConfig(),
+  )
+
+  /** HTTP/2- and TCP-level transport metrics for P2P gRPC connections.
+    *
+    * These metrics are meant to troubleshoot latency of gRPC bidirectional streaming with
+    * third-party peers by leveraging gRPC `Channelz`, Netty epoll (when available) and a Netty
+    * channel customizer. They are all labeled by peer node ID and connection direction. Sampling is
+    * periodic and kept proportional to the number of P2P connections, so the overhead is low;
+    * TCP-level details additionally require the Linux-only epoll transport (a graceful fallback to
+    * NIO is used otherwise, in which case TCP-level metrics are simply not reported).
+    *
+    * @param enabled
+    *   Whether to collect and publish P2P transport metrics (enabled by default).
+    * @param pollInterval
+    *   How often the transport of each live P2P connection is sampled (Channelz and epoll
+    *   `TcpInfo`).
+    * @param preferEpoll
+    *   Whether to use the Netty epoll transport (when available on the platform) so that TCP-level
+    *   `TcpInfo` (round-trip time, retransmissions, window scale) becomes observable. When epoll is
+    *   not available, or this is `false`, the default NIO transport is used and TCP-level metrics
+    *   are not reported.
+    */
+  final case class P2PTransportMetricsConfig(
+      enabled: Boolean = true,
+      pollInterval: config.PositiveFiniteDuration = config.PositiveFiniteDuration.ofSeconds(5),
+      preferEpoll: Boolean = true,
   )
 
   /** Configuration for peer-to-peer authentication
@@ -423,6 +479,12 @@ object BftBlockOrdererConfig {
     * @param flowControlReadyAllowance
     *   If `flowControlBuffer` is set, a "ready to send" signal will be valid for the specified
     *   number of messages without further checks.
+    * @param rttProbeInterval
+    *   The interval at which each outgoing (dialer) connection sends a low-frequency
+    *   application-level `ConnectionOpened` "echo" probe to the peer, which the peer reflects back,
+    *   so that the connection-direction-independent application-level round-trip time to the peer
+    *   can be measured and reported as a metric. Each interval is jittered by +/-50% to avoid
+    *   synchronized probe bursts across peers. Set to zero to disable RTT probing.
     */
   final case class P2PConnectionManagementConfig(
       // The maximum number of connection attempts before we log a warning.
@@ -443,6 +505,8 @@ object BftBlockOrdererConfig {
       flowControlBuffer: PositiveInt = PositiveInt.tryCreate(2048),
       flowControlBufferDropNewest: Boolean = false,
       flowControlReadyAllowance: PositiveInt = PositiveInt.one,
+      rttProbeInterval: config.NonNegativeFiniteDuration =
+        config.NonNegativeFiniteDuration.ofMinutes(3),
   )
 
   /** Configuration for the peer-to-peer server that accepts incoming connections
@@ -551,6 +615,10 @@ object BftBlockOrdererConfig {
     *   The number of blocks per segment.
     * @param pbftViewChangeTimeout
     *   The base duration to use for view change timeouts for ISS segments.
+    * @param pbftViewChangeTimeoutStep
+    *   The step duration to use for view change timeouts for ISS segments.
+    * @param pbftViewChangeTimeoutUpperBound
+    *   The upper bound duration to use for view change timeouts for ISS segments.
     * @param blacklistLeaderSelectionPolicyConfig
     *   The leader selection policy to enforce in the presence of View Changes of segments.
     * @param maxRequestsInBatch
@@ -568,9 +636,12 @@ object BftBlockOrdererConfig {
       signingPublicKeyProtoFile: File,
       segmentLength: Long,
       pbftViewChangeTimeout: FiniteDuration,
+      pbftViewChangeTimeoutStep: config.NonNegativeFiniteDuration,
+      pbftViewChangeTimeoutUpperBound: config.NonNegativeFiniteDuration,
       blacklistLeaderSelectionPolicyConfig: BlacklistLeaderSelectionPolicyConfig,
       maxRequestsInBatch: Short,
       maxBatchesPerBlockProposal: Short,
+      stricterDetectionOfRequestsPotentiallyChangingOrderingTopology: Boolean,
       peers: Seq[BftBlockOrderingStandalonePeerConfig],
       testSlowdown: Option[BftBlockOrderingStandaloneTestSlowdownConfig] = None,
   )
@@ -583,11 +654,14 @@ object BftBlockOrdererConfig {
     *   Optional simulated slowdown applied when sending messages to peers.
     * @param topologyDelay
     *   Optional simulated slowdown applied when fetching the ordering topology.
+    * @param computeDelay
+    *   Optional simulated slowdown applied during specific computation stages.
     */
   final case class BftBlockOrderingStandaloneTestSlowdownConfig(
       postOrderingDelay: Option[FiniteDurationDistribution] = None,
       sendDelay: Option[BftBlockOrderingP2PSendDelayConfig] = None,
       topologyDelay: Option[BftBlockOrderingStandaloneTopologyDelayConfig] = None,
+      computeDelay: Option[BftBlockOrderingStandaloneComputeDelayConfig] = None,
   )
 
   /** Configuration for simulating delays in sending messages to peers in a BFT block ordering
@@ -604,19 +678,23 @@ object BftBlockOrdererConfig {
       delaysByRecipients: Seq[DelayByRecipients] = Seq.empty,
   ) {
 
-    private val delayByRecipientInstanceName
-        : Map[String, (FiniteDurationDistribution, Option[Probability], Option[Probability])] =
+    private val delayByRecipientInstanceName: Map[
+      String,
+      (FiniteDurationDistribution, Option[Probability], Option[Probability], Option[Probability]),
+    ] =
       delaysByRecipients.flatMap {
         case DelayByRecipients(
               instanceNames,
               delayDistribution,
               probabilityOfGrpcSendSuccess,
+              probabilityOfGrpcSendReachingRecipient,
               probabilityOfGrpcReady,
             ) =>
           instanceNames.map(
-            _ -> (delayDistribution, probabilityOfGrpcSendSuccess.map(
-              Probability(_)
-            ), probabilityOfGrpcReady.map(Probability(_)))
+            _ -> (delayDistribution,
+            probabilityOfGrpcSendSuccess.map(Probability(_)),
+            probabilityOfGrpcSendReachingRecipient.map(Probability(_)),
+            probabilityOfGrpcReady.map(Probability(_)))
           )
       }.toMap
 
@@ -636,24 +714,66 @@ object BftBlockOrdererConfig {
         .flatMap(_._2)
         .fold(true)(p => p.flipCoin(new Random(ThreadLocalRandom.current())))
 
-    def nextGrpcSendAcceptedByFlowControl(recipientInstanceName: String): Boolean =
+    def nextGrpcGoesThrough(recipientInstanceName: String): Boolean =
       delayByRecipientInstanceName
         .get(recipientInstanceName)
         .flatMap(_._3)
         .fold(true)(p => p.flipCoin(new Random(ThreadLocalRandom.current())))
+
+    def nextGrpcSendAcceptedByFlowControl(recipientInstanceName: String): Boolean =
+      delayByRecipientInstanceName
+        .get(recipientInstanceName)
+        .flatMap(_._4)
+        .fold(true)(p => p.flipCoin(new Random(ThreadLocalRandom.current())))
+  }
+
+  /** Configuration for simulating delays in specific computation stages in a standalone BFT block
+    * ordering network.
+    *
+    * @param signPrePrepare
+    *   Optional simulated slowdown applied when signing a pre-prepare message.
+    */
+  final case class BftBlockOrderingStandaloneComputeDelayConfig(
+      signPrePrepare: Option[FiniteDurationDistribution] = None
+  ) {
+    def nextSignPrePrepareDelay: Option[FiniteDuration] =
+      signPrePrepare.map(_.generateRandomDuration(new Random(ThreadLocalRandom.current())))
   }
 
   object BftBlockOrderingP2PSendDelayConfig {
 
+    /** Configuration for simulating delays in sending messages to specific recipients in a
+      * standalone BFT block ordering network.
+      *
+      * @param instanceNames
+      *   The names of the recipient sequencer instances to which this delay configuration applies.
+      * @param delayDistribution
+      *   The delay distribution to apply when sending messages to the specified recipients.
+      * @param probabilityOfGrpcSendSuccess
+      *   Optional probability of a gRPC send to the specified recipients succeeding; when it does
+      *   not, it throws and tears down the P2P connection.
+      * @param probabilityOfGrpcSendReachingRecipient
+      *   Optional probability of a gRPC send to the specified recipients reaching the recipient;
+      *   when it does not, it is dropped by the sender.
+      * @param probabilityOfGrpcSendAcceptedByFlowControl
+      *   Optional probability of a gRPC send to the specified recipients being accepted by flow
+      *   control; when it does not, it is enqueued and retried, unless dropped due to the queue
+      *   being full.
+      */
     final case class DelayByRecipients(
         instanceNames: Seq[String],
         delayDistribution: FiniteDurationDistribution,
         probabilityOfGrpcSendSuccess: Option[Double] = None,
+        probabilityOfGrpcSendReachingRecipient: Option[Double] = None,
         probabilityOfGrpcSendAcceptedByFlowControl: Option[Double] = None,
     ) {
       require(
         probabilityOfGrpcSendSuccess.forall(p => p >= 0.0 && p <= 1.0),
         "probabilityOfGrpcSendSuccess must be between 0.0 and 1.0",
+      )
+      require(
+        probabilityOfGrpcSendReachingRecipient.forall(p => p >= 0.0 && p <= 1.0),
+        "probabilityOfGrpcSendReachingRecipient must be between 0.0 and 1.0",
       )
       require(
         probabilityOfGrpcSendAcceptedByFlowControl.forall(p => p >= 0.0 && p <= 1.0),

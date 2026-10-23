@@ -8,7 +8,6 @@ import com.typesafe.scalalogging.LazyLogging
 
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{Semaphore, TimeUnit}
-import scala.util.control.NonFatal
 
 /** Although our integration tests are designed not to conflict with one another when running
   * concurrently, practically due to how resource heavy their setups are you will start encountering
@@ -48,7 +47,7 @@ object ConcurrentEnvironmentLimiter extends LazyLogging {
 
   val IntegrationTestConcurrencyLimit = "canton-test.integration.concurrency"
 
-  private val concurrencyLimit: Int = System.getProperty(IntegrationTestConcurrencyLimit, "3").toInt
+  private val concurrencyLimit: Int = System.getProperty(IntegrationTestConcurrencyLimit, "2").toInt
 
   /** Configured to be fair so earlier started tests will be first to get environments */
   private val semaphore = new Semaphore(concurrencyLimit, true)
@@ -83,11 +82,14 @@ object ConcurrentEnvironmentLimiter extends LazyLogging {
     change(name, Running)
     try block
     catch {
-      // creations can easily fail and throw
-      // capture these and immediately release the permit as the destroy method will not be called
-      case NonFatal(e) =>
-        semaphore.release(numPermits)
+      // Creations can easily fail and throw.
+      // Capture these and immediately release the permit as the destroy method will not be called.
+      // This must also cover fatal errors such as a NoClassDefFoundError thrown while building the
+      // environment definition: otherwise the permit leaks and every later environment creation
+      // blocks forever on the semaphore, which shows up in CI as an sbt timeout.
+      case e: Throwable =>
         change(name, Failed, purge = true)
+        semaphore.release(numPermits)
         throw e
     }
   }
@@ -96,7 +98,7 @@ object ConcurrentEnvironmentLimiter extends LazyLogging {
   def destroy[A](name: String, permits: PositiveInt)(block: => A): A =
     try block
     finally {
-      semaphore.release(getNumPermits(permits))
       change(name, Done, purge = true)
+      semaphore.release(getNumPermits(permits))
     }
 }

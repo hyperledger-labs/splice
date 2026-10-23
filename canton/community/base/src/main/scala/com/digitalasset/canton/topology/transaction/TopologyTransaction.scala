@@ -9,8 +9,12 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.PrettyInstances.*
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.v30
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
+import com.digitalasset.canton.protocol.{SynchronizerLimits, v30, v31}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{ProtoConverter, ProtocolVersionedMemoizedEvidence}
 import com.digitalasset.canton.topology.TopologyManagerError
@@ -26,17 +30,19 @@ import slick.jdbc.SetParameter
 import scala.reflect.ClassTag
 
 /** Replace or Remove */
-sealed trait TopologyChangeOp extends Product with Serializable with PrettyPrinting {
+sealed trait TopologyChangeOp extends Product with Serializable with PrettyPrintingFromCompanion {
   def toProto: v30.Enums.TopologyChangeOp
 
   final def select[TargetOp <: TopologyChangeOp](implicit
       O: ClassTag[TargetOp]
   ): Option[TargetOp] = O.unapply(this)
 
-  override protected def pretty: Pretty[TopologyChangeOp.this.type] = adHocPrettyInstance
+  override def prettyCompanion: PrettyPrintingCompanion[TopologyChangeOp] = TopologyChangeOp
 }
 
-object TopologyChangeOp {
+object TopologyChangeOp extends PrettyPrintingCompanion[TopologyChangeOp] {
+
+  override protected val pretty: Pretty[TopologyChangeOp] = adHocPrettyInstance
 
   /** Adds or replaces an existing mapping with the same unique key. */
   final case object Replace extends TopologyChangeOp {
@@ -125,7 +131,7 @@ final case class TopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
     override val deserializedFrom: Option[ByteString],
 ) extends TopologyTransactionLike[Op, M]
     with ProtocolVersionedMemoizedEvidence
-    with PrettyPrinting
+    with PrettyPrintingFromCompanion
     with HasProtocolVersionedWrapperE[TopologyTransaction[TopologyChangeOp, TopologyMapping]] {
 
   def nextSerial(implicit elc: ErrorLoggingContext): Either[TopologyManagerError, PositiveInt] =
@@ -204,24 +210,33 @@ final case class TopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
       )
     )
 
-  /** Indicates how to pretty print this instance. See `PrettyPrintingTest` for examples on how to
-    * implement this method.
-    */
-  override protected def pretty: Pretty[TopologyTransaction.this.type] =
-    prettyOfClass(
-      unnamedParam(_.mapping),
-      param("serial", _.serial),
-      param("operation", _.operation),
-      param("hash", _.hash.hash),
+  def toProtoV31: Either[String, v31.TopologyTransaction] =
+    mapping.toProtoV31.map(serializedMapping =>
+      v31.TopologyTransaction(
+        operation = operation.toProto,
+        serial = serial.value,
+        mapping = Some(serializedMapping),
+      )
     )
+
+  override def prettyCompanion
+      : PrettyPrintingCompanion[TopologyTransaction[TopologyChangeOp, TopologyMapping]] =
+    TopologyTransactionPrettyPrintingCompanion
 
   @transient override protected lazy val companionObj: TopologyTransaction.type =
     TopologyTransaction
 }
 
+/** @param synchronizerLimits
+  *   bounds the collections inside a mapping: the synchronizer's limits, or
+  *   [[com.digitalasset.canton.protocol.SynchronizerLimits.default]] where no synchronizer is known
+  */
+final case class TopologyTransactionDeserializationContext(synchronizerLimits: SynchronizerLimits)
+
 object TopologyTransaction
-    extends VersioningCompanionMemoizationE[
-      TopologyTransaction[TopologyChangeOp, TopologyMapping]
+    extends VersioningCompanionContextMemoizationE[
+      TopologyTransaction[TopologyChangeOp, TopologyMapping],
+      TopologyTransactionDeserializationContext,
     ] {
 
   final case class TxHash(hash: Hash) extends AnyVal
@@ -233,16 +248,20 @@ object TopologyTransaction
 
   val versioningTable: VersioningTable =
     VersioningTable(
-      ProtoVersion(30) -> VersionedProtoCodec.applyE(ProtocolVersion.v34)(v30.TopologyTransaction)(
+      ProtoVersion(30) -> VersionedProtoCodec.applyE(ProtocolVersion.v36)(v30.TopologyTransaction)(
         supportedProtoVersionMemoizedPVV(_)(fromProtoV30),
         _.toProtoV30,
-      )
-      // TODO(i32231): enable protoV31
-//      ProtoVersion(31) -> VersionedProtoCodec.applyE(ProtocolVersion.v36)(v31.TopologyTransaction)(
-//        supportedProtoVersionMemoized(_)(fromProtoV31),
-//        _.toProtoV31,
-//      ),
+      ),
+      ProtoVersion(31) -> VersionedProtoCodec.applyE(ProtocolVersion.v37)(
+        v31.TopologyTransaction
+      )(
+        supportedProtoVersionMemoizedPVV(_)(fromProtoV31),
+        _.toProtoV31,
+      ),
     )
+
+  override def admissibleRpvs(rpv: ProtocolVersion): Seq[ProtocolVersion] =
+    if (rpv >= ProtocolVersion.v37) Seq(ProtocolVersion.v36, rpv) else Seq(rpv)
 
   def create[Op <: TopologyChangeOp, M <: TopologyMapping](
       op: Op,
@@ -279,16 +298,18 @@ object TopologyTransaction
     transaction.toByteString.map(_ => TopologyTransaction[Op, M](op, serial, mapping)(rpv, None))
   }
 
-  private def fromProtoV30(
+  def fromProtoV30(
       pvv: ProtocolVersionValidation,
+      context: TopologyTransactionDeserializationContext,
       transactionP: v30.TopologyTransaction,
   )(
       bytes: ByteString
   ): ParsingResult[TopologyTransaction[TopologyChangeOp, TopologyMapping]] = {
+    val TopologyTransactionDeserializationContext(synchronizerLimits) = context
     val v30.TopologyTransaction(opP, serialP, mappingP) = transactionP
     for {
       mapping <- ProtoConverter.parseRequired(
-        TopologyMapping.fromProtoV30(pvv, _),
+        TopologyMapping.fromProtoV30(pvv, synchronizerLimits, _),
         "mapping",
         mappingP,
       )
@@ -307,4 +328,54 @@ object TopologyTransaction
     } yield tx
   }
 
+  private def fromProtoV31(
+      pvv: ProtocolVersionValidation,
+      context: TopologyTransactionDeserializationContext,
+      transactionP: v31.TopologyTransaction,
+  )(
+      bytes: ByteString
+  ): ParsingResult[TopologyTransaction[TopologyChangeOp, TopologyMapping]] = {
+    val TopologyTransactionDeserializationContext(synchronizerLimits) = context
+    val v31.TopologyTransaction(opP, serialP, mappingP) = transactionP
+    for {
+      mapping <- ProtoConverter.parseRequired(
+        TopologyMapping.fromProtoV31(pvv, synchronizerLimits, _),
+        "mapping",
+        mappingP,
+      )
+      serial <- ProtoConverter.parsePositiveInt("serial", serialP)
+      op <- ProtoConverter.parseEnum(TopologyChangeOp.fromProtoV30, "operation", opP)
+      rpv <- protocolVersionRepresentativeFor(ProtoVersion(31))
+      tx = TopologyTransaction(op, serial, mapping)(
+        rpv,
+        Some(bytes),
+      )
+      // Ensure the transaction is serializable
+      // TODO(i33934): use memoization for `toByteString`; this will implicitly guarantee that a deserialized transaction is serializable
+      _ <- tx.toByteString.leftMap(err =>
+        ProtoDeserializationError.OtherError(s"Transaction is not serializable: $err")
+      )
+    } yield tx
+  }
+
+}
+
+/** Kept separate from the `TopologyTransaction` companion object: mixing
+  * [[com.digitalasset.canton.logging.pretty.PrettyPrintingCompanion]] into it would also put the
+  * `ShowUtil` implicits into the implicit scope of the types nested in it (notably
+  * `TopologyTransaction.TxHash`), which makes `show` interpolation on those types ambiguous.
+  */
+private object TopologyTransactionPrettyPrintingCompanion
+    extends PrettyPrintingCompanion[TopologyTransaction[TopologyChangeOp, TopologyMapping]] {
+
+  /** Indicates how to pretty print this instance. See `PrettyPrintingTest` for examples on how to
+    * implement this method.
+    */
+  override protected val pretty: Pretty[TopologyTransaction[TopologyChangeOp, TopologyMapping]] =
+    prettyOfClass(
+      unnamedParam(_.mapping),
+      param("serial", _.serial),
+      param("operation", _.operation),
+      param("hash", _.hash.hash),
+    )
 }

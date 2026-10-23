@@ -44,7 +44,6 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
 import com.digitalasset.canton.util.collection.IterableUtil
 import com.digitalasset.canton.util.{MonadUtil, TracedPossiblyPrevalidated}
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.nonempty.NonEmpty
 import io.opentelemetry.api.trace.Tracer
 
@@ -155,7 +154,6 @@ class BlockUpdateGeneratorImpl(
     rateLimitManager: SequencerRateLimitManager,
     drSequencingTimeUpperBound: Option[DisasterRecoverySequencingTimeUpperBound],
     getAnnouncedLsu: => Option[AnnouncedLsu],
-    producePostOrderingTopologyTicks: Boolean,
     consistencyChecks: Boolean,
     parameters: BlockProcessingParameters,
     metrics: SequencerMetrics,
@@ -169,9 +167,7 @@ class BlockUpdateGeneratorImpl(
 
   private val epsilon = synchronizerSyncCryptoApi.staticSynchronizerParameters.topologyChangeDelay
   private val protocolVersion = synchronizerSyncCryptoApi.psid.protocolVersion
-  private val reorderer =
-    if (protocolVersion <= ProtocolVersion.v34) BlockReorderer.NoOp
-    else new BlockReorderer.Impl(consistencyChecks, loggerFactory)
+  private val reorderer = new BlockReorderer.Impl(consistencyChecks, loggerFactory)
 
   private val blockChunkProcessor =
     new BlockChunkProcessor(
@@ -444,11 +440,9 @@ class BlockUpdateGeneratorImpl(
               if upgrade.upgradeTime <= baseBlockSequencingTime =>
             FutureUnlessShutdown.pure((state, ChunkUpdate.noop))
           case _ =>
-            // Starting with protocol version 35, topology ticks can be deterministically injected post-ordering
-            // by sequencers, making time proofs unnecessary for observing topology transactions becoming effective.
-            if (
-              protocolVersion >= ProtocolVersion.v35 && producePostOrderingTopologyTicks && createTick
-            ) {
+            // topology ticks can be deterministically injected post-ordering by sequencers,
+            // making time proofs unnecessary for observing topology transactions becoming effective.
+            if (createTick) {
               blockChunkProcessor.emitTick(
                 state.copy(
                   // important to do this update from here instead of from inside emitTick,

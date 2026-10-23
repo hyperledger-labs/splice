@@ -15,7 +15,11 @@ import com.digitalasset.canton.data.ViewPosition.{
   MerkleSeqIndex,
   MerkleSeqIndexFromRoot,
 }
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.protocol.{RootHash, v30}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.version.*
@@ -39,7 +43,7 @@ final case class MerkleSeq[+M <: VersionedMerkleTree[?]](
 )(
     override val representativeProtocolVersion: RepresentativeProtocolVersion[MerkleSeq.type],
     hashOps: HashOps,
-) extends PrettyPrinting
+) extends PrettyPrintingFromCompanion
     with HasProtocolVersionedWrapper[
       MerkleSeq[VersionedMerkleTree[?]]
     ] {
@@ -139,10 +143,8 @@ final case class MerkleSeq[+M <: VersionedMerkleTree[?]](
   def toProtoV30: v30.MerkleSeq =
     v30.MerkleSeq(rootOrEmpty = rootOrEmpty.map(MerkleTree.toBlindableNodeV30))
 
-  override protected def pretty: Pretty[MerkleSeq.this.type] = prettyOfClass(
-    param("root hash", _.rootHashO, _.rootOrEmpty.exists(!_.isBlinded)),
-    unnamedParamIfDefined(_.rootOrEmpty),
-  )
+  override def prettyCompanion: PrettyPrintingCompanion[MerkleSeq[VersionedMerkleTree[?]]] =
+    MerkleSeq
 
   def mapM[A <: VersionedMerkleTree[A]](f: M => A): MerkleSeq[A] =
     this.copy(rootOrEmpty = rootOrEmpty.map(_.unwrap.fold(BlindedNode(_), seq => seq.mapM(f))))(
@@ -180,7 +182,7 @@ final case class MerkleSeq[+M <: VersionedMerkleTree[?]](
 }
 
 object MerkleSeq
-    extends VersioningCompanionContextPVValidation2[
+    extends VersioningCompanionContext[
       MerkleSeq[VersionedMerkleTree[?]],
       (
           HashOps,
@@ -188,13 +190,19 @@ object MerkleSeq
           (ByteString, DepthCounter) => ParsingResult[MerkleTree[VersionedMerkleTree[?]]],
           DepthCounter,
       ),
-    ] {
+    ]
+    with PrettyPrintingCompanion[MerkleSeq[VersionedMerkleTree[?]]] {
 
   override def name: String = "MerkleSeq"
 
+  override protected val pretty: Pretty[MerkleSeq[VersionedMerkleTree[?]]] = prettyOfClass(
+    param("root hash", _.rootHashO, _.rootOrEmpty.exists(!_.isBlinded)),
+    unnamedParamIfDefined(_.rootOrEmpty),
+  )
+
   override val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.MerkleSeq)(
-      supportedProtoVersion(_)(fromProtoV30),
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v36)(v30.MerkleSeq)(
+      supportedProtoVersionPVV(_)(fromProtoV30),
       _.toProtoV30,
     )
   )
@@ -246,7 +254,13 @@ object MerkleSeq
     def toProtoV30: v30.MerkleSeqElement
   }
 
-  object Branch {
+  object Branch extends PrettyPrintingCompanion[Branch[VersionedMerkleTree[?]]] {
+
+    override protected val pretty: Pretty[Branch[VersionedMerkleTree[?]]] = prettyOfClass(
+      param("first", _.first),
+      param("second", _.second),
+    )
+
     def apply[M <: VersionedMerkleTree[?]](
         first: MerkleTree[MerkleSeqElement[M]],
         second: MerkleTree[MerkleSeqElement[M]],
@@ -332,10 +346,7 @@ object MerkleSeq
         data = None,
       )
 
-    override protected def pretty: Pretty[Branch.this.type] = prettyOfClass(
-      param("first", _.first),
-      param("second", _.second),
-    )
+    override def prettyCompanion: PrettyPrintingCompanion[Branch[VersionedMerkleTree[?]]] = Branch
 
     override def mapM[A <: VersionedMerkleTree[A]](
         f: M => A
@@ -347,7 +358,11 @@ object MerkleSeq
     }
   }
 
-  object Singleton {
+  object Singleton extends PrettyPrintingCompanion[Singleton[VersionedMerkleTree[?]]] {
+
+    override protected val pretty: Pretty[Singleton[VersionedMerkleTree[?]]] =
+      prettyOfClass(unnamedParam(_.data))
+
     private[data] def apply[M <: VersionedMerkleTree[?]](
         data: MerkleTree[M],
         protocolVersion: ProtocolVersion,
@@ -412,7 +427,8 @@ object MerkleSeq
         data = Some(MerkleTree.toBlindableNodeV30(data)),
       )
 
-    override protected def pretty: Pretty[Singleton.this.type] = prettyOfClass(unnamedParam(_.data))
+    override def prettyCompanion: PrettyPrintingCompanion[Singleton[VersionedMerkleTree[?]]] =
+      Singleton
 
     override def mapM[A <: VersionedMerkleTree[A]](
         f: M => A
@@ -423,7 +439,7 @@ object MerkleSeq
   }
 
   object MerkleSeqElement
-      extends VersioningCompanionContextPVValidation2[
+      extends VersioningCompanionContext[
         MerkleSeqElement[VersionedMerkleTree[?]],
         // The function in the second part of the context is the deserializer for unblinded nodes
         (
@@ -442,37 +458,35 @@ object MerkleSeq
     }
 
     override val versioningTable: VersioningTable = VersioningTable(
-      ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.MerkleSeqElement)(
-        supportedProtoVersion(_)(fromProtoV30),
+      ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v36)(v30.MerkleSeqElement)(
+        supportedProtoVersionPVV(_)(fromProtoV30),
         _.toProtoV30,
       )
     )
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     private[MerkleSeq] def fromByteStringV30[M <: VersionedMerkleTree[?]](
+        pvv: ProtocolVersionValidation,
         context: (
             HashOps,
             (ByteString, DepthCounter) => ParsingResult[MerkleTree[M]],
         ),
-        expectedProtocolVersion: ProtocolVersion,
     )(bytes: ByteString, depthCounter: DepthCounter): ParsingResult[MerkleSeqElement[M]] = {
       val (hashOps, f) = context
-      fromByteString((hashOps, f, depthCounter), expectedProtocolVersion)(bytes)
+      fromByteString(pvv, (hashOps, f, depthCounter), bytes)
         .asInstanceOf[ParsingResult[MerkleSeqElement[M]]]
     }
 
     private[MerkleSeq] def fromProtoV30[M <: VersionedMerkleTree[?]](
+        pvv: ProtocolVersionValidation,
         context: (
-            (
-                HashOps,
-                (ByteString, DepthCounter) => ParsingResult[MerkleTree[M]],
-                DepthCounter,
-            ),
-            ProtocolVersion,
+            HashOps,
+            (ByteString, DepthCounter) => ParsingResult[MerkleTree[M]],
+            DepthCounter,
         ),
         merkleSeqElementP: v30.MerkleSeqElement,
     ): ParsingResult[MerkleSeqElement[M]] = {
-      val ((hashOps, dataFromByteString, depthCounter), expectedProtocolVersion) = context
+      val (hashOps, dataFromByteString, depthCounter) = context
       val v30.MerkleSeqElement(maybeFirstP, maybeSecondP, maybeDataP) = merkleSeqElementP
 
       def branchChildFromMaybeProtoBlindableNode(
@@ -483,7 +497,7 @@ object MerkleSeq
           MerkleTree.fromProtoOptionV30WithMerkleSeq(
             Some(nodeP),
             newDepth,
-            fromByteStringV30((hashOps, dataFromByteString), expectedProtocolVersion),
+            fromByteStringV30(pvv, (hashOps, dataFromByteString)),
           )
         )
 
@@ -534,19 +548,17 @@ object MerkleSeq
   }
 
   def fromProtoV30[M <: VersionedMerkleTree[?]](
+      pvv: ProtocolVersionValidation,
       context: (
-          (
-              HashOps,
-              (ByteString, DepthCounter) => ParsingResult[
-                MerkleTree[M & HasProtocolVersionedWrapper[?]]
-              ],
-              DepthCounter,
-          ),
-          ProtocolVersion,
+          HashOps,
+          (ByteString, DepthCounter) => ParsingResult[
+            MerkleTree[M & HasProtocolVersionedWrapper[?]]
+          ],
+          DepthCounter,
       ),
       merkleSeqP: v30.MerkleSeq,
   ): ParsingResult[MerkleSeq[M]] = {
-    val ((hashOps, dataFromByteString, depthCounter), expectedProtocolVersion) = context
+    val (hashOps, dataFromByteString, depthCounter) = context
     val v30.MerkleSeq(maybeRootP) = merkleSeqP
     for {
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
@@ -555,7 +567,7 @@ object MerkleSeq
           maybeRootP,
           depthCounter,
           MerkleSeqElement
-            .fromByteStringV30[M]((hashOps, dataFromByteString), expectedProtocolVersion),
+            .fromByteStringV30[M](pvv, (hashOps, dataFromByteString)),
         )
       )
     } yield MerkleSeq(rootOrEmpty)(rpv, hashOps)

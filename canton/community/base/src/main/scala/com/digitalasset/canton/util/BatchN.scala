@@ -11,8 +11,8 @@ import scala.collection.mutable.ArrayBuffer
 /** Forms dynamically-sized batches based on downstream backpressure.
   *   - Under light load, this flow emits batches of size 1.
   *   - Under moderate load, this flow emits batches according to the batch mode:
-  *     - MaximizeConcurrency: emits batches of even sizes
-  *     - MaximizeBatchSize: emits fewer but full batches
+  *     - forMaxConcurrency: emits batches of even sizes
+  *     - forMaxBatchSize: emits fewer but full batches
   *   - Under heavy load (dowstream saturated), this flow emits batches of `maxBatchSize`.
   *
   * moderate load: short intermittent backpressure from downstream that doesn't fill up the maximum
@@ -21,151 +21,86 @@ import scala.collection.mutable.ArrayBuffer
   * heavy load: downstream backpressure causes the full batch capacity to fill up and BatchN to
   * exert backpressure to upstream.
   *
-  * Under heavy load or when maxBatchCount == 1, CatchUpMode.MaximizeBatchSize and
-  * CatchupMode.MaximizeConcurrency behave the same way, i.e. full batches are emitted.
+  * Under heavy load or when maxBatchCount == 1, forMaxBatchSize and forMaxConcurrency behave the
+  * same way, i.e. full batches are emitted.
   */
 object BatchN {
 
-  /** Determines how BatchN catches up under moderate load. */
-  sealed trait CatchUpMode
-
-  /** Causes BatchN to favor a smaller number of large batches when catching up after backpressure
+  /** BatchN variant to favor a smaller number of large batches when catching up after backpressure
     */
-  case object MaximizeBatchSize extends CatchUpMode
+  def forMaxBatchSize[In](maxBatchSize: Int, maxBatchCount: Int): Flow[In, Iterable[In], NotUsed] =
+    apply(maxBatchSize, maxBatchCount, minBatchSize = maxBatchSize, costFn = (_: Any) => 1L)
 
-  /** Causes BatchN to favor a higher number of small batches when catching up after backpressure */
-  case object MaximizeConcurrency extends CatchUpMode
+  /** BatchN variant to favor a higher number of small batches when catching up after backpressure
+    */
+  def forMaxConcurrency[In](
+      maxBatchSize: Int,
+      maxBatchCount: Int,
+  ): Flow[In, Iterable[In], NotUsed] =
+    apply(maxBatchSize, maxBatchCount, minBatchSize = 1, costFn = (_: Any) => 1L)
 
   def apply[In](
       maxBatchSize: Int,
       maxBatchCount: Int,
-      catchUpMode: CatchUpMode = MaximizeConcurrency,
+      minBatchSize: Int,
+      costFn: In => Long,
   ): Flow[In, Iterable[In], NotUsed] = {
+    assert(maxBatchSize > 0, s"maxBatchSize ($maxBatchSize) must be greater than 0")
+    assert(
+      minBatchSize <= maxBatchSize,
+      s"minBatchSize ($minBatchSize) must be less than or equal to maxBatchSize ($maxBatchSize)",
+    )
     val totalBatchSize = maxBatchSize * maxBatchCount
     Flow[In]
-      .batch[ArrayBuffer[In]](
+      .batchWeighted[ArrayBuffer[In]](
         totalBatchSize.toLong,
+        costFn,
         newBatch(totalBatchSize, _),
       )(_ addOne _)
       .mapConcat { totalBatch =>
-        val totalSize = totalBatch.size
-        val batchSize = catchUpMode match {
-          case MaximizeBatchSize => maxBatchSize
-          case MaximizeConcurrency => totalSize / maxBatchCount
-        }
-        if (batchSize == 0) {
-          totalBatch.view
-            .map(Seq(_))
-            .toVector
-        } else {
-          totalBatch
-            .grouped(batchSize)
-            .toVector
-        }
-      }
-  }
-
-  private final case class WeightedElem[T](elem: T, weight: Long)
-
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  private final class BatchBuilder[T] {
-    private var elems: ArrayBuffer[T] = new ArrayBuffer[T]()
-    private var _weight: Long = 0
-
-    def weight: Long = _weight
-
-    def isEmpty: Boolean = elems.isEmpty
-
-    def add(weightedElem: WeightedElem[T]): Unit = {
-      elems.addOne(weightedElem.elem)
-      _weight = _weight + weightedElem.weight
-    }
-
-    def buildAndReset: Iterable[T] = {
-      val result = elems
-      elems = new ArrayBuffer[T]()
-      _weight = 0
-      result
-    }
-  }
-
-  /** The weighted version of `apply`. In case of `MaximizeConcurrency` it attempts to create
-    * equally weighed batches.
-    *   - If an item is too heavy to fit in a batch (over maxBatchWeight) it is rather added to the
-    *     next batch
-    *     - Unless this is the single item in this batch
-    *   - The `weightFn` is evaluated once and memoized in `WeightedElem`s
-    *   - After processing all the items in the next buffer the prepared batch can be
-    *     - at batch cap => it is emitted as a last batch
-    *     - less than batch cap => save these items for the next iteration of `statefulMap`
-    *
-    * @param weightFn
-    *   the function to calculate the weight of each incoming item
-    * @param weightReporter
-    *   provides a way to observe the actual weights of each batch. Used for metric reporting
-    */
-  def weighted[In](
-      maxBatchWeight: Long,
-      downstreamParallelism: Int,
-      catchUpMode: CatchUpMode = MaximizeConcurrency,
-  )(
-      weightFn: In => Long,
-      weightReporter: Long => Unit = _ => (),
-  ): Flow[In, Iterable[In], NotUsed] = {
-    // setting maxBatchCount a bit more than the downstream parallelism to ensure the parallel processing capacity is well utilised
-    val maxBatchCount = downstreamParallelism + 1
-
-    def calculateBatches(
-        builder: BatchBuilder[In],
-        nextBuffer: ArrayBuffer[WeightedElem[In]],
-    ): (BatchBuilder[In], Iterable[Iterable[In]]) = {
-      val batchWeightCap =
-        catchUpMode match {
-          case MaximizeBatchSize => maxBatchWeight
-          case MaximizeConcurrency =>
-            (builder.weight + nextBuffer.view.map(_.weight).sum) / maxBatchCount
-        }
-      if (batchWeightCap == 0) {
-        (
-          builder,
-          (builder.buildAndReset ++ nextBuffer.map(_.elem)).view
-            .map(Seq(_))
-            .toVector,
-        )
-      } else {
-        val acc: ArrayBuffer[Iterable[In]] = new ArrayBuffer(initialSize = maxBatchCount)
-        nextBuffer.foreach { item =>
-          if (builder.weight > 0 && builder.weight + item.weight > batchWeightCap) {
-            weightReporter(builder.weight)
-            acc.addOne(builder.buildAndReset)
+        val (targetBatchWeight, remainder) =
+          if (maxBatchSize == minBatchSize)
+            minBatchSize.toLong -> 0L
+          else {
+            val totalCost = totalBatch.view.map(costFn).sum
+            val baseBatchSize = totalCost / maxBatchCount
+            if (baseBatchSize >= minBatchSize)
+              baseBatchSize -> totalCost % maxBatchCount
+            else
+              minBatchSize.toLong -> 0L
           }
-          builder.add(item)
+
+        // imperative code to effectively split the totalBatch into batches of targetBatchWeight factoring in the remainder
+        val result = ArrayBuffer[ArrayBuffer[In]]()
+        @SuppressWarnings(Array("org.wartremover.warts.Var"))
+        var currentBatch = ArrayBuffer[In]()
+        @SuppressWarnings(Array("org.wartremover.warts.Var"))
+        var currentBatchWeightRemaining = 0L
+        @SuppressWarnings(Array("org.wartremover.warts.Var"))
+        var currentRemainder = remainder
+
+        def initNewBatch(): Unit = {
+          currentBatch = ArrayBuffer[In]()
+          currentBatch.sizeHint(targetBatchWeight.toInt + 1)
+          currentBatchWeightRemaining = if (remainder > 0) {
+            currentRemainder = currentRemainder - 1
+            targetBatchWeight + 1
+          } else targetBatchWeight
         }
-        if (builder.weight < batchWeightCap)
-          (builder, acc)
-        else {
-          weightReporter(builder.weight)
-          (builder, acc.addOne(builder.buildAndReset))
+
+        initNewBatch()
+        totalBatch.foreach { in =>
+          val cost = costFn(in)
+          if (currentBatchWeightRemaining - cost < 0 && currentBatch.nonEmpty) {
+            result.addOne(currentBatch)
+            initNewBatch()
+          }
+          currentBatch.addOne(in)
+          currentBatchWeightRemaining = currentBatchWeightRemaining - cost
         }
+        if (currentBatch.nonEmpty) result.addOne(currentBatch)
+        result
       }
-    }
-
-    def finish(builder: BatchBuilder[In]) =
-      if (builder.isEmpty) None
-      else Some(ArrayBuffer(builder.buildAndReset))
-
-    Flow[In]
-      .map(e => WeightedElem(e, weightFn(e)))
-      .batchWeighted[ArrayBuffer[WeightedElem[In]]](
-        maxBatchWeight * maxBatchCount,
-        _.weight,
-        ArrayBuffer(_),
-      )(_ addOne _)
-      .statefulMap(() => new BatchBuilder[In]())(
-        calculateBatches,
-        finish,
-      )
-      .mapConcat(identity)
   }
 
   private def newBatch[In](maxBatchSize: Int, newElement: In) = {

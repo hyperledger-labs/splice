@@ -4,15 +4,19 @@
 package com.digitalasset.canton.data
 
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.v30
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
+import com.digitalasset.canton.protocol.{TransactionProtocolLimits, v30}
 import com.digitalasset.canton.serialization.ProtoConverter.{
   ParsingResult,
   parseNonNegativeInt,
   parsePositiveInt,
 }
-import com.digitalasset.canton.validation.ProtoValidation
-import com.digitalasset.canton.version.ProtocolVersionValidation
+import com.digitalasset.canton.validation.{ProtoValidation, ValidationParam}
+import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
 import com.digitalasset.canton.{LfPartyId, ProtoDeserializationError}
 
 /** A set of confirming parties and their weights plus a threshold constitutes a quorum.
@@ -24,12 +28,9 @@ import com.digitalasset.canton.{LfPartyId, ProtoDeserializationError}
 final case class Quorum(
     confirmers: Map[LfPartyId, PositiveInt],
     threshold: NonNegativeInt,
-) extends PrettyPrinting {
+) extends PrettyPrintingFromCompanion {
 
-  override protected def pretty: Pretty[Quorum] = prettyOfClass(
-    param("confirmers", _.confirmers),
-    param("threshold", _.threshold),
-  )
+  override def prettyCompanion: PrettyPrintingCompanion[Quorum] = Quorum
 
   private[data] def tryToProtoV30(informees: Seq[LfPartyId]): v30.Quorum =
     v30.Quorum(
@@ -54,12 +55,18 @@ final case class Quorum(
     )
 }
 
-object Quorum {
+object Quorum extends PrettyPrintingCompanion[Quorum] {
+
+  override protected val pretty: Pretty[Quorum] = prettyOfClass(
+    param("confirmers", _.confirmers),
+    param("threshold", _.threshold),
+  )
 
   lazy val empty: Quorum = Quorum(Map.empty, NonNegativeInt.zero)
 
   def fromProtoV30(
       pvv: ProtocolVersionValidation,
+      limits: TransactionProtocolLimits,
       quorumP: v30.Quorum,
       informees: Seq[LfPartyId],
   ): ParsingResult[Quorum] = {
@@ -70,7 +77,9 @@ object Quorum {
           partyIndexAndWeightsP,
           "party_index_and_weights",
           pvv,
-          ProtoValidation.MaxCollectionSize,
+          ValidationParam(
+            ProtocolVersion.newBoundsOnPV37 -> limits.maxQuorumSize
+          ),
         ) { case (v30.PartyIndexAndWeight(indexP, weightP), _) =>
           for {
             weight <- parsePositiveInt("weight", weightP)

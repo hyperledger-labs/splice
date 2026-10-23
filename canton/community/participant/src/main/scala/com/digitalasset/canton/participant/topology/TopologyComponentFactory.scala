@@ -126,7 +126,7 @@ class TopologyComponentFactory(
         initialRecordTime = recordOrderPublisher.initTimestamp,
         participantId,
         pauseSynchronizerIndexingDuringPartyReplication = alphaOnlinePartyReplicationSupport.exists(
-          _.pauseSynchronizerIndexingDuringPartyReplication
+          _.target.pauseSynchronizerIndexingDuringPartyReplication
         ),
         synchronizerPredecessor = synchronizerPredecessor,
         pendingLsuOperationsStore = pendingLsuOperationsStore,
@@ -278,7 +278,7 @@ class TopologyComponentFactory(
     new InitialTopologySnapshotValidator(
       crypto.pureCrypto,
       topologyStore,
-      batching.topologyCacheAggregator,
+      batching,
       topology,
       Some(crypto.staticSynchronizerParameters),
       timeouts,
