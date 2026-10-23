@@ -39,6 +39,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore.{
 }
 import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.InternedStringStore
 import org.lfdecentralizedtrust.splice.util.{DarUtil, WalletTestUtil}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -133,26 +134,27 @@ class CryptoHashEquivalenceIntegrationTest extends IntegrationTest with WalletTe
       }
       val participantId =
         ParticipantId.tryFromProtoPrimitive("PAR::batch-hash-test::dummy")
-      val updateHistory = new UpdateHistory(
-        storage,
-        0L,
-        "batch_hash_equiv_test",
-        participantId,
-        svParty,
-        BackfillingRequirement.BackfillingNotRequired,
-        InternedStringStore.createWithoutWarmup(
+      val updateHistory = UpdateHistory
+        .create(
           storage,
-          10_000L,
-          FiniteDuration(1, "minute"),
+          0L,
+          "batch_hash_equiv_test",
+          StoreMemberId(participantId),
+          svParty,
+          BackfillingRequirement.BackfillingNotRequired,
+          InternedStringStore.createWithoutWarmup(
+            storage,
+            10_000L,
+            FiniteDuration(1, "minute"),
+            loggerFactory,
+            NoOpMetricsFactory,
+          ),
+          AnalyzableTimeWindowConfig.UnlimitedAtw,
           loggerFactory,
-          NoOpMetricsFactory,
-        ),
-        AnalyzableTimeWindowConfig.UnlimitedAtw,
-        loggerFactory,
-        enableissue12777Workaround = true,
-        enableImportUpdateBackfill = false,
-        HistoryMetrics(NoOpMetricsFactory, 0L),
-      )
+          enableImportUpdateBackfill = false,
+          HistoryMetrics(NoOpMetricsFactory, 0L),
+        )
+        .futureValue
       updateHistory.ingestionSink.initialize().futureValue
       val appActivityRecordStore = new DbAppActivityRecordStore(
         storage,

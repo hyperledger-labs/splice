@@ -44,10 +44,27 @@ export const SvSequencerConfigSchema = z
   })
   .strict();
 export type SvSequencerConfig = z.infer<typeof SvSequencerConfigSchema>;
+const CloudSqlOverrideSchema = z
+  .object(
+    _.mapValues(CloudSqlConfigSchema.shape, field =>
+      field instanceof z.ZodDefault ? field.unwrap() : field
+    )
+  )
+  .partial();
+export const SvCantonBftConfigSchema = z
+  .object({
+    cloudSql: CloudSqlOverrideSchema,
+    splicePostgres: SplicePostgresSchema,
+  })
+  .partial()
+  .strict();
+export type SvCantonBftConfig = Pick<SvSequencerConfig, 'cloudSql' | 'splicePostgres'>;
+export type SvCantonBftConfigOverride = z.infer<typeof SvCantonBftConfigSchema>;
 const PhysicalSynchronizerConfigOverridesSchema = z
   .object({
     mediator: SvMediatorConfigSchema.partial().optional(),
     sequencer: SvSequencerConfigSchema.partial().optional(),
+    cantonBft: SvCantonBftConfigSchema.optional(),
   })
   .strict();
 export const PhysicalSynchronizersConfigOverridesSchema = z
@@ -66,6 +83,7 @@ type SyncNodeConfigWithOverrides = {
   physicalSynchronizerOverrides: z.infer<typeof PhysicalSynchronizersConfigOverridesSchema>;
   sequencer: SvSequencerConfig;
   mediator: SvMediatorConfig;
+  cantonBft?: SvCantonBftConfigOverride;
 };
 
 // Replaces the top-level sequencer and mediator configs with a per-migration `physicalSynchronizers`
@@ -73,29 +91,39 @@ type SyncNodeConfigWithOverrides = {
 // Implicit config merging is confusing but for now I don't really see a better way of introducing these overrides.
 // Perhaps a proper revisit of the synchronizerMigration config structure will lead to a better solution here.
 export function withPhysicalSynchronizers<C extends SyncNodeConfigWithOverrides>(
-  { physicalSynchronizerOverrides, sequencer, mediator, ...rest }: C,
+  { physicalSynchronizerOverrides, sequencer, mediator, cantonBft, ...svConfig }: C,
   migrations: { id: number }[]
 ): Omit<C, keyof SyncNodeConfigWithOverrides> & {
   physicalSynchronizers: Record<
     number,
-    { mediator: SvMediatorConfig; sequencer: SvSequencerConfig }
+    { mediator: SvMediatorConfig; sequencer: SvSequencerConfig; cantonBft: SvCantonBftConfig }
   >;
 } {
-  const physicalSynchronizers = migrations.map(migration => [
-    migration.id,
-    {
-      mediator: mergeConfigFragments(
-        mediator,
-        physicalSynchronizerOverrides[migration.id]?.mediator || {}
-      ) as SvMediatorConfig,
-      sequencer: mergeConfigFragments(
+  const physicalSynchronizers = DecentralizedSynchronizerUpgradeConfig.allMigrations.map(
+    migration => {
+      const mergedSequencer = mergeConfigFragments(
         sequencer,
         physicalSynchronizerOverrides[migration.id]?.sequencer || {}
-      ) as SvSequencerConfig,
-    },
-  ]);
+      ) as SvSequencerConfig;
+      return [
+        migration.id,
+        {
+          mediator: mergeConfigFragments(
+            mediator,
+            physicalSynchronizerOverrides[migration.id]?.mediator || {}
+          ) as SvMediatorConfig,
+          sequencer: mergedSequencer,
+          cantonBft: mergeConfigFragments(
+            _.pick(mergedSequencer, ['cloudSql', 'splicePostgres']),
+            cantonBft || {},
+            physicalSynchronizerOverrides[migration.id]?.cantonBft || {}
+          ) as SvCantonBftConfig,
+        },
+      ];
+    }
+  );
   return {
-    ...rest,
+    ...svConfig,
     physicalSynchronizers: _.fromPairs(physicalSynchronizers),
   };
 }

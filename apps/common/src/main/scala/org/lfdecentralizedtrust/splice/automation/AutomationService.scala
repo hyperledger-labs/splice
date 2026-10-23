@@ -74,6 +74,25 @@ abstract class AutomationService(
   final protected def registerTrigger(trigger: Trigger): Unit = {
     registerService(trigger)
     val triggerName = identifyTriggerByName(trigger)
+    val metricTriggerName = trigger.getClass.getSimpleName
+    trigger match {
+      case _: TaskbasedTrigger[?] =>
+        val _ = automationMetrics.registerTriggerParallelismGauge(
+          metricTriggerName,
+          "taskbased",
+          automationConfig.parallelism.toLong,
+        )
+      case _ => ()
+    }
+    trigger match {
+      case _: PollingTrigger =>
+        val _ = automationMetrics.registerTriggerParallelismGauge(
+          metricTriggerName,
+          "polling",
+          1L,
+        )
+      case _ => ()
+    }
     if (companion.expectedTriggers.nonEmpty && !companion.expectedTriggers(triggerName))
       logger.warn(
         s"Registering unexpected trigger $triggerName; possibly missing from $companion's expectedTriggerClasses"

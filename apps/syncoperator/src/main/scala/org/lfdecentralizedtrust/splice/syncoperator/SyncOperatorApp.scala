@@ -173,6 +173,7 @@ class SyncOperatorApp(
         config.lsu,
         config.lsuDumpPath,
         config.trafficBalanceReconciliationDelay,
+        config.outageTrafficAllowance,
         loggerFactory,
         packageVersionSupport,
       )

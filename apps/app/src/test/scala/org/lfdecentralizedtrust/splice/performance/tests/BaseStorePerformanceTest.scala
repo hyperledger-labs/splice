@@ -65,7 +65,7 @@ abstract class BaseStorePerformanceTest(
   protected implicit val closeContext: CloseContext = CloseContext(this)
 
   type Store <: HasIngestionSink
-  protected def mkStore(storage: DbStorage): Store
+  protected def mkStore(storage: DbStorage): Future[Store]
 
   /** A short name for this test, used as the metrics file name and Pushgateway label. */
   protected def testName: String = this.getClass.getSimpleName.stripSuffix("$")

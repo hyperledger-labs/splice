@@ -381,15 +381,17 @@ class TopologyAdministrationGroup(
           consoleEnvironment.commandTimeouts.unbounded
         ),
     ): Unit =
-      consoleEnvironment.run {
-        adminCommand(
-          TopologyAdminCommands.Write
-            .ImportTopologySnapshot(
-              topologyTransactions,
-              store,
-              synchronize,
-            )
-        )
+      TraceContext.withNewTraceContext("import_topology_snapshot") { implicit traceContext =>
+        consoleEnvironment.run {
+          adminCommand(
+            TopologyAdminCommands.Write
+              .ImportTopologySnapshot(
+                topologyTransactions,
+                store,
+                synchronize,
+              )
+          )
+        }
       }
 
     @Help.Summary("Loads topology transactions from a file into the specified topology store")
@@ -409,15 +411,17 @@ class TopologyAdministrationGroup(
           consoleEnvironment.commandTimeouts.unbounded
         ),
     ): Unit =
-      consoleEnvironment.run {
-        adminCommand(
-          TopologyAdminCommands.Write
-            .ImportTopologySnapshotV2(
-              topologyTransactions.newInput(),
-              store,
-              synchronize,
-            )
-        )
+      TraceContext.withNewTraceContext("import_topology_snapshotV2") { implicit traceContext =>
+        consoleEnvironment.run {
+          adminCommand(
+            TopologyAdminCommands.Write
+              .ImportTopologySnapshotV2(
+                topologyTransactions.newInput(),
+                store,
+                synchronize,
+              )
+          )
+        }
       }
 
     def load(

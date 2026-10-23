@@ -30,30 +30,28 @@ const dashboardConstants: { [name: string]: string } = {
   cluster: CLUSTER_BASENAME,
 };
 
+// A variable of a dashboard in the V2 resource format
 type DashboardVariable = {
-  name: string;
-  type: string;
-  query?: string;
-  current?: { text: string; value: string };
-  options?: { selected: boolean; text: string; value: string }[];
+  kind: string;
+  spec: {
+    name: string;
+    query?: string;
+    current?: { text: string; value: string };
+  };
 };
 
 function setDashboardConstants(content: string): string {
   const dashboard = JSON.parse(content);
-  const variables: DashboardVariable[] = (dashboard.templating?.list ?? []).filter(
-    (v: DashboardVariable) => v.type === 'constant' && v.name in dashboardConstants
-  );
-  if (variables.length === 0) {
-    // keep the file as is to not reformat dashboards without such variables
-    return content;
-  }
-  variables.forEach(v => {
-    const value = dashboardConstants[v.name];
-    v.query = value;
-    v.current = { text: value, value };
-    v.options = [{ selected: true, text: value, value }];
-  });
-  return JSON.stringify(dashboard, null, 2);
+  const variables: DashboardVariable[] = dashboard.spec?.variables ?? [];
+  variables
+    .filter(v => v.kind === 'ConstantVariable' && v.spec.name in dashboardConstants)
+    .forEach(v => {
+      const value = dashboardConstants[v.spec.name];
+      v.spec.query = value;
+      v.spec.current = { text: value, value };
+    });
+  // Compact JSON keeps the ConfigMaps well below the 1 MiB limit
+  return JSON.stringify(dashboard);
 }
 
 function createConfigMapForFolder(

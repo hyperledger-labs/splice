@@ -13,7 +13,7 @@ import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
-import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTestBase}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, MultiDomainAcsStore, StoreTestBase}
 import org.lfdecentralizedtrust.splice.syncoperator.store.SyncOperatorStore
 import org.lfdecentralizedtrust.splice.syncoperator.store.db.DbSyncOperatorStore
 import org.lfdecentralizedtrust.splice.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
@@ -41,10 +41,25 @@ abstract class SyncOperatorStoreTest extends StoreTestBase with HasExecutionCont
       synchronizerId: SynchronizerId = ourSynchronizer,
       operator: Option[PartyId] = Some(operatorParty),
       migrationId: Long = 0L,
+  ): Contract[MemberTraffic.ContractId, MemberTraffic] =
+    memberTrafficOfId(
+      member.toProtoPrimitive,
+      totalPurchased,
+      synchronizerId,
+      operator,
+      migrationId,
+    )
+
+  private def memberTrafficOfId(
+      memberId: String,
+      totalPurchased: Long,
+      synchronizerId: SynchronizerId = ourSynchronizer,
+      operator: Option[PartyId] = Some(operatorParty),
+      migrationId: Long = 0L,
   ): Contract[MemberTraffic.ContractId, MemberTraffic] = {
     val template = new MemberTraffic(
       dsoParty.toProtoPrimitive,
-      member.toProtoPrimitive,
+      memberId,
       synchronizerId.toProtoPrimitive,
       migrationId,
       totalPurchased,
@@ -63,8 +78,13 @@ abstract class SyncOperatorStoreTest extends StoreTestBase with HasExecutionCont
   private def ingest(
       store: SyncOperatorStore,
       contracts: Seq[Contract[MemberTraffic.ContractId, MemberTraffic]],
+  ): Future[Unit] = ingestInto(store.multiDomainAcsStore.testIngestionSink, contracts)
+
+  private def ingestInto(
+      sink: MultiDomainAcsStore.IngestionSink,
+      contracts: Seq[Contract[MemberTraffic.ContractId, MemberTraffic]],
   ): Future[Unit] =
-    store.multiDomainAcsStore.testIngestionSink.ingestAcs(
+    sink.ingestAcs(
       nextOffset(),
       // the purchase is made and recorded on the decentralized synchronizer, not on the dedicated
       // one it names
@@ -140,6 +160,46 @@ abstract class SyncOperatorStoreTest extends StoreTestBase with HasExecutionCont
         _ <- ingest(store, Seq.empty)
         total <- store.getTotalPurchasedMemberTraffic(alice)
       } yield total shouldBe 0L
+    }
+
+    "list the total of every member with a purchase for this synchronizer" in {
+      for {
+        store <- mkStore()
+        _ <- ingest(
+          store,
+          Seq(
+            memberTraffic(alice, 100L),
+            memberTraffic(alice, 250L),
+            memberTraffic(bob, 700L),
+            memberTraffic(bob, 900L, synchronizerId = foreignSynchronizer),
+            memberTraffic(bob, 300L, operator = Some(otherOperator)),
+          ),
+        )
+        totals <- store.listTotalPurchasedMemberTraffic()
+      } yield totals shouldBe Map(alice -> 350L, bob -> 700L)
+    }
+
+    "leave a purchase whose member id does not parse out of every total, with a warning" in {
+      for {
+        store <- mkStore()
+        _ <- loggerFactory.assertLogs(
+          // Past the test sink, which fails on any warning.
+          ingestInto(
+            store.multiDomainAcsStore.ingestionSink,
+            Seq(memberTraffic(alice, 100L), memberTrafficOfId("not-a-member", 250L)),
+          ),
+          _.warningMessage should include("of member not-a-member, which does not parse"),
+        )
+        totals <- store.listTotalPurchasedMemberTraffic()
+      } yield totals shouldBe Map(alice -> 100L)
+    }
+
+    "list no totals before any purchase" in {
+      for {
+        store <- mkStore()
+        _ <- ingest(store, Seq.empty)
+        totals <- store.listTotalPurchasedMemberTraffic()
+      } yield totals shouldBe empty
     }
   }
 }

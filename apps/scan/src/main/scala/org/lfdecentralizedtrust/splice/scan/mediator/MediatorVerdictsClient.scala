@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.mediator
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.data.CantonTimestampExtensions.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.HasRunOnClosing
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}

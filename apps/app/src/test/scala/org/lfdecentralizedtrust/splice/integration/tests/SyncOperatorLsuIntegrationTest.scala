@@ -58,7 +58,7 @@ class SyncOperatorLsuIntegrationTest
   private val purchase = 2_000_000L
   private val splitwellAlias = SynchronizerAlias.tryCreate("splitwell")
 
-  // The synchronizer is bootstrapped at serial 0 and protocol version 35, see bootstrap-canton.sc.
+  // The synchronizer is bootstrapped at serial 0 and protocol version 36, see bootstrap-canton.sc.
   private val successorSerial = NonNegativeInt.one
   private val successorPv = ProtocolVersion.v36
 

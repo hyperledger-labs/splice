@@ -18,6 +18,7 @@ import { TopologySnapshotSchema } from './config';
 import {
   CloudSqlWithOverrideConfigSchema,
   PhysicalSynchronizersConfigOverridesSchema,
+  SvCantonBftConfigSchema,
   SvMediatorConfigSchema,
   SvSequencerConfigSchema,
   withPhysicalSynchronizers,
@@ -157,6 +158,7 @@ export const SyncNodeSchema = z
     participant: SvParticipantConfigSchema.optional(),
     sequencer: SvSequencerConfigSchema.prefault({}),
     mediator: SvMediatorConfigSchema.prefault({}),
+    cantonBft: SvCantonBftConfigSchema.optional(),
     physicalSynchronizerOverrides: PhysicalSynchronizersConfigOverridesSchema.prefault({}),
   })
   .strict();

@@ -94,7 +94,7 @@ case class EnvironmentDefinition(
       .withMultiSyncFeatureFlag()
       .withTrafficTopupsEnabled
       .withInitialPackageVersions
-      .withProtocolVersion(ProtocolVersion.v36)
+      .withProtocolVersion(ProtocolVersion.v37)
       .withProtocolVersionFromEnv
       .withEagerAppActivityMarkerConversion
 
@@ -523,22 +523,26 @@ case class EnvironmentDefinition(
   /** Drops the splitwell apps and leaves alice's validator as the only one connected to the
     * splitwell synchronizer.
     */
-  def withOnlyAliceValidatorConnectingToSplitwell: EnvironmentDefinition = {
+  def withOnlyAliceValidatorConnectingToSplitwell: EnvironmentDefinition =
+    withValidatorsDisconnectedFromSplitwell("bobValidator", "splitwellValidator")
+
+  /** Drops all splitwell apps, and clears all of the given validators' extra synchronizers, not
+    * just splitwell, so the global synchronizer is the only one they connect to.
+    */
+  def withValidatorsDisconnectedFromSplitwell(validators: String*): EnvironmentDefinition =
     this
       .addConfigTransform((_, conf) =>
         conf.copy(
           splitwellApps = Map.empty,
-          validatorApps =
-            Seq("bobValidator", "splitwellValidator").foldLeft(conf.validatorApps) { (apps, name) =>
-              apps.updatedWith(InstanceName.tryCreate(name)) {
-                _.map { validatorConfig =>
-                  validatorConfig.copy(domains = validatorConfig.domains.copy(extra = Seq.empty))
-                }
+          validatorApps = validators.foldLeft(conf.validatorApps) { (apps, name) =>
+            apps.updatedWith(InstanceName.tryCreate(name)) {
+              _.map { validatorConfig =>
+                validatorConfig.copy(domains = validatorConfig.domains.copy(extra = Seq.empty))
               }
-            },
+            }
+          },
         )
       )
-  }
 
   def clearConfigTransforms(): EnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())

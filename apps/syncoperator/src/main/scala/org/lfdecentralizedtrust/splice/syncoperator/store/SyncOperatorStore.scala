@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.syncoperator.store
 
 import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.syncoperator.store.db.DbSyncOperatorStore
 import org.lfdecentralizedtrust.splice.syncoperator.store.db.SyncOperatorTables.SyncOperatorAcsStoreRowData
@@ -37,6 +38,13 @@ trait SyncOperatorStore extends AppStore {
   def getTotalPurchasedMemberTraffic(memberId: Member)(implicit
       tc: TraceContext
   ): Future[Long]
+
+  /** Total traffic purchased on this operator's synchronizer, per member with a purchase on
+    * record.
+    */
+  def listTotalPurchasedMemberTraffic()(implicit
+      tc: TraceContext
+  ): Future[Map[Member, Long]]
 }
 
 object SyncOperatorStore {
@@ -81,7 +89,7 @@ object SyncOperatorStore {
     )
   }
 
-  def contractFilter(key: Key): MultiDomainAcsStore.ContractFilter[
+  def contractFilter(key: Key, logger: TracedLogger): MultiDomainAcsStore.ContractFilter[
     SyncOperatorAcsStoreRowData,
     AcsInterfaceViewRowData.NoInterfacesIngested,
   ] = {
@@ -105,7 +113,17 @@ object SyncOperatorStore {
               .fromProtoPrimitive_(contract.payload.memberId)
               // we ignore cases where the member id is invalid instead of throwing an exception
               // to avoid killing the entire ingestion pipeline as a result
-              .fold(_ => None, Some(_)),
+              .fold(
+                error => {
+                  // The row encoder gets no trace context.
+                  logger.warn(
+                    s"Skipping the purchased traffic in ${contract.contractId.contractId} of " +
+                      s"member ${contract.payload.memberId}, which does not parse: $error"
+                  )(TraceContext.empty)
+                  None
+                },
+                member => Some(StoreMemberId(member)),
+              ),
             // the filter has already established these agree, so avoid parsing per contract
             memberTrafficDomain = Some(key.synchronizerId),
             totalTrafficPurchased = Some(contract.payload.totalPurchased),

@@ -50,10 +50,10 @@ abstract class StoreIngestionPerformanceTest(
     ) {
 
   def run(): Future[Unit] = withStorage { storage =>
-    val store = mkStore(storage)
     TraceContext
       .withNewTraceContext(this.getClass.getName) { implicit tc =>
-        (for {
+        for {
+          store <- mkStore(storage)
           _ <- store.ingestionSink.initialize()
           _ <- sanityCheckTables(storage) { count =>
             Option.when(count != 0)(
@@ -68,7 +68,7 @@ abstract class StoreIngestionPerformanceTest(
             )
           }
           _ = writeIngestionMetrics(metrics, success = true)
-        } yield ())
+        } yield ()
       }
   }
 

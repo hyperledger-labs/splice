@@ -25,5 +25,3 @@ applications that are part of Splice.
    ../api/splice-token-test-trading-app-v2/index
    ../api/splice-token-standard-v1-test/index
    ../api/splice-util-batched-markers/index
-
-See :ref:`daml_code_architecture` for an overview of the apps and their relation.

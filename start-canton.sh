@@ -226,7 +226,7 @@ tmux_cmd_canton() {
      COMETBFT_DOCKER_IP=${COMETBFT_DOCKER_IP-} \
      LOG_LEVEL_API_REQUEST=DEBUG \
      SPLITWELL_MAX_BASE_TRAFFIC_AMOUNT=${splitwell_max_base_traffic_amount-} \
-     CANTON_TOKEN_FILENAME=$tokensFile CANTON_PARTICIPANTS_FILENAME=$participantsFile JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
+     CANTON_PROTOCOL_VERSION=${CANTON_PROTOCOL_VERSION:-37} CANTON_TOKEN_FILENAME=$tokensFile CANTON_PARTICIPANTS_FILENAME=$participantsFile JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
       -c $baseConfig $confOverrides \
       --log-level-canton=DEBUG \
       --log-encoder json \

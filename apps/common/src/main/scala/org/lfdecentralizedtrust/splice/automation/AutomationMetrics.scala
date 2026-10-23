@@ -20,6 +20,18 @@ class AutomationMetrics(
 
   val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "automation"
 
+  private val triggerParallelismInfo: MetricInfo = MetricInfo(
+    name = SpliceMetrics.MetricsPrefix :+ "trigger" :+ "parallelism",
+    summary = "Maximum number of tasks a trigger can process concurrently",
+    description =
+      "Reports the configured parallelism for task-based triggers and one for polling triggers.",
+    qualification = Debug,
+    labelsWithDescription = Map(
+      "trigger_name" -> "The name of the trigger",
+      "trigger_type" -> "Whether the trigger is task-based or polling",
+    ),
+  )
+
   private val healthInfo: MetricInfo = MetricInfo(
     name = prefix :+ "background-service-health",
     summary = "Health of an automation background service",
@@ -40,13 +52,29 @@ class AutomationMetrics(
       }
     }
 
+  private val triggerParallelismGauges: MultiGauge[Long] =
+    MultiGauge.long(metricsFactory, triggerParallelismInfo)(identity)
+
   def registerHealthGauge(service: HasHealth): CloseableGauge = {
     val serviceName = service.getClass.getSimpleName
     healthGauges.register(service)(mc.withExtraLabels(("service", serviceName)))
   }
 
+  def registerTriggerParallelismGauge(
+      triggerName: String,
+      triggerType: String,
+      parallelism: Long,
+  ): CloseableGauge =
+    triggerParallelismGauges.register(parallelism)(
+      mc.withExtraLabels(
+        "trigger_name" -> triggerName,
+        "trigger_type" -> triggerType,
+      )
+    )
+
   override def close(): Unit = {
     healthGauges.close()
+    triggerParallelismGauges.close()
   }
 }
 

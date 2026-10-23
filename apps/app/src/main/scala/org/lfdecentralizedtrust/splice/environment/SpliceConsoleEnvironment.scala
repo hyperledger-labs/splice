@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.environment
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.console.ConsoleEnvironmentAccess.*
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
   ConsoleOutput,

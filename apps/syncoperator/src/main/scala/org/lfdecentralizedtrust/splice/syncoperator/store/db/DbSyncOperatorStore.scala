@@ -10,6 +10,7 @@ import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsInterfaceViewRowData,
@@ -76,7 +77,7 @@ class DbSyncOperatorStore(
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[
     SyncOperatorAcsStoreRowData,
     AcsInterfaceViewRowData.NoInterfacesIngested,
-  ] = SyncOperatorStore.contractFilter(key)
+  ] = SyncOperatorStore.contractFilter(key, logger)
 
   import multiDomainAcsStore.waitUntilAcsIngested
 
@@ -90,7 +91,19 @@ class DbSyncOperatorStore(
       SyncOperatorTables.acsTableName,
       acsStoreId,
       domainMigrationId,
-      memberId,
+      StoreMemberId(memberId),
+      key.synchronizerId,
+    )
+  }
+
+  override def listTotalPurchasedMemberTraffic()(implicit
+      tc: TraceContext
+  ): Future[Map[Member, Long]] = waitUntilAcsIngested {
+    sumPurchasedMemberTrafficPerMember(
+      storage,
+      SyncOperatorTables.acsTableName,
+      acsStoreId,
+      domainMigrationId,
       key.synchronizerId,
     )
   }
