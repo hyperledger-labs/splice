@@ -139,6 +139,9 @@ abstract class StoreReadPerformanceTest(
       ),
     )
 
+    println(
+      s"${this.getClass.getName}: Read metrics for '$opName':\n${metricsJson.spaces2}"
+    )
     writeMetricsFile(metricsJson, "store-read-perf-metrics", "Read", opName = Some(opName))
   }
 
