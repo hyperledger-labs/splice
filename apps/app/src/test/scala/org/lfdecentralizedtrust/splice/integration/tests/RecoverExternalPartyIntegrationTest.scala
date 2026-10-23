@@ -201,7 +201,7 @@ class RecoverExternalPartyIntegrationTest
       verboseHashing = true,
     )
 
-    eventually() {
+    eventuallySucceeds() {
       bobValidatorBackend
         .getExternalPartyBalance(aliceParty)
         .totalUnlockedCoin shouldBe "2000.0000000000"
