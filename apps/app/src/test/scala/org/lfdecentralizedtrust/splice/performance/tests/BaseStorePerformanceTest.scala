@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.performance.tests
 
 import cats.data.NonEmptyList
-import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
@@ -67,6 +67,23 @@ abstract class BaseStorePerformanceTest(
   type Store <: HasIngestionSink
   protected def mkStore(storage: DbStorage): Future[Store]
 
+  /** In-memory metrics factory wired into the storage's [[DbStorageMetrics]].
+    *  The DB executor `exectime` timer is recorded and can be read back to measure DB time.
+    */
+  protected val dbMetricsFactory: InMemoryMetricsFactory = new InMemoryMetricsFactory
+
+  /** Sum of all recorded DB executor execution times (both read and write queues),
+    * in milliseconds. The time is monotonically increasing. We need to snapshot
+    * before/after an operation to find the duration of an operation.
+    */
+  protected def totalDbExecTimeMs: Long =
+    dbMetricsFactory.metrics.timers.iterator.collect {
+      case (name, byContext) if name.toString.endsWith("exectime") =>
+        byContext.values.iterator
+          .map(timer => timer.data.recordedValues.values.flatten.sum)
+          .sum
+    }.sum
+
   /** A short name for this test, used as the metrics file name and Pushgateway label. */
   protected def testName: String = this.getClass.getSimpleName.stripSuffix("$")
 
@@ -81,7 +98,7 @@ abstract class BaseStorePerformanceTest(
   protected def initializeStorage(): DbStorage = {
     val metrics = new DbStorageMetrics(
       new DbStorageHistograms(MetricName("store", "perftest"))(new HistogramInventory),
-      NoOpMetricsFactory,
+      dbMetricsFactory,
     )(MetricsContext())
     // Build storage through the production factory so the perf suite exercises DbStorageMulti
     // (write-connection pool holding an exclusive advisory lock) exactly as the apps do, rather

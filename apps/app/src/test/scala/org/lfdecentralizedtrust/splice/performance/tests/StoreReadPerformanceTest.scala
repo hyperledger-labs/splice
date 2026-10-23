@@ -13,11 +13,17 @@ import scala.concurrent.{ExecutionContext, Future}
 
 final case class StoreReadPerfMetrics(
     totalTimeNs: BigDecimal,
+    dbExecTimeNs: BigDecimal,
     peakHeapBytes: BigDecimal,
     cpuToWallClockRatio: BigDecimal,
     updateSizeBytes: Long,
     numUpdates: Long,
-)
+) {
+
+  /** Time not spent executing DB queries
+    */
+  def nonDbExecTimeNs: BigDecimal = (totalTimeNs - dbExecTimeNs).max(BigDecimal(0))
+}
 
 final case class ReadOperation(
     name: String,
@@ -111,6 +117,17 @@ abstract class StoreReadPerformanceTest(
         metrics.cpuToWallClockRatio,
       ),
       metric(
+        "db_exec_time_ns",
+        "DB executor execution time recorded by DbStorageMetrics (InMemoryMetricsFactory). " +
+          "Millisecond-truncated, so a coarse lower bound for the DB-fetch cost.",
+        metrics.dbExecTimeNs,
+      ),
+      metric(
+        "non_db_exec_time_ns",
+        "Time not spent executing DB queries (total_time_ns - db_exec_time_ns).",
+        metrics.nonDbExecTimeNs,
+      ),
+      metric(
         "update_size_bytes",
         "Size of the update dump file in bytes",
         BigDecimal(metrics.updateSizeBytes),
@@ -135,22 +152,29 @@ abstract class StoreReadPerformanceTest(
       accF.flatMap { acc =>
         val wallBefore = System.nanoTime()
         val cpuBefore = getProcessCpuTimeNs
+        val dbExecMsBefore = totalDbExecTimeMs
         op.execute(tc).map { _ =>
           val wallAfter = System.nanoTime()
           val cpuAfter = getProcessCpuTimeNs
+          val dbExecMsAfter = totalDbExecTimeMs
           val duration = wallAfter - wallBefore
           val cpuDeltaNs = math.max(cpuAfter - cpuBefore, 0L)
+          val dbExecNs = math.max(dbExecMsAfter - dbExecMsBefore, 0L) * 1000000L
           val heapUsed = getHeapUsedBytes
           val cpuToWallClockRatio =
             if (duration > 0) BigDecimal(cpuDeltaNs) / BigDecimal(duration) else BigDecimal(0)
 
           val msg =
-            f"Read '${op.name}': time=${BigDecimal(duration) / 1e6}%.2f ms, updateSize=$updateSizeBytes bytes, numUpdates=${txs.size}"
+            f"Read '${op.name}': time=${BigDecimal(duration) / 1e6}%.2f ms, " +
+              f"dbExec=${BigDecimal(dbExecNs) / 1e6}%.2f ms, " +
+              f"decode=${BigDecimal(math.max(duration - dbExecNs, 0L)) / 1e6}%.2f ms, " +
+              f"updateSize=$updateSizeBytes bytes, numUpdates=${txs.size}"
           logger.info(msg)
           println(s"${this.getClass.getName}: $msg")
 
           val m = StoreReadPerfMetrics(
             totalTimeNs = BigDecimal(duration),
+            dbExecTimeNs = BigDecimal(dbExecNs),
             peakHeapBytes = heapUsed,
             cpuToWallClockRatio = cpuToWallClockRatio,
             updateSizeBytes = updateSizeBytes,
