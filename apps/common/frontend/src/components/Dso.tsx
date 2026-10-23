@@ -22,13 +22,16 @@ import { SvNodeState } from '@daml.js/splice-dso-governance/lib/Splice/DSO/SvSta
 import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 
 export interface DsoInfo {
-  svUser: string;
-  svPartyId: string;
   dsoPartyId: string;
   votingThreshold: bigint;
   amuletRules: Contract<AmuletRules>;
   dsoRules: Contract<DsoRules>;
   nodeStates: Contract<SvNodeState>[];
+}
+
+export interface SvInfo {
+  svUser: string;
+  svPartyId: string;
 }
 
 function encodeSvUiState(uiState: DsoInfo): unknown {
@@ -70,12 +73,15 @@ function getInfoTable(title: string, rows: { key: string; value: string; isParty
 function createRow(key: string, value: string, isParty: boolean = false) {
   return { key, value, isParty };
 }
-const GeneralInformationView: React.FC<{ dsoInfo: DsoInfo }> = ({ dsoInfo }) => {
+const GeneralInformationView: React.FC<{ dsoInfo: DsoInfo; svInfo: SvInfo }> = ({
+  dsoInfo,
+  svInfo,
+}) => {
   const cs: { key: string; value: string }[] = [];
   dsoInfo.dsoRules.payload.svs.forEach((value, key) => cs.push(createRow(key, value.name)));
   const svInfos = [
-    createRow('svUser', dsoInfo.svUser),
-    createRow('svPartyId', dsoInfo.svPartyId, true),
+    createRow('svUser', svInfo.svUser),
+    createRow('svPartyId', svInfo.svPartyId, true),
   ];
   const membersInfos: { key: string; value: string; isParty: boolean }[] = [];
   for (const member of cs) {
@@ -217,12 +223,14 @@ function tabProps(info: string) {
 }
 interface DsoViewPrettyJSONProps {
   dsoInfoQuery: UseQueryResult<DsoInfo>;
+  svInfoQuery: UseQueryResult<SvInfo>;
   cometBftNodeDebugQuery?: UseQueryResult<CometBftNodeDumpOrErrorResponse>;
   sequencerStatusQuery?: UseQueryResult<NodeStatus>;
   mediatorStatusQuery?: UseQueryResult<NodeStatus>;
 }
 const DsoViewPrettyJSON: React.FC<DsoViewPrettyJSONProps> = ({
   dsoInfoQuery,
+  svInfoQuery,
   cometBftNodeDebugQuery,
   sequencerStatusQuery,
   mediatorStatusQuery,
@@ -233,11 +241,14 @@ const DsoViewPrettyJSON: React.FC<DsoViewPrettyJSONProps> = ({
     setValue(newValue);
   };
 
-  if (dsoInfoQuery.isPending) {
+  if (dsoInfoQuery.isPending || svInfoQuery.isPending) {
     return <Loading />;
   }
   if (dsoInfoQuery.isError) {
     return <ErrorDisplay message={'Failed to fetch DSO info.'} />;
+  }
+  if (svInfoQuery.isError) {
+    return <ErrorDisplay message={'Failed to fetch SV info.'} />;
   }
   const dsoInfoData = dsoInfoQuery.data;
 
@@ -267,7 +278,7 @@ const DsoViewPrettyJSON: React.FC<DsoViewPrettyJSONProps> = ({
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>
-        <GeneralInformationView dsoInfo={dsoInfoData} />
+        <GeneralInformationView dsoInfo={dsoInfoData} svInfo={svInfoQuery.data} />
       </TabPanel>
       <TabPanel value={value} index={1}>
         <JSONPretty

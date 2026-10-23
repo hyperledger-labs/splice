@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.util.{
   ChoiceContextWithDisclosures,
   ContractWithState,
   DsoInfo,
+  DsoInfoV1,
   FactoryChoiceWithDisclosures,
 }
 import org.lfdecentralizedtrust.splice.validator.admin.api.client.commands.*
@@ -321,6 +322,14 @@ abstract class ValidatorAppReference(
       consoleEnvironment.run {
         httpCommand(
           HttpScanProxyAppClient.GetDsoInfo
+        )
+      }
+    }
+
+    def getDsoInfoV1(): DsoInfoV1 = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanProxyAppClient.GetDsoInfoV1
         )
       }
     }

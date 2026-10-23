@@ -104,7 +104,7 @@ object SequencerAdminCommands {
       }
   }
 
-  final case object GetPruningStatus
+  case object GetPruningStatus
       extends BaseSequencerAdministrationCommand[
         proto.PruningStatusRequest,
         proto.PruningStatusResponse,
@@ -246,49 +246,6 @@ object SequencerAdminCommands {
 
   }
 
-  @deprecated(
-    "Use InitializeFromOnboardingStateV2 instead",
-    since = "3.5",
-  )
-  final case class InitializeFromOnboardingState(onboardingStateStream: InputStream)(implicit
-      ec: ExecutionContext,
-      loggingContext: ErrorLoggingContext,
-  ) extends GrpcAdminCommand[
-        Unit,
-        proto.InitializeSequencerFromOnboardingStateResponse,
-        InitializeSequencerResponse,
-      ] {
-    override type Svc =
-      proto.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub
-
-    override def createService(
-        channel: ManagedChannel
-    ): proto.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub =
-      proto.SequencerInitializationServiceGrpc.stub(channel)
-
-    override protected def submitRequest(
-        service: proto.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub,
-        request: Unit,
-    ): Future[proto.InitializeSequencerFromOnboardingStateResponse] =
-      GrpcStreamingUtils.streamToServer(
-        service.initializeSequencerFromOnboardingState,
-        (onboardingState: ByteString) =>
-          proto.InitializeSequencerFromOnboardingStateRequest(
-            onboardingState
-          ),
-        onboardingStateStream,
-      )
-
-    override protected def createRequest(): Either[String, Unit] = Right(())
-
-    override protected def handleResponse(
-        response: proto.InitializeSequencerFromOnboardingStateResponse
-    ): Either[String, InitializeSequencerResponse] =
-      Right(InitializeSequencerResponse(response.replicated))
-
-    override def timeoutType: TimeoutType = DefaultUnboundedTimeout
-  }
-
   final case class InitializeFromOnboardingStateV2(onboardingStateStream: InputStream)(implicit
       ec: ExecutionContext,
       loggingContext: ErrorLoggingContext,
@@ -355,13 +312,13 @@ object SequencerAdminCommands {
         request: Unit,
     ): Future[proto.InitializeSequencerFromGenesisStateResponse] = {
       val parameters = synchronizerParameters.protoVersion match {
-        case ProtoVersion(30) =>
-          proto.InitializeSequencerFromGenesisStateRequest.Parameters.V30(
-            synchronizerParameters.toProtoV30
-          )
         case ProtoVersion(31) =>
           proto.InitializeSequencerFromGenesisStateRequest.Parameters.V31(
             synchronizerParameters.toProtoV31
+          )
+        case ProtoVersion(32) =>
+          proto.InitializeSequencerFromGenesisStateRequest.Parameters.V32(
+            synchronizerParameters.toProtoV32
           )
         case other =>
           throw Status.INTERNAL
@@ -425,13 +382,13 @@ object SequencerAdminCommands {
         request: Unit,
     ): Future[proto.InitializeSequencerFromLsuPredecessorResponse] = {
       val parameters = synchronizerParameters.protoVersion match {
-        case ProtoVersion(30) =>
-          proto.InitializeSequencerFromLsuPredecessorRequest.Parameters.V30(
-            synchronizerParameters.toProtoV30
-          )
         case ProtoVersion(31) =>
           proto.InitializeSequencerFromLsuPredecessorRequest.Parameters.V31(
             synchronizerParameters.toProtoV31
+          )
+        case ProtoVersion(32) =>
+          proto.InitializeSequencerFromLsuPredecessorRequest.Parameters.V32(
+            synchronizerParameters.toProtoV32
           )
         case other =>
           throw Status.INTERNAL
@@ -487,13 +444,13 @@ object SequencerAdminCommands {
         request: Unit,
     ): Future[proto.InitializeSequencerFromGenesisStateV2Response] = {
       val parameters = synchronizerParameters.protoVersion match {
-        case ProtoVersion(30) =>
-          proto.InitializeSequencerFromGenesisStateV2Request.Parameters.SynchronizerParametersV30(
-            synchronizerParameters.toProtoV30
-          )
         case ProtoVersion(31) =>
           proto.InitializeSequencerFromGenesisStateV2Request.Parameters.SynchronizerParametersV31(
             synchronizerParameters.toProtoV31
+          )
+        case ProtoVersion(32) =>
+          proto.InitializeSequencerFromGenesisStateV2Request.Parameters.SynchronizerParametersV32(
+            synchronizerParameters.toProtoV32
           )
         case other =>
           throw Status.INTERNAL
@@ -556,48 +513,6 @@ object SequencerAdminCommands {
             .leftMap(_.toString)
         case _ => Left("response is empty")
       }
-
-    //  command will potentially take a long time
-    override def timeoutType: TimeoutType = DefaultUnboundedTimeout
-  }
-
-  @deprecated(
-    "Use OnboardingStateV2 instead",
-    since = "3.5",
-  )
-  final case class OnboardingState(
-      observer: StreamObserver[proto.OnboardingStateResponse],
-      sequencerOrTimestamp: Either[SequencerId, CantonTimestamp],
-  ) extends BaseSequencerAdministrationCommand[
-        proto.OnboardingStateRequest,
-        CancellableContext,
-        CancellableContext,
-      ] {
-    override protected def createRequest(): Either[String, proto.OnboardingStateRequest] =
-      Right(
-        proto.OnboardingStateRequest(request =
-          sequencerOrTimestamp.fold[proto.OnboardingStateRequest.Request](
-            sequencer =>
-              proto.OnboardingStateRequest.Request
-                .SequencerUid(sequencer.uid.toProtoPrimitive),
-            timestamp => proto.OnboardingStateRequest.Request.Timestamp(timestamp.toProtoTimestamp),
-          )
-        )
-      )
-
-    override protected def submitRequest(
-        service: proto.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
-        request: proto.OnboardingStateRequest,
-    ): Future[CancellableContext] = {
-      val context = Context.current().withCancellation()
-      context.run(() => service.onboardingState(request, observer))
-      Future.successful(context)
-    }
-
-    override protected def handleResponse(
-        response: CancellableContext
-    ): Either[String, CancellableContext] =
-      Right(response)
 
     //  command will potentially take a long time
     override def timeoutType: TimeoutType = DefaultUnboundedTimeout

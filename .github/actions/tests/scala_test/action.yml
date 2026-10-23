@@ -247,7 +247,7 @@ runs:
       if: ${{ steps.list_tests.outputs.test_count != '0' }}
       uses: ./.github/actions/sbt/execute_sbt_command
       with:
-        extra_env_vars: "POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres INITIAL_PACKAGE_VERSIONS=${{ steps.daml_package_versions.outputs.initial_package_versions }} PROTOCOL_VERSION=${{ inputs.protocol_version }}"
+        extra_env_vars: "POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres INITIAL_PACKAGE_VERSIONS=${{ steps.daml_package_versions.outputs.initial_package_versions }} PROTOCOL_VERSION=${{ inputs.protocol_version }} CANTON_AUTOMATIC_PROTOCOL_VERSION=1"
         cmd: ${{ steps.list_tests.outputs.RUN_SPLITTED_TESTS_CMD }}
         additional_nix_args: "--keep GITHUB_ACTION"
         extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${{ inputs.auth0_management_api_client_id }} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${{ inputs.auth0_management_api_client_secret }}

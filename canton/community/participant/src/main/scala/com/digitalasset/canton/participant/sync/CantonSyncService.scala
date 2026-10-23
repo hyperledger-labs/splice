@@ -11,10 +11,10 @@ import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
+import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.*
-import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
@@ -24,20 +24,14 @@ import com.digitalasset.canton.crypto.{
   RandomOps,
   SyncCryptoApiParticipantProvider,
 }
-import com.digitalasset.canton.data.{
-  CantonTimestamp,
-  Offset,
-  PathRollbackContextFactory,
-  ReassignmentSubmitterMetadata,
-  SynchronizerSuccessor,
-}
+import com.digitalasset.canton.data.*
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.error.*
 import com.digitalasset.canton.error.TransactionRoutingError.{
   MalformedInputErrors,
   RoutingInternalError,
 }
-import com.digitalasset.canton.health.{HealthQuasiComponent, HealthStatus, MutableHealthComponent}
+import com.digitalasset.canton.health.HealthStatus
 import com.digitalasset.canton.ledger.api.{
   EnrichedVettedPackages,
   ListVettedPackagesOpts,
@@ -49,7 +43,10 @@ import com.digitalasset.canton.ledger.api.{
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.*
-import com.digitalasset.canton.ledger.participant.state.SyncService.SubmissionCostEstimation
+import com.digitalasset.canton.ledger.participant.state.SyncService.{
+  ReassignmentCostEstimation,
+  SubmissionCostEstimation,
+}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
@@ -66,6 +63,7 @@ import com.digitalasset.canton.participant.admin.grpc.PruningServiceError
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
 import com.digitalasset.canton.participant.admin.party.PartyReplicationTriggers
 import com.digitalasset.canton.participant.admin.repair.{CommitmentsService, RepairService}
+import com.digitalasset.canton.participant.commitment.AcsCommitmentProcessorManager
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.SubmissionDuringShutdown
@@ -128,7 +126,7 @@ import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.PackageConsumer.PackageResolver
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.{ProtocolVersion, ReleaseProtocolVersion}
 import com.digitalasset.daml.lf.archive.DamlLf
 import com.digitalasset.daml.lf.data.Ref.{PackageId, Party, SubmissionId}
 import com.digitalasset.daml.lf.data.{ImmArray, Ref}
@@ -181,7 +179,6 @@ class CantonSyncService(
     parameters: ParticipantNodeParameters,
     connectedSynchronizerFactory: ConnectedSynchronizer.Factory[ConnectedSynchronizer],
     metrics: ParticipantMetrics,
-    sequencerInfoLoader: SequencerInfoLoader,
     override val isActive: () => Boolean,
     declarativeChangeTrigger: () => Unit,
     futureSupervisor: FutureSupervisor,
@@ -258,7 +255,6 @@ class CantonSyncService(
     pendingLsuOperationsStore,
     pendingOnboardingTransactionsStore,
     metrics,
-    sequencerInfoLoader,
     isActive,
     declarativeChangeTrigger,
     futureSupervisor,
@@ -275,14 +271,9 @@ class CantonSyncService(
 
   import ShowUtil.*
 
-  def connectedSynchronizerHealth: MutableHealthComponent =
-    connectionsManager.connectedSynchronizerHealth
-  def ephemeralHealth: MutableHealthComponent = connectionsManager.ephemeralHealth
-  def sequencerClientHealth: MutableHealthComponent = connectionsManager.sequencerClientHealth
-  def sequencerConnectionPoolHealth: () => Seq[HealthQuasiComponent] =
-    () => connectionsManager.sequencerConnectionPoolHealthRef.get.apply()
-  def acsCommitmentProcessorHealth: MutableHealthComponent =
-    connectionsManager.acsCommitmentProcessorHealth
+  /** Health components of every connected synchronizer, keyed by physical synchronizer id. */
+  def connectedSynchronizersHealth: ConnectedSynchronizersHealth =
+    connectionsManager.connectedSynchronizersHealth
 
   val maxDeduplicationDuration: NonNegativeFiniteDuration =
     participantNodePersistentState.value.settingsStore.settings.maxDeduplicationDuration
@@ -349,7 +340,7 @@ class CantonSyncService(
       // vet any packages that have not yet been vetted
       EitherTUtil.toFutureUnlessShutdown(
         AdminWorkflowServices.handleDamlErrorDuringPackageLoading(
-          s"${AdminWorkflowServices.PingDarResourceName}__${AdminWorkflowServices.PartyReplicationDarResourceName}"
+          s"${AdminWorkflowServices.PingDarResourceName}__${AdminWorkflowServices.AcsReplicationDarResourceName}"
         )(
           packageService
             .vetPackages(
@@ -363,16 +354,16 @@ class CantonSyncService(
     val topologyClientO = connectedSynchronizersLookup.get(lsid).map(_.topologyClient)
     val vettingF = topologyClientO match {
       case Some(topologyClient) =>
-        val partyReplicationPackagesIfShouldVet =
+        val acsReplicationPackagesIfShouldVet =
           if (
-            AdminWorkflowServices.isPartyReplicationWorkflowLoaded(
+            AdminWorkflowServices.isAcsReplicationWorkflowLoaded(
               parameters.alphaOnlinePartyReplicationSupport
             )
           ) {
-            AdminWorkflowServices.PartyReplicationPackages.keySet
+            AdminWorkflowServices.AcsReplicationPackages.keySet
           } else Set.empty
         val packagesToVet = AdminWorkflowServices.PingPackages.keySet ++
-          partyReplicationPackagesIfShouldVet
+          acsReplicationPackagesIfShouldVet
         logger.debug("Checking whether admin workflows need to be vetted still.")
 
         topologyClient.headSnapshot
@@ -484,11 +475,11 @@ class CantonSyncService(
   private val migrationService =
     new SynchronizerMigration(
       aliasManager,
+      connectionsManager,
       synchronizerConnectionConfigStore,
       stateInspection,
       repairService,
       prepareSynchronizerConnectionForMigration,
-      sequencerInfoLoader,
       parameters.processingTimeouts,
       loggerFactory,
     )
@@ -1107,7 +1098,7 @@ class CantonSyncService(
       }
       operation = PendingOnboardingTransactions(
         transactions.sortBy(TopologyStore.initialParticipantDispatchingOrder),
-        ProtocolVersion.latest,
+        ReleaseProtocolVersion(ProtocolVersion.latest),
       )
         .toPendingOperation(synchronizerId, config.synchronizerAlias)
       _ <- pendingOnboardingTransactionsStore
@@ -1247,6 +1238,8 @@ class CantonSyncService(
       source: Source[SynchronizerAlias],
       target: Target[SynchronizerConnectionConfig],
       force: Boolean,
+      forceRepairWhenTopologyTransactionAtLedgerEnd: Boolean,
+      commitmentProcessorManager: Option[AcsCommitmentProcessorManager],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] = {
@@ -1267,7 +1260,7 @@ class CantonSyncService(
     for {
       _ <- allSynchronizersMustBeOffline()
 
-      targetSynchronizerInfo <- migrationService.isSynchronizerMigrationPossible(
+      targetPsid <- migrationService.isSynchronizerMigrationPossible(
         source,
         target,
         force = force,
@@ -1279,7 +1272,9 @@ class CantonSyncService(
             .migrateSynchronizer(
               source,
               target,
-              targetSynchronizerInfo.map(_.psid),
+              targetPsid,
+              forceRepairWhenTopologyTransactionAtLedgerEnd,
+              commitmentProcessorManager,
             )
             .leftMap[SyncServiceError](
               SyncServiceError.SyncServiceMigrationError(source, target.map(_.synchronizerAlias), _)
@@ -1290,6 +1285,11 @@ class CantonSyncService(
       _ <- purgeDeactivatedSynchronizer(source.unwrap)
     } yield ()
   }
+
+  def getPsid(config: SynchronizerConnectionConfig)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SyncServiceError, PhysicalSynchronizerId] =
+    connectionsManager.getPsid(config)
 
   @VisibleForTesting
   def performLsu(
@@ -1841,17 +1841,33 @@ class CantonSyncService(
               .Reject(s"Unable to resolve $synchronizerId to a connected physical synchronizer id")
           )
 
-      def lookupPsids(source: Source[SynchronizerId], target: Target[SynchronizerId]): Either[
+      def lookupAndCheckPsids(
+          source: Source[SynchronizerId],
+          target: Target[SynchronizerId],
+          hasPkgValidationOverrides: Boolean,
+      ): Either[
         RequestValidationErrors.InvalidArgument.Reject,
         (Source[PhysicalSynchronizerId], Target[PhysicalSynchronizerId]),
       ] = for {
         sourcePsid <- lookupPsid(source.unwrap).map(Source(_))
         targetPsid <- lookupPsid(target.unwrap).map(Target(_))
+        _ <- Either.cond(
+          !hasPkgValidationOverrides || (sourcePsid.unwrap.protocolVersion > ProtocolVersion.v36 && targetPsid.unwrap.protocolVersion > ProtocolVersion.v36),
+          (),
+          RequestValidationErrors.InvalidArgument
+            .Reject(
+              s"Can only use validation package overrides when both source and target synchronizers are running protocol version ${ProtocolVersion.v37} or later. Source: ${sourcePsid.unwrap.protocolVersion}, Target: ${targetPsid.unwrap.protocolVersion}"
+            ),
+        )
       } yield (sourcePsid, targetPsid)
 
       ReassignmentCommandsBatch.create(reassignmentCommands) match {
         case Right(unassigns: ReassignmentCommandsBatch.Unassignments) =>
-          lookupPsids(unassigns.source, unassigns.target) match {
+          lookupAndCheckPsids(
+            unassigns.source,
+            unassigns.target,
+            unassigns.hasPkgValidationOverrides,
+          ) match {
             case Right((sourcePsid, targetPsid)) =>
               doReassignment(
                 psid = sourcePsid.unwrap
@@ -1868,6 +1884,8 @@ class CantonSyncService(
                   contractIds = unassigns.contractIds,
                   targetSynchronizer = targetPsid,
                   sourceTopology = Source(sourceTopology),
+                  overrideSourceValidationPkgIds = unassigns.overrideSourceValidationPkgIds,
+                  overrideTargetValidationPkgIds = unassigns.overrideTargetValidationPkgIds,
                 )
               }
 
@@ -1923,7 +1941,6 @@ class CantonSyncService(
           .toSeq
       )(
         _.findIncomplete(
-          sourceSynchronizer = None,
           validAt = validAt,
           stakeholders = NonEmpty.from(stakeholders),
           limit = NonNegativeInt.maxValue,
@@ -2051,6 +2068,74 @@ class CantonSyncService(
       )
     } yield estimatedTrafficCost
 
+  override def estimateReassignmentCosts(
+      synchronizerRankTarget: SynchronizerRank,
+      submitterInfo: SubmitterInfo,
+      targetSynchronizer: PhysicalSynchronizerId,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, Seq[ReassignmentCostEstimation]] =
+    if (synchronizerRankTarget.reassignments.isEmpty)
+      EitherT.pure[FutureUnlessShutdown, String](Seq.empty)
+    else {
+      def sourceSynchronizerOf(
+          source: PhysicalSynchronizerId
+      ): EitherT[FutureUnlessShutdown, String, ConnectedSynchronizer] =
+        EitherT.fromOption[FutureUnlessShutdown](
+          connectedSynchronizersLookupContainer.get(source),
+          s"Node is not connected to source synchronizer $source",
+        )
+
+      val batches = synchronizerRankTarget.reassignments.toSeq
+
+      for {
+        estimates <- batches.parTraverse { case ((submitter, source, stakeholders), cids) =>
+          val contractIds = cids.toSeq
+          for {
+            sourceSynchronizer <- sourceSynchronizerOf(source)
+            unassignmentCost <- sourceSynchronizer.estimateUnassignmentCost(
+              submitter,
+              contractIds,
+              Target(targetSynchronizer),
+              submitterInfo,
+              stakeholders.signatories.toSeq,
+            )
+            (unassignmentRequestCost, unassignmentResponseCost) = unassignmentCost
+
+            contracts <- contractIds.parTraverse { cid =>
+              sourceSynchronizer.ephemeral.contractLookup
+                .lookup(cid)
+                .toRight(s"Cannot find contract with id $cid")
+            }
+
+            targetConnected <- EitherT.fromOption[FutureUnlessShutdown](
+              connectedSynchronizersLookupContainer.get(targetSynchronizer),
+              s"Node is not connected to target synchronizer $targetSynchronizer",
+            )
+
+            assignmentCost <- targetConnected.estimateAssignmentCost(
+              submitter,
+              contracts,
+              Source(sourceSynchronizer.psid),
+              Source(sourceSynchronizer.topologyClient.headSnapshot),
+              submitterInfo,
+              stakeholders.signatories.toSeq,
+            )
+
+            (assignmentRequestCost, assignmentResponseCost) = assignmentCost
+          } yield ReassignmentCostEstimation(
+            sourceSynchronizerId = source,
+            targetSynchronizerId = targetSynchronizer,
+            contractIds = contractIds,
+            unassignmentRequestCost = unassignmentRequestCost,
+            unassignmentResponseCost = unassignmentResponseCost,
+            assignmentRequestCost = assignmentRequestCost,
+            assignmentResponseCost = assignmentResponseCost,
+          )
+        }
+      } yield estimates
+    }
+
   override def hashOps: HashOps = this.syncCrypto.pureCrypto
 
   override def randomOps: RandomOps = this.syncCrypto.pureCrypto
@@ -2080,7 +2165,6 @@ object CantonSyncService {
       cantonParameterConfig: ParticipantNodeParameters,
       pruningProcessor: PruningProcessor,
       metrics: ParticipantMetrics,
-      sequencerInfoLoader: SequencerInfoLoader,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
       testingConfig: TestingConfigInternal,
@@ -2117,7 +2201,6 @@ object CantonSyncService {
         cantonParameterConfig,
         ConnectedSynchronizer.DefaultFactory,
         metrics,
-        sequencerInfoLoader,
         () => storage.isActive && replicaManager.isActive,
         triggerDeclarativeChange,
         futureSupervisor,

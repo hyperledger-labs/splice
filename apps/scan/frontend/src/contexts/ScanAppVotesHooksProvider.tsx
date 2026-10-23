@@ -3,6 +3,7 @@
 import {
   AmuletPriceVote,
   DsoInfo,
+  SvInfo,
   SvVote,
   VotesHooks,
   VotesHooksContext,
@@ -24,6 +25,9 @@ export const ScanAppVotesHooksProvider: React.FC<React.PropsWithChildren> = ({ c
     isReadOnly: true,
     useDsoInfos(): UseQueryResult<DsoInfo> {
       return scanHooks.useDsoInfos();
+    },
+    useSvInfo(): UseQueryResult<SvInfo> {
+      return scanHooks.useSvInfo();
     },
     useListDsoRulesVoteRequests(): UseQueryResult<Contract<VoteRequest>[]> {
       return scanHooks.useListDsoRulesVoteRequests();

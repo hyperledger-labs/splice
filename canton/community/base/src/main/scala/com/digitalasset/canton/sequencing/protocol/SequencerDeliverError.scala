@@ -51,13 +51,13 @@ sealed abstract class SequencerDeliverErrorCode(id: String, category: ErrorCateg
 @Explanation("""Delivery errors wrapped into sequenced events""")
 object SequencerErrors extends SequencerErrorGroup {
   @Explanation("""
-      |This error occurs when the sequencer receives an invalid submission request, e.g. it has an
-      |aggregation rule with an unreachable threshold.
-      |Malformed requests will not emit any deliver event.
+                 |This error occurs when the sequencer receives an invalid submission request, e.g. it has an
+                 |aggregation rule with an unreachable threshold.
+                 |Malformed requests will not emit any deliver event.
       """)
   @Resolution("""
-      |Check if the sender is running an attack.
-      |If you can rule out an attack, please reach out to Canton support.
+                |Check if the sender is running an attack.
+                |If you can rule out an attack, please reach out to Canton support.
       """)
   case object SubmissionRequestMalformed
       extends AlarmErrorCode(id = "SEQUENCER_SUBMISSION_REQUEST_MALFORMED", redactDetails = false) {
@@ -75,6 +75,20 @@ object SequencerErrors extends SequencerErrorGroup {
         Error(submissionRequest.sender.toProtoPrimitive, submissionRequest.messageId.unwrap, error)
     }
   }
+
+  @Explanation("""
+                 |This error occurs when the sequencer receives an invalid submission request.
+                 |The request will be rejected so that the sender can be charged for the submission attempt.
+      """)
+  @Resolution("""
+                |Check if the sender is running an attack.
+                |If you can rule out an attack, please reach out to Canton support.
+      """)
+  case object SubmissionRequestMalformedAndRejected
+      extends SequencerDeliverErrorCode(
+        id = "SEQUENCER_SUBMISSION_REQUEST_MALFORMED_REJECTED",
+        ErrorCategory.UnredactedSecurityAlert,
+      )
 
   @Explanation(
     """This error occurs when the sequencer cannot accept submission request due to the current state of the system."""
@@ -207,7 +221,7 @@ object SequencerErrors extends SequencerErrorGroup {
 
     def apply(message: String, protocolVersion: ProtocolVersion): SequencerDeliverError =
       // for backward compatibility reasons, we need to keep the message format unchanged
-      if (protocolVersion <= ProtocolVersion.v35)
+      if (protocolVersion == ProtocolVersion.v35)
         super.apply(message)
       else
         AggregateSubmissionAlreadySentV2.apply(message)
@@ -304,7 +318,7 @@ object SequencerErrors extends SequencerErrorGroup {
       )
 
   @Explanation("""The sequencer is currently unavailable.""")
-  @Resolution("""Retry quickly.""")
+  @Resolution("""Retry with backoff and jittering.""")
   case object Unavailable
       extends SequencerDeliverErrorCode(
         id = "SEQUENCER_UNAVAILABLE",

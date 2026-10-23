@@ -125,6 +125,7 @@ generateNewRootNamespaceBufImage := {
   // Create a lighter buf image for offline root key scripts
   val requiredTypes = List(
     "com.digitalasset.canton.protocol.v30.TopologyTransaction",
+    "com.digitalasset.canton.protocol.v31.TopologyTransaction",
     "com.digitalasset.canton.version.v1.UntypedVersionedMessage",
     "com.digitalasset.canton.protocol.v30.SignedTopologyTransaction",
     "com.digitalasset.canton.crypto.v30.SigningPublicKey",
@@ -190,6 +191,27 @@ showVersion := {
 lazy val showJavaVersion = taskKey[Unit]("Show the java version")
 showJavaVersion := {
   println(System.getProperty("java.version"))
+}
+
+lazy val sharedDependenciesJsonFile = file("shared_dependencies.json")
+
+lazy val generateSharedDependencies =
+  taskKey[Unit]("Generate shared_dependencies.json from SharedDependencies.scala")
+generateSharedDependencies := {
+  IO.write(sharedDependenciesJsonFile, SharedDependencies.json)
+  streams.value.log.info(s"Wrote $sharedDependenciesJsonFile")
+}
+
+lazy val checkSharedDependenciesUpToDate =
+  taskKey[Unit]("Check that shared_dependencies.json matches SharedDependencies.scala")
+checkSharedDependenciesUpToDate := {
+  val actual = IO.read(sharedDependenciesJsonFile)
+  val expected = SharedDependencies.json
+  if (actual != expected) {
+    sys.error(
+      s"$sharedDependenciesJsonFile is out of date with SharedDependencies.scala. Run `generateSharedDependencies` to regenerate it."
+    )
+  }
 }
 
 lazy val testLibraries = Seq(
@@ -529,6 +551,8 @@ lazy val `daml-lf-transaction-test-lib` = DamlProjects.`daml-lf-transaction-test
 lazy val `daml-lf-archive` = DamlProjects.`daml-lf-archive`
 lazy val `daml-lf-stable-packages` = DamlProjects.`daml-lf-stable-packages`
 lazy val `daml-lf-validation` = DamlProjects.`daml-lf-validation`
+lazy val `daml-lf-upgrade-check` = DamlProjects.`daml-lf-upgrade-check`
+lazy val `daml-lf-upgrade-check-test` = DamlProjects.`daml-lf-upgrade-check-test`
 lazy val `daml-lf-snapshot-proto` = DamlProjects.`daml-lf-snapshot-proto`
 lazy val `daml-lf-snapshot` = DamlProjects.`daml-lf-snapshot`
 lazy val `daml-lf-interpreter` = DamlProjects.`daml-lf-interpreter`

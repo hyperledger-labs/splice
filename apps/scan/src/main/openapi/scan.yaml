@@ -34,10 +34,16 @@ paths:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
 
   /v0/dso:
+    # TODO (#7882): remove
     get:
-      tags: [external, scan]
+      deprecated: true
+      tags: [deprecated]
       x-jvm-package: scan
       operationId: "getDsoInfo"
+      description: |
+        Deprecated. Please use /v1/dso instead, and /v0/sv-info for the `sv_user` and
+        `sv_party_id` fields. These fields differ between Scan instances, so responses
+        cannot be compared across SVs.
       responses:
         "200":
           description: ok
@@ -45,6 +51,37 @@ paths:
             application/json:
               schema:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponse"
+
+  /v1/dso:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getDsoInfoV1"
+      description: |
+        Returns information about the DSO. Can be used in BFT reads.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponseV1"
+
+  /v0/sv-info:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getSvInfo"
+      description: |
+        Returns the SV operating this Scan instance. The response differs between
+        Scan instances, so it cannot be used in BFT reads.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetSvInfoResponse"
 
   /v0/validators/validator-faucets:
     get:
@@ -1804,6 +1841,18 @@ components:
       required: ["dso_party_id"]
       properties:
         dso_party_id:
+          type: string
+    GetSvInfoResponse:
+      type: object
+      required:
+        - sv_user
+        - sv_party_id
+      properties:
+        sv_user:
+          description: User ID representing the SV
+          type: string
+        sv_party_id:
+          description: Party representing the SV
           type: string
     GetClosedRoundsResponse:
       type: object

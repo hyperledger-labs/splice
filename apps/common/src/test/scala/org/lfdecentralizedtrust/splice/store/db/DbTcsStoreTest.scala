@@ -38,27 +38,29 @@ class DbTcsStoreTest extends StoreTestBase with SplicePostgresTest with AcsJdbcT
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    val acsStore = new DbMultiDomainAcsStore(
-      storage,
-      "acs_store_template",
-      Some("txlog_store_template"),
-      None,
-      storeDescriptor(0, participantId, synchronizerId),
-      Some(storeDescriptor(1, participantId, synchronizerId)),
-      loggerFactory,
-      contractFilter(synchronizerId),
-      testTxLogConfig,
-      0L,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      IngestionConfig(),
-      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-      acsArchiveConfigOpt = Some(
-        AcsArchiveConfig(
-          archiveTableName,
-          AcsArchiveConfig.defaultBaseColumns,
-        )
-      ),
-    )
+    val acsStore = DbMultiDomainAcsStore
+      .create(
+        storage,
+        "acs_store_template",
+        Some("txlog_store_template"),
+        None,
+        storeDescriptor(0, participantId, synchronizerId),
+        Some(storeDescriptor(1, participantId, synchronizerId)),
+        loggerFactory,
+        contractFilter(synchronizerId),
+        testTxLogConfig,
+        0L,
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+        IngestionConfig(),
+        defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+        acsArchiveConfigOpt = Some(
+          AcsArchiveConfig(
+            archiveTableName,
+            AcsArchiveConfig.defaultBaseColumns,
+          )
+        ),
+      )
+      .futureValue
     new DbTcsStore(
       acsStore,
       descriptor => SynchronizerId.tryFromString(descriptor.key("synchronizerId")),

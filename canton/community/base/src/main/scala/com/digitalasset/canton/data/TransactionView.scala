@@ -22,14 +22,14 @@ import com.digitalasset.canton.data.TransactionView.{
   validateViewParticipantData,
 }
 import com.digitalasset.canton.data.ViewPosition.MerklePathElement
-import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrintingCompanion}
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggingContext}
 import com.digitalasset.canton.protocol.{v30, *}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.util.collection.MapsUtil
-import com.digitalasset.canton.util.{ErrorUtil, MonadUtil, RoseTree}
+import com.digitalasset.canton.util.{ErrorUtil, RoseTree}
 import com.digitalasset.canton.version.*
-import com.digitalasset.canton.{LfPartyId, LfVersioned, ProtoDeserializationError, checked}
+import com.digitalasset.canton.{LfPartyId, ProtoDeserializationError, checked}
 import com.google.common.annotations.VisibleForTesting
 import monocle.Lens
 import monocle.macros.GenLens
@@ -129,12 +129,7 @@ final case class TransactionView private (
   def allSubviewsWithPosition(rootPos: ViewPosition): Seq[(TransactionView, ViewPosition)] =
     allSubviewsWithPositionTree(rootPos).preorder.toSeq
 
-  override protected def pretty: Pretty[TransactionView] = prettyOfClass(
-    param("root hash", _.rootHash),
-    param("view common data", _.viewCommonData),
-    param("view participant data", _.viewParticipantData),
-    param("subviews", _.subviews),
-  )
+  override def prettyCompanion: PrettyPrintingCompanion[TransactionView] = TransactionView
 
   /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
   @VisibleForTesting
@@ -186,39 +181,6 @@ final case class TransactionView private (
     */
   def keyMaintainers(): Map[LfGlobalKey, Set[LfPartyId]] =
     viewParticipantData.tryUnwrap.keyResolution.fmap(_.unversioned.maintainers)
-
-  private lazy val legacyGlobalKeyInputsE
-      : Either[String, Map[LfGlobalKey, LfVersioned[KeyResolutionWithMaintainers]]] =
-    for {
-      viewParticipantData <- unblindViewParticipantData("Global key inputs")
-
-      _ <- subviews.allUnblinded(hash =>
-        s"Global key inputs of view $viewHash can be computed only if all subviews are unblinded, but $hash is blinded"
-      )
-      inputs <-
-        MonadUtil.foldLeftM(viewParticipantData.keyResolution, subviews.unblindedElements) {
-          case (acc, subview) =>
-            subview.legacyGlobalKeyInputsE.map { subviewGki =>
-              MapsUtil.mergeWith(acc, subviewGki)((accRes, _) => accRes)
-            }
-        }
-
-    } yield inputs
-
-  /** Legacy view global keys mapping
-    *
-    * Used to support protocol behaviour until
-    * [[com.digitalasset.canton.version.ProtocolVersion.v34]]
-    *
-    * @throws java.lang.IllegalStateException
-    *   if the [[ViewParticipantData]] of this view or any subview is blinded
-    */
-  def legacyGlobalKeyInputs(implicit
-      loggingContext: NamedLoggingContext
-  ): Map[LfGlobalKey, LfVersioned[LegacyKeyResolutionWithMaintainers]] =
-    getOrError(legacyGlobalKeyInputsE).fmap(
-      _.map(LegacyKeyResolutionWithMaintainers.tryFromNextGen)
-    )
 
   /** The input contracts of the view (including subviews).
     *
@@ -420,12 +382,20 @@ final case class TransactionView private (
 object TransactionView
     extends VersioningCompanionContext[
       TransactionView,
-      (HashOps, DepthCounter, ProtocolVersion),
-    ] {
+      TransactionViewDeserializationContext,
+    ]
+    with PrettyPrintingCompanion[TransactionView] {
   override def name: String = "TransactionView"
+
+  override protected val pretty: Pretty[TransactionView] = prettyOfClass(
+    param("root hash", _.rootHash),
+    param("view common data", _.viewCommonData),
+    param("view participant data", _.viewParticipantData),
+    param("subviews", _.subviews),
+  )
   override val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.ViewNode)(
-      supportedProtoVersion(_)(fromProtoV30),
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v36)(v30.ViewNode)(
+      supportedProtoVersionPVV(_)(fromProtoV30),
       _.toProtoV30,
     )
   )
@@ -514,25 +484,37 @@ object TransactionView
   }
 
   private def fromProtoV30(
-      context: (HashOps, DepthCounter, ProtocolVersion),
+      pvv: ProtocolVersionValidation,
+      context: TransactionViewDeserializationContext,
       protoView: v30.ViewNode,
   ): ParsingResult[TransactionView] = {
-    val (hashOps, depthCounter, expectedProtocolVersion) = context
+    val TransactionViewDeserializationContext(
+      hashOps,
+      depthCounter,
+      expectedProtocolVersion,
+      transactionLimits,
+    ) = context
     for {
       commonData <- MerkleTree.fromProtoOptionV30NoMerkleSeq(
         protoView.viewCommonData,
-        ViewCommonData.fromByteString(expectedProtocolVersion, hashOps),
+        ViewCommonData.fromByteString(
+          pvv,
+          ViewCommonDataDeserializationContext(hashOps, transactionLimits),
+          _,
+        ),
       )
       participantData <- MerkleTree.fromProtoOptionV30NoMerkleSeq(
         protoView.viewParticipantData,
-        ViewParticipantData.fromByteString(
-          expectedProtocolVersion,
-          (hashOps, expectedProtocolVersion),
-        ),
+        ViewParticipantData.fromByteString(pvv, (hashOps, expectedProtocolVersion), _),
       )
 
       subViews <- TransactionSubviews.fromProtoV30(
-        (hashOps, expectedProtocolVersion),
+        pvv,
+        TransactionSubviewsDeserializationContext(
+          hashOps,
+          expectedProtocolVersion,
+          transactionLimits,
+        ),
         depthCounter,
         protoView.subviews,
       )
@@ -672,3 +654,21 @@ object TransactionView
       protocolVersion >= ProtocolVersion.v36
   }
 }
+
+/** Context required to deserialize TransactionView
+  *
+  * @param hashOps
+  *   hash operations
+  * @param depthCounter
+  *   counter to limit transaction view depth
+  * @param pv
+  *   protocol version
+  * @param limits
+  *   protocol limits
+  */
+final case class TransactionViewDeserializationContext(
+    hashOps: HashOps,
+    depthCounter: DepthCounter,
+    pv: ProtocolVersion,
+    limits: TransactionProtocolLimits,
+)

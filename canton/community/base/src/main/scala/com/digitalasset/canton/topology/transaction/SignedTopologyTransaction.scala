@@ -18,8 +18,12 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.v30
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
+import com.digitalasset.canton.protocol.{SynchronizerLimits, v30}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.db.DbSerializationException
 import com.digitalasset.canton.topology.TopologyManager.assignExpectedUsageToKeys
@@ -66,7 +70,7 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
     with DelegatedTopologyTransactionLike[Op, M]
     with Product
     with Serializable
-    with PrettyPrinting {
+    with PrettyPrintingFromCompanion {
   {
     val duplicateSigningKeys = signatures.toSeq
       .map(_.authorizingLongTermKey)
@@ -199,14 +203,9 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
     )
   }
 
-  override protected def pretty: Pretty[SignedTopologyTransaction.this.type] =
-    prettyOfClass(
-      unnamedParam(_.transaction),
-      // just calling `signatures.map(_.signedBy)` hides the fact that there could be
-      // multiple (possibly invalid) signatures by the same key
-      param("signatures", _.signatures.toSeq.map(_.authorizingLongTermKey).sorted),
-      paramIfTrue("proposal", _.isProposal),
-    )
+  override def prettyCompanion
+      : PrettyPrintingCompanion[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] =
+    SignedTopologyTransaction
 
   def restrictedToSynchronizer: Option[SynchronizerId] =
     transaction.mapping.restrictedToSynchronizer
@@ -228,7 +227,23 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
 }
 
 object SignedTopologyTransaction
-    extends VersioningCompanion[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] {
+    extends VersioningCompanionContext[
+      SignedTopologyTransaction[TopologyChangeOp, TopologyMapping],
+      TopologyTransactionDeserializationContext,
+    ]
+    with PrettyPrintingCompanion[
+      SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]
+    ] {
+
+  override protected val pretty
+      : Pretty[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]] =
+    prettyOfClass(
+      unnamedParam(_.transaction),
+      // just calling `signatures.map(_.signedBy)` hides the fact that there could be
+      // multiple (possibly invalid) signatures by the same key
+      param("signatures", _.signatures.toSeq.map(_.authorizingLongTermKey).sorted),
+      paramIfTrue("proposal", _.isProposal),
+    )
 
   val InitialTopologySequencingTime: CantonTimestamp = CantonTimestamp.MinValue.immediateSuccessor
 
@@ -241,7 +256,7 @@ object SignedTopologyTransaction
     SignedTopologyTransaction[TopologyChangeOp.Replace, TopologyMapping]
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v36)(
       v30.SignedTopologyTransaction
     )(
       supportedProtoVersionPVV(_)(fromProtoV30),
@@ -409,6 +424,7 @@ object SignedTopologyTransaction
 
   def fromProtoV30(
       pvv: ProtocolVersionValidation,
+      context: TopologyTransactionDeserializationContext,
       transactionP: v30.SignedTopologyTransaction,
   ): ParsingResult[GenericSignedTopologyTransaction] = {
     val v30.SignedTopologyTransaction(
@@ -418,7 +434,7 @@ object SignedTopologyTransaction
       multiTransactionSignaturesPO,
     ) = transactionP
     for {
-      transaction <- TopologyTransaction.fromByteString(pvv, txBytes)
+      transaction <- TopologyTransaction.fromByteString(pvv, context, txBytes)
 
       singleSignatures <- ProtoValidation
         .validateLengthThen(
@@ -470,11 +486,15 @@ object SignedTopologyTransaction
       getByteString: GetResult[ByteString]
   ): GetResult[GenericSignedTopologyTransaction] =
     GetResult { r =>
-      fromTrustedByteString(r.<<[ByteString]).valueOr(err =>
+      // Trusted bytes from the node's own store, so the validators pass the content through and
+      // the limits in the context are never read.
+      fromTrustedByteString(TopologyTransactionDeserializationContext(SynchronizerLimits.default))(
+        r.<<[ByteString]
+      ).valueOr { err =>
         throw new DbSerializationException(
           s"Failed to deserialize SignedTopologyTransaction: $err"
         )
-      )
+      }
     }
 
   implicit def setParameterTopologyTransaction(implicit
@@ -491,14 +511,14 @@ final case class SignedTopologyTransactions[
       SignedTopologyTransactions.type
     ]
 ) extends HasProtocolVersionedWrapper[SignedTopologyTransactions[TopologyChangeOp, TopologyMapping]]
-    with PrettyPrinting {
+    with PrettyPrintingFromCompanion {
 
   @transient override protected lazy val companionObj: SignedTopologyTransactions.type =
     SignedTopologyTransactions
 
-  override protected def pretty: Pretty[SignedTopologyTransactions.this.type] = prettyOfParam(
-    _.transactions
-  )
+  override def prettyCompanion
+      : PrettyPrintingCompanion[SignedTopologyTransactions[TopologyChangeOp, TopologyMapping]] =
+    SignedTopologyTransactions
 
   def toProtoV30: v30.SignedTopologyTransactions = v30.SignedTopologyTransactions(
     transactions.map(_.toByteString)
@@ -516,9 +536,20 @@ final case class SignedTopologyTransactions[
 }
 
 object SignedTopologyTransactions
-    extends VersioningCompanion[SignedTopologyTransactions[TopologyChangeOp, TopologyMapping]] {
+    extends VersioningCompanionContext[
+      SignedTopologyTransactions[TopologyChangeOp, TopologyMapping],
+      TopologyTransactionDeserializationContext,
+    ]
+    with PrettyPrintingCompanion[
+      SignedTopologyTransactions[TopologyChangeOp, TopologyMapping]
+    ] {
+
+  override protected val pretty
+      : Pretty[SignedTopologyTransactions[TopologyChangeOp, TopologyMapping]] = prettyOfParam(
+    _.transactions
+  )
   override val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v36)(
       v30.SignedTopologyTransactions
     )(
       supportedProtoVersionPVV(_)(fromProtoV30),
@@ -541,6 +572,7 @@ object SignedTopologyTransactions
 
   def fromProtoV30(
       pvv: ProtocolVersionValidation,
+      context: TopologyTransactionDeserializationContext,
       proto: v30.SignedTopologyTransactions,
   ): ParsingResult[SignedTopologyTransactions[TopologyChangeOp, TopologyMapping]] =
     for {
@@ -554,6 +586,7 @@ object SignedTopologyTransactions
         .traverse(
           SignedTopologyTransaction.fromByteString(
             pvv,
+            context,
             _,
           )
         )

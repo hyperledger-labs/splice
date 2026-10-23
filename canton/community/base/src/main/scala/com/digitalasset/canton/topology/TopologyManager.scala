@@ -72,7 +72,7 @@ import com.digitalasset.canton.topology.transaction.checks.{
 import com.digitalasset.canton.topology.util.SerialUtils.EnhancedPositiveInt
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{EitherTUtil, MonadUtil, SimpleExecutionQueue}
+import com.digitalasset.canton.util.{EitherTUtil, EitherUtil, MonadUtil, SimpleExecutionQueue}
 import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
 import com.digitalasset.canton.{LfPackageId, config}
 import com.digitalasset.nonempty.NonEmpty
@@ -205,6 +205,7 @@ class TemporaryTopologyManager(
     topologyCacheAggregatorConfig: BatchAggregatorConfig,
     topologyConfig: TopologyConfig,
     store: TopologyStore[TemporaryStore],
+    managerVersion: TopologyManager.Version,
     timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
     loggerFactory: NamedLoggerFactory,
@@ -216,6 +217,7 @@ class TemporaryTopologyManager(
       topologyCacheAggregatorConfig,
       topologyConfig,
       store,
+      managerVersion,
       exitOnFatalFailures = false,
       timeouts,
       futureSupervisor,
@@ -244,6 +246,7 @@ class AuthorizedTopologyManager(
       topologyCacheAggregatorConfig,
       topologyConfig,
       store,
+      managerVersion = TopologyManager.NoPV,
       exitOnFatalFailures = exitOnFatalFailures,
       timeouts,
       futureSupervisor,
@@ -262,6 +265,7 @@ abstract class LocalTopologyManager[StoreId <: TopologyStoreId](
     topologyCacheAggregatorConfig: BatchAggregatorConfig,
     topologyConfig: TopologyConfig,
     store: TopologyStore[StoreId],
+    managerVersion: TopologyManager.Version,
     exitOnFatalFailures: Boolean,
     timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
@@ -272,7 +276,7 @@ abstract class LocalTopologyManager[StoreId <: TopologyStoreId](
       clock,
       crypto,
       store,
-      TopologyManager.NoPV,
+      managerVersion,
       exitOnFatalFailures = exitOnFatalFailures,
       timeouts,
       futureSupervisor,
@@ -974,7 +978,12 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
         keys,
       )
 
-    case PartyToParticipant(partyId, threshold, participants, signingKeysWithThresholdO) =>
+    case PartyToParticipant(
+          partyId,
+          threshold,
+          participants,
+          signingKeysWithThresholdO,
+        ) =>
       checkPartyToParticipantIsNotDangerous(
         partyId,
         threshold,
@@ -1102,14 +1111,25 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
   ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] =
     EitherT.fromEither(store.storeId.forSynchronizer match {
       case Some(psid) =>
-        Either.cond(
-          upgradeAnnouncement.successorSynchronizerId >= psid.opaque,
-          (),
-          InvalidSynchronizerSuccessor.Reject.conflictWithCurrentPsid(
-            successorSynchronizerId = upgradeAnnouncement.successorSynchronizerId,
-            currentSynchronizerId = psid,
-          ),
-        )
+        for {
+          _ <- EitherUtil.condUnit(
+            upgradeAnnouncement.successorSynchronizerId >= psid.opaque,
+            InvalidSynchronizerSuccessor.Reject.conflictWithCurrentPsid(
+              successorSynchronizerId = upgradeAnnouncement.successorSynchronizerId,
+              currentSynchronizerId = psid,
+            ),
+          )
+          _ <- EitherUtil.condUnit(
+            !LsuAnnouncement.isForbiddenProtocolVersionDowngrade(
+              current = psid,
+              successor = upgradeAnnouncement.successorSynchronizerId,
+            ),
+            InvalidSynchronizerSuccessor.Reject.protocolVersionDowngrade(
+              currentSynchronizerId = psid,
+              successorSynchronizerId = upgradeAnnouncement.successorSynchronizerId,
+            ),
+          )
+        } yield ()
       case None => Right(())
     })
 
@@ -1148,7 +1168,12 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
         .map {
           _.collectOfMapping[PartyToParticipant].collectLatestByUniqueKey.toTopologyState
             .collectFirst {
-              case PartyToParticipant(_, currentThreshold, currentHostingParticipants, _) =>
+              case PartyToParticipant(
+                    _,
+                    currentThreshold,
+                    currentHostingParticipants,
+                    _,
+                  ) =>
                 Some(currentThreshold) -> currentHostingParticipants
             }
             .getOrElse(None -> Nil)

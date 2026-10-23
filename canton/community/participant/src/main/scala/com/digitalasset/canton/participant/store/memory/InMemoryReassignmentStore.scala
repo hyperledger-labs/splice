@@ -4,14 +4,12 @@
 package com.digitalasset.canton.participant.store.memory
 
 import cats.data.EitherT
-import cats.implicits.catsSyntaxParallelTraverse_
 import cats.instances.order.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.data.UnassignmentData.ReassignmentGlobalOffset
 import com.digitalasset.canton.data.{CantonTimestamp, Offset, UnassignmentData}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -20,14 +18,16 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.protocol.reassignment.{
   AssignmentData,
   IncompleteReassignmentData,
+  ReassignmentData,
 }
 import com.digitalasset.canton.participant.store.ReassignmentStore
+import com.digitalasset.canton.participant.topology.OfflineTopologyLookup
 import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId}
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.collection.MapsUtil
-import com.digitalasset.canton.util.{Checked, CheckedT, ErrorUtil}
+import com.digitalasset.canton.util.{Checked, CheckedT, ErrorUtil, MonadUtil}
 import com.digitalasset.nonempty.NonEmpty
 import monocle.Monocle.toAppliedFocusOps
 
@@ -38,6 +38,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class InMemoryReassignmentStore(
     synchronizer: Target[SynchronizerId],
+    participantId: ParticipantId,
+    offlineTopologyLookup: OfflineTopologyLookup,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends ReassignmentStore
@@ -62,7 +64,7 @@ class InMemoryReassignmentStore(
     logger.debug(s"Add reassignment request in the store: ${unassignmentData.reassignmentId}")
 
     val reassignmentId = unassignmentData.reassignmentId
-    val newEntry = ReassignmentEntry(unassignmentData, None, None)
+    val newEntry = ReassignmentEntry(unassignmentData, None, None, None)
 
     val result: Either[ReassignmentStoreError, Unit] = MapsUtil
       .updateWithConcurrentlyM_[Checked[
@@ -92,6 +94,7 @@ class InMemoryReassignmentStore(
     } yield ReassignmentEntry(
       reassignmentData,
       reassignmentEntry.reassignmentGlobalOffset,
+      reassignmentEntry.incompleteLastStakeholderOffboardedTargetOffset,
       reassignmentEntry.assignmentTs,
     )
 
@@ -115,16 +118,107 @@ class InMemoryReassignmentStore(
   }
 
   override def addReassignmentsOffsets(
-      offsets: Map[ReassignmentId, UnassignmentData.ReassignmentGlobalOffset]
+      updates: Seq[(ReassignmentId, UnassignmentData.ReassignmentGlobalOffset)]
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, ReassignmentStoreError, Unit] = offsets.toList
-    .parTraverse_ { case (reassignmentId, newGlobalOffset) =>
-      editReassignmentEntry(
-        reassignmentId,
-        entry => addUnassignmentGlobalOffset(entry, newGlobalOffset),
-      )
+  ): EitherT[FutureUnlessShutdown, ReassignmentStoreError, Unit] =
+    MonadUtil.sequentialTraverse_(updates.groupBy(_._1).toList) {
+      case (reassignmentId, updatesForId) =>
+        editReassignmentEntry(
+          reassignmentId,
+          entry => {
+            val (mergedOffsets, batchConflicts, storedConflicts) =
+              ReassignmentStore.mergeBatchThenStored(
+                reassignmentId,
+                entry.reassignmentGlobalOffset,
+                updatesForId.map(_._2),
+              )
+            batchConflicts.foreach(alarmOnMergeFailure(_, "Keeping the first offsets"))
+            storedConflicts.foreach(alarmOnMergeFailure(_, "Keeping the stored offsets"))
+            Right(entry.copy(reassignmentGlobalOffset = mergedOffsets))
+          },
+        )
     }
+
+  override def handlePartiesOffboarding(
+      offset: Offset,
+      ts: CantonTimestamp,
+      parties: NonEmpty[Set[LfPartyId]],
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, ReassignmentStoreError, Unit] = {
+    def findIncompletes(
+        validAt: Offset,
+        stakeholders: Set[LfPartyId],
+    ): List[ReassignmentData.IdAndStakeholders] = {
+      def onlyUnassignmentCompleted(entry: ReassignmentEntry): Boolean =
+        entry.unassignmentGlobalOffset.exists(_ <= validAt) &&
+          entry.assignmentGlobalOffset.forall(_ > validAt)
+
+      def incompleteReassignment(entry: ReassignmentEntry): Boolean =
+        onlyUnassignmentCompleted(
+          entry
+        ) && entry.incompleteLastStakeholderOffboardedTargetOffset.isEmpty
+
+      def filter(entry: ReassignmentEntry): Boolean =
+        incompleteReassignment(entry) && {
+          val entryStakeholders = entry.stakeholders
+          stakeholders.exists(entryStakeholders.contains(_))
+        }
+
+      reassignmentEntryMap.values
+        .to(LazyList)
+        .collect {
+          case entry if filter(entry) =>
+            ReassignmentData.IdAndStakeholders(entry.reassignmentId, entry.stakeholders)
+        }
+        .toList
+    }
+
+    val allIncompletes = findIncompletes(offset, parties)
+    val allStakeholders = allIncompletes.flatMap {
+      case ReassignmentData.IdAndStakeholders(_, stakeholders) => stakeholders
+    }.toSet
+
+    for {
+      snapshot <- offlineTopologyLookup
+        .offlineAwaitTopologySnapshot(synchronizer.value, ts)
+        .leftMap(err => TopologyLookupError(synchronizer.value, ts, err.toString))
+
+      hostingParticipants <- EitherT.right[ReassignmentStoreError](
+        snapshot.activeParticipantsOfPartiesWithInfoIgnoringFreeze(allStakeholders.toSeq)
+      )
+      locallyHostedStakeholders = hostingParticipants
+        .collect {
+          case (party, partyInfo) if partyInfo.participants.contains(participantId) => party
+        }
+        .toSet
+        .diff(parties)
+
+      notIncompletesAnymore = allIncompletes.collect {
+        case ReassignmentData.IdAndStakeholders(reassignmentId, stakeholders)
+            if stakeholders.intersect(locallyHostedStakeholders).isEmpty =>
+          reassignmentId
+      }
+
+      _ = logger.debug(
+        s"Marking last stakeholder offboarded for reassignments: $notIncompletesAnymore"
+      )
+
+      _ <- MonadUtil.sequentialTraverse_(notIncompletesAnymore) { reassignmentId =>
+        editReassignmentEntry(
+          reassignmentId = reassignmentId,
+          updateEntry = entry => {
+            if (entry.incompleteLastStakeholderOffboardedTargetOffset.isDefined)
+              entry.asRight
+            else entry.copy(incompleteLastStakeholderOffboardedTargetOffset = Some(offset)).asRight
+          },
+        )
+      }
+
+    } yield ()
+
+  }
 
   override def completeReassignment(reassignmentId: ReassignmentId, ts: CantonTimestamp)(implicit
       traceContext: TraceContext
@@ -162,22 +256,6 @@ class InMemoryReassignmentStore(
       case _ =>
         Checked.result(reassignmentEntry.focus(_.assignmentTs).replace(Some(ts)))
     }
-
-  private def addUnassignmentGlobalOffset(
-      entry: ReassignmentEntry,
-      offset: ReassignmentGlobalOffset,
-  ): Either[ReassignmentGlobalOffsetsMerge, ReassignmentEntry] = {
-    val newGlobalOffsetE = entry.reassignmentGlobalOffset
-      .fold[Either[ReassignmentGlobalOffsetsMerge, ReassignmentGlobalOffset]](Right(offset))(
-        _.merge(offset).leftMap(
-          ReassignmentGlobalOffsetsMerge(entry.reassignmentId, _)
-        )
-      )
-
-    newGlobalOffsetE.map(newGlobalOffset =>
-      entry.copy(reassignmentGlobalOffset = Some(newGlobalOffset))
-    )
-  }
 
   override def deleteCompletionsSince(
       criterionInclusive: CantonTimestamp
@@ -244,6 +322,7 @@ class InMemoryReassignmentStore(
     val newEntry = ReassignmentEntry(
       assignmentData,
       reassignmentGlobalOffset = None,
+      incompleteLastStakeholderOffboardedTargetOffset = None,
       unassignmentTs = CantonTimestamp.Epoch,
       tsCompletion = None,
     )
@@ -288,14 +367,16 @@ class InMemoryReassignmentStore(
   }
 
   override def findIncomplete(
-      sourceSynchronizer: Option[Source[SynchronizerId]],
       validAt: Offset,
       stakeholders: Option[NonEmpty[Set[LfPartyId]]],
       limit: NonNegativeInt,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[IncompleteReassignmentData]] = {
     def onlyUnassignmentCompleted(entry: ReassignmentEntry): Boolean =
-      entry.unassignmentGlobalOffset.exists(_ <= validAt) &&
-        entry.assignmentGlobalOffset.forall(_ > validAt)
+      (entry.unassignmentGlobalOffset.exists(_ <= validAt) &&
+        entry.assignmentGlobalOffset.forall(
+          _ > validAt
+        )) && entry.incompleteLastStakeholderOffboardedTargetOffset
+        .forall(_ >= validAt)
 
     def onlyAssignmentCompleted(entry: ReassignmentEntry): Boolean =
       entry.assignmentGlobalOffset.exists(_ <= validAt) &&
@@ -305,11 +386,10 @@ class InMemoryReassignmentStore(
       onlyUnassignmentCompleted(entry) || onlyAssignmentCompleted(entry)
 
     def filter(entry: ReassignmentEntry): Boolean =
-      sourceSynchronizer.forall(_ == entry.sourceSynchronizer) &&
-        incompleteReassignment(entry) && {
-          val entryStakeholders = entry.stakeholders
-          stakeholders.forall(_.exists(entryStakeholders.contains(_)))
-        }
+      incompleteReassignment(entry) && {
+        val entryStakeholders = entry.stakeholders
+        stakeholders.forall(_.exists(entryStakeholders.contains(_)))
+      }
 
     val values = reassignmentEntryMap.values
       .to(LazyList)
@@ -385,7 +465,7 @@ class InMemoryReassignmentStore(
             ) &&
             completionTs.forall(ts => entry.assignmentTs.forall(ts == _))
           }
-          .collect { case (reassignmentId, ReassignmentEntry(_, _, _, Some(request), _, _, _)) =>
+          .collect { case (reassignmentId, ReassignmentEntry(_, _, _, Some(request), _, _, _, _)) =>
             request.contractsBatch.contractIds.map(_ -> reassignmentId)
           }
           .flatten

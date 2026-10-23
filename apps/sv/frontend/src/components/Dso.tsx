@@ -20,6 +20,7 @@ const DsoWithContexts: React.FC = () => {
     return (
       <DsoViewPrettyJSON
         dsoInfoQuery={dsoInfoQuery}
+        svInfoQuery={dsoInfoQuery}
         cometBftNodeDebugQuery={cometBftNodeDebugQuery}
         sequencerStatusQuery={sequencerStatusQuery}
         mediatorStatusQuery={mediatorStatusQuery}

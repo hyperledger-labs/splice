@@ -12,7 +12,9 @@ import com.digitalasset.canton.admin.api.client.data.{
   SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
   SubscriptionLivenessLimits,
+  AcsCommitmentLimits,
   SynchronizerLimits,
+  TopologyLimits,
   TransactionProtocolLimits,
 }
 import com.digitalasset.canton.config.*
@@ -695,7 +697,11 @@ object SvSynchronizerNodeConfig {
       maxTransactionRootViews = PositiveInt.tryCreate(1_000_000),
       maxTransactionSubViews = PositiveInt.tryCreate(10_000_000),
       maxTransactionTreeDepth = PositiveInt.MaxValue,
-    )
+      maxSignaturesPerEnvelope = TransactionProtocolLimits.default.maxSignaturesPerEnvelope,
+      maxQuorumSize = TransactionProtocolLimits.default.maxQuorumSize,
+    ),
+    topologyLimits = TopologyLimits.default,
+    acsCommitmentLimits = AcsCommitmentLimits.default,
   )
 }
 

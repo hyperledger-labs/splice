@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.validator.store
 
+import com.digitalasset.canton.tracing.TraceContext
+
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   install as walletCodegen,
@@ -28,7 +30,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
@@ -168,8 +169,9 @@ object ValidatorStore {
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
-  ): ValidatorStore =
-    new DbValidatorStore(
+      tc: TraceContext,
+  ): Future[ValidatorStore] =
+    DbValidatorStore.create(
       key,
       storage,
       loggerFactory,

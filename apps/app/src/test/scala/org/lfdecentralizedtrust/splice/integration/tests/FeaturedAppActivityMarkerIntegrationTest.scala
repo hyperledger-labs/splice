@@ -80,7 +80,7 @@ class FeaturedAppActivityMarkerIntegrationTest
 
     actAndCheck(timeUntilSuccess = 60.seconds)(
       "Create activity markers", {
-        for (i <- 1 to markerMultiplier) {
+        for (_ <- 1 to markerMultiplier) {
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
             .submitJava(
               Seq(alice),

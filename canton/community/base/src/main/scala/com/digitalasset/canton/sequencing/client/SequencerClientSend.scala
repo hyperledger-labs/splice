@@ -5,6 +5,7 @@ package com.digitalasset.canton.sequencing.client
 
 import cats.data.EitherT
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.canton.crypto.SynchronizerSnapshotSyncCryptoApi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
@@ -18,7 +19,6 @@ import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 
-import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext
 
 trait SequencerClientSend {
@@ -72,6 +72,11 @@ trait SequencerClientSend {
     *   [[com.digitalasset.canton.sequencing.protocol.AggregationRule]] to the request for
     *   deduplication, unless one is already present. False disables amplification for this request
     *   independent of the configuration.
+    * @param currentSnapshotApproximation
+    *   The current approximate snapshot. If you already have an approximate snapshot available that
+    *   was used previously (for example, to sign an inner `SignedProtocolMessage` such as a
+    *   `ConfirmationResponse` or `ConfirmationResultMessage`), you should pass it here. Otherwise,
+    *   leave it empty and the sequencer client will retrieve it internally via the crypto client.
     * @param timestamps
     *   Aggregated timestamps needed for sending a request.
     * @param trafficCostValidator
@@ -81,6 +86,7 @@ trait SequencerClientSend {
     */
   def sendAsync(
       batch: Batch[DefaultOpenEnvelope],
+      currentSnapshotApproximation: Option[SynchronizerSnapshotSyncCryptoApi],
       timestamps: SendRequestTimestamps = defaultSendRequestTimestamps,
       messageId: MessageId = generateMessageId,
       aggregationRule: Option[AggregationRule] = None,
@@ -99,6 +105,7 @@ trait SequencerClientSend {
     */
   def send(
       batch: Batch[DefaultOpenEnvelope],
+      currentSnapshotApproximation: Option[SynchronizerSnapshotSyncCryptoApi],
       timestamps: SendRequestTimestamps = defaultSendRequestTimestamps,
       messageId: MessageId = generateMessageId,
       aggregationRule: Option[AggregationRule] = None,
@@ -111,6 +118,7 @@ trait SequencerClientSend {
       metricsContext: MetricsContext,
   ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] = sendAsync(
     batch = batch,
+    currentSnapshotApproximation = currentSnapshotApproximation,
     timestamps = timestamps,
     messageId = messageId,
     aggregationRule = aggregationRule,
@@ -123,7 +131,6 @@ trait SequencerClientSend {
   private def defaultSendRequestTimestamps: SendRequestTimestamps = {
     val now = clock.now
     SendRequestTimestamps(
-      topologyTimestamp = None,
       approximateTimestampForSigning = now,
       maxSequencingTime = generateMaxSequencingTime(now),
     )
@@ -147,8 +154,6 @@ object SequencerClientSend {
 
   /** Aggregates all the timestamps needed when sending a request.
     *
-    * @param topologyTimestamp
-    *   An optional timestamp specifying the topology state to reference for this request.
     * @param approximateTimestampForSigning
     *   Defines a timestamp used for signing a request, overriding the timestamp of the selected
     *   topology. For submission requests (e.g., encrypted view messages), the topology is not yet
@@ -158,16 +163,8 @@ object SequencerClientSend {
     * @param maxSequencingTime
     *   The max sequencing time for the request.
     */
-  @nowarn("cat=deprecation")
   final case class SendRequestTimestamps(
-      @deprecated(
-        since = "pv35",
-        message =
-          "Do not specify a topology timestamp for send requests. This field will be removed in a future version.",
-      )
-      topologyTimestamp: Option[CantonTimestamp],
       approximateTimestampForSigning: CantonTimestamp,
       maxSequencingTime: CantonTimestamp,
   )
-
 }

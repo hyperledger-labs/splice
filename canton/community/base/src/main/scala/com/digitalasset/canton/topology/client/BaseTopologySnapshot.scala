@@ -4,7 +4,6 @@
 package com.digitalasset.canton.topology.client
 
 import cats.syntax.functorFilter.*
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.SigningKeysWithThreshold
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -26,12 +25,10 @@ import com.digitalasset.canton.topology.store.{
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Replace
 import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.topology.transaction.{
-  HostingParticipant,
   LsuAnnouncement,
   MediatorSynchronizerState,
   OwnerToKeyMapping,
   ParticipantAttributes,
-  ParticipantPermission,
   ParticipantSynchronizerPermission,
   PartyToKeyMapping,
   PartyToParticipant,
@@ -137,7 +134,6 @@ abstract class BaseTopologySnapshot(
       packages: Set[PackageId],
       ledgerTime: CantonTimestamp,
       vettedPackages: Map[PackageId, VettedPackage],
-      checkDependencyVetting: Boolean,
   )(implicit traceContext: TraceContext): UnknownOrUnvettedPackages = {
     def isValid(pkg: PackageId): Boolean =
       vettedPackages.get(pkg).exists(_.validAt(ledgerTime))
@@ -154,8 +150,7 @@ abstract class BaseTopologySnapshot(
       case Right(resolvedPackagesAndDependencies) =>
         UnknownOrUnvettedPackages.unvetted(
           participantId = participant,
-          packageIds = invalidPackages ++ resolvedPackagesAndDependencies
-            .packageIds(withDependencies = checkDependencyVetting)
+          packageIds = invalidPackages ++ resolvedPackagesAndDependencies.mainPackageIds
             .filterNot(isValid),
         )
     }
@@ -213,16 +208,18 @@ abstract class BaseTopologySnapshot(
 
   override private[client] def loadActiveParticipantsOf(
       party: PartyId,
+      view: BaseTopologySnapshot.HostingView,
       participantStates: Seq[ParticipantId] => FutureUnlessShutdown[
         Map[ParticipantId, ParticipantAttributes]
       ],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[PartyInfo] =
-    loadBatchActiveParticipantsOf(Seq(party), participantStates).map(
+    loadBatchActiveParticipantsOf(Seq(party), view, participantStates).map(
       _.getOrElse(party, PartyInfo.EmptyPartyInfo)
     )
 
   override private[client] def loadBatchActiveParticipantsOf(
       parties: Seq[PartyId],
+      view: BaseTopologySnapshot.HostingView,
       loadParticipantStates: Seq[ParticipantId] => FutureUnlessShutdown[
         Map[ParticipantId, ParticipantAttributes]
       ],
@@ -268,12 +265,7 @@ abstract class BaseTopologySnapshot(
               val partyToParticipantMappings = collectLatestByType[PartyToParticipant](
                 storedTransactions,
                 TopologyMapping.Code.PartyToParticipant,
-              ).map { ptp =>
-                ptp.partyId -> (ptp.threshold, ptp.participants.map {
-                  case HostingParticipant(participantId, partyPermission, onboarding) =>
-                    participantId -> (partyPermission, onboarding)
-                }.toMap)
-              }.toMap
+              )
 
               // admin parties are implicitly defined by the fact that a participant is available on a synchronizer.
               // admin parties have the same UID as their participant
@@ -286,19 +278,14 @@ abstract class BaseTopologySnapshot(
             }
         }
         .getOrElse(
-          FutureUnlessShutdown.pure(
-            Map.empty[
-              PartyId,
-              (PositiveInt, Map[ParticipantId, (ParticipantPermission, Boolean)]),
-            ] -> Seq.empty
-          )
+          FutureUnlessShutdown.pure(Seq.empty[PartyToParticipant] -> Seq.empty[ParticipantId])
         )
-      (partyToParticipantMap, adminPartyParticipants) = partyData
+      (partyToParticipantMappings, adminPartyParticipants) = partyData
 
       // fetch all admin parties
-      participantIds = partyToParticipantMap.values.flatMap { case (_, participants) =>
-        participants.keys
-      }.toSeq ++ adminPartyParticipants
+      participantIds = partyToParticipantMappings.flatMap(
+        _.participantIds
+      ) ++ adminPartyParticipants
 
       participantToAttributesMap <- loadParticipantStates(participantIds)
 
@@ -306,41 +293,15 @@ abstract class BaseTopologySnapshot(
         .mapFilter(participantId =>
           participantToAttributesMap
             .get(participantId)
-            .map(attrs =>
-              // participant admin parties are never consortium parties
-              participantId.adminParty -> PartyInfo
-                .nonConsortiumPartyInfo(Map(participantId -> attrs))
-            )
+            .map(attrs => participantId.adminParty -> PartyInfo.forAdminParty(participantId, attrs))
         )
         .toMap
 
-      // In case the party->participant mapping contains participants missing from map returned
-      // by loadParticipantStates, filter out participants with "empty" permissions and transitively
-      // parties whose participants have all been filtered out this way.
-      // this can only affect participants that have left the synchronizer
       partiesToPartyInfos = {
-        val p2pMappings = partyToParticipantMap.toSeq.mapFilter {
-          case (partyId, (threshold, participantToPermissionsMap)) =>
-            val participantIdToAttribs = participantToPermissionsMap.toSeq.mapFilter {
-              case (participantId, (partyPermission, onboarding)) =>
-                participantToAttributesMap
-                  .get(participantId)
-                  .map { participantAttributes =>
-                    // Use the lower permission between party and the permission granted to the participant by the synchronizer
-                    val reducedPermission =
-                      ParticipantPermission.lowerOf(
-                        partyPermission,
-                        participantAttributes.permission,
-                      )
-                    participantId -> ParticipantAttributes(
-                      reducedPermission,
-                      participantAttributes.loginAfter,
-                      onboarding = onboarding,
-                    )
-                  }
-            }.toMap
-            if (participantIdToAttribs.isEmpty) None
-            else Some(partyId -> PartyInfo(threshold, participantIdToAttribs))
+        val p2pMappings = partyToParticipantMappings.mapFilter { mapping =>
+          PartyInfo
+            .fromMapping(mapping, participantToAttributesMap, view, psid.protocolVersion)
+            .map(mapping.partyId -> _)
         }.toMap
         // In case of conflicting mappings, the admin party takes higher precedence
         // Note that conflicts are prevented in TopologyMappingChecks.
@@ -693,5 +654,39 @@ abstract class BaseTopologySnapshot(
       )
     }
     result
+  }
+}
+
+object BaseTopologySnapshot {
+
+  /** How the hosts of a party are derived from the hosting states of its mapping entries.
+    *
+    * The mapping also lists participants that do not host the party yet (see
+    * `HostingState.canHost`), so the hosts are not simply the listed participants. In addition,
+    * while any entry is Freezing, the party is frozen. The two views differ only in how they treat
+    * a frozen party.
+    */
+  private[client] sealed trait HostingView extends Product with Serializable
+
+  private[client] object HostingView {
+
+    /** A frozen party has no hosts. Every consumer reads this view except the freeze-ignoring ones.
+      * Request processing thus treats a frozen party like any party without hosts and rejects the
+      * requests in which it is a stakeholder, without a freeze-specific check.
+      */
+    case object Default extends HostingView
+
+    /** A frozen party keeps its Onboarding and Active hosts.
+      *
+      * A freeze emits no Ledger API topology events. Hence, consumers that keep state over time and
+      * correct it only when such an event arrives must not see a frozen party as unhosted: during a
+      * freeze, a change outside the party's control (e.g. a co-stakeholder's hosting change or a
+      * commitment reinitialization) would drop the party's hosts from their state, and no event
+      * would restore them afterwards. These consumers are ACS commitments, which would then
+      * mismatch, and the reassignment stores' offboarding cleanup, which would mark an incomplete
+      * reassignment as complete. Legacy offline party replication also reads this view, so that it
+      * keeps working during a freeze.
+      */
+    case object IgnoringFreeze extends HostingView
   }
 }

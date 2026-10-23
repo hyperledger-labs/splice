@@ -3,10 +3,13 @@
 
 package com.digitalasset.canton.version
 
+import cats.syntax.either.*
 import cats.syntax.functor.*
-import com.digitalasset.canton.ProtoDeserializationError.UnknownProtoVersion
+import com.digitalasset.canton.Errors.raiseCannotSerialize
+import com.digitalasset.canton.ProtoDeserializationError.{OtherError, UnknownProtoVersion}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.topology.transaction.TopologyTransaction
 import com.digitalasset.canton.{ProtoDeserializationError, checked}
 import com.digitalasset.nonempty.{NonEmpty, NonEmptyUtil}
 
@@ -45,21 +48,39 @@ final case class SupportedProtoVersions[F[
         case (_, converter) if protocolVersion >= converter.fromInclusive.representative =>
           converter
       }
-      .getOrElse(higherConverter)
+      .getOrElse(raiseCannotSerialize(name, protocolVersion))
 
   def deserializerFor(
       protoVersion: ProtoVersion
-  ): Deserializer =
-    converters.get(protoVersion).map(_.deserializer).getOrElse(higherConverter.deserializer)
+  ): ParsingResult[Deserializer] =
+    converters.get(protoVersion).map(_.deserializer) match {
+      case Some(deserializer) => deserializer.asRight
+
+      case None =>
+        /*
+          We want to fail here. However, we have on MainNet a topology transaction with protobuf version 29.
+          Hence, for topology transactions, we make an exception.
+         */
+
+        // Converters are sorted in descending order, so the lowest supported version is the last one
+        val (lowestSupportedProtoVersion, lowestProtoCodec) = converters.last1
+
+        if (name == TopologyTransaction.name && protoVersion < lowestSupportedProtoVersion)
+          lowestProtoCodec.deserializer.asRight
+        else
+          OtherError(
+            s"Unable to find deserializer for version $protoVersion and message $name. This indicates that the node is trying to parse a message with a proto version that is not supported anymore."
+          ).asLeft
+    }
 
   def protoVersionFor(
       protocolVersion: RepresentativeProtocolVersion[Comp]
-  ): ProtoVersion = converters
+  ): Either[String, ProtoVersion] = converters
     .collectFirst {
       case (protoVersion, converter) if protocolVersion >= converter.fromInclusive =>
         protoVersion
     }
-    .getOrElse(higherProtoVersion)
+    .toRight(s"Unable to find proto version for $name for protocol version $protocolVersion")
 
   def converterFor(
       protocolVersion: RepresentativeProtocolVersion[Comp]
@@ -152,7 +173,10 @@ object SupportedProtoVersions {
 
   private[version] def fromNonEmpty[F[
       _
-  ], ValueClass, Context, DeserializedValueClass, Comp, Dependency](name: String)(
+  ], ValueClass, Context, DeserializedValueClass, Comp, Dependency](
+      name: String,
+      expectedMinimumPv: ProtocolVersion = ProtocolVersion.minimum,
+  )(
       converters: NonEmpty[Seq[
         (
             ProtoVersion,
@@ -176,8 +200,8 @@ object SupportedProtoVersions {
     // remember to specify that explicitly by adding to the SupportedProtoVersions:
     // ProtoVersion(-1) -> UnsupportedProtoCodec(ProtocolVersion.minimum),
     require(
-      lowestProtocolVersion.fromInclusive.representative == ProtocolVersion.minimum,
-      s"ProtocolVersion corresponding to lowest proto version should be ${ProtocolVersion.minimum}, found $lowestProtocolVersion",
+      lowestProtocolVersion.fromInclusive.representative == expectedMinimumPv,
+      s"ProtocolVersion corresponding to lowest proto version should be $expectedMinimumPv, found $lowestProtocolVersion",
     )
 
     SupportedProtoVersions(sortedConverters, name)

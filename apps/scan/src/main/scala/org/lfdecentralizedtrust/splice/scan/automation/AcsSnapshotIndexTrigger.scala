@@ -45,7 +45,7 @@ class AcsSnapshotIndexTrigger(
     .indexSnapshotStakeholdersTable(task)
     .map(_ => TaskSuccess(s"Successfully indexed tables of snapshot ${task.snapshotRecordTime}"))
     .transform {
-      case Failure(e: AdvisoryLocks.FailedToAcquireLockException) =>
+      case Failure(_: AdvisoryLocks.FailedToAcquireLockException) =>
         // There was a concurrent DDL statement running.
         // The next `retrieveTasks` will still include the task.
         Success(TaskNoop)

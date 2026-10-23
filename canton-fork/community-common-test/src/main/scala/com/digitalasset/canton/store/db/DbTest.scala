@@ -4,7 +4,6 @@
 package com.digitalasset.canton.store.db
 
 import com.digitalasset.canton.config.DbConfig
-import com.digitalasset.canton.config.DbConfig.{H2, Postgres}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.DbStorage
@@ -105,27 +104,5 @@ trait DbTest
     // cleanDB is usually implemented by a TRUNCATE statement, which can be very slow,
     // we therefore use a long timeout.
     Await.result(cleanDb(storage.underlying), 120.seconds)
-  }
-}
-
-/** Run db test against h2 */
-trait H2Test extends DbTest { this: Suite =>
-
-  override protected def mkDbConfig(basicConfig: DbBasicConfig): H2 = basicConfig.toH2DbConfig
-
-  override protected def createSetup(): DbStorageSetup =
-    DbStorageSetup.h2(loggerFactory, migrationMode, mkDbConfig)
-}
-
-/** Run db test for running against postgres */
-trait PostgresTest extends DbTest { this: Suite =>
-
-  override protected def mkDbConfig(basicConfig: DbBasicConfig): Postgres =
-    basicConfig.toPostgresDbConfig
-
-  override protected def createSetup(): DbStorageSetup = {
-    // postgres has limit of 63 chars for the db name
-    val dbName = this.getClass.getSimpleName.replaceAll("[^a-zA-Z0-9]", "").toLowerCase.take(63)
-    DbStorageSetup.postgres(loggerFactory, migrationMode, mkDbConfig, useDbNameO = Some(dbName))
   }
 }

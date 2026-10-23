@@ -45,3 +45,7 @@ ACS_COMMITMENT_DEGRADATION
 # TODO(#6524): Fix mismatches
 ACS_COMMITMENT_MISMATCH
 Backing off .* after error: Requested pruning timestamp .* is later than the earliest available pruning timestamp.*MediatorPruningScheduler
+
+# A command that passes phase 1 right after a sim-clock jump gets the new clock as ledger time but is
+# ordered into a BFT block whose time still derives from pre-jump commits, so the two differ by the jump.
+Time validation has failed: The delta of the ledger time .* and the record time .* exceeds the max of

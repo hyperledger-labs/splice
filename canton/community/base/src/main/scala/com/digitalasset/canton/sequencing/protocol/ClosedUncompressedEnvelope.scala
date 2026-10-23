@@ -6,7 +6,8 @@ package com.digitalasset.canton.sequencing.protocol
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.foldable.*
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.checkedToByteString
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{HashOps, Signature, SignatureCheckError, SyncCryptoApi}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.*
@@ -22,24 +23,12 @@ import com.digitalasset.canton.protocol.messages.{
   TypedSignedProtocolMessageContent,
   UnsignedProtocolMessage,
 }
-import com.digitalasset.canton.protocol.{SynchronizerLimits, v30, v31}
-import com.digitalasset.canton.serialization.ProtoConverter
+import com.digitalasset.canton.protocol.{SynchronizerLimits, v31}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ByteStringUtil, MaxBytesToDecompress, MonadUtil}
-import com.digitalasset.canton.validation.ProtoValidation
-import com.digitalasset.canton.version.{
-  HasProtocolVersionedWrapper,
-  ProtoVersion,
-  ProtocolVersion,
-  ProtocolVersionValidation,
-  RepresentativeProtocolVersion,
-  UnsupportedProtoCodec,
-  VersionedProtoCodec,
-  VersioningCompanionContext,
-}
-import com.digitalasset.canton.{ProtoDeserializationError, checkedToByteString}
+import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
 import com.digitalasset.nonempty.NonEmpty
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
@@ -55,20 +44,14 @@ import scala.concurrent.ExecutionContext
   * a [[com.digitalasset.canton.protocol.messages.TypedSignedProtocolMessageContent]] otherwise. It
   * itself is serialized without version wrappers inside a [[Batch]].
   */
+// TODO(#35535) Consider deleting (de)serialization machinery for this one
 final case class ClosedUncompressedEnvelope private[protocol] (
     override val bytes: ByteString,
     override val recipients: Recipients,
     signatures: Seq[Signature],
 )(
-    override val representativeProtocolVersion: RepresentativeProtocolVersion[
-      ClosedUncompressedEnvelope.type
-    ],
-    pvv: ProtocolVersionValidation,
-) extends ClosedEnvelope
-    with HasProtocolVersionedWrapper[ClosedUncompressedEnvelope] {
-
-  @transient override protected lazy val companionObj: ClosedUncompressedEnvelope.type =
-    ClosedUncompressedEnvelope
+    pvv: ProtocolVersionValidation
+) extends ClosedEnvelope {
 
   override def toOpenEnvelope(
       hashOps: HashOps,
@@ -93,8 +76,7 @@ final case class ClosedUncompressedEnvelope private[protocol] (
           )(bytes)
           .flatMap { envelopeContent =>
             envelopeContent.message match {
-              case LegacyAcsCommitmentProtocolMessage(acsCommitment, signatures)
-                  if protocolVersion >= ProtocolVersion.v35 =>
+              case LegacyAcsCommitmentProtocolMessage(acsCommitment, signatures) =>
                 Right(
                   OpenEnvelope(
                     SignedProtocolMessage(
@@ -103,14 +85,6 @@ final case class ClosedUncompressedEnvelope private[protocol] (
                     ),
                     recipients,
                   )(protocolVersion)
-                )
-              case internal: LegacyAcsCommitmentProtocolMessage
-                  if protocolVersion < ProtocolVersion.v35 =>
-                Left(
-                  ProtoDeserializationError.OtherError(
-                    s"Unexpected type inside envelope: ${internal.showType}. This type should only be used with " +
-                      s"protocol version ${ProtocolVersion.v35} or higher."
-                  )
                 )
               case _ =>
                 Right(
@@ -162,14 +136,10 @@ final case class ClosedUncompressedEnvelope private[protocol] (
         MaxBytesToDecompress(NonNegativeInt.tryCreate(uncompressed.size))
       ),
       pvv,
+      // Not enforced for serialization
+      maxSignaturesPerEnvelope = PositiveInt.MaxValue,
     )
   }
-
-  def toProtoV30: v30.Envelope = v30.Envelope(
-    content = bytes,
-    recipients = Some(recipients.toProtoV30),
-    signatures = signatures.map(_.toProtoV30),
-  )
 
   def updateSignatures(signatures: Seq[Signature]): ClosedUncompressedEnvelope =
     copy(signatures = signatures)
@@ -188,7 +158,6 @@ final case class ClosedUncompressedEnvelope private[protocol] (
       bytes,
       recipients,
       signatures,
-      representativeProtocolVersion,
       pvv,
     )
 
@@ -217,54 +186,11 @@ final case class ClosedUncompressedEnvelope private[protocol] (
     copy(recipients = newRecipients)
 }
 
-object ClosedUncompressedEnvelope
-    extends VersioningCompanionContext[ClosedUncompressedEnvelope, SynchronizerLimits] {
+object ClosedUncompressedEnvelope {
   val recipientsLens: Lens[ClosedUncompressedEnvelope, Recipients] =
     Lens[ClosedUncompressedEnvelope, Recipients](_.recipients)(newRecipients =>
       envelope => envelope.withRecipients(newRecipients)
     )
-
-  override def name: String = "ClosedUncompressedEnvelope"
-
-  override val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(
-      ProtocolVersion.v34
-    )(v30.Envelope)(
-      supportedProtoVersionPVV(_)(fromProtoV30),
-      _.toProtoV30,
-    ),
-    ProtoVersion(31) -> UnsupportedProtoCodec(ProtocolVersion.v35),
-  )
-
-  private[protocol] def fromProtoV30(
-      pvv: ProtocolVersionValidation,
-      synchronizerLimits: SynchronizerLimits,
-      envelopeP: v30.Envelope,
-  ): ParsingResult[ClosedUncompressedEnvelope] = {
-    val v30.Envelope(contentP, recipientsP, signaturesP) = envelopeP
-    for {
-      recipients <- ProtoConverter.parseRequired(
-        Recipients.fromProtoV30(pvv, synchronizerLimits, _),
-        "recipients",
-        recipientsP,
-      )
-      signatures <- ProtoValidation
-        .validateLengthThen(
-          signaturesP,
-          "signatures",
-          pvv,
-          ProtoValidation.MaxCollectionSize,
-        )((element, _) => Signature.fromProtoV30(element))
-      rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
-      closedEnvelope = create(
-        contentP,
-        recipients,
-        signatures,
-        rpv,
-        pvv,
-      )
-    } yield closedEnvelope
-  }
 
   def tryFromProtocolMessage(
       protocolMessage: ProtocolMessage,
@@ -285,7 +211,7 @@ object ClosedUncompressedEnvelope
         )
       case SignedProtocolMessage(typedMessage, signatures) =>
         typedMessage.content match {
-          case acsCommitment: LegacyAcsCommitment if protocolVersion >= ProtocolVersion.v35 =>
+          case acsCommitment: LegacyAcsCommitment =>
             ClosedUncompressedEnvelope.create(
               EnvelopeContent(
                 LegacyAcsCommitmentProtocolMessage(acsCommitment, signatures),
@@ -309,10 +235,9 @@ object ClosedUncompressedEnvelope
       bytes: ByteString,
       recipients: Recipients,
       signatures: Seq[Signature],
-      representativeProtocolVersion: RepresentativeProtocolVersion[ClosedUncompressedEnvelope.type],
       pvv: ProtocolVersionValidation,
   ): ClosedUncompressedEnvelope =
-    ClosedUncompressedEnvelope(bytes, recipients, signatures)(representativeProtocolVersion, pvv)
+    ClosedUncompressedEnvelope(bytes, recipients, signatures)(pvv)
 
   def create(
       bytes: ByteString,
@@ -324,7 +249,6 @@ object ClosedUncompressedEnvelope
       bytes,
       recipients,
       signatures,
-      protocolVersionRepresentativeFor(protocolVersion),
       ProtocolVersionValidation.PV(protocolVersion),
     )
 }

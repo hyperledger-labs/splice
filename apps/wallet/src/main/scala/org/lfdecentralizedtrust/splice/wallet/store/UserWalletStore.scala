@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.wallet.store
 
+import com.digitalasset.canton.tracing.TraceContext
+
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
@@ -52,7 +54,6 @@ import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
@@ -568,11 +569,6 @@ object UserWalletStore {
       paymentInterval: RelTime,
       paymentDuration: RelTime,
   )
-  final case class EntryWithSubscriptionContext(
-      entry: Contract[ansCodegen.AnsEntry.ContractId, ansCodegen.AnsEntry],
-      subscriptionReference: subsCodegen.SubscriptionRequest.ContractId,
-  )
-
   def apply(
       key: Key,
       storage: DbStorage,
@@ -586,8 +582,9 @@ object UserWalletStore {
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       close: CloseContext,
-  ): UserWalletStore = {
-    new DbUserWalletStore(
+      tc: TraceContext,
+  ): Future[UserWalletStore] = {
+    DbUserWalletStore.create(
       key,
       storage,
       loggerFactory,

@@ -6,7 +6,11 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.HashOps
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.{
+  Pretty,
+  PrettyPrintingCompanion,
+  PrettyPrintingFromCompanion,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.SynchronizerLimits
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
@@ -291,6 +295,7 @@ private[bftordering] class BftOrderingModuleSystemInitializer[
               config.consensusEmptyBlockCreationTimeout,
               config.consensusEnableFlushingSegment,
               config.consensusFlushingMinBlocks,
+              config.consensusWindowSizeForRetransmissionOfCommitCertificates,
               config.viewChangeTimeoutOverride,
               loggerFactory,
               timeouts,
@@ -583,9 +588,15 @@ object BftOrderingModuleSystemInitializer {
       initialTopologyQueryTimestamp: Option[TopologyActivationTime],
       previousTopologyQueryTimestamp: Option[TopologyActivationTime],
       onboardingTopologyQueryTimestamp: Option[TopologyActivationTime] = None,
-  ) extends PrettyPrinting {
+  ) extends PrettyPrintingFromCompanion {
 
-    override protected def pretty: Pretty[BootstrapTopologyInfo] =
+    override def prettyCompanion: PrettyPrintingCompanion[BootstrapTopologyInfo] =
+      BootstrapTopologyInfo
+  }
+
+  object BootstrapTopologyInfo extends PrettyPrintingCompanion[BootstrapTopologyInfo] {
+
+    override protected val pretty: Pretty[BootstrapTopologyInfo] =
       prettyOfClass(
         param("initialTopologyEpochNumber", _.initialTopologyEpochNumber),
         param("initialTopologyQueryTimestamp", _.initialTopologyQueryTimestamp.map(_.value)),

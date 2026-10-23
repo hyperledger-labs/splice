@@ -45,7 +45,7 @@ class RecoverExternalPartyIntegrationTest
     )
     val synchronizerId = physicalSynchronizerId.logical
 
-    val onboarding @ OnboardingResult(aliceParty, alicePublicKey, alicePrivateKey) =
+    val onboarding @ OnboardingResult(aliceParty, _, alicePrivateKey) =
       onboardExternalParty(aliceValidatorBackend, Some("aliceExternal"))
 
     aliceValidatorWalletClient.tap(5000.0)

@@ -27,7 +27,7 @@ import com.digitalasset.canton.topology.{
   TopologyManagerError,
 }
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.base.error.utils.ErrorDetails
@@ -230,13 +230,13 @@ class JoiningNodeInitializer(
         } else Future.unit
       }
       domainMigrationId <- resolveDomainMigrationId(migrationIdFromSponsorSv())
-      svStore = newSvStore(
+      svStore <- newSvStore(
         storeKey,
         domainMigrationId,
         participantId,
         svAcsStoreDescriptorUserVersion,
       )
-      dsoStore = newDsoStore(
+      dsoStore <- newDsoStore(
         svStore.key,
         domainMigrationId,
         participantId,
@@ -657,8 +657,8 @@ class JoiningNodeInitializer(
                 show"Party $dsoParty is not hosted on participant $participantId"
               )
               .asRuntimeException()
-          case Some(HostingParticipant(_, permission, onboarding)) =>
-            if (permission == ParticipantPermission.Submission && !onboarding)
+          case Some(hosting) =>
+            if (hosting.permission == ParticipantPermission.Submission && !hosting.onboarding)
               dsoPartyHosting
             else
               throw Status.FAILED_PRECONDITION.withDescription(description).asRuntimeException()

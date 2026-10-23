@@ -749,37 +749,6 @@ class UpdateHistory private (
       )
   }
 
-  def verifyNoRolledBackAcsSnapshots(
-      historyId: Long,
-      migrationId: Long,
-      recordTime: CantonTimestamp,
-  )(implicit tc: TraceContext): Future[Unit] = {
-    val action = sql"""
-          select snapshot_record_time from acs_snapshot
-          where history_id = $historyId and migration_id = $migrationId and snapshot_record_time > $recordTime
-        """
-      .as[CantonTimestamp]
-      .map(times =>
-        if (times.length > 0) {
-          throw new IllegalStateException(
-            s"Found acs snapshots at $times for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime, " +
-              "but the configuration says the domain was paused during the migration. " +
-              "Check the domain migration configuration and the content of the update history database"
-          )
-        } else {
-          logger.debug(
-            s"No updates found for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime"
-          )
-        }
-      )
-
-    storage
-      .query(
-        action,
-        "verifyNoRolledBackAcsSnapshots",
-      )
-  }
-
   /** Deletes all updates on the given domain with a record time before the given time.
     */
   def deleteUpdatesBefore(

@@ -3,12 +3,15 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
+import com.digitalasset.canton.tracing.TraceContext
+
+import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore
+
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.rewardaccountingv2.CalculateRewardsV2
@@ -41,11 +44,66 @@ import scala.jdk.OptionConverters.*
 
 object DbScanRewardsReferenceStore {
 
+  /** Looks up the store ids, and creates the store. */
+  def create(
+      key: ScanRewardsReferenceStore.Key,
+      storage: DbStorage,
+      loggerFactory: NamedLoggerFactory,
+      retryProvider: RetryProvider,
+      migrationId: Long,
+      participantId: ParticipantId,
+      ingestionConfig: IngestionConfig,
+      defaultLimit: Limit,
+  )(implicit
+      ec: ExecutionContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+      closeContext: CloseContext,
+      tc: TraceContext,
+  ): Future[DbScanRewardsReferenceStore] =
+    DbMultiDomainAcsStore
+      .lookupStoreIds(storage, acsStoreDescriptor(key, participantId), None)
+      .map { storeIds =>
+        new DbScanRewardsReferenceStore(
+          key = key,
+          storage = storage,
+          loggerFactory = loggerFactory,
+          retryProvider = retryProvider,
+          migrationId = migrationId,
+          participantId = participantId,
+          ingestionConfig = ingestionConfig,
+          storeIds,
+          defaultLimit = defaultLimit,
+        )
+      }
+
+  // Any change in the store descriptor will lead to previously deployed applications
+  // forgetting all persisted data once they upgrade to the new version.
+  // WARNING: Reinitializing the acs store is a very expensive operation, as it currently fetches the full
+  // unfiltered ACS from the participant, irrespective of the filter defined by `acsContractFilter`.
+  // This may lead to the entire app being unavailable or not working properly until the full ACS has been ingested.
+  // Do not modify any part of the store descriptor unless you are sure that the resulting downtime is acceptable.
+  // If you do modify it, make sure to very clearly document in the release notes that there will be planned downtime,
+  // and notify the person coordinating the deployment.
+  def acsStoreDescriptor(
+      key: ScanRewardsReferenceStore.Key,
+      participantId: ParticipantId,
+  ): StoreDescriptor =
+    StoreDescriptor(
+      version = 3,
+      name = "DbScanRewardsReferenceStore",
+      party = key.dsoParty,
+      participant = participantId,
+      key = Map(
+        "dsoParty" -> key.dsoParty.toProtoPrimitive,
+        "synchronizerId" -> key.synchronizerId.toProtoPrimitive,
+      ),
+    )
+
   // same as `defaultAppActivityWeight` in the daml.
   val DefaultAppActivityWeight: BigDecimal = BigDecimal(1)
 }
 
-class DbScanRewardsReferenceStore(
+class DbScanRewardsReferenceStore private (
     override val key: ScanRewardsReferenceStore.Key,
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -53,6 +111,7 @@ class DbScanRewardsReferenceStore(
     migrationId: Long,
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
+    storeIds: DbMultiDomainAcsStore.StoreIds,
     override val defaultLimit: Limit,
 )(implicit
     override protected val ec: ExecutionContext,
@@ -62,24 +121,8 @@ class DbScanRewardsReferenceStore(
       storage = storage,
       acsTableName = ScanRewardsReferenceTables.acsTableName,
       interfaceViewsTableNameOpt = None,
-      // Any change in the store descriptor will lead to previously deployed applications
-      // forgetting all persisted data once they upgrade to the new version.
-      // WARNING: Reinitializing the acs store is a very expensive operation, as it currently fetches the full
-      // unfiltered ACS from the participant, irrespective of the filter defined by `acsContractFilter`.
-      // This may lead to the entire app being unavailable or not working properly until the full ACS has been ingested.
-      // Do not modify any part of the store descriptor unless you are sure that the resulting downtime is acceptable.
-      // If you do modify it, make sure to very clearly document in the release notes that there will be planned downtime,
-      // and notify the person coordinating the deployment.
-      acsStoreDescriptor = StoreDescriptor(
-        version = 3,
-        name = "DbScanRewardsReferenceStore",
-        party = key.dsoParty,
-        participant = participantId,
-        key = Map(
-          "dsoParty" -> key.dsoParty.toProtoPrimitive,
-          "synchronizerId" -> key.synchronizerId.toProtoPrimitive,
-        ),
-      ),
+      acsStoreDescriptor = DbScanRewardsReferenceStore.acsStoreDescriptor(key, participantId),
+      storeIds = storeIds,
       migrationId = migrationId,
       ingestionConfig = ingestionConfig,
       acsArchiveConfigOpt = Some(

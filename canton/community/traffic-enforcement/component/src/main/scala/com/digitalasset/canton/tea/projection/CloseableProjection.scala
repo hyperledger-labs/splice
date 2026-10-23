@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.tea.projection
 
+import cats.Eval
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, FlagCloseable, LifeCycle}
@@ -13,10 +14,9 @@ import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Terminated}
 import org.apache.pekko.projection.{ProjectionBehavior, ProjectionId}
 
-import scala.concurrent.Promise
+import scala.concurrent.{Future, Promise}
 
-/** Wrapper class that cleanly closes a projection and reports if it dies while still expected to
-  * run.
+/** Wrapper class that can cleanly close a projection
   */
 class CloseableProjection(
     projectionId: ProjectionId,
@@ -27,39 +27,39 @@ class CloseableProjection(
     extends NamedLogging
     with FlagCloseable {
 
-  private val terminated = Promise[Done]()
-
-  // Watch from construction: the projection can die before anyone tries to close it.
-  watchProjectionTermination()
-
   override def onClosed(): Unit = {
     import TraceContext.Implicits.Empty.*
 
-    projectionRef ! ProjectionBehavior.Stop
     LifeCycle.close(
-      AsyncCloseable(s"projection-$projectionId", terminated.future, timeouts.closing)
+      AsyncCloseable(s"projection-$projectionId", stopAndAwait.value, timeouts.closing)
     )(logger)
   }
 
-  /** Watches the projection actor for this wrapper's whole lifetime and completes `terminated` when
-    * the projection has wound down and terminated.
+  /** Sends a Stop signal to a projection actor and returns a Future that completes when the
+    * projection has cleanly wound down and terminated. Wrap into Eval.later so it gets memoized
+    * even if onClosed is called multiple times
     */
-  private def watchProjectionTermination(): Unit =
+  private def stopAndAwait: Eval[Future[Done]] = Eval.later {
+    val promise = Promise[Done]()
+
+    // Spawn a tiny, ephemeral watcher actor whose sole purpose is to monitor the death of the projection
     system
       .systemActorOf[Nothing](
         Behaviors.setup[Nothing] { context =>
           context.watch(projectionRef)
+
+          // Send the graceful stop signal
+          projectionRef ! ProjectionBehavior.Stop
+
           Behaviors.receiveSignal[Nothing] { case (_, Terminated(`projectionRef`)) =>
-            if (!isClosing) {
-              noTracingLogger.error(
-                s"Projection $projectionId terminated unexpectedly and stopped processing events"
-              )
-            }
-            terminated.trySuccess(Done).discard
+            promise.trySuccess(Done).discard
             Behaviors.stopped
           }
         },
-        s"projection-watcher-for-${projectionId.name}-${java.util.UUID.randomUUID()}",
+        s"projection-shutdown-watcher-for-${projectionId.name}-${java.util.UUID.randomUUID()}",
       )
       .discard
+
+    promise.future
+  }
 }
