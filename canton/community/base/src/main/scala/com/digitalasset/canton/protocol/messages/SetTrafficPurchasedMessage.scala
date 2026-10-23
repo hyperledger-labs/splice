@@ -59,7 +59,7 @@ final case class SetTrafficPurchasedMessage private (
 
 object SetTrafficPurchasedMessage
     extends VersioningCompanionMemoization[
-      SetTrafficPurchasedMessage,
+      SetTrafficPurchasedMessage
     ]
     with PrettyPrintingCompanion[SetTrafficPurchasedMessage] {
   override val name: String = "SetTrafficPurchasedMessage"

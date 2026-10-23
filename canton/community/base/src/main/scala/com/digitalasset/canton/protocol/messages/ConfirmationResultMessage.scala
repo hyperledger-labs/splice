@@ -87,7 +87,7 @@ case class ConfirmationResultMessage private (
 
 object ConfirmationResultMessage
     extends VersioningCompanionMemoization[
-      ConfirmationResultMessage,
+      ConfirmationResultMessage
     ]
     with PrettyPrintingCompanion[ConfirmationResultMessage] {
   override val name: String = "ConfirmationResultMessage"

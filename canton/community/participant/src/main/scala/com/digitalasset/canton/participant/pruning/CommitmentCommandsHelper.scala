@@ -100,7 +100,7 @@ final case class CommitmentContractMetadata(
 
 object CommitmentContractMetadata
     extends HasVersionedMessageCompanion[
-      CommitmentContractMetadata,
+      CommitmentContractMetadata
     ]
     with PrettyPrintingCompanion[CommitmentContractMetadata] {
   import JsonCodecs.*
