@@ -107,6 +107,8 @@ Splice unsafe shutdown future
 
 # The portfolio UI warns about the plain-HTTP validator URL used by the docker compose deployment
 Using a non-TLS validator endpoint\. This is acceptable only in trusted environments
+# TODO(DACH-NY/canton-network-internal#7669): The portfolio UI logs in-flight contract listings as failed when the test navigates away from it
+\(SDK\)/Failed to list contracts of interface .*AllocationRequest
 
 Failed to connect to scan of Digital-Asset-Eng-3.*AppUpgradeIntegrationTest
 
