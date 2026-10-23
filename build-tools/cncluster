@@ -1926,6 +1926,20 @@ function subcmd_mediator_console() {
     kill $port_forwarding_pid
 }
 
+subcommand_whitelist[bootstrap_dsync]='Bootstrap a dedicated synchronizer'
+
+function subcmd_bootstrap_dsync() {
+    _cluster_must_exist
+
+    DSYNC_NAME="${1-}"
+
+    if [ -z "${DSYNC_NAME}" ]; then
+        _error "Usage: $SCRIPTNAME bootstrap_dsync <dsync_name>"
+    fi
+
+    $SPLICE_ROOT/build-tools/bootstrap-dsync.py --dsync "$DSYNC_NAME"
+}
+
 function _get_single_pod() {
     namespace="${1-}"
     app_name="${2-}"
