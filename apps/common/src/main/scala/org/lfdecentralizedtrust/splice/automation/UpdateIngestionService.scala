@@ -21,15 +21,17 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerConnection,
   SpliceMetrics,
 }
+import org.lfdecentralizedtrust.splice.automation.UpdateIngestionService.IngestionProgress
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.metrics.api.MetricHandle.{Counter, LabeledMetricsFactory}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricQualification, MetricsContext}
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 
 /** Ingestion for ACS and transfer stores.
@@ -59,15 +61,14 @@ class UpdateIngestionService(
 
   // Progress tracking for the stall watchdog. The ledger API stream can stop delivering without ever failing,
   // in which case the retry loop of RetryingService never kicks in and the store silently stops advancing.
-  private val lastProgressNanos = new AtomicLong(System.nanoTime())
-  private val lastIngestedOffset = new AtomicLong(-1L)
-  private val stalled = new AtomicBoolean(false)
-  // Bumped whenever progress is made or a new stream instance is started, so that an in-flight stall check can
-  // tell that the state it sampled is out of date.
-  private val progressVersion = new AtomicLong(0L)
+  // All of it lives in one immutable value so that readers always see a consistent snapshot, and so that a
+  // stall can be claimed with a compare-and-set that fails if anything was ingested since the snapshot.
+  private val progress = new AtomicReference(
+    IngestionProgress(offset = -1L, atNanos = System.nanoTime())
+  )
   private val stallCheckInFlight = new AtomicBoolean(false)
 
-  override protected def isMakingProgress: Boolean = !stalled.get()
+  override protected def isMakingProgress: Boolean = !progress.get().stalled
 
   override protected val loggerFactory: NamedLoggerFactory =
     baseLoggerFactory.append("ingestionLoopFor", ingestionTargetName)
@@ -109,12 +110,8 @@ class UpdateIngestionService(
             _ <- ingestAcsAndInFlight(acsOffset)
           } yield acsOffset
       }
-      _ = {
-        // Only restart the watchdog window here: `stalled` must stay set until something is actually ingested.
-        lastIngestedOffset.set(subscribeFrom)
-        progressVersion.incrementAndGet()
-        lastProgressNanos.set(System.nanoTime())
-      }
+      // Restart the watchdog window for the new stream. `stalled` stays set until something is actually ingested.
+      _ = progress.updateAndGet(_.copy(offset = subscribeFrom, atNanos = System.nanoTime()))
     } yield new ServiceWithGuaranteedShutdown(
       source = batchSource(connection.updates(subscribeFrom, filter)),
       map = process,
@@ -142,12 +139,8 @@ class UpdateIngestionService(
     }
   }
 
-  private def recordProgress(offset: Long): Unit = {
-    lastIngestedOffset.set(offset)
-    progressVersion.incrementAndGet()
-    lastProgressNanos.set(System.nanoTime())
-    stalled.set(false)
-  }
+  private def recordProgress(offset: Long): Unit =
+    progress.set(IngestionProgress(offset = offset, atNanos = System.nanoTime()))
 
   private def scheduleStallCheck(): Unit = {
     implicit val tc: TraceContext = TraceContext.empty
@@ -173,16 +166,15 @@ class UpdateIngestionService(
     * has moved on. An idle ledger (ledger end == last ingested offset) is not a stall.
     *
     * The ledger end query is asynchronous, so the stream may recover or be replaced while it is in flight. We
-    * therefore sample the instance, the progress version and the offset before asking, and only act on the answer
-    * if all of them are unchanged and the service is still not paused. Only one check runs at a time.
+    * therefore take one snapshot of the progress and the stream instance before asking, derive everything from
+    * that snapshot, and claim the stall with a compare-and-set on it: if anything was ingested since, the claim
+    * fails and the stream is left alone. Only one check runs at a time.
     */
   private def checkForStall()(implicit tc: TraceContext): Future[Unit] = {
     val stallTimeout = config.ingestion.stallTimeout.underlying
-    val stalledFor = (System.nanoTime() - lastProgressNanos.get()).nanos
-    val instanceO = currentService.filter(_.isActive)
-    val versionAtStart = progressVersion.get()
-    val ingestedAtStart = lastIngestedOffset.get()
-    instanceO match {
+    val snapshot = progress.get()
+    val stalledFor = (System.nanoTime() - snapshot.atNanos).nanos
+    currentService.filter(_.isActive) match {
       case Some(instance)
           if !isPaused && stalledFor >= stallTimeout &&
             stallCheckInFlight.compareAndSet(false, true) =>
@@ -190,27 +182,31 @@ class UpdateIngestionService(
         Future.unit
           .flatMap(_ => connection.ledgerEnd())
           .map { ledgerEnd =>
-            val unchanged = progressVersion.get() == versionAtStart &&
-              currentService.exists(_ eq instance) && instance.isActive && !isPaused
-            if (unchanged) {
+            if (currentService.exists(_ eq instance) && instance.isActive && !isPaused) {
+              val now = System.nanoTime()
               if (
                 UpdateIngestionService.hasStalled(
                   stalledFor,
                   stallTimeout,
                   ledgerEnd,
-                  ingestedAtStart,
+                  snapshot.offset,
                 )
               ) {
-                logger.warn(
-                  s"Ingestion of $ingestionTargetName made no progress for $stalledFor: ingested up to offset " +
-                    s"$ingestedAtStart while the ledger end is at $ledgerEnd. Restarting the ingestion loop."
-                )
-                stalled.set(true)
-                metrics.stallRestarts.inc()(MetricsContext.Empty)
-                instance.initiateShutdown()
+                // Give the restarted instance a full window. Fails if progress was recorded since the snapshot.
+                if (
+                  progress.compareAndSet(snapshot, snapshot.copy(atNanos = now, stalled = true))
+                ) {
+                  logger.warn(
+                    s"Ingestion of $ingestionTargetName made no progress for $stalledFor: ingested up to offset " +
+                      s"${snapshot.offset} while the ledger end is at $ledgerEnd. Restarting the ingestion loop."
+                  )
+                  metrics.stallRestarts.inc()(MetricsContext.Empty)
+                  instance.initiateShutdown()
+                }
+              } else {
+                // An idle ledger gets a full window before the next check.
+                progress.compareAndSet(snapshot, snapshot.copy(atNanos = now)).discard
               }
-              // Give the (re)started instance, or an idle ledger, a full window before checking again.
-              lastProgressNanos.set(System.nanoTime())
             }
           }
           .recover { case ex =>
@@ -267,6 +263,15 @@ class UpdateIngestionService(
 }
 
 object UpdateIngestionService {
+
+  /** What the stall watchdog knows about the ingestion: the offset and time of the last ingested batch, and whether
+    * a stall was detected that has not been followed by any ingestion yet.
+    */
+  private[automation] final case class IngestionProgress(
+      offset: Long,
+      atNanos: Long,
+      stalled: Boolean = false,
+  )
 
   /** The ingestion has stalled if it made no progress for at least `timeout` while the participant's ledger end is
     * ahead of the last ingested offset. If the ledger end has not moved past what we ingested the ledger is simply
