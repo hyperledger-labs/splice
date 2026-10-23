@@ -73,6 +73,7 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import org.slf4j.event.Level
+import slick.dbio.DBIO
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -491,6 +492,149 @@ class DbVotesStoreTest
       }
     }
 
+    "the migration from the txlog" should {
+      "copy the vote results exactly as the ingestion inserted them" in {
+        for {
+          stores <- mkStores()
+          _ <- ingestAll(stores, txLogVoteFixtures)
+          expected <- listAllRows(stores.votesStore)
+          expectedFirstIngested <- stores.votesStore.getFirstIngestedRecordTime()
+          _ <- clearVotesStore(stores)
+          _ <- runMigration()
+          actual <- listAllRows(stores.votesStore)
+          firstIngested <- stores.votesStore.getFirstIngestedRecordTime()
+          cursor <- stores.votesStore.getBackfillingCursor()
+          complete <- stores.votesStore.isBackfillingComplete()
+        } yield {
+          // Make sure the comparison is not trivially satisfied by two empty stores
+          expected should have size txLogVoteFixtures.flatMap(_.votes).size.toLong
+          actual shouldBe expected
+          expectedFirstIngested should not be empty
+          // Where live ingestion started is not up to the migration, backfilling continues
+          // from where the txlog starts
+          firstIngested shouldBe empty
+          cursor shouldBe expectedFirstIngested.map(DbVotesStore.VotesBackfillCursor(_, 0))
+          // The txlog backfilling was never initialized, so there may be older votes
+          complete shouldBe false
+        }
+      }
+
+      "mark the votes store as complete if the txlog backfilling is" in {
+        for {
+          stores <- mkStores()
+          _ <- ingestAll(stores, txLogVoteFixtures)
+          _ <- clearVotesStore(stores)
+          _ <- setTxLogBackfillingComplete(stores, complete = true)
+          _ <- runMigration()
+          complete <- stores.votesStore.isBackfillingComplete()
+        } yield complete shouldBe true
+      }
+
+      "not mark the votes store as complete while the txlog backfilling is in progress" in {
+        for {
+          stores <- mkStores()
+          _ <- ingestAll(stores, txLogVoteFixtures)
+          _ <- clearVotesStore(stores)
+          _ <- setTxLogBackfillingComplete(stores, complete = false)
+          _ <- runMigration()
+          complete <- stores.votesStore.isBackfillingComplete()
+          rows <- listAllRows(stores.votesStore)
+        } yield {
+          complete shouldBe false
+          rows should have size txLogVoteFixtures.flatMap(_.votes).size.toLong
+        }
+      }
+
+      "leave the first ingested record time of the live ingestion alone" in {
+        for {
+          stores <- mkStores()
+          _ <- ingestAll(stores, txLogVoteFixtures)
+          txLogFirstIngested <- stores.votesStore
+            .getFirstIngestedRecordTime()
+            .map(_.getOrElse(fail("not ingested")))
+          // Live ingestion started after the txlog did
+          _ <- setFirstIngestedRecordTime(stores, txLogFirstIngested.plusSeconds(100))
+          _ <- runMigration()
+          firstIngested <- stores.votesStore.getFirstIngestedRecordTime()
+          cursor <- stores.votesStore.getBackfillingCursor()
+        } yield {
+          firstIngested shouldBe Some(txLogFirstIngested.plusSeconds(100))
+          cursor shouldBe Some(DbVotesStore.VotesBackfillCursor(txLogFirstIngested, 0))
+        }
+      }
+
+      "migrate every txlog store on its own, and pair it with the key value store of its participant" in {
+        val keyPattern = "votes_store_backfill_cursor_%"
+        for {
+          kv <- ScanKeyValueStore(
+            dsoParty,
+            mkParticipantId("DbVotesStoreTest"),
+            storage,
+            loggerFactory,
+          )
+          otherKv <- ScanKeyValueStore(
+            dsoParty,
+            mkParticipantId("DbVotesStoreTestOther"),
+            storage,
+            loggerFactory,
+          )
+          stores <- mkStoresWith(kv)
+          // Resetting the ACS store gives a new ACS store id, and keeps the txlog store
+          _ <- mkStoresWith(kv, acsStoreDescriptorUserVersion = Some(1L))
+          // Resetting the txlog store gives a new txlog store id, for the same party and participant
+          resetTxLog <- mkStoresWith(kv, txLogStoreDescriptorUserVersion = Some(1L))
+          // Another participant has its own key value store
+          other <- mkStoresWith(otherKv, "DbVotesStoreTestOther")
+          _ <- ingestAll(stores, txLogVoteFixtures.take(2))
+          _ <- ingestAll(resetTxLog, txLogVoteFixtures.drop(2))
+          _ <- ingestAll(other, txLogVoteFixtures.take(1))
+          all = Seq(stores, resetTxLog, other)
+          expectedRows <- MonadUtil.sequentialTraverse(all)(s => listAllRows(s.votesStore))
+          firstIngested <- MonadUtil.sequentialTraverse(all)(s =>
+            s.votesStore.getFirstIngestedRecordTime()
+          )
+          _ <- MonadUtil.sequentialTraverse(all)(clearVotesStore)
+          _ <- runMigration()
+          actualRows <- MonadUtil.sequentialTraverse(all)(s => listAllRows(s.votesStore))
+          cursors <- MonadUtil.sequentialTraverse(all)(s => s.votesStore.getBackfillingCursor())
+          cursorKeys <- futureUnlessShutdownToFuture(
+            storage.query(
+              sql"select store_id, key from key_value_store where key like $keyPattern".as[
+                (Int, String)
+              ],
+              "test.cursorKeys",
+            )
+          )
+        } yield {
+          all.map(_.votesStore.storeId).distinct should have size 3
+          expectedRows.map(_.size) shouldBe Seq(2, txLogVoteFixtures.size - 2, 1)
+          // Each store gets exactly its own votes, and the txlog of the reset ACS store is not affected
+          actualRows shouldBe expectedRows
+          cursors shouldBe firstIngested.map(_.map(DbVotesStore.VotesBackfillCursor(_, 0)))
+          // The keys are in the key value store of the participant of the txlog store, once per txlog store
+          cursorKeys.toSet shouldBe Set(
+            kv.storeId -> DbVotesStore.backfillCursorKey(stores.votesStore.storeId),
+            kv.storeId -> DbVotesStore.backfillCursorKey(resetTxLog.votesStore.storeId),
+            otherKv.storeId -> DbVotesStore.backfillCursorKey(other.votesStore.storeId),
+          )
+          cursorKeys should have size 3
+        }
+      }
+
+      "do nothing on a database without scan stores" in {
+        for {
+          _ <- runMigration()
+          rows <- futureUnlessShutdownToFuture(
+            storage.query(
+              sql"select count(*) from votes_store_results".as[Long].head,
+              "test.countVoteRows",
+            )
+          )
+        } yield rows shouldBe 0L
+      }
+
+    }
+
     "backfilling from peers" should {
       "page backwards by (record_time, event_number) and insert the same results" in {
         val cursor = DbVotesStore.VotesBackfillCursor(CantonTimestamp.MinValue, 0)
@@ -518,14 +662,14 @@ class DbVotesStoreTest
       "serve the identifying data and the stored result, nothing else" in {
         for {
           stores <- mkStores()
-          _ <- ingestAll(stores, voteFixtures)
+          _ <- ingestAll(stores, txLogVoteFixtures)
           served <- stores.votesStore.listBackfillPage(
             DbVotesStore.VotesBackfillCursor(CantonTimestamp.MaxValue, 0),
             1000,
           )
           rows <- listAllRows(stores.votesStore)
         } yield {
-          served should have size voteFixtures.flatMap(_.votes).size.toLong
+          served should have size txLogVoteFixtures.size.toLong
           // Newest first
           served.map(_.recordTime) shouldBe served.map(_.recordTime).sorted.reverse
           served.map(s => (s.recordTime, s.synchronizerId, s.updateId, s.eventNumber)) shouldBe
@@ -709,6 +853,108 @@ class DbVotesStoreTest
     )
   }
 
+  /** The subset of [[voteFixtures]] that can occur in the txlog: there, a vote is always the
+    * root of its transaction, so a transaction closes exactly one vote request.
+    */
+  private def txLogVoteFixtures: Seq[VoteFixture] =
+    voteFixtures.filter(f => f.votes.size == 1 && !f.nested)
+
+  /** A row of `votes_store_results`, without the local `store_id` and `row_id`. */
+  private case class VoteRow(
+      recordTime: Long,
+      synchronizerId: String,
+      updateId: String,
+      eventNumber: Int,
+      voteActionName: String,
+      voteRequesterName: String,
+      voteAccepted: Boolean,
+      voteTrackingCid: String,
+      voteCompletedAt: Option[Long],
+      voteEffectiveAt: Option[Long],
+      choiceResult: String,
+      error: Option[String],
+  )
+
+  implicit private val getResultVoteRow: GetResult[VoteRow] = GetResult { r =>
+    VoteRow(
+      r.<<[Long],
+      r.<<[String],
+      r.<<[String],
+      r.<<[Int],
+      r.<<[String],
+      r.<<[String],
+      r.<<[Boolean],
+      r.<<[String],
+      r.<<?[Long],
+      r.<<?[Long],
+      r.<<[String],
+      r.<<?[String],
+    )
+  }
+
+  /** All columns of all rows of the votes store, oldest first. */
+  private def listAllRows(votesStore: DbVotesStore): Future[Seq[VoteRow]] =
+    futureUnlessShutdownToFuture(
+      storage.query(
+        sql"""select record_time, synchronizer_id, update_id, event_number, vote_action_name,
+                     vote_requester_name, vote_accepted, vote_tracking_cid, vote_completed_at,
+                     vote_effective_at, choice_result, error
+              from votes_store_results
+              where store_id = ${votesStore.storeId}
+              order by record_time, event_number""".as[VoteRow],
+        "test.listAllRows",
+      )
+    )
+
+  /** Brings the votes store into the state that it had before the migration: without rows and without
+    * the data that the ingestion of the votes store keeps in the key value store.
+    */
+  private def clearVotesStore(stores: Stores): Future[Unit] =
+    futureUnlessShutdownToFuture(
+      storage.update(
+        DBIO.seq(
+          sqlu"delete from votes_store_results where store_id = ${stores.votesStore.storeId}",
+          sqlu"delete from key_value_store where key like 'votes_store_%'",
+        ),
+        "test.clearVotesStore",
+      )
+    )
+
+  private def setTxLogBackfillingComplete(stores: Stores, complete: Boolean): Future[Unit] =
+    futureUnlessShutdownToFuture(
+      storage.update(
+        sqlu"""insert into txlog_backfilling_status (store_id, backfilling_complete)
+               values (${stores.votesStore.storeId}, $complete)
+               on conflict (store_id) do update set backfilling_complete = $complete""",
+        "test.setTxLogBackfillingComplete",
+      )
+    ).map(_ => ())
+
+  private def setFirstIngestedRecordTime(
+      stores: Stores,
+      recordTime: CantonTimestamp,
+  ): Future[Unit] =
+    futureUnlessShutdownToFuture(
+      storage.update(
+        sqlu"""update key_value_store
+               set value = to_jsonb(${recordTime.toMicros})
+               where key = ${DbVotesStore.firstIngestedRecordTimeKey(stores.votesStore.storeId)}""",
+        "test.setFirstIngestedRecordTime",
+      )
+    ).map(_ => ())
+
+  /** Runs the migration script as is, to check it against the data written by the ingestion.
+    * Flyway runs a script once, so this bypasses [[DbStorageIdempotency]], which runs all writes twice.
+    */
+  private def runMigration(): Future[Unit] = {
+    val script = scala.io.Source
+      .fromResource("db/migration/canton-network/postgres/stable/V079__votes_store_from_txlog.sql")
+      .mkString
+    futureUnlessShutdownToFuture(
+      storage.underlying.queryAndUpdate(sqlu"#$script".map(_ => ()), "test.runMigration")
+    )
+  }
+
   private lazy val filters: Seq[VoteResultsFilters] = Seq(
     VoteResultsFilters(),
     VoteResultsFilters(accepted = Some(true)),
@@ -838,53 +1084,6 @@ class DbVotesStoreTest
   /** Pages backwards through a (fully backfilled) votes store via [[DbVotesStore.listBackfillPage]],
     * following the cursor the same way [[VotesStoreBackfilling]] would when reading from a peer.
     */
-  /** A row of `votes_store_results`, without the local `store_id` and `row_id`. */
-  private case class VoteRow(
-      recordTime: Long,
-      synchronizerId: String,
-      updateId: String,
-      eventNumber: Int,
-      voteActionName: String,
-      voteRequesterName: String,
-      voteAccepted: Boolean,
-      voteTrackingCid: String,
-      voteCompletedAt: Option[Long],
-      voteEffectiveAt: Option[Long],
-      choiceResult: String,
-      error: Option[String],
-  )
-
-  implicit private val getResultVoteRow: GetResult[VoteRow] = GetResult { r =>
-    VoteRow(
-      r.<<[Long],
-      r.<<[String],
-      r.<<[String],
-      r.<<[Int],
-      r.<<[String],
-      r.<<[String],
-      r.<<[Boolean],
-      r.<<[String],
-      r.<<?[Long],
-      r.<<?[Long],
-      r.<<[String],
-      r.<<?[String],
-    )
-  }
-
-  /** All columns of all rows of the votes store, oldest first. */
-  private def listAllRows(votesStore: DbVotesStore): Future[Seq[VoteRow]] =
-    futureUnlessShutdownToFuture(
-      storage.query(
-        sql"""select record_time, synchronizer_id, update_id, event_number, vote_action_name,
-                     vote_requester_name, vote_accepted, vote_tracking_cid, vote_completed_at,
-                     vote_effective_at, choice_result, error
-              from votes_store_results
-              where store_id = ${votesStore.storeId}
-              order by record_time, event_number""".as[VoteRow],
-        "test.listAllRows",
-      )
-    )
-
   private def listAllPeerPages(
       votesStore: DbVotesStore,
       pageSize: Int,
@@ -935,6 +1134,7 @@ class DbVotesStoreTest
       kvStore: DbKeyValueStore,
       participantName: String = "DbVotesStoreTest",
       acsStoreDescriptorUserVersion: Option[Long] = None,
+      txLogStoreDescriptorUserVersion: Option[Long] = None,
   ): Future[Stores] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
@@ -958,7 +1158,7 @@ class DbVotesStoreTest
         new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, timeouts),
         defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
         acsStoreDescriptorUserVersion,
-        None,
+        txLogStoreDescriptorUserVersion,
         additionalIngestionSinks = Seq(new DbVotesStore.IngestionSink(kvStore, loggerFactory)),
       )(parallelExecutionContext, implicitly, implicitly, implicitly)
       votesStore = DbVotesStore(
