@@ -2012,7 +2012,6 @@ class DbSvDsoStore private (
   ] = (_, limit) =>
     implicit tc =>
       waitUntilAcsIngested {
-        val opName = "listProvisionalGovernanceLocksWithFeaturedAppRightSample"
         for {
           ignoredParties <- UnavailablePartiesStore.listParties(unavailablePartiesStore)
           filterClause =
@@ -2041,7 +2040,7 @@ class DbSvDsoStore private (
                 splice.governancelock.GovernanceLock.TEMPLATE_ID_WITH_PACKAGE_ID
               )}
               and acs.assigned_domain = $synchronizerId
-              and acs.governance_lock_type = 'f:pfa'
+              and acs.governance_lock_type = ${GovernanceLockUtil.StoreTypeAndKind.provisionalFeaturedApp.storeValue}
               and exists (
                 select 1
                 from #${DsoTables.acsTableName} fa_right
@@ -2055,15 +2054,14 @@ class DbSvDsoStore private (
                   and fa_right.featured_app_right_provider = acs.governance_lock_subject
               )
               """ ++ filterClause ++ sql"""
-            limit 1000
+            limit greatest(1000, ${10 * sqlLimit(limit)})
           ) sample
           order by random()
           limit ${sqlLimit(limit)}
           """).toActionBuilder.as[AcsQueries.SelectFromAcsTableWithStateResult],
-            opName,
+            "listProvisionalGovernanceLocksWithFeaturedAppRightSample",
           )
-          limited = applyLimit(opName, limit, result)
-        } yield limited.map(
+        } yield result.map(
           assignedContractFromRow(splice.governancelock.GovernanceLock.COMPANION)(_)
         )
       }

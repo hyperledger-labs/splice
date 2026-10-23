@@ -2,36 +2,25 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.governancelock
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ProvisionalFeaturedAppLockConversionTrigger
 import org.lfdecentralizedtrust.splice.util.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_25
 class ProvisionalFeaturedAppLockConversionIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
-    with GovernanceLockTest
-    with TriggerTestUtil {
+    with GovernanceLockTest {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAutomationConfig(ConfigTransforms.ConfigurableApp.Sv)(
-          _.withPausedTrigger[ProvisionalFeaturedAppLockConversionTrigger]
-        )(config)
-      )
 
   private val lockAmount = BigDecimal(10000)
-
-  private def conversionTrigger(implicit env: SpliceTestConsoleEnvironment) =
-    sv1Backend.dsoDelegateBasedAutomation.trigger[ProvisionalFeaturedAppLockConversionTrigger]
 
   // Conversion archives the lock and creates a new one, so the kind is looked up by provider
   // rather than by contract id.
@@ -95,19 +84,17 @@ class ProvisionalFeaturedAppLockConversionIntegrationTest
         },
       )
 
-      setTriggersWithin(triggersToResumeAtStart = Seq(conversionTrigger)) {
-        actAndCheck(
-          "charlie grants himself a FeaturedAppRight",
-          eventuallySucceeds() {
-            charlieWalletClient.selfGrantFeaturedAppRight()
-          },
-        )(
-          "charlie's lock is converted and alice's is left alone",
-          _ => {
-            lockKindFor(charlie) shouldBe featuredFor(charlie)
-            lockKindFor(alice) shouldBe provisionalFor(alice)
-          },
-        )
-      }
+      actAndCheck(
+        "charlie grants himself a FeaturedAppRight",
+        eventuallySucceeds() {
+          charlieWalletClient.selfGrantFeaturedAppRight()
+        },
+      )(
+        "charlie's lock is converted and alice's is left alone",
+        _ => {
+          lockKindFor(charlie) shouldBe featuredFor(charlie)
+          lockKindFor(alice) shouldBe provisionalFor(alice)
+        },
+      )
   }
 }

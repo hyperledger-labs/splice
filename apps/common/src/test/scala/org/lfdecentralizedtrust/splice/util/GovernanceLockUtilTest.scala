@@ -10,6 +10,7 @@ import java.util.Optional
 import org.scalatest.wordspec.AnyWordSpec
 
 class GovernanceLockUtilTest extends AnyWordSpec with BaseTest {
+  private val glu = GovernanceLockUtil
 
   private val provider = "provider::1220aaaa"
   private val featuredApp = new gl.governancelockkind.GLK_FeaturedApp(provider)
@@ -35,27 +36,24 @@ class GovernanceLockUtilTest extends AnyWordSpec with BaseTest {
 
   "governanceLockTypeAndSubject" should {
     "encode every kind of full lock" in {
-      GovernanceLockUtil.governanceLockTypeAndSubject(
-        lock(featuredApp, vesting = false)
-      ) shouldBe ("f:fa", provider)
-      GovernanceLockUtil.governanceLockTypeAndSubject(
-        lock(provisionalFeaturedApp, vesting = false)
-      ) shouldBe ("f:pfa", provider)
-      GovernanceLockUtil.governanceLockTypeAndSubject(
-        lock(superValidator, vesting = false)
-      ) shouldBe ("f:sv", "sv1")
+      glu.governanceLockTypeAndSubject(lock(featuredApp, false)) shouldBe
+        (glu.StoreTypeAndKind(glu.StoreType.Full, glu.StoreKind.FeaturedApp), provider)
+      glu.governanceLockTypeAndSubject(lock(provisionalFeaturedApp, false)) shouldBe
+        (glu.StoreTypeAndKind(glu.StoreType.Full, glu.StoreKind.ProvisionalFeaturedApp), provider)
+      glu.governanceLockTypeAndSubject(lock(superValidator, false)) shouldBe
+        (glu.StoreTypeAndKind(glu.StoreType.Full, glu.StoreKind.SuperValidator), "sv1")
     }
 
     "encode every kind of vesting lock" in {
-      GovernanceLockUtil.governanceLockTypeAndSubject(
-        lock(featuredApp, vesting = true)
-      ) shouldBe ("v:fa", provider)
-      GovernanceLockUtil.governanceLockTypeAndSubject(
-        lock(provisionalFeaturedApp, vesting = true)
-      ) shouldBe ("v:pfa", provider)
-      GovernanceLockUtil.governanceLockTypeAndSubject(
-        lock(superValidator, vesting = true)
-      ) shouldBe ("v:sv", "sv1")
+      glu.governanceLockTypeAndSubject(lock(featuredApp, true)) shouldBe
+        (glu.StoreTypeAndKind(glu.StoreType.Vesting, glu.StoreKind.FeaturedApp), provider)
+      glu.governanceLockTypeAndSubject(lock(provisionalFeaturedApp, true)) shouldBe
+        (glu.StoreTypeAndKind(
+          glu.StoreType.Vesting,
+          glu.StoreKind.ProvisionalFeaturedApp,
+        ), provider)
+      glu.governanceLockTypeAndSubject(lock(superValidator, true)) shouldBe
+        (glu.StoreTypeAndKind(glu.StoreType.Vesting, glu.StoreKind.SuperValidator), "sv1")
     }
   }
 }

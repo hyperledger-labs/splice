@@ -41,7 +41,9 @@ class GovernanceLockTimeBasedIntegrationTest
         ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
           _.copy(
             // Shorten the SV vesting period so we can test partial and full withdrawal while only
-            // advancing the clock a couple minutes
+            // advancing the clock a couple minutes. We do this so the test logic can run within a
+            // single round, avoiding potential flakes caused by test logic racing against round
+            // automation working through its backlog. See relevant issues: #7223, #7206
             initialGovernanceLockConfig = Some(
               InitialGovernanceLockConfig(
                 superValidatorLockVestingDuration =

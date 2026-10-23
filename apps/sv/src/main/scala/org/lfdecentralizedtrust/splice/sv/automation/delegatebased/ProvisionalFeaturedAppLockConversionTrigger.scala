@@ -83,11 +83,8 @@ class ProvisionalFeaturedAppLockConversionTrigger(
       }
       convertible = locksWithRights.flatten
       res <-
-        if (convertible.isEmpty) {
-          Future.successful(
-            TaskSuccess("No provisional featured app locks with a live FeaturedAppRight to convert")
-          )
-        } else {
+        if (convertible.isEmpty) Future.successful(TaskNoop)
+        else
           svTaskContext
             .connection(SpliceLedgerConnectionPriority.AmuletExpiry)
             .submit(
@@ -117,7 +114,6 @@ class ProvisionalFeaturedAppLockConversionTrigger(
                   s"provisional featured app locks in batch"
               )
             )
-        }
     } yield res
 
   private def providerOf(payload: splice.governancelock.GovernanceLock): Option[PartyId] =

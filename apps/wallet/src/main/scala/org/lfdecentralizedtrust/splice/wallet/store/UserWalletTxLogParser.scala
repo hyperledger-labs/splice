@@ -153,9 +153,11 @@ class UserWalletTxLogParser(
       case exercised: ExercisedEvent =>
         exercised match {
 
-          // Governance lock substitutions are not shown in the wallet history. Their accept and
-          // withdraw unlock amulets without any of the choices below, so they must be matched before
-          // the generic token standard choices.
+          // Governance lock substitutions are not shown in the wallet history.
+          // This is a limitation we've accepted, as accepting a substitution does not result in a
+          // transfer, but instead in a lock being created, so it's not simple to parse them.
+          // Their acceptance and withdrawal unlock amulets without any of the choices below, so
+          // they must be matched before the generic token standard choices.
           case GovernanceLockSubstitutionExercise(_) =>
             now(State.empty)
 

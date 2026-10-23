@@ -27,18 +27,44 @@ object GovernanceLockUtil {
   def getVestingLockSpecification(lock: gl.GovernanceLock): Option[gl.VestingLockSpecification] =
     foldSpecification(lock)(_ => None, Some(_))
 
+  sealed abstract class StoreType(val type_ : String)
+  object StoreType {
+    case object Full extends StoreType("f")
+    case object Vesting extends StoreType("v")
+  }
+
+  sealed abstract class StoreKind(val kind: String)
+  object StoreKind {
+    case object FeaturedApp extends StoreKind("fa")
+    case object ProvisionalFeaturedApp extends StoreKind("pfa")
+    case object SuperValidator extends StoreKind("sv")
+  }
+
+  final case class StoreTypeAndKind(type_ : StoreType, kind: StoreKind) {
+    final val storeValue: String = s"${type_.type_}:${kind.kind}"
+  }
+  object StoreTypeAndKind {
+    val provisionalFeaturedApp = StoreTypeAndKind(StoreType.Full, StoreKind.ProvisionalFeaturedApp)
+  }
+
   /** Encodes a lock as the `governance_lock_type` and `governance_lock_subject` index columns. */
-  def governanceLockTypeAndSubject(lock: gl.GovernanceLock): (String, String) = {
-    val lockType = foldSpecification(lock)(_ => "f", _ => "v")
-    val (kindTag, subject) = getGovernanceLockKind(lock) match {
-      case kind: gl.governancelockkind.GLK_FeaturedApp => ("fa", kind.provider)
-      case kind: gl.governancelockkind.GLK_ProvisionalFeaturedApp => ("pfa", kind.provider)
-      case kind: gl.governancelockkind.GLK_SuperValidatorRightsOwner => ("sv", kind.svName)
+  def governanceLockTypeAndSubject(lock: gl.GovernanceLock): (StoreTypeAndKind, String) = {
+    val storeType =
+      foldSpecification[StoreType](lock)(_ => StoreType.Full, _ => StoreType.Vesting)
+    val (storeKind, subject) = getGovernanceLockKind(lock) match {
+      case kind: gl.governancelockkind.GLK_FeaturedApp =>
+        // The type annotation is necessary to avoid a wartremover error that says
+        // Inferred type containing Product
+        (StoreKind.FeaturedApp: StoreKind, kind.provider)
+      case kind: gl.governancelockkind.GLK_ProvisionalFeaturedApp =>
+        (StoreKind.ProvisionalFeaturedApp, kind.provider)
+      case kind: gl.governancelockkind.GLK_SuperValidatorRightsOwner =>
+        (StoreKind.SuperValidator, kind.svName)
       case kind =>
         throw Status.INTERNAL
           .withDescription(s"Unexpected GovernanceLockKind: $kind")
           .asRuntimeException()
     }
-    (s"$lockType:$kindTag", subject)
+    (StoreTypeAndKind(storeType, storeKind), subject)
   }
 }

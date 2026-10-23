@@ -513,7 +513,7 @@ object ScanStore {
             contractExpiresAt = GovernanceLockUtil
               .getVestingLockSpecification(contract.payload)
               .map(v => Timestamp.assertFromInstant(v.endTime)),
-            governanceLockType = Some(lockType),
+            governanceLockType = Some(lockType.storeValue),
             governanceLockSubject = Some(lockSubject),
           )
         },
