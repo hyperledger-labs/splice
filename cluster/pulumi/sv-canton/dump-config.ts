@@ -24,6 +24,7 @@ async function main() {
     const migration = migrations[migrationIndex];
     await writeMigration(migration.id, allSvsToDeploy);
   }
+  //TODO(splice#7780): Add support for dsync nodes
 }
 
 async function writeMigration(migrationId: DomainMigrationIndex, svs: StaticSvConfig[]) {
@@ -33,14 +34,14 @@ async function writeMigration(migrationId: DomainMigrationIndex, svs: StaticSvCo
   const secrets = new SecretsFixtureMap();
   for (const sv of svs) {
     withDumpConfigStack(sv.nodeName, () =>
-      installNode.installNode(migrationId, sv.nodeName, {
+      installNode.installNode(migrationId, {
         getSecrets: () => Promise.resolve(secrets),
         /* eslint-disable @typescript-eslint/no-unused-vars */
         getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
           Promise.resolve('access_token'),
         getCfg: () => (sv.nodeName === 'sv' ? svRunbookAuth0Config : cantonNetworkAuth0Config),
         reuseNamespaceConfig: (fromNamespace: string, toNamespace: string) => {},
-      })
+      }, sv.nodeName, 'sv')
     );
   }
 }

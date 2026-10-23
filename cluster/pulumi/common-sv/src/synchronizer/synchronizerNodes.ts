@@ -19,18 +19,20 @@ import {
 function buildDecentralizedSynchronizerNode(
   migrationInfo: MigrationInfo,
   migrationId: DomainMigrationIndex,
-  cometbftNodeConfigs: {
-    self: StaticCometBftConfigWithNodeName;
-    sv1: StaticCometBftConfigWithNodeName;
-    peers: StaticCometBftConfigWithNodeName[];
-  },
+  cometbftNodeConfigs:
+    | {
+        self: StaticCometBftConfigWithNodeName;
+        sv1: StaticCometBftConfigWithNodeName;
+        peers: StaticCometBftConfigWithNodeName[];
+      }
+    | undefined,
   ingressName: string
 ): DecentralizedSynchronizerNode {
   return migrationInfo.sequencer.enableBftSequencer
     ? new CrossStackDecentralizedSynchronizerNode(migrationId, ingressName)
     : new CrossStackCometBftDecentralizedSynchronizerNode(
         migrationId,
-        new CometBftNodeConfigs(migrationId, cometbftNodeConfigs).nodeIdentifier,
+        new CometBftNodeConfigs(migrationId, cometbftNodeConfigs!).nodeIdentifier,
         ingressName
       );
 }
@@ -44,11 +46,13 @@ export class SynchronizerNodes {
 
   constructor(
     decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
-    cometbftNodeConfigs: {
-      self: StaticCometBftConfigWithNodeName;
-      sv1: StaticCometBftConfigWithNodeName;
-      peers: StaticCometBftConfigWithNodeName[];
-    },
+    cometbftNodeConfigs:
+      | {
+          self: StaticCometBftConfigWithNodeName;
+          sv1: StaticCometBftConfigWithNodeName;
+          peers: StaticCometBftConfigWithNodeName[];
+        }
+      | undefined,
     ingressName: string
   ) {
     const activeMigrationId = decentralizedSynchronizerMigrationConfig.active.id;

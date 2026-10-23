@@ -62,3 +62,4 @@ export const SynchronizerMigrationSchema = z
     frozenMigrationId: z.number(),
   })
   .strict();
+export type SynchronizerMigrationConfig = z.infer<typeof SynchronizerMigrationSchema>;

@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
-import * as _ from 'lodash';
 import {
   DecentralizedSynchronizerUpgradeConfig,
   EnvVarConfigSchema,
@@ -11,7 +10,6 @@ import {
 } from '@canton-network/splice-pulumi-common';
 import { ValidatorAppConfigSchema } from '@canton-network/splice-pulumi-common-validator/src/config';
 import { clusterYamlConfig } from '@canton-network/splice-pulumi-common/src/config/config';
-import { mergeConfigFragments } from '@canton-network/splice-pulumi-common/src/config/configLoader';
 import { CnChartVersionSchema } from '@canton-network/splice-pulumi-common/src/config/versionSchema';
 import util from 'node:util';
 import { z } from 'zod';
@@ -20,12 +18,10 @@ import { TopologySnapshotSchema } from './config';
 import {
   CloudSqlWithOverrideConfigSchema,
   PhysicalSynchronizersConfigOverridesSchema,
-  SvCantonBftConfig,
   SvCantonBftConfigSchema,
-  SvMediatorConfig,
   SvMediatorConfigSchema,
-  SvSequencerConfig,
   SvSequencerConfigSchema,
+  withPhysicalSynchronizers,
 } from './physicalSynchronizerConfig';
 import { CatchupTestSchema } from './testing';
 
@@ -155,94 +151,72 @@ const SvValidatorAppConfigSchema = z
   .and(ValidatorAppConfigSchema);
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
-// things here are declared optional even when they aren't, to allow partial overrides of defaults
-// TODO(DACH-NY/canton-network-internal#4859) the above is no longer true since defaults were removed.
-//   We should remove .optional() from required fields.
-const SingleSvConfigSchema = z
+
+// TODO(splice#7780): consider what else we need to support out of SingleSvConfigSchema also for dsyncs, and move those here.
+export const SyncNodeSchema = z
   .object({
-    publicName: z.string().optional(),
-    subdomain: z.string().optional(),
-    cometbft: SvCometbftConfigSchema.optional(),
     participant: SvParticipantConfigSchema.optional(),
     sequencer: SvSequencerConfigSchema.prefault({}),
     mediator: SvMediatorConfigSchema.prefault({}),
     cantonBft: SvCantonBftConfigSchema.optional(),
     physicalSynchronizerOverrides: PhysicalSynchronizersConfigOverridesSchema.prefault({}),
-    appsPg: AppsPgConfigSchema.optional(),
-    svApp: SvAppConfigSchema.optional(),
-    scanApp: ScanAppConfigSchema.optional(),
-    validatorApp: SvValidatorAppConfigSchema.optional(),
-    pruning: z
-      .object({
-        cometbft: z
-          .object({
-            retainBlocks: z.number(),
-          })
-          .optional(),
-        sequencer: z
-          .object({
-            enabled: z.boolean().optional(),
-            pruningInterval: z.string().optional(),
-            retentionPeriod: z.string().optional(),
-          })
-          .optional(),
-        cantonBft: CantonPruningSchema,
-        mediator: CantonPruningSchema,
-        participant: CantonPruningSchema,
-      })
-      .optional(),
-    logging: z
-      .object({
-        appsLogLevel: LogLevelSchema,
-        appsAsync: z.boolean().default(false),
-        cantonLogLevel: LogLevelSchema,
-        cantonStdoutLogLevel: LogLevelSchema.optional(),
-        // Log level for the Splice apps' HTTP request logging (org.lfdecentralizedtrust.splice.admin.api)
-        apiRequestLogLevel: LogLevelSchema.optional(),
-        // Log level for the Canton nodes' Ledger-API audit logging (com.digitalasset.canton.logging.audit)
-        // Falls back to `apiRequestLogLevel` when not specified
-        cantonApiRequestLogLevel: LogLevelSchema.optional(),
-        cantonAsync: z.boolean().default(false),
-        cometbftLogLevel: CometbftLogLevelSchema.optional(),
-        cometbftExtraLogLevelFlags: z.string().optional(),
-      })
-      .optional(),
-    periodicSnapshots: z.object({ topology: TopologySnapshotSchema.optional() }).optional(),
-    testing: z.object({ catchup: CatchupTestSchema.optional() }).optional(),
-    versionOverride: CnChartVersionSchema.optional(),
   })
+  .strict();
+
+// things here are declared optional even when they aren't, to allow partial overrides of defaults
+// TODO(DACH-NY/canton-network-internal#4859) the above is no longer true since defaults were removed.
+//   We should remove .optional() from required fields.
+const SingleSvConfigSchema = SyncNodeSchema.extend({
+  publicName: z.string().optional(),
+  subdomain: z.string().optional(),
+  cometbft: SvCometbftConfigSchema.optional(),
+  appsPg: AppsPgConfigSchema.optional(),
+  svApp: SvAppConfigSchema.optional(),
+  scanApp: ScanAppConfigSchema.optional(),
+  validatorApp: SvValidatorAppConfigSchema.optional(),
+  pruning: z
+    .object({
+      cometbft: z
+        .object({
+          retainBlocks: z.number(),
+        })
+        .optional(),
+      sequencer: z
+        .object({
+          enabled: z.boolean().optional(),
+          pruningInterval: z.string().optional(),
+          retentionPeriod: z.string().optional(),
+        })
+        .optional(),
+      cantonBft: CantonPruningSchema,
+      mediator: CantonPruningSchema,
+      participant: CantonPruningSchema,
+    })
+    .optional(),
+  logging: z
+    .object({
+      appsLogLevel: LogLevelSchema,
+      appsAsync: z.boolean().default(false),
+      cantonLogLevel: LogLevelSchema,
+      cantonStdoutLogLevel: LogLevelSchema.optional(),
+      // Log level for the Splice apps' HTTP request logging (org.lfdecentralizedtrust.splice.admin.api)
+      apiRequestLogLevel: LogLevelSchema.optional(),
+      // Log level for the Canton nodes' Ledger-API audit logging (com.digitalasset.canton.logging.audit)
+      // Falls back to `apiRequestLogLevel` when not specified
+      cantonApiRequestLogLevel: LogLevelSchema.optional(),
+      cantonAsync: z.boolean().default(false),
+      cometbftLogLevel: CometbftLogLevelSchema.optional(),
+      cometbftExtraLogLevelFlags: z.string().optional(),
+    })
+    .optional(),
+  periodicSnapshots: z.object({ topology: TopologySnapshotSchema.optional() }).optional(),
+  testing: z.object({ catchup: CatchupTestSchema.optional() }).optional(),
+  versionOverride: CnChartVersionSchema.optional(),
+})
   .strict()
-  .transform(({ physicalSynchronizerOverrides, sequencer, mediator, cantonBft, ...svConfig }) => {
-    // Implicit config merging is confusing but for now I don't really see a better way of introducting these overrides.
-    // Perhaps a proper revisit of the synchronizerMigration config structure will lead to a better solution here.
-    const physicalSynchronizers = DecentralizedSynchronizerUpgradeConfig.allMigrations.map(
-      migration => {
-        const mergedSequencer = mergeConfigFragments(
-          sequencer,
-          physicalSynchronizerOverrides[migration.id]?.sequencer || {}
-        ) as SvSequencerConfig;
-        return [
-          migration.id,
-          {
-            mediator: mergeConfigFragments(
-              mediator,
-              physicalSynchronizerOverrides[migration.id]?.mediator || {}
-            ) as SvMediatorConfig,
-            sequencer: mergedSequencer,
-            cantonBft: mergeConfigFragments(
-              _.pick(mergedSequencer, ['cloudSql', 'splicePostgres']),
-              cantonBft || {},
-              physicalSynchronizerOverrides[migration.id]?.cantonBft || {}
-            ) as SvCantonBftConfig,
-          },
-        ];
-      }
-    );
-    return {
-      ...svConfig,
-      physicalSynchronizers: _.fromPairs(physicalSynchronizers),
-    };
-  });
+  .transform(config =>
+    withPhysicalSynchronizers(config, DecentralizedSynchronizerUpgradeConfig.allMigrations)
+  );
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema);
 const SvsConfigurationSchema = z.object({
   svs: AllSvsConfigurationSchema,

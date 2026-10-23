@@ -15,3 +15,4 @@ export * from './svApp';
 export * from './validatorApp';
 export * from './bulkStorage';
 export * from './svConfigsBasic';
+export * from './dSyncNode';
