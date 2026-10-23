@@ -26,6 +26,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.I
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import scala.concurrent.duration.*
+import scala.util.{Failure, Success}
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.metrics.api.MetricHandle.{Counter, LabeledMetricsFactory}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricQualification, MetricsContext}
@@ -61,6 +62,10 @@ class UpdateIngestionService(
   private val lastProgressNanos = new AtomicLong(System.nanoTime())
   private val lastIngestedOffset = new AtomicLong(-1L)
   private val stalled = new AtomicBoolean(false)
+  // Bumped whenever progress is made or a new stream instance is started, so that an in-flight stall check can
+  // tell that the state it sampled is out of date.
+  private val progressVersion = new AtomicLong(0L)
+  private val stallCheckInFlight = new AtomicBoolean(false)
 
   override protected def isMakingProgress: Boolean = !stalled.get()
 
@@ -107,6 +112,7 @@ class UpdateIngestionService(
       _ = {
         // Only restart the watchdog window here: `stalled` must stay set until something is actually ingested.
         lastIngestedOffset.set(subscribeFrom)
+        progressVersion.incrementAndGet()
         lastProgressNanos.set(System.nanoTime())
       }
     } yield new ServiceWithGuaranteedShutdown(
@@ -138,6 +144,7 @@ class UpdateIngestionService(
 
   private def recordProgress(offset: Long): Unit = {
     lastIngestedOffset.set(offset)
+    progressVersion.incrementAndGet()
     lastProgressNanos.set(System.nanoTime())
     stalled.set(false)
   }
@@ -152,40 +159,69 @@ class UpdateIngestionService(
         jitter = 0.1,
       )
       .unwrap
-      .foreach {
-        case UnlessShutdown.Outcome(_) => scheduleStallCheck()
-        case UnlessShutdown.AbortedDueToShutdown => ()
+      .onComplete {
+        case Success(UnlessShutdown.AbortedDueToShutdown) => ()
+        case Success(UnlessShutdown.Outcome(_)) => scheduleStallCheck()
+        case Failure(ex) =>
+          // Never let an unexpected failure end the watchdog, as that would silently disable it.
+          logger.warn("Ingestion stall check failed unexpectedly, rescheduling it.", ex)
+          scheduleStallCheck()
       }
   }
 
   /** Restarts the current ingestion instance if it has not made progress for `stallTimeout` while the participant
     * has moved on. An idle ledger (ledger end == last ingested offset) is not a stall.
+    *
+    * The ledger end query is asynchronous, so the stream may recover or be replaced while it is in flight. We
+    * therefore sample the instance, the progress version and the offset before asking, and only act on the answer
+    * if all of them are unchanged and the service is still not paused. Only one check runs at a time.
     */
   private def checkForStall()(implicit tc: TraceContext): Future[Unit] = {
-    val stalledFor = (System.nanoTime() - lastProgressNanos.get()).nanos
     val stallTimeout = config.ingestion.stallTimeout.underlying
-    val running = !isPaused && currentService.exists(_.isActive)
-    if (!running || stalledFor < stallTimeout) Future.unit
-    else
-      connection
-        .ledgerEnd()
-        .map { ledgerEnd =>
-          val ingested = lastIngestedOffset.get()
-          if (UpdateIngestionService.hasStalled(stalledFor, stallTimeout, ledgerEnd, ingested)) {
-            logger.warn(
-              s"Ingestion of $ingestionTargetName made no progress for $stalledFor: ingested up to offset $ingested " +
-                s"while the ledger end is at $ledgerEnd. Restarting the ingestion loop."
-            )
-            stalled.set(true)
-            metrics.stallRestarts.inc()(MetricsContext.Empty)
-            currentService.foreach(_.initiateShutdown())
+    val stalledFor = (System.nanoTime() - lastProgressNanos.get()).nanos
+    val instanceO = currentService.filter(_.isActive)
+    val versionAtStart = progressVersion.get()
+    val ingestedAtStart = lastIngestedOffset.get()
+    instanceO match {
+      case Some(instance)
+          if !isPaused && stalledFor >= stallTimeout &&
+            stallCheckInFlight.compareAndSet(false, true) =>
+        // `flatMap` so that an exception thrown by `ledgerEnd()` itself ends up in the recover below.
+        Future.unit
+          .flatMap(_ => connection.ledgerEnd())
+          .map { ledgerEnd =>
+            val unchanged = progressVersion.get() == versionAtStart &&
+              currentService.exists(_ eq instance) && instance.isActive && !isPaused
+            if (unchanged) {
+              if (
+                UpdateIngestionService.hasStalled(
+                  stalledFor,
+                  stallTimeout,
+                  ledgerEnd,
+                  ingestedAtStart,
+                )
+              ) {
+                logger.warn(
+                  s"Ingestion of $ingestionTargetName made no progress for $stalledFor: ingested up to offset " +
+                    s"$ingestedAtStart while the ledger end is at $ledgerEnd. Restarting the ingestion loop."
+                )
+                stalled.set(true)
+                metrics.stallRestarts.inc()(MetricsContext.Empty)
+                instance.initiateShutdown()
+              }
+              // Give the (re)started instance, or an idle ledger, a full window before checking again.
+              lastProgressNanos.set(System.nanoTime())
+            }
           }
-          // Give the (re)started instance a full window before checking again.
-          lastProgressNanos.set(System.nanoTime())
-        }
-        .recover { case ex =>
-          logger.info("Failed to check ingestion progress against the ledger end, will retry.", ex)
-        }
+          .recover { case ex =>
+            logger.info(
+              "Failed to check ingestion progress against the ledger end, will retry.",
+              ex,
+            )
+          }
+          .andThen { case _ => stallCheckInFlight.set(false) }
+      case _ => Future.unit
+    }
   }
 
   private def ingestAcsAndInFlight(

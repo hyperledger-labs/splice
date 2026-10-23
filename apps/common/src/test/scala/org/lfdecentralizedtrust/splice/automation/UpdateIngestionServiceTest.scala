@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.automation
 import cats.data.NonEmptyList
 import com.daml.ledger.javaapi.data.OffsetCheckpoint
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.config.{
   NonNegativeFiniteDuration,
   PositiveFiniteDuration,
@@ -19,7 +19,9 @@ import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
-import org.mockito.ArgumentMatchersSugar
+import org.mockito.{ArgumentMatchersSugar, Mockito}
+import org.mockito.invocation.InvocationOnMock
+import org.mockito.stubbing.Answer
 import org.scalatest.wordspec.AnyWordSpec
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, IngestionConfig}
 import org.lfdecentralizedtrust.splice.environment.{
@@ -35,7 +37,8 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.I
 
 import java.util.Collections
 import java.util.concurrent.ConcurrentLinkedQueue
-import scala.concurrent.Future
+import java.util.concurrent.atomic.AtomicInteger
+import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
@@ -71,6 +74,44 @@ class UpdateIngestionServiceTest
     }
   }
 
+  private def checkpointAt(offset: Long) =
+    GetTreeUpdatesResponse(
+      TreeUpdateOrOffsetCheckpoint.Checkpoint(new OffsetCheckpoint(offset, Collections.emptyList()))
+    )
+
+  private def startService(sink: RecordingSink, connection: SpliceLedgerConnection) = {
+    val config = AutomationConfig(
+      pollingInterval = NonNegativeFiniteDuration.ofMillis(200),
+      ingestion = IngestionConfig(
+        stallTimeout = PositiveFiniteDuration.ofSeconds(1),
+        stallCheckInterval = NonNegativeFiniteDuration.ofMillis(200),
+      ),
+    )
+    val retryProvider =
+      RetryProvider(loggerFactory, ProcessingTimeout(), FutureSupervisor.Noop, NoOpMetricsFactory)
+    val service = loggerFactory.suppressWarningsAndErrors {
+      new UpdateIngestionService(
+        "test",
+        sink,
+        connection,
+        config,
+        new WallClock(timeouts, loggerFactory),
+        backoffClock = new WallClock(timeouts, loggerFactory),
+        retryProvider,
+        mock[PackageVersionSupport],
+        loggerFactory,
+      )
+    }
+    (service, retryProvider)
+  }
+
+  // Shut down like the app does: closing the retry provider stops the running stream.
+  private def stopService(service: UpdateIngestionService, retryProvider: RetryProvider): Unit =
+    loggerFactory.suppressWarningsAndErrors {
+      retryProvider.close()
+      service.close()
+    }
+
   "UpdateIngestionService" should {
     "restart a silently stalled update stream and resume ingesting" in {
       val sink = new RecordingSink
@@ -79,53 +120,93 @@ class UpdateIngestionServiceTest
       // First subscription never delivers anything and never fails: the stall that the retry loop cannot see.
       // The second subscription (after the watchdog restarted the stream) delivers a checkpoint.
       val stalled = Source.never[GetTreeUpdatesResponse]
-      val healthy = Source
-        .single(
-          GetTreeUpdatesResponse(
-            TreeUpdateOrOffsetCheckpoint.Checkpoint(
-              new OffsetCheckpoint(20L, Collections.emptyList())
-            )
-          )
-        )
-        .concat(Source.never[GetTreeUpdatesResponse])
+      val healthy = Source.single(checkpointAt(20L)).concat(Source.never[GetTreeUpdatesResponse])
       when(
         connection.updates(any[Long], any[MultiDomainAcsStore.IngestionFilter])(any[TraceContext])
       )
         .thenReturn(stalled, healthy)
 
-      val config = AutomationConfig(
-        pollingInterval = NonNegativeFiniteDuration.ofMillis(200),
-        ingestion = IngestionConfig(
-          stallTimeout = PositiveFiniteDuration.ofSeconds(1),
-          stallCheckInterval = NonNegativeFiniteDuration.ofMillis(200),
-        ),
-      )
-      val retryProvider =
-        RetryProvider(loggerFactory, ProcessingTimeout(), FutureSupervisor.Noop, NoOpMetricsFactory)
-      val service = loggerFactory.suppressWarningsAndErrors {
-        val s = new UpdateIngestionService(
-          "test",
-          sink,
-          connection,
-          config,
-          new WallClock(timeouts, loggerFactory),
-          backoffClock = new WallClock(timeouts, loggerFactory),
-          retryProvider,
-          mock[PackageVersionSupport],
-          loggerFactory,
-        )
+      val (service, retryProvider) = startService(sink, connection)
+      loggerFactory.suppressWarningsAndErrors {
         eventually(30.seconds) {
           sink.ingestedOffsets.asScala.toList should contain(20L)
         }
-        s
       }
       val healthyAfterRestart = service.isHealthy
-      // Shut down like the app does: closing the retry provider stops the running stream.
-      loggerFactory.suppressWarningsAndErrors {
-        retryProvider.close()
-        service.close()
-      }
+      stopService(service, retryProvider)
       healthyAfterRestart shouldBe true
+    }
+
+    "keep checking after an unexpected failure of a stall check" in {
+      val sink = new RecordingSink
+      val connection = mock[SpliceLedgerConnection]
+      // The first check blows up synchronously. The watchdog must survive that and restart the stalled stream.
+      val calls = new AtomicInteger(0)
+      Mockito
+        .when(connection.ledgerEnd()(any[TraceContext]))
+        .thenAnswer(new Answer[Future[Long]] {
+          override def answer(invocation: InvocationOnMock): Future[Long] =
+            if (calls.incrementAndGet() == 1) sys.error("boom") else Future.successful(20L)
+        })
+      val healthy = Source.single(checkpointAt(20L)).concat(Source.never[GetTreeUpdatesResponse])
+      when(
+        connection.updates(any[Long], any[MultiDomainAcsStore.IngestionFilter])(any[TraceContext])
+      )
+        .thenReturn(Source.never[GetTreeUpdatesResponse], healthy)
+
+      val (service, retryProvider) = startService(sink, connection)
+      loggerFactory.suppressWarningsAndErrors {
+        eventually(30.seconds) {
+          sink.ingestedOffsets.asScala.toList should contain(20L)
+        }
+      }
+      stopService(service, retryProvider)
+      succeed
+    }
+
+    "not restart a stream that recovers while the ledger end query is in flight" in {
+      val sink = new RecordingSink
+      val connection = mock[SpliceLedgerConnection]
+      // The first ledger end query stays pending until we complete it. Later queries answer immediately.
+      val firstLedgerEnd = Promise[Long]()
+      val ledgerEndCalls = new AtomicInteger(0)
+      // Count calls ourselves: `verify` is not safe to poll while the watchdog thread calls the mock.
+      Mockito
+        .when(connection.ledgerEnd()(any[TraceContext]))
+        .thenAnswer(new Answer[Future[Long]] {
+          override def answer(invocation: InvocationOnMock): Future[Long] =
+            if (ledgerEndCalls.incrementAndGet() == 1) firstLedgerEnd.future
+            else Future.successful(25L)
+        })
+      val (queue, stream) = Source.queue[GetTreeUpdatesResponse](10).preMaterialize()
+      // A second subscription would mean that the stream was restarted.
+      when(
+        connection.updates(any[Long], any[MultiDomainAcsStore.IngestionFilter])(any[TraceContext])
+      )
+        .thenReturn(stream, Source.never[GetTreeUpdatesResponse])
+
+      val (service, retryProvider) = startService(sink, connection)
+      loggerFactory.suppressWarningsAndErrors {
+        // The stream is silent, so the watchdog asks for the ledger end.
+        eventually(30.seconds) {
+          ledgerEndCalls.get() should be >= 1
+        }
+        // While that query is in flight the stream recovers and ingests a checkpoint.
+        queue.offer(checkpointAt(20L))
+        eventually(30.seconds) {
+          sink.ingestedOffsets.asScala.toList should contain(20L)
+        }
+        // The ledger end is still ahead of the ingested offset, but the answer is stale.
+        firstLedgerEnd.success(25L)
+        Threading.sleep(500)
+      }
+      val healthyAfterStaleAnswer = service.isHealthy
+      stopService(service, retryProvider)
+      healthyAfterStaleAnswer shouldBe true
+      verify(connection, times(1)).updates(
+        any[Long],
+        any[MultiDomainAcsStore.IngestionFilter],
+      )(any[TraceContext])
     }
   }
 
