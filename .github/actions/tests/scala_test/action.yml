@@ -138,6 +138,22 @@ runs:
       with:
         cache_version: ${{ inputs.cache_version }}
 
+    - name: Fetch release line of daml_base_version
+      if: inputs.daml_base_version != ''
+      shell: bash
+      run: |
+        # initial-package-config.py reads daml/dars.lock from the tip of this release line
+        ref="release-line-${{ inputs.daml_base_version }}"
+        for attempt in {1..3}; do
+          if git fetch --no-tags --force --depth=1 --filter=blob:none origin "refs/heads/${ref}:refs/remotes/origin/${ref}"; then
+            break
+          elif [ "$attempt" -eq 3 ]; then
+            echo "Fetching ${ref} failed"
+            exit 1
+          fi
+          sleep 5
+        done
+
     - name: Set Daml package versions
       uses: ./.github/actions/nix/run
       with:
