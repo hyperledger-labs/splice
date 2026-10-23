@@ -99,7 +99,7 @@ export function withPhysicalSynchronizers<C extends SyncNodeConfigWithOverrides>
     { mediator: SvMediatorConfig; sequencer: SvSequencerConfig; cantonBft: SvCantonBftConfig }
   >;
 } {
-  const physicalSynchronizers = DecentralizedSynchronizerUpgradeConfig.allMigrations.map(
+  const physicalSynchronizers = migrations.map(
     migration => {
       const mergedSequencer = mergeConfigFragments(
         sequencer,
