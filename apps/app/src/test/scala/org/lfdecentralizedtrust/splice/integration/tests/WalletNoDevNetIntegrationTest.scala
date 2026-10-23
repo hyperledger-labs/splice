@@ -48,7 +48,6 @@ import org.lfdecentralizedtrust.splice.wallet.config.AutoAcceptTransfersConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 
 import java.time.Duration
-import scala.concurrent.duration.DurationInt
 import java.util.UUID
 
 class WalletNoDevNetIntegrationTest
@@ -140,12 +139,17 @@ class WalletNoDevNetIntegrationTest
       })
       .copy(
         preAppStart = implicit env => {
-          // Reset traffic state for alice and bob such that extraTrafficRemainder = 0 to make sure we hit the cases where command priority matters.
+          // Reset traffic state for alice and bob such that extraTrafficRemainder is below the reserved traffic
+          // amount to make sure we hit the cases where command priority matters. Leave half the reserve so that
+          // the apps' own start-up submissions and the High priority accepts do not depend on base traffic.
           sv1Backend.sequencerClient.health.status match {
             case _: NodeStatus.Success[?] =>
-              Seq(aliceValidatorBackend, bobValidatorBackend).foreach(
-                setExtraTrafficRemainder(_, 0L)
-              )
+              Seq(aliceValidatorBackend, bobValidatorBackend).foreach { validator =>
+                setExtraTrafficRemainder(
+                  validator,
+                  validator.config.domains.global.reservedTraffic.value / 2,
+                )
+              }
             case _ =>
           }
         }
@@ -195,23 +199,12 @@ class WalletNoDevNetIntegrationTest
       // Keep each transfer small: every accepted transfer raises the receiver's balance,
       // and it must stay below the cost of one top-up for the next accept to count.
       val amount = BigDecimal(10)
-      val baseTrafficForHighPrioritySubmission = 15_000L
 
       // Fails the test if it does not hold, so that an accept can never pass with Low priority.
       def checkCannotAffordTopupAndTrafficBelowReserve(
           validator: ValidatorAppBackendReference,
           walletClient: WalletAppClientReference,
-      ): Unit = {
-        clue(
-          s"${validator.name} has enough base traffic for a high priority submission"
-        ) {
-          eventually(timeUntilSuccess = 2.minutes, maxPollInterval = 1.second) {
-            getTrafficState(
-              validator,
-              activeSynchronizerId,
-            ).baseTrafficRemainder.value should be >= baseTrafficForHighPrioritySubmission
-          }
-        }
+      ): Unit =
         clue(
           s"Precondition: ${validator.name} cannot afford one top-up and its traffic is at or below the reserve"
         ) {
@@ -223,7 +216,6 @@ class WalletNoDevNetIntegrationTest
             getTrafficState(validator, activeSynchronizerId).extraTrafficRemainder
           remainder should be <= reserved
         }
-      }
 
       // 1. acceptTransferOffer
       val offerTrackingId = UUID.randomUUID.toString
