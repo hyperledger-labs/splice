@@ -16,6 +16,7 @@ val synchronizerId = bootstrap
       StaticSynchronizerParameters.defaultsWithoutKMS(ProtocolVersion.latest),
     mediatorRequestAmplification = SubmissionRequestAmplification.NoAmplification,
     mediatorThreshold = PositiveInt.tryCreate(2),
+    identityTransactions = None,
   )
   .logical
 
