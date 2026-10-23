@@ -347,9 +347,10 @@ object DbStorageSetup {
   def useTestContainer(forceTestContainer: Boolean = false): Boolean = {
     val isCI = sys.env.contains("CI")
     val isMachine = sys.env.contains("MACHINE")
+    val isGha = sys.env.contains("GITHUB_ACTION")
     val useTestContainerByForce = sys.env.contains("DB_FORCE_TEST_CONTAINER") || forceTestContainer
 
-    useTestContainerByForce || !isCI || isMachine
+    useTestContainerByForce || !((isCI && !isMachine) || isGha)
   }
 
   def newPostgresContainer(withQueryStats: Boolean = collectQueryStats): PostgreSQLContainer = {

@@ -1081,6 +1081,8 @@ object LedgerClient {
           contractId = contractId.contractId,
           source = source.toProtoPrimitive,
           target = target.toProtoPrimitive,
+          overrideSourceValidationPackageId = None,
+          overrideTargetValidationPackageId = None,
         )
     }
 

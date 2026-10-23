@@ -72,7 +72,7 @@ import com.digitalasset.canton.{config, networking}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.nonempty.NonEmpty
 import com.google.protobuf.ByteString
-import io.grpc.Context
+import io.grpc.{Context, Status}
 
 import java.io.{BufferedInputStream, ByteArrayOutputStream, FileInputStream, IOException}
 import java.net.URI

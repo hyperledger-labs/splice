@@ -38,7 +38,6 @@ import com.digitalasset.canton.topology.{
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.NoTracing
-import com.digitalasset.canton.util.ResourceUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{ReassignmentCounter, SequencerCounter, SynchronizerAlias}
 import io.grpc.Context
@@ -457,45 +456,7 @@ class ParticipantRepairAdministration(
         RepresentativePackageIdOverride.NoOverride,
       excludedStakeholders: Set[PartyId] = Set.empty,
       forceRepairWhenTopologyTransactionAtLedgerEnd: Boolean = false,
-  ): Unit = {
-
-    val temporaryFile = File.newTemporaryFile(suffix = ".gz")
-    val outputStream = temporaryFile.newGzipOutputStream()
-    val resolvedWorkflowIdPrefix =
-      if (workflowIdPrefix.isEmpty) s"import-${UUID.randomUUID}" else workflowIdPrefix
-
-    ResourceUtil.withResource(outputStream) { outputStream =>
-      contracts
-        .traverse_ { repairContract =>
-          for {
-            lapiContract <- RepairContract.toLapiActiveContract(repairContract, synchronizerId)
-            activeContract = ActiveContract.create(lapiContract)(protocolVersion)
-            _ = activeContract.writeDelimitedTo(outputStream)
-          } yield outputStream.flush()
-        }
-        .valueOr(err =>
-          consoleEnvironment.raiseError(s"Unable to add contract data to stream: $err")
-        )
-    }
-
-    check(FeatureFlag.Repair) {
-      consoleEnvironment.run {
-        runner.adminCommand(
-          ParticipantAdminCommands.ParticipantRepairManagement.ImportAcs(
-            temporaryFile.toJava,
-            resolvedWorkflowIdPrefix,
-            contractImportMode,
-            representativePackageIdOverride,
-            excludedStakeholders,
-            synchronizerId,
-            forceRepairWhenTopologyTransactionAtLedgerEnd,
-          )
-        )
-      }
-    }
-
-    temporaryFile.delete(swallowIOExceptions = true)
-  }
+  ): Unit = ???
 
   @Help.Summary("Purge the data of a deactivated synchronizer")
   @Help.Description(

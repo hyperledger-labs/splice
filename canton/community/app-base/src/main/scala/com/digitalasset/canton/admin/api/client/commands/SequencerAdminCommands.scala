@@ -36,7 +36,7 @@ import com.digitalasset.canton.synchronizer.sequencer.{SequencerPruningStatus, S
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.{Member, SequencerId, SynchronizerId}
-import com.digitalasset.canton.util.{EitherUtil, GrpcStreamingUtils}
+import com.digitalasset.canton.util.GrpcStreamingUtils
 import com.digitalasset.canton.version.{ProtoVersion, ProtocolVersion, ReleaseVersion}
 import com.google.protobuf.ByteString
 import io.grpc.Context.CancellableContext

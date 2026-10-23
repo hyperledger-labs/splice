@@ -576,7 +576,7 @@ object BuildCommon {
           // We don't actually care about the damlLibrariesVersion but some of the Canton code needs it to compile.
           // We just set it to the canton version which isn't right but seems less annoying than having to maintain the actual version.
           BuildInfoKey("damlLibrariesVersion" -> CantonDependencies.canton_library_version),
-          BuildInfoKey("stableProtocolVersions" -> List("34", "35", "36")),
+          BuildInfoKey("stableProtocolVersions" -> List("36", "37")),
           BuildInfoKey("betaProtocolVersions" -> List()),
         ),
         buildInfoPackage := "com.digitalasset.canton.buildinfo",
@@ -882,8 +882,8 @@ object BuildCommon {
               "com.digitalasset.canton.participant.admin.workflows",
             ),
             (
-              (Compile / sourceDirectory).value / "daml" / "canton-builtin-admin-workflow-party-replication-alpha",
-              (Compile / damlDarOutput).value / "canton-builtin-admin-workflow-party-replication-alpha-current.dar",
+              (Compile / sourceDirectory).value / "daml" / "canton-builtin-admin-workflow-acs-replication-alpha",
+              (Compile / damlDarOutput).value / "canton-builtin-admin-workflow-acs-replication-alpha-current.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),
           ),
@@ -891,7 +891,7 @@ object BuildCommon {
         Compile / damlCodegenUseProject := false,
         Compile / damlBuildOrder := Seq(
           "daml/canton-builtin-admin-workflow-ping/daml.yaml",
-          "daml/canton-builtin-admin-workflow-party-replication-alpha/daml.yaml",
+          "daml/canton-builtin-admin-workflow-acs-replication-alpha/daml.yaml",
         ),
         // TODO(DACH-NY/canton-network-node#16168) Before creating the first stable release with backwards compatibility guarantees,
         //  make "AdminWorkflows.dar" stable again

@@ -67,13 +67,13 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
   /** Provide an environment for an individual test either by reusing an existing one or creating a
     * new one depending on the approach being used.
     */
-  def provideEnvironment: BaseTestConsoleEnvironment[C, E]
+  def provideEnvironment(testName: String): BaseTestConsoleEnvironment[C, E]
 
   /** Optional hook for implementors to know when a test has finished and be provided the
     * environment instance. This is required over a afterEach hook as we need the environment
     * instance passed.
     */
-  def testFinished(environment: BaseTestConsoleEnvironment[C, E]): Unit = {}
+  def testFinished(testName: String, environment: BaseTestConsoleEnvironment[C, E]): Unit = {}
 
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
 
