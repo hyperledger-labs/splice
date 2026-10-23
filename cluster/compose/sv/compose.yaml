@@ -25,7 +25,10 @@ services:
       - CREATE_DATABASE_scan=scan
       - CREATE_DATABASE_sv=sv
     volumes:
-      - postgres-splice-sv:/var/lib/postgresql/data
+      # Postgres 18 and above
+      - postgres-splice-sv:/var/lib/postgresql
+      # Postgres 17 and below. Replace the volume above with this one if you haven't yet upgraded to Postgres >=18.
+      #- postgres-splice-sv:/var/lib/postgresql/data
       - ./postgres-entrypoint.sh:/postgres-entrypoint.sh
     entrypoint: /postgres-entrypoint.sh
     user: "postgres"

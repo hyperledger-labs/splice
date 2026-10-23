@@ -34,6 +34,10 @@ IGNORED_FILE_PATTERNS = [
     re.compile(r"^cluster/images/splice-test-cometbft/Dockerfile$"),
 ]
 
+VERSION_VAR_IMAGES = {
+    "POSTGRES_VERSION": "postgres",
+}
+
 
 def main() -> int:
     _setup_env()
@@ -184,8 +188,17 @@ def _refs_from_plain_file(path: Path) -> set[tuple[str, str, str]]:
         for line in f:
             if line.lstrip().startswith("#"):
                 continue
-            refs.update(_extract_refs_from_text(line))
+            refs.update(_extract_refs_from_text(_resolve_version_vars(line)))
     return refs
+
+
+# We have places where we pin an image via `SOFTWARE_VERSION=image:version...`
+# which is not prefixed by the image and breaks the rest of the script, but we still want to validate it.
+def _resolve_version_vars(line: str) -> str:
+    for var, image in VERSION_VAR_IMAGES.items():
+        name = re.escape(var)
+        line = re.sub(rf"\b{name}=(?:\$\{{{name}:-)?", f"{image}:", line)
+    return line
 
 
 def _tracked_dockerfiles() -> list[str]:
