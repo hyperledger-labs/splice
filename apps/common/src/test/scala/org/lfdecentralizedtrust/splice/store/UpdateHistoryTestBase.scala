@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.store
 
+import com.digitalasset.canton.time.Clock
+
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Transaction}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
@@ -23,12 +25,14 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodeg
 import org.lfdecentralizedtrust.splice.util.Contract
 import org.scalatest.Assertion
 
-import scala.concurrent.Future
+import java.time.{LocalDate, ZoneOffset}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import UpdateHistory.UpdateHistoryResponse
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.config.NonNegativeDuration
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
+import com.digitalasset.canton.util.MonadUtil
 
 abstract class UpdateHistoryTestBase
     extends StoreTestBase
@@ -230,9 +234,18 @@ abstract class UpdateHistoryTestBase
     succeed
   }
 
-  protected def initStore(implicit store: UpdateHistory): Future[Unit] = {
-    store.testIngestionSink.initialize().map(_ => ())
-  }
+  protected def initStore(
+      store: UpdateHistory,
+      timeStart: CantonTimestamp = time(0),
+      partitionRunwayDays: Int = 7,
+  ): Future[Unit] = for {
+    _ <- createUpdateHistoryPartitions(
+      store,
+      timeStart,
+      partitionRunwayDays,
+    )
+    _ <- store.testIngestionSink.initialize(mockLedgerConnection(timeStart))
+  } yield ()
 
   protected def mkStore(
       updateStreamParty: PartyId = party1,
@@ -242,6 +255,7 @@ abstract class UpdateHistoryTestBase
       backfillingRequired: BackfillingRequirement = BackfillingRequirement.NeedsBackfilling,
       analyzableTimeWindowDuration: NonNegativeDuration =
         NonNegativeDuration.tryFromDuration(scala.concurrent.duration.Duration.Inf),
+      clock: Clock = this.clock,
   ): UpdateHistory = {
     UpdateHistory
       .create(
@@ -256,6 +270,7 @@ abstract class UpdateHistoryTestBase
         loggerFactory,
         enableImportUpdateBackfill = true,
         HistoryMetrics.apply(NoOpMetricsFactory, domainMigrationId),
+        clock,
       )
       .futureValue
   }
@@ -484,5 +499,22 @@ object UpdateHistoryTestBase {
         )
       case _ => throw new RuntimeException("Invalid transfer type")
     }
+  }
+
+  def createUpdateHistoryPartitions(
+      updateHistory: UpdateHistory,
+      timeStart: CantonTimestamp,
+      partitionRunwayDays: Int,
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
+    val firstDay = LocalDate.ofInstant(timeStart.toInstant, ZoneOffset.UTC)
+    for {
+      // for tests that want import updates
+      _ <- updateHistory.createPartitions(
+        LocalDate.ofInstant(CantonTimestamp.MinValue.toInstant, ZoneOffset.UTC)
+      )
+      _ <- MonadUtil.sequentialTraverse(0.until(partitionRunwayDays)) { n =>
+        updateHistory.createPartitions(firstDay.plusDays(n.toLong))
+      }
+    } yield ()
   }
 }

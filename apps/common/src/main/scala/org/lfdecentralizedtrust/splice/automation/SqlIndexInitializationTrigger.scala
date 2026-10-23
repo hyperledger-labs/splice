@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import com.digitalasset.canton.config.DbConfig
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, *}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -234,27 +233,10 @@ object SqlIndexInitializationTrigger {
     ) extends IndexAction
   }
 
-  /** Indexes managed by this trigger class */
+  /** Indexes managed by this trigger class
+    *  WARNING: partitioned tables (such as all update_history tables) cannot be indexed 'concurrently'.
+    */
   val defaultIndexActions: List[IndexAction] = List[IndexAction](
-    IndexAction
-      .Create(
-        indexName = "updt_hist_crea_hi_mi_ci_import_updates",
-        // Create index statements do not seem to support parameters, so we use the literal value interpolation instead.
-        createAction = sqlu"""
-          create index concurrently if not exists updt_hist_crea_hi_mi_ci_import_updates
-          on update_history_creates (history_id, migration_id, contract_id)
-          where record_time = #${CantonTimestamp.MinValue.toMicros}
-        """,
-      ),
-    IndexAction
-      .Create(
-        indexName = "updt_hist_tran_hi_eth",
-        createAction = sqlu"""
-          create index concurrently if not exists updt_hist_tran_hi_eth
-          on update_history_transactions (history_id, external_transaction_hash)
-          where external_transaction_hash is not null
-        """,
-      ),
     IndexAction
       .Create(
         indexName = "dso_acs_store_sid_mid_pn_tid_rbio",

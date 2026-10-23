@@ -16,6 +16,7 @@ import { CnChartVersionSchema } from '@canton-network/splice-pulumi-common/src/c
 import util from 'node:util';
 import { z } from 'zod';
 
+import { FlywayMigrationToWaitForSchema } from './bigQueryFlywayMigration';
 import { TopologySnapshotSchema } from './config';
 import {
   CloudSqlWithOverrideConfigSchema,
@@ -122,6 +123,7 @@ export const ScanBigQueryConfigSchema = z
         message: 'Value must be an exact number of days, expressed in seconds',
       })
       .default(7 * SECONDS_PER_DAY),
+    flywayMigrationToWaitFor: FlywayMigrationToWaitForSchema,
   })
   .strict(); // Keeps strict mode safe now that all known fields are explicitly defined
 

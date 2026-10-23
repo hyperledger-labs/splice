@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.scan.store
 
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.caching.ScaffeineCache
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
@@ -39,7 +38,6 @@ import org.lfdecentralizedtrust.splice.store.{
   ResultsPage,
   SynchronizerStore,
   TxLogStore,
-  UpdateHistory,
   VoteResultsFilters,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState}
@@ -198,19 +196,6 @@ class CachingScanStore(
       tc: TraceContext
   ): Future[Map[TransferCommand.ContractId, TransferCommandTxLogEntry]] =
     store.lookupLatestTransferCommandEvents(sender, nonce, limit)
-
-  override def lookupContractByRecordTime[C, TCId <: ContractId[?], T](
-      companion: C,
-      updateHistory: UpdateHistory,
-      recordTime: CantonTimestamp,
-  )(implicit
-      companionClass: MultiDomainAcsStore.ContractCompanion[C, TCId, T],
-      tc: TraceContext,
-  ): Future[Option[Contract[TCId, T]]] = store.lookupContractByRecordTime(
-    companion,
-    updateHistory,
-    recordTime,
-  )
 
   override def listVoteRequestResults(
       filters: VoteResultsFilters,

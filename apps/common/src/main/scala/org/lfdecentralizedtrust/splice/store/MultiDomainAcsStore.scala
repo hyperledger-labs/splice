@@ -830,7 +830,10 @@ object MultiDomainAcsStore extends StoreErrors {
     def ingestionFilter: IngestionFilter
 
     /** Must be the first method called. Returns information about where and how to start ingestion. */
-    def initialize()(implicit traceContext: TraceContext): Future[IngestionStart]
+    def initialize(connection: BaseLedgerConnection)(implicit
+        traceContext: TraceContext,
+        mat: Materializer,
+    ): Future[IngestionStart]
 
     @VisibleForTesting
     def ingestAcs(

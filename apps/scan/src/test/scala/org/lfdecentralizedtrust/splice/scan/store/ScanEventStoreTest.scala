@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.store.{
   StoreTestBase,
   TimestampWithMigrationId,
   UpdateHistory,
+  UpdateHistoryTestBase,
 }
 import org.lfdecentralizedtrust.splice.scan.store.db.{DbAppActivityRecordStore, DbScanVerdictStore}
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{EnvelopeT, TrafficSummaryT}
@@ -1055,7 +1056,9 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
     } yield verdict.value.rowId
 
   private def newUpdateHistory(
-      migrationId: Long
+      migrationId: Long,
+      timeStart: CantonTimestamp,
+      partitionRunwayDays: Int,
   ): Future[UpdateHistory] = {
     val participantId = mkParticipantId("ScanEventStoreTest")
     for {
@@ -1071,8 +1074,14 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
         loggerFactory,
         enableImportUpdateBackfill = true,
         HistoryMetrics(NoOpMetricsFactory, migrationId),
+        clock,
       )
-      _ <- updateHistory.ingestionSink.initialize()
+      _ <- updateHistory.ingestionSink.initialize(mockLedgerConnection())
+      _ <- UpdateHistoryTestBase.createUpdateHistoryPartitions(
+        updateHistory,
+        timeStart,
+        partitionRunwayDays,
+      )
     } yield updateHistory
   }
 
@@ -1254,9 +1263,14 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
       eventStore: ScanEventStore,
   )
 
-  private def newEventStore(migrationId: Long = domainMigrationId): Future[EventStoreCtx] =
+  private def newEventStore(
+      migrationId: Long = domainMigrationId,
+      // Tests use CantonTimestamp.now() as record time
+      timeStart: CantonTimestamp = CantonTimestamp.now(),
+      partitionRunwayDays: Int = 7,
+  ): Future[EventStoreCtx] =
     for {
-      uh <- newUpdateHistory(migrationId)
+      uh <- newUpdateHistory(migrationId, timeStart, partitionRunwayDays)
       vs = newVerdictStore(uh)
       es = new ScanEventStore(vs, uh, loggerFactory)
     } yield EventStoreCtx(vs, uh, es)

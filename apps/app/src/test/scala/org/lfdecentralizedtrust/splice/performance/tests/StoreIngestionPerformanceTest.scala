@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.performance.tests
 
+import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
+import org.lfdecentralizedtrust.splice.store.StoreTestBase.mockLedgerConnectionWithUpdates
 import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
@@ -54,13 +56,21 @@ abstract class StoreIngestionPerformanceTest(
       .withNewTraceContext(this.getClass.getName) { implicit tc =>
         for {
           store <- mkStore(storage)
-          _ <- store.ingestionSink.initialize()
           _ <- sanityCheckTables(storage) { count =>
             Option.when(count != 0)(
               s"Expected table to be empty before ingestion, but found $count rows."
             )
           }
           txs = loadTxsFromDump()
+          _ <- store.ingestionSink.initialize(
+            mockLedgerConnectionWithUpdates(
+              txs.map(tx =>
+                LedgerClient.GetTreeUpdatesResponse(
+                  TreeUpdateOrOffsetCheckpoint.Update(tx.update.update, tx.update.synchronizerId)
+                )
+              )
+            )
+          )
           metrics <- ingestWithMetrics(store, txs)
           _ <- sanityCheckTables(storage) { count =>
             Option.when(count == 0)(

@@ -1,0 +1,66 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: update-history
+    folder: canton-network
+    interval: 5m
+    rules:
+      - uid: b8kq2upr4rnwmf
+        title: Update history partition runway too short
+        condition: too_short
+        data:
+          - refId: runway
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: min by (namespace) ((splice_history_updates_partition_runway_end > 0) / 1e6 - time())
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: runway
+          - refId: too_short
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 518400 # 6 days
+                      - 0
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [ ]
+                  reducer:
+                    params: [ ]
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: runway
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: too_short
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          description: Scan creates the daily update history partitions ahead of ingestion. Once the record time reaches the end of the runway, ingestion fails. Check the logs of the PartitionMaintenanceTrigger.
+          runbook_url: ""
+          severity: warning
+          summary: The update history partition runway is only {{ humanizeDuration $values.runway.Value }} in {{ index $labels "namespace" }}'s Scan
+        labels:
+          "": ""
+          gcloud_filter: resource.labels.namespace_name=%22{{ index $$labels "namespace" }}%22%0A
+        isPaused: false

@@ -66,6 +66,12 @@ class WalletTimeBasedIntegrationTest
           _.focus(_.transferPreapproval.preapprovalLifetime).replace(preapprovalLifetime)
         )(config)
       )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllScanAppConfigs_(
+          // more days than default runway days are advanced
+          _.copy(updateHistoryPartitionRunwayDays = 90)
+        )(config)
+      )
 
   "A wallet" should {
 

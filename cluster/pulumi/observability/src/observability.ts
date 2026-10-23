@@ -1054,6 +1054,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 '$ACS_SNAPSHOT_UPDATE_LATENCY_THRESHOLD_SECONDS',
                 monitoringConfig.alerting.alerts.acsSnapshots.updateLatencyThresholdSeconds.toString()
               ),
+            'update_history_alerts.yaml': readGrafanaAlertingFile('update_history_alerts.yaml'),
             'sv-status-report_alerts.yaml': readAndSetAlertRulesGrafanaAlertingFile(
               'sv-status-report_alerts.yaml',
               [

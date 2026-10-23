@@ -1337,8 +1337,9 @@ class DbScanAppRewardsStoreTest
         loggerFactory,
         enableImportUpdateBackfill = false,
         HistoryMetrics(NoOpMetricsFactory, migrationId),
+        clock,
       )
-      _ <- updateHistory.ingestionSink.initialize()
+      _ <- updateHistory.ingestionSink.initialize(mockLedgerConnection())
     } yield {
       val appActivityRecordStore = new DbAppActivityRecordStore(
         storage.underlying,

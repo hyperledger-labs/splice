@@ -1,0 +1,234 @@
+-- Legacy tables will eventually be dropped by pruning.
+-- Indexes are renamed to avoid clashes with the new tables.
+
+alter table update_history_transactions
+    rename to update_history_transactions_legacy;
+alter sequence update_history_transactions_row_id_seq rename to update_history_transactions_legacy_row_id_seq;
+alter table update_history_transactions_legacy
+    rename constraint update_history_transactions_pkey to update_history_transactions_legacy_pkey;
+alter index updt_hist_tran_hi_mi_di_rt rename to updt_hist_tran_hi_mi_di_rt_legacy;
+alter index updt_hist_tran_hi_mi_rt_di rename to updt_hist_tran_hi_mi_rt_di_legacy;
+alter index updt_hist_tran_hi_mi_ui_import_updates rename to updt_hist_tran_hi_mi_ui_import_updates_legacy;
+alter index updt_hist_tran_hi_mi_ui_u rename to updt_hist_tran_hi_mi_ui_u_legacy;
+alter index updt_hist_tran_hi_ui rename to updt_hist_tran_hi_ui_legacy;
+-- Created at runtime by SqlIndexInitializationTrigger, might not exist yet
+alter index if exists updt_hist_tran_hi_eth rename to updt_hist_tran_hi_eth_legacy;
+
+alter table update_history_creates
+    rename to update_history_creates_legacy;
+alter sequence update_history_creates_v2_row_id_seq rename to update_history_creates_legacy_row_id_seq;
+alter table update_history_creates_legacy
+    rename constraint update_history_creates_pkey to update_history_creates_legacy_pkey;
+alter index contract_create_lookup rename to contract_create_lookup_legacy;
+alter index updt_hist_crea_hi_mi_rt rename to updt_hist_crea_hi_mi_rt_legacy;
+alter index updt_hist_crea_hi_tidmn_tiden_pn_rid rename to updt_hist_crea_hi_tidmn_tiden_pn_rid_legacy;
+alter index updt_hist_crea_unique rename to updt_hist_crea_unique_legacy;
+-- Created at runtime by SqlIndexInitializationTrigger, might not exist yet
+alter index if exists updt_hist_crea_hi_mi_ci_import_updates rename to updt_hist_crea_hi_mi_ci_import_updates_legacy;
+
+alter table update_history_exercises
+    rename to update_history_exercises_legacy;
+alter sequence update_history_exercises_v2_row_id_seq rename to update_history_exercises_legacy_row_id_seq;
+alter table update_history_exercises_legacy
+    rename constraint update_history_exercises_pkey to update_history_exercises_legacy_pkey;
+alter index updt_hist_exer_hi_mi_rt_co rename to updt_hist_exer_hi_mi_rt_co_legacy;
+alter index updt_hist_exer_unique rename to updt_hist_exer_unique_legacy;
+
+alter table update_history_assignments
+    rename to update_history_assignments_legacy;
+alter sequence update_history_assignments_row_id_seq rename to update_history_assignments_legacy_row_id_seq;
+alter table update_history_assignments_legacy
+    rename constraint update_history_assignments_pkey to update_history_assignments_legacy_pkey;
+alter index updt_hist_assi_hi_mi_di_rt rename to updt_hist_assi_hi_mi_di_rt_legacy;
+alter index updt_hist_assi_hi_mi_rt_di rename to updt_hist_assi_hi_mi_rt_di_legacy;
+alter index updt_hist_assi_hi_mi_ui_u rename to updt_hist_assi_hi_mi_ui_u_legacy;
+
+alter table update_history_unassignments
+    rename to update_history_unassignments_legacy;
+alter sequence update_history_unassignments_row_id_seq rename to update_history_unassignments_legacy_row_id_seq;
+alter table update_history_unassignments_legacy
+    rename constraint update_history_unassignments_pkey to update_history_unassignments_legacy_pkey;
+alter index updt_hist_unas_hi_mi_di_rt rename to updt_hist_unas_hi_mi_di_rt_legacy;
+alter index updt_hist_unas_hi_mi_rt_di rename to updt_hist_unas_hi_mi_rt_di_legacy;
+alter index updt_hist_unas_hi_mi_ui_u rename to updt_hist_unas_hi_mi_ui_u_legacy;
+
+-- This FK followed the rename of update_history_transactions, so it would otherwise pin
+-- update_history_backfilling to update_history_transactions_legacy forever.
+-- It cannot be recreated against the new table, which has no unique constraint on
+-- (history_id, migration_id, domain_id, update_id) without record_time.
+alter table update_history_backfilling
+    drop constraint update_history_backfilling_history_id_joining_migration_id_fkey;
+
+-- Create all new tables:
+-- * For sequences, ALTER SEQUENCE would fail with 'cannot change ownership of identity sequence'.
+-- * The primary key is (row_id, record_time), as a primary key on a partitioned table must include the partition key.
+--   It serves as the row identity (e.g., as replica identity for logical replication), deduplication is done by the unique indexes.
+-- * The unique indexes include record_time, for the same reason. This does not weaken deduplication:
+--   record_time is part of the update itself, so ingesting the same update again carries the same record_time and hits the unique index.
+-- * creates, exercises and assignments get _interned columns (see interned_strings).
+create table update_history_transactions
+(
+    history_id                integer                  not null references update_history_descriptors (id),
+    row_id                    bigint generated by default as identity,
+    ingested_at               timestamp with time zone not null default now(),
+    update_id                 text                     not null,
+    record_time               bigint                   not null,
+    participant_offset        text                     not null,
+    domain_id                 text                     not null,
+    migration_id              integer                  not null,
+    effective_at              bigint                   not null,
+    root_event_ids            text[]                   not null,
+    workflow_id               text,
+    command_id                text,
+    external_transaction_hash bytea,
+    primary key (row_id, record_time)
+)
+    partition by range (record_time);
+select setval(pg_get_serial_sequence('update_history_transactions', 'row_id'), last_value, is_called)
+from update_history_transactions_legacy_row_id_seq;
+create index updt_hist_tran_hi_mi_di_rt on update_history_transactions (history_id, migration_id, domain_id, record_time);
+create index updt_hist_tran_hi_mi_rt_di on update_history_transactions (history_id, migration_id, record_time, domain_id);
+create unique index updt_hist_tran_hi_mi_ui_u on update_history_transactions (history_id, migration_id, domain_id, update_id, record_time);
+create index updt_hist_tran_hi_ui on update_history_transactions (history_id, update_id);
+-- Moved here from SqlIndexInitializationTrigger: CREATE INDEX CONCURRENTLY is not supported on partitioned tables,
+-- and on the empty parent a plain CREATE INDEX is instant.
+create index updt_hist_tran_hi_eth on update_history_transactions (history_id, external_transaction_hash)
+    where external_transaction_hash is not null;
+
+create table update_history_creates
+(
+    history_id                       integer                  not null references update_history_descriptors (id),
+    row_id                           bigint generated by default as identity,
+    ingested_at                      timestamp with time zone not null default now(),
+    event_id                         text                     not null,
+    update_row_id                    bigint                   not null,
+    contract_id                      text                     not null,
+    created_at                       bigint                   not null,
+    template_id_package_id           text                     not null,
+    template_id_module_name          text                     not null,
+    template_id_entity_name          text                     not null,
+    package_name                     text                     not null,
+    create_arguments                 jsonb                    not null,
+    signatories                      text[]                   not null,
+    observers                        text[]                   not null,
+    contract_key                     jsonb,
+    record_time                      bigint                   not null,
+    update_id                        text                     not null,
+    domain_id                        text                     not null,
+    migration_id                     integer                  not null,
+    template_id_package_id_interned  bigint                   not null,
+    template_id_module_name_interned bigint                   not null,
+    template_id_entity_name_interned bigint                   not null,
+    package_name_interned            bigint                   not null,
+    primary key (row_id, record_time)
+)
+    partition by range (record_time);
+select setval(pg_get_serial_sequence('update_history_creates', 'row_id'), last_value, is_called)
+from update_history_creates_legacy_row_id_seq;
+create index updt_hist_crea_hi_mi_rt on update_history_creates (history_id, migration_id, record_time);
+create index updt_hist_crea_uri on update_history_creates (update_row_id);
+
+create table update_history_exercises
+(
+    history_id                       integer                  not null references update_history_descriptors (id),
+    row_id                           bigint generated by default as identity,
+    ingested_at                      timestamp with time zone not null default now(),
+    event_id                         text                     not null,
+    update_row_id                    bigint                   not null,
+    child_event_ids                  text[]                   not null,
+    choice                           text                     not null,
+    template_id_package_id           text                     not null,
+    template_id_module_name          text                     not null,
+    template_id_entity_name          text                     not null,
+    contract_id                      text                     not null,
+    consuming                        boolean                  not null,
+    argument                         jsonb                    not null,
+    result                           jsonb                    not null,
+    package_name                     text                     not null,
+    interface_id_package_id          text,
+    interface_id_module_name         text,
+    interface_id_entity_name         text,
+    acting_parties                   text[]                   not null,
+    record_time                      bigint                   not null,
+    update_id                        text                     not null,
+    domain_id                        text                     not null,
+    migration_id                     integer                  not null,
+    template_id_package_id_interned  bigint                   not null,
+    template_id_module_name_interned bigint                   not null,
+    template_id_entity_name_interned bigint                   not null,
+    package_name_interned            bigint                   not null,
+    choice_interned                  bigint                   not null,
+    interface_id_package_id_interned bigint,
+    interface_id_module_name_interned bigint,
+    interface_id_entity_name_interned bigint,
+    primary key (row_id, record_time)
+)
+    partition by range (record_time);
+select setval(pg_get_serial_sequence('update_history_exercises', 'row_id'), last_value, is_called)
+from update_history_exercises_legacy_row_id_seq;
+create index updt_hist_exer_hi_mi_rt_co on update_history_exercises (history_id, migration_id, record_time, consuming);
+
+create table update_history_assignments
+(
+    history_id                       integer                  not null references update_history_descriptors (id),
+    row_id                           bigint generated by default as identity,
+    ingested_at                      timestamp with time zone not null default now(),
+    update_id                        text                     not null,
+    record_time                      bigint                   not null,
+    participant_offset               text                     not null,
+    domain_id                        text                     not null,
+    migration_id                     integer                  not null,
+    reassignment_counter             integer                  not null,
+    source_domain                    text                     not null,
+    reassignment_id                  text                     not null,
+    submitter                        text                     not null,
+    contract_id                      text                     not null,
+    event_id                         text                     not null,
+    created_at                       bigint                   not null,
+    template_id_package_id           text                     not null,
+    template_id_module_name          text                     not null,
+    template_id_entity_name          text                     not null,
+    package_name                     text                     not null,
+    create_arguments                 jsonb                    not null,
+    signatories                      text[],
+    observers                        text[],
+    contract_key                     jsonb,
+    template_id_package_id_interned  bigint                   not null,
+    template_id_module_name_interned bigint                   not null,
+    template_id_entity_name_interned bigint                   not null,
+    package_name_interned            bigint                   not null,
+    primary key (row_id, record_time)
+)
+    partition by range (record_time);
+select setval(pg_get_serial_sequence('update_history_assignments', 'row_id'), last_value, is_called)
+from update_history_assignments_legacy_row_id_seq;
+create index updt_hist_assi_hi_mi_di_rt on update_history_assignments (history_id, migration_id, domain_id, record_time);
+create index updt_hist_assi_hi_mi_rt_di on update_history_assignments (history_id, migration_id, record_time, domain_id);
+create unique index updt_hist_assi_hi_mi_ui_u on update_history_assignments (history_id, migration_id, domain_id, update_id, record_time);
+
+create table update_history_unassignments
+(
+    history_id           integer                  not null references update_history_descriptors (id),
+    row_id               bigint generated by default as identity,
+    ingested_at          timestamp with time zone not null default now(),
+    update_id            text                     not null,
+    record_time          bigint                   not null,
+    participant_offset   text                     not null,
+    domain_id            text                     not null,
+    migration_id         integer                  not null,
+    reassignment_counter integer                  not null,
+    target_domain        text                     not null,
+    reassignment_id      text                     not null,
+    submitter            text                     not null,
+    contract_id          text                     not null,
+    primary key (row_id, record_time)
+)
+    partition by range (record_time);
+select setval(pg_get_serial_sequence('update_history_unassignments', 'row_id'), last_value, is_called)
+from update_history_unassignments_legacy_row_id_seq;
+create index updt_hist_unas_hi_mi_di_rt on update_history_unassignments (history_id, migration_id, domain_id, record_time);
+create index updt_hist_unas_hi_mi_rt_di on update_history_unassignments (history_id, migration_id, record_time, domain_id);
+create unique index updt_hist_unas_hi_mi_ui_u on update_history_unassignments (history_id, migration_id, domain_id, update_id, record_time);
+
+-- No partitions are created here. They are created by UpdateHistory.createPartitions, which must run at startup
+-- before ingestion resumes (#6313), otherwise the first insert after the upgrade fails.

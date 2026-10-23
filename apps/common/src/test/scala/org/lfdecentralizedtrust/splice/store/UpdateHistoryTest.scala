@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.{
   CreatedEvent,
   DamlRecord,
   ExercisedEvent,
+  Identifier,
   Int64,
   OffsetCheckpoint,
   Value,
@@ -15,6 +16,7 @@ import com.digitalasset.daml.lf.data.Bytes
 import com.google.rpc.status.Status
 import com.google.rpc.status.Status.toJavaProto
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, AppRewardCoupon}
+import com.digitalasset.canton.time.SimClock
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
@@ -23,7 +25,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 import com.daml.ledger.javaapi.data.Transaction
 
-import java.time.Instant
+import java.time.{Instant, LocalDate, ZoneOffset}
 import java.util.Collections
 import scala.concurrent.Future
 import scala.concurrent.duration.*
@@ -34,6 +36,7 @@ import StoreTestBase.*
 import cats.data.NonEmptyList
 import com.google.protobuf.ByteString
 import com.digitalasset.canton.config.NonNegativeDuration
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 class UpdateHistoryTest extends UpdateHistoryTestBase {
 
@@ -49,6 +52,60 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
   }
 
   "UpdateHistory" should {
+
+    "createPartitions" should {
+
+      "be idempotent" in {
+        val store = mkStore()
+
+        for {
+          _ <- initStore(store)
+          _ <- createUpdateHistoryPartitions(store, time(0), partitionRunwayDays = 7)
+          _ <- create(domain1, cid1, offset1, party1, store, time(10))
+          result <- updates(store)
+        } yield result should have size 1
+      }
+    }
+
+    "initialize with a connection" should {
+
+      def daysAfter(days: Long) = CantonTimestamp.Epoch.plus(java.time.Duration.ofDays(days))
+      val day0 = LocalDate.ofInstant(CantonTimestamp.Epoch.toInstant, ZoneOffset.UTC)
+
+      def mkClock(now: CantonTimestamp) = {
+        val clock = new SimClock(loggerFactory = loggerFactory)
+        clock.advanceTo(now)
+        clock
+      }
+
+      "create partitions from the first update to ingest if nothing was ingested" in {
+        val store = mkStore(clock = mkClock(daysAfter(20)))
+        for {
+          _ <- store.ingestionSink.initialize(mockLedgerConnection(daysAfter(3)))
+          days <- store.listDatesWithAllPartitions()
+        } yield {
+          store.isReady shouldBe true
+          days shouldBe (3L to 27L).map(day0.plusDays).toSet
+        }
+      }
+
+      "extend the runway from the last ingested record time after a downtime" in {
+        val clock = mkClock(CantonTimestamp.Epoch)
+        val store = mkStore(clock = clock)
+        for {
+          _ <- initStore(store, timeStart = time(0), partitionRunwayDays = 1)
+          _ <- create(domain1, cid1, offset1, party1, store, time(10))
+          _ = clock.advanceTo(daysAfter(20))
+          _ <- store.ingestionSink.initialize(mockLedgerConnection())
+          _ <- create(domain1, cid2, offset2, party1, store, daysAfter(15))
+          days <- store.listDatesWithAllPartitions()
+          result <- updates(store)
+        } yield {
+          days.filterNot(_.isBefore(day0)) shouldBe (0L to 27L).map(day0.plusDays).toSet
+          result should have size 2
+        }
+      }
+    }
 
     "ingestion" should {
 
@@ -232,6 +289,73 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             ExpectedExercise(cid1, domain2, "Archive"),
           ),
         )
+      }
+
+      "write interned strings of create, exercise and assignment events" in {
+        implicit val store = mkStore()
+        val c = appRewardCoupon(1, party1, contractId = cid1)
+        val templateId = c.identifier
+        val interfaceId = new Identifier("interfacePackageId", "Interface.Module", "Interface")
+        val expectedTemplateStrings = Seq(
+          "template_id_package_id" -> templateId.getPackageId,
+          "template_id_module_name" -> templateId.getModuleName,
+          "template_id_entity_name" -> templateId.getEntityName,
+          "package_name" -> getPackageName(templateId),
+        )
+        val expectedStrings = Seq(
+          "update_history_creates" -> expectedTemplateStrings,
+          "update_history_assignments" -> expectedTemplateStrings,
+          "update_history_exercises" -> (expectedTemplateStrings ++ Seq(
+            "choice" -> "Archive",
+            "interface_id_package_id" -> interfaceId.getPackageId,
+            "interface_id_module_name" -> interfaceId.getModuleName,
+            "interface_id_entity_name" -> interfaceId.getEntityName,
+          )),
+        ).flatMap { case (table, columns) =>
+          columns.map { case (column, value) => (table, column, value) }
+        }
+        for {
+          _ <- initStore(store)
+          _ <- domain1.create(c, recordTime = time(1).toInstant)
+          _ <- domain1.unassign(c -> domain2, reassignmentId1, 1, time(2))
+          _ <- domain2.assign(c -> domain1, reassignmentId1, 1, time(3))
+          _ <- domain2.exercise(
+            c,
+            Some(interfaceId),
+            "Archive",
+            com.daml.ledger.javaapi.data.Unit.getInstance(),
+            com.daml.ledger.javaapi.data.Unit.getInstance(),
+            recordTime = time(4).toInstant,
+          )
+          internedStrings <- storage
+            .query(
+              sql"select id, value from interned_strings".as[(Long, String)],
+              "internedStrings",
+            )
+            .failOnShutdown
+          storedStrings <- MonadUtil.sequentialTraverse(expectedStrings) {
+            case (table, column, _) =>
+              storage
+                .query(
+                  sql"""
+                    select #$column, #${column}_interned
+                    from #$table
+                    where history_id = ${store.historyId}
+                  """.as[(String, Long)],
+                  "storedStrings",
+                )
+                .failOnShutdown
+          }
+        } yield {
+          val strings = internedStrings.toMap
+          forAll(expectedStrings.zip(storedStrings)) { case ((table, column, expected), rows) =>
+            withClue(s"$table.$column") {
+              val (text, interned) = rows.loneElement
+              text shouldBe expected
+              strings(interned) shouldBe expected
+            }
+          }
+        }
       }
 
       // Note: we do not really want to support multiple UpdateHistory instances ingesting
@@ -712,8 +836,6 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
     "create" should {
 
       "store the participant id in its prefixed form" in {
-        import storage.api.jdbcProfile.api.*
-
         val store = mkStore(party1, migration1, participant1)
         for {
           stored <- storage

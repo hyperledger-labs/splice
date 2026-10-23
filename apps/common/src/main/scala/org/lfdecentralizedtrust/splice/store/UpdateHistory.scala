@@ -28,7 +28,13 @@ import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{
   SourceMigrationInfo,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
-import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries, InternedStringStore}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsJdbcTypes,
+  AcsQueries,
+  AdvisoryLockIds,
+  AdvisoryLocks,
+  InternedStringStore,
+}
 import db.AsUpdateReturning.*
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
@@ -45,6 +51,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.pretty.Pretty.{param, prettyOfClass}
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -61,6 +68,8 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.I
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import slick.jdbc.canton.SQLActionBuilder
 
+import java.time.{LocalDate, ZoneOffset}
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
@@ -70,9 +79,11 @@ import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.util.MonadUtil
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
-import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
+
+import scala.util.Try
 
 /** Stores all original daml updates visible to `updateStreamParty`.
   *
@@ -104,6 +115,8 @@ class UpdateHistory private (
     override protected val loggerFactory: NamedLoggerFactory,
     enableImportUpdateBackfill: Boolean,
     metrics: HistoryMetrics,
+    clock: Clock,
+    partitionRunwayDays: Int,
 )(implicit
     ec: ExecutionContext,
     closeContext: CloseContext,
@@ -159,12 +172,16 @@ class UpdateHistory private (
         includeCreatedEventBlob = false,
       )
 
-      override def initialize()(implicit
-          traceContext: TraceContext
+      override def initialize(connection: BaseLedgerConnection)(implicit
+          traceContext: TraceContext,
+          mat: Materializer,
       ): Future[IngestionStart] = {
         logger.info(s"Initializing update history ingestion sink for party $updateStreamParty")
 
         for {
+          // We have to create partitions on initialization because
+          // otherwise ingestion will fail until UpdateHistoryPartitionMaintenanceTrigger creates them.
+          _ <- createMissingPartitions(connection, clock.now)
           _ <- storage
             .update(
               sql"""
@@ -325,6 +342,200 @@ class UpdateHistory private (
       """
     }
 
+  def createPartitions(firstDay: LocalDate)(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    def startOf(d: LocalDate) =
+      CantonTimestamp.assertFromInstant(d.atStartOfDay(ZoneOffset.UTC).toInstant)
+
+    val tableSuffix = firstDay.format(DateTimeFormatter.BASIC_ISO_DATE)
+    val start = startOf(firstDay)
+    val end = startOf(firstDay.plusDays(1))
+
+    storage
+      .queryAndUpdate(
+        // CREATE TABLE is transactional, so the partitions of all tables are created atomically.
+        // The lock makes concurrent callers wait for each other instead of failing.
+        AdvisoryLocks.withBlockingTransactionalLock(
+          profile,
+          AdvisoryLockIds.createUpdateHistoryPartitionStatement,
+          DBIO.seq(PartitionedTables.map { table =>
+            val partition = s"${table}_$tableSuffix"
+            // This is safe because withBlockingTransactionalLock ensures all 3 statements happen together.
+            sql"select exists (select 1 from pg_inherits where inhrelid = to_regclass('#$partition'))"
+              .as[Boolean]
+              .head
+              .flatMap { alreadyAttached =>
+                if (alreadyAttached) DBIO.unit
+                else {
+                  for {
+                    _ <-
+                      sqlu"create table if not exists #$partition (like #$table including defaults including constraints)"
+                    _ <-
+                      sqlu"alter table #$table attach partition #$partition for values from (#${start.toMicros}) to (#${end.toMicros})"
+                  } yield ()
+                }
+              }
+          }*),
+        ),
+        "createPartitions",
+      )
+      .map { _ =>
+        metrics.UpdateHistory.partitionRunwayEnd.updateValue(_.max(end))
+      }
+  }
+
+  def readLastIngestedRecordTime()(implicit
+      tc: TraceContext
+  ): Future[Option[CantonTimestamp]] = {
+    val updateTables = Seq(
+      "update_history_transactions",
+      "update_history_assignments",
+      "update_history_unassignments",
+    )
+    val legacyTables = updateTables.map(table => s"${table}_legacy")
+    for {
+      // These might not exist after pruning
+      existingLegacyTables <- storage.query(
+        sql"""
+          select t
+          from unnest($legacyTables) t
+          where to_regclass(t) is not null -- checks that the table exists
+        """.as[String],
+        "readLastIngestedRecordTime.getExistingLegacyTables",
+      )
+      maxRecordTimes = (updateTables ++ existingLegacyTables)
+        .map { table =>
+          SQLActionBuilderChain(
+            sql"(select max(record_time) from #$table where history_id = $historyId and migration_id = $domainMigrationId)"
+          )
+        }
+        .reduceOption((acc, next) => acc ++ sql"," ++ next)
+        .getOrElse(SQLActionBuilderChain(sql""))
+      result <- storage.query(
+        (sql"select greatest(" ++ maxRecordTimes ++ sql")").toActionBuilder
+          .as[Option[CantonTimestamp]]
+          .head,
+        "readLastIngestedRecordTime",
+      )
+    } yield result
+  }
+
+  def listDatesWithAllPartitions()(implicit tc: TraceContext): Future[Set[LocalDate]] = {
+    def partitionDay(parent: String, child: String): LocalDate = {
+      val dateSuffix = child.stripPrefix(s"${parent}_")
+      // the dates MUST be parseable
+      Try(LocalDate.parse(dateSuffix, DateTimeFormatter.BASIC_ISO_DATE)).getOrElse(
+        throw io.grpc.Status.INTERNAL
+          .withDescription(s"Failed to parse date suffix from $child")
+          .asRuntimeException()
+      )
+    }
+
+    storage
+      .query(
+        sql"""
+          select parent.relname, child.relname
+          from pg_inherits i
+          join pg_class parent on parent.oid = i.inhparent
+          join pg_class child on child.oid = i.inhrelid
+          join pg_namespace n on n.oid = parent.relnamespace
+          where n.nspname = current_schema
+            and parent.relname in (#${PartitionedTables.map(t => s"'$t'").mkString(", ")})
+        """.as[(String, String)],
+        "listPartitionDays",
+      )
+      .map { rows =>
+        val dateToTablesWithPartition = rows.groupMap { case (parent, child) =>
+          partitionDay(parent, child)
+        } { case (parent, _) =>
+          parent
+        }
+
+        dateToTablesWithPartition
+          .filter { case (date, tablesWithPartition) =>
+            val diffWithExpected = PartitionedTables.diff(tablesWithPartition)
+            if (diffWithExpected.nonEmpty) {
+              logger.warn(
+                s"Bug: Date $date is missing partitions for $diffWithExpected. This means that createPartitions is broken. It will be re-created."
+              )
+              false
+            } else true
+          }
+          .keys
+          .toSet
+      }
+  }
+
+  // Requires Postgres 18 to run. Therefore, all Scan operators must be running said version of Postgres.
+  def analyzePartitionedTables()(implicit tc: TraceContext): Future[Unit] =
+    storage.update(
+      DBIO.sequence(PartitionedTables.map(table => sqlu"analyze only #$table")).map(_ => ()),
+      "analyzePartitionedTables",
+    )
+
+  def missingPartitionDays(now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[Seq[LocalDate]] =
+    missingPartitionDays(now, Future.successful(now))
+
+  def createMissingPartitions(connection: BaseLedgerConnection, now: CantonTimestamp)(implicit
+      tc: TraceContext,
+      mat: Materializer,
+  ): Future[Seq[LocalDate]] =
+    for {
+      missing <- missingPartitionDays(now, firstRecordTimeToIngest(connection))
+      _ <- MonadUtil.sequentialTraverse(missing)(createPartitions)
+      _ <-
+        if (missing.isEmpty) Future.unit
+        else {
+          logger.info(s"Created update history partitions for ${missing.mkString(", ")}")
+          analyzePartitionedTables()
+        }
+    } yield missing
+
+  private def missingPartitionDays(
+      now: CantonTimestamp,
+      firstRecordTimeIfNothingIngested: => Future[CantonTimestamp],
+  )(implicit tc: TraceContext): Future[Seq[LocalDate]] =
+    for {
+      lastRecordTimeIngested <- readLastIngestedRecordTime()
+      existing <- listDatesWithAllPartitions()
+      firstRecordTime <- lastRecordTimeIngested match {
+        case Some(last) => Future.successful(last)
+        case None => firstRecordTimeIfNothingIngested
+      }
+    } yield {
+      val lastDay = dayOf(now.plus(java.time.Duration.ofDays(partitionRunwayDays.toLong)))
+      Iterator
+        .iterate(dayOf(firstRecordTime))(_.plusDays(1))
+        .takeWhile(!_.isAfter(lastDay))
+        .filterNot(existing.contains)
+        .toSeq
+    }
+
+  private def firstRecordTimeToIngest(connection: BaseLedgerConnection)(implicit
+      tc: TraceContext,
+      mat: Materializer,
+  ): Future[CantonTimestamp] = {
+    for {
+      latestPrunedOffset <- connection.latestPrunedOffset()
+      first <- connection
+        .updates(beginOffset = latestPrunedOffset, ingestionSink.ingestionFilter)
+        .map(_.updateOrCheckpoint)
+        .collect {
+          case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>
+            reassignment.recordTime
+          case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), _) =>
+            CantonTimestamp.assertFromInstant(tree.getRecordTime)
+        }
+        .runWith(Sink.head)
+    } yield first
+  }
+
+  private def dayOf(ts: CantonTimestamp): LocalDate =
+    LocalDate.ofInstant(ts.toInstant, ZoneOffset.UTC)
+
   private def ingestUpdateOrCheckpoint_(
       updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint,
       migrationId: Long,
@@ -418,7 +629,7 @@ class UpdateHistory private (
     val safeObservers = event.createdEvent.getObservers.asScala.toSeq.map(lengthLimited)
     metrics.UpdateHistory.assignments.mark()
     for {
-      _ <- DBIO.from(internEventStrings(templateId, event.createdEvent.getPackageName, None))
+      interned <- DBIO.from(internEventStrings(templateId, event.createdEvent.getPackageName))
       result <- sqlu"""
       insert into update_history_assignments(
         history_id,update_id,record_time,
@@ -428,7 +639,9 @@ class UpdateHistory private (
         contract_id, event_id, created_at,
         template_id_package_id, template_id_module_name, template_id_entity_name,
         package_name, create_arguments,
-        signatories, observers, contract_key
+        signatories, observers, contract_key,
+        template_id_package_id_interned, template_id_module_name_interned, template_id_entity_name_interned,
+        package_name_interned
       )
       values (
         $historyId, $safeUpdateId, $safeRecordTime,
@@ -438,8 +651,9 @@ class UpdateHistory private (
         $safeContractId, $safeEventId, $safeCreatedAt,
         $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
         $safePackageName, $createArguments::jsonb,
-        $safeSignatories, $safeObservers, $contractKey::jsonb
-
+        $safeSignatories, $safeObservers, $contractKey::jsonb,
+        ${interned.templateIdPackageId}, ${interned.templateIdModuleName}, ${interned.templateIdEntityName},
+        ${interned.packageName}
       )
     """
     } yield result
@@ -538,7 +752,7 @@ class UpdateHistory private (
     val safeDomainId = lengthLimited(tree.getSynchronizerId)
 
     for {
-      _ <- DBIO.from(internEventStrings(templateId, event.getPackageName, None))
+      interned <- DBIO.from(internEventStrings(templateId, event.getPackageName))
       result <- sqlu"""
       insert into update_history_creates(
         history_id, event_id, update_row_id,
@@ -546,7 +760,9 @@ class UpdateHistory private (
         template_id_package_id, template_id_module_name, template_id_entity_name,
         package_name, create_arguments, signatories, observers,
         contract_key,
-        record_time, update_id, domain_id, migration_id
+        record_time, update_id, domain_id, migration_id,
+        template_id_package_id_interned, template_id_module_name_interned, template_id_entity_name_interned,
+        package_name_interned
       )
       values (
         $historyId, $safeEventId, $updateRowId,
@@ -554,7 +770,9 @@ class UpdateHistory private (
         $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
         $safePackageName, $createArguments::jsonb, $safeSignatories, $safeObservers,
         $contractKey::jsonb,
-        $recordTime, $safeUpdateId, $safeDomainId, $migrationId
+        $recordTime, $safeUpdateId, $safeDomainId, $migrationId,
+        ${interned.templateIdPackageId}, ${interned.templateIdModuleName}, ${interned.templateIdEntityName},
+        ${interned.packageName}
       )
     """
     } yield result
@@ -564,20 +782,29 @@ class UpdateHistory private (
   private def internEventStrings(
       identifier: Identifier,
       packageName: String,
-      choiceName: Option[String],
   )(implicit
       tc: TraceContext
-  ): Future[Unit] = {
-    import cats.implicits.*
-    // TODO (#6312): use the returned ids in the partitioned table
+  ): Future[InternedEventStrings] =
     for {
-      _ <- internedStringStore.getOrIntern(identifier.getPackageId)
-      _ <- internedStringStore.getOrIntern(identifier.getModuleName)
-      _ <- internedStringStore.getOrIntern(identifier.getEntityName)
-      _ <- internedStringStore.getOrIntern(packageName)
-      _ <- choiceName.traverse(internedStringStore.getOrIntern)
-    } yield ()
-  }
+      templateIdPackageId <- internedStringStore.getOrIntern(identifier.getPackageId)
+      templateIdModuleName <- internedStringStore.getOrIntern(identifier.getModuleName)
+      templateIdEntityName <- internedStringStore.getOrIntern(identifier.getEntityName)
+      packageNameInterned <- internedStringStore.getOrIntern(packageName)
+    } yield InternedEventStrings(
+      templateIdPackageId,
+      templateIdModuleName,
+      templateIdEntityName,
+      packageNameInterned,
+    )
+
+  private def internInterfaceId(interfaceId: Identifier)(implicit
+      tc: TraceContext
+  ): Future[InternedIdentifier] =
+    for {
+      packageId <- internedStringStore.getOrIntern(interfaceId.getPackageId)
+      moduleName <- internedStringStore.getOrIntern(interfaceId.getModuleName)
+      entityName <- internedStringStore.getOrIntern(interfaceId.getEntityName)
+    } yield InternedIdentifier(packageId, moduleName, entityName)
 
   private def insertExerciseEventRow(
       updateId: String,
@@ -605,18 +832,20 @@ class UpdateHistory private (
     val exerciseResult =
       String256M.tryCreate(ProtobufCodec.serializeValue(event.getExerciseResult))
     val safeActingParties = event.getActingParties.asScala.toSeq.map(lengthLimited)
-    val interfaceIdModuleName =
-      event.getInterfaceId.toScala.map(i => lengthLimited(i.getModuleName))
-    val interfaceIdEntityName =
-      event.getInterfaceId.toScala.map(i => lengthLimited(i.getEntityName))
-    val interfaceIdPackageId =
-      event.getInterfaceId.toScala.map(i => lengthLimited(i.getPackageId))
+    val interfaceId = event.getInterfaceId.toScala
+    val interfaceIdModuleName = interfaceId.map(i => lengthLimited(i.getModuleName))
+    val interfaceIdEntityName = interfaceId.map(i => lengthLimited(i.getEntityName))
+    val interfaceIdPackageId = interfaceId.map(i => lengthLimited(i.getPackageId))
     val recordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
     val safeUpdateId = lengthLimited(tree.getUpdateId)
     val safeDomainId = lengthLimited(tree.getSynchronizerId)
 
     for {
-      _ <- DBIO.from(internEventStrings(templateId, event.getPackageName, Some(event.getChoice)))
+      interned <- DBIO.from(internEventStrings(templateId, event.getPackageName))
+      choiceInterned <- DBIO.from(internedStringStore.getOrIntern(event.getChoice))
+      interfaceIdInterned <- DBIO.sequenceOption(
+        interfaceId.map(id => DBIO.from(internInterfaceId(id)))
+      )
       result <- sqlu"""
       insert into update_history_exercises(
         history_id, event_id, update_row_id,
@@ -626,7 +855,10 @@ class UpdateHistory private (
         package_name, argument, result,
         acting_parties,
         interface_id_package_id, interface_id_module_name, interface_id_entity_name,
-        record_time, update_id, domain_id, migration_id
+        record_time, update_id, domain_id, migration_id,
+        template_id_package_id_interned, template_id_module_name_interned, template_id_entity_name_interned,
+        package_name_interned, choice_interned,
+        interface_id_package_id_interned, interface_id_module_name_interned, interface_id_entity_name_interned
       )
       values (
         $historyId, $safeEventId, $updateRowId,
@@ -636,7 +868,12 @@ class UpdateHistory private (
         $safePackageName, $choiceArguments::jsonb, $exerciseResult::jsonb,
         $safeActingParties,
         $interfaceIdPackageId, $interfaceIdModuleName, $interfaceIdEntityName,
-        $recordTime, $safeUpdateId, $safeDomainId, $migrationId
+        $recordTime, $safeUpdateId, $safeDomainId, $migrationId,
+        ${interned.templateIdPackageId}, ${interned.templateIdModuleName}, ${interned.templateIdEntityName},
+        ${interned.packageName}, $choiceInterned,
+        ${interfaceIdInterned.map(_.packageId)}, ${interfaceIdInterned.map(
+          _.moduleName
+        )}, ${interfaceIdInterned.map(_.entityName)}
       )
     """
     } yield result
@@ -2245,6 +2482,8 @@ object UpdateHistory {
       loggerFactory: NamedLoggerFactory,
       enableImportUpdateBackfill: Boolean,
       metrics: HistoryMetrics,
+      clock: Clock,
+      partitionRunwayDays: Int = 7,
   )(implicit
       initTraceContext: TraceContext,
       ec: ExecutionContext,
@@ -2291,8 +2530,18 @@ object UpdateHistory {
       loggerFactory,
       enableImportUpdateBackfill,
       metrics,
+      clock,
+      partitionRunwayDays,
     )
   }
+
+  private val PartitionedTables: Seq[String] = Seq(
+    "update_history_transactions",
+    "update_history_creates",
+    "update_history_exercises",
+    "update_history_assignments",
+    "update_history_unassignments",
+  )
 
   sealed trait BackfillingRequirement
   object BackfillingRequirement {
@@ -2312,6 +2561,19 @@ object UpdateHistory {
   final case class UpdateHistoryResponse(
       update: TreeUpdate,
       synchronizerId: SynchronizerId,
+  )
+
+  private final case class InternedIdentifier(
+      packageId: InternedStringStore.InternedId,
+      moduleName: InternedStringStore.InternedId,
+      entityName: InternedStringStore.InternedId,
+  )
+
+  private final case class InternedEventStrings(
+      templateIdPackageId: InternedStringStore.InternedId,
+      templateIdModuleName: InternedStringStore.InternedId,
+      templateIdEntityName: InternedStringStore.InternedId,
+      packageName: InternedStringStore.InternedId,
   )
 
   case class State(
