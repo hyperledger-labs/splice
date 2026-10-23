@@ -8,7 +8,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.metrics.ExecutorServiceMetrics
-import com.daml.metrics.api.{HistogramInventory, MetricsContext, MetricsInfoFilter}
+import com.daml.metrics.api.{HistogramInventory, MetricName, MetricsContext, MetricsInfoFilter}
 import com.digitalasset.canton.concurrent.*
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.console.{
@@ -26,7 +26,12 @@ import com.digitalasset.canton.environment.Environment.*
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.MetricsConfig.JvmMetrics
-import com.digitalasset.canton.metrics.{CantonHistograms, MetricsRegistry, OtlpReporter}
+import com.digitalasset.canton.metrics.{
+  CantonHistograms,
+  DbStorageHistograms,
+  MetricsRegistry,
+  OtlpReporter,
+}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.participant.config.ParticipantNodeConfig
@@ -117,6 +122,9 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
   private val currentConfig = new AtomicReference[Config](initialConfig)
   private val histogramInventory = new HistogramInventory()
   private val histograms = new CantonHistograms()(histogramInventory)
+  val dbStorageHistograms = new DbStorageHistograms(
+    MetricName("cn")
+  )(histogramInventory)
   private val baseFilter = new MetricsInfoFilter(
     config.monitoring.metrics.globalFilters,
     config.monitoring.metrics.qualifiers.toSet,
@@ -160,7 +168,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
 
   def createConsole(
       consoleOutput: ConsoleOutput = StandardConsoleOutput
-  ): ConsoleEnvironment = {
+  ): Console = {
     val console = _createConsole(consoleOutput)
     healthDumpGenerator
       .putIfAbsent(createHealthDumpGenerator(console.grpcAdminCommandRunner))

@@ -68,7 +68,7 @@ import io.circe.syntax.*
 
 import java.io.File as JFile
 import java.time.Instant
-import scala.annotation.unused
+import scala.annotation.{nowarn, unused}
 import scala.concurrent.duration.*
 import scala.sys.process.ProcessLogger
 
@@ -814,6 +814,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         |all mediators to confirm.
         |"""
     )
+    @nowarn("cat=deprecation")
     def synchronizer_local(
         synchronizerName: String = "local"
     )(implicit consoleEnvironment: ConsoleEnvironment): SynchronizerId = {

@@ -719,7 +719,7 @@ object P2PGrpcConnectionState extends PrettyPrintingCompanion[P2PGrpcConnectionS
                     (
                       this,
                       updatedState,
-                      true,
+                      true
                     )
                 } { _ =>
                   this ->
@@ -771,7 +771,7 @@ object P2PGrpcConnectionState extends PrettyPrintingCompanion[P2PGrpcConnectionS
           updatedState -> (
             this,
             updatedState,
-            true,
+            true
           )
         } { _ =>
           this -> (this, this, false)

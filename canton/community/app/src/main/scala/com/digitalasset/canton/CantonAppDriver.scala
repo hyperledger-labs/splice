@@ -25,7 +25,6 @@ import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.JarResourceUtils
-import com.digitalasset.canton.version.ReleaseVersion
 import com.digitalasset.nonempty.NonEmpty
 import com.sun.management.GarbageCollectionNotificationInfo
 import com.typesafe.config.ConfigFactory
@@ -65,7 +64,7 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
     }
 
   protected def logAppVersion(): Unit =
-    logger.info(s"Starting Canton version ${ReleaseVersion.current}")
+    logger.info(s"Starting Canton version ${BuildInfo.version}")
 
   // BE CAREFUL: Set the environment variables before you touch anything related to
   // logback as otherwise, the logback configuration will be read without these

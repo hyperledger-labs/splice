@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # --- Defaults ---
 VERSION="17"
 SHARDS=4
@@ -116,7 +119,7 @@ SQL_DIR="psql/${DATA_TYPE}"
 # but pipe the output to a log file in the original starting directory.
 (
   cd "$SQL_DIR" || { echo "Error: Cannot find directory $SQL_DIR"; exit 1; }
-  
+
   PGPASSWORD="$PASS" psql -h "$HOST" -p "$PORT" -U "$USER" -d "$DB" \
        -v num_shards="$SHARDS" \
        -v keys_per_shard="$KEYS" \

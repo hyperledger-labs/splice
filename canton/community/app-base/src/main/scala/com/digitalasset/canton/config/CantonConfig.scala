@@ -256,6 +256,7 @@ object ConsoleCommandTimeout {
 final case class TimeoutSettings(
     console: ConsoleCommandTimeout = ConsoleCommandTimeout(),
     processing: ProcessingTimeout = ProcessingTimeout(),
+    requestTimeout: NonNegativeDuration = NonNegativeDuration.tryFromDuration(40.seconds),
 )
 
 sealed trait ClockConfig extends Product with Serializable

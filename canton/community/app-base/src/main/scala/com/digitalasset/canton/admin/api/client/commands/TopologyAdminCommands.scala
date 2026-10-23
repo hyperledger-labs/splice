@@ -1618,7 +1618,7 @@ object TopologyAdminCommands {
     }
 
     final case class GetId()
-        extends BaseInitializationService[v30.GetIdRequest, v30.GetIdResponse, UniqueIdentifier] {
+        extends BaseInitializationService[v30.GetIdRequest, v30.GetIdResponse, GetIdResult] {
       override protected def createRequest(): Either[String, v30.GetIdRequest] =
         Right(v30.GetIdRequest())
 
@@ -1630,7 +1630,7 @@ object TopologyAdminCommands {
 
       override protected def handleResponse(
           response: v30.GetIdResponse
-      ): Either[String, UniqueIdentifier] =
+      ): Either[String, GetIdResult] =
         ProtoValidation
           .validate(
             response.uniqueIdentifier,
@@ -1640,12 +1640,18 @@ object TopologyAdminCommands {
           .leftMap(_.message)
           .flatMap { uniqueIdentifier =>
             if (uniqueIdentifier.nonEmpty)
-              UniqueIdentifier.fromProtoPrimitive_(uniqueIdentifier).leftMap(_.message)
+              UniqueIdentifier
+                .fromProtoPrimitive_(uniqueIdentifier)
+                .leftMap(_.message)
+                .map(id => GetIdResult(response.initialized, Some(id)))
             else
-              Left(
-                s"Node is not initialized and therefore does not have an Id assigned yet."
-              )
+              Right(GetIdResult(response.initialized, None))
           }
     }
+
+    final case class GetIdResult(
+        initialized: Boolean,
+        uniqueIdentifier: Option[UniqueIdentifier],
+    )
   }
 }

@@ -354,20 +354,8 @@ object SequencerAdminCommands {
       synchronizerParameters: InternalSsp,
       serverVersion: Option[ReleaseVersion],
   ): Either[String, Unit] =
-    if (synchronizerParameters.protocolVersion < ProtocolVersion.v36) {
-      Either.unit
-    } else {
-      serverVersion
-        .toRight("Server version is not known")
-        .flatMap { sv =>
-          import scala.math.Ordered.orderingToOrdered
-          EitherUtil.condUnit(
-            // sv >= ReleaseVersion(3, 6, 0) does not work with pre-releases: 3.6.0-SNAPSHOT < 3.6.0 :-/
-            sv.majorMinor >= (3, 6),
-            s"Server version $sv does not support protocol version 36",
-          )
-        }
-    }
+    // Stubbed in splice
+    Either.unit
 
   final case class InitializeFromLsuPredecessor(
       topologySnapshotStream: InputStream,

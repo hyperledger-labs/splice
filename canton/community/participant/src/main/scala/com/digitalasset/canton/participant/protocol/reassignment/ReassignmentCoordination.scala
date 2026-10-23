@@ -276,8 +276,9 @@ class ReassignmentCoordination(
     targetCrypto <- cryptoSnapshot(targetPsid, staticSynchronizerParameters, timestamp)
   } yield targetCrypto.map(_.ipsSnapshot)
 
-  private def getTopologyClient[T[X] <: ReassignmentTag[X]
-    : SameReassignmentType: SingletonTraverse](
+  private def getTopologyClient[
+      T[X] <: ReassignmentTag[X]: SameReassignmentType: SingletonTraverse
+  ](
       psid: T[PhysicalSynchronizerId],
       staticSynchronizerParameters: T[StaticSynchronizerParameters],
   ): Either[UnknownPhysicalSynchronizer, T[SynchronizerCryptoClient]] =

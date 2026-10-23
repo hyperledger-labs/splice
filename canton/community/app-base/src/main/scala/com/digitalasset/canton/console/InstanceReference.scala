@@ -93,7 +93,7 @@ trait InstanceReference
   @inline final override def uid: UniqueIdentifier = id.uid
 
   val name: String
-  protected[canton] val instanceType: String
+  protected val instanceType: String
 
   protected[canton] def executionContext: ExecutionContext
 
@@ -152,7 +152,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
 
   val name: String
   val consoleEnvironment: ConsoleEnvironment
-  private[console] val nodes: Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]
+  protected[console] val nodes: Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]
 
   @Help.Summary("Database related operations")
   @Help.Group("Database")
@@ -216,7 +216,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
     private def filterByNodeAndAttribute(
         attributes: Map[String, String]
     )(value: MetricValue): Boolean =
-      value.attributes.get("node").contains(name) && attributes.forall { case (k, v) =>
+      value.attributes.get("node_name").contains(name) && attributes.forall { case (k, v) =>
         value.attributes.get(k).contains(v)
       }
 
@@ -390,7 +390,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
     else
       NodeNotStarted.ErrorCanton(this)
 
-  override protected[console] def adminCommand[Result](
+  override def adminCommand[Result](
       grpcCommand: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     runCommandIfRunning(
@@ -776,7 +776,7 @@ class LocalParticipantReference(
     case ClockConfig.RemoteClock(_) => None
   }
 
-  override private[console] val nodes = consoleEnvironment.environment.participants
+  override protected[console] val nodes = consoleEnvironment.environment.participants
 
   @Help.Summary("Return participant config")
   def config: ParticipantNodeConfig =
@@ -1463,7 +1463,7 @@ class LocalSequencerReference(
         .asSequencerConnection(sequencerAlias = SequencerAlias.tryCreate(name), sequencerId = None)
     )
 
-  private[console] val nodes: SequencerNodes =
+  protected[console] val nodes: SequencerNodes =
     consoleEnvironment.environment.sequencers
 
   override protected[console] def runningNode: Option[SequencerNodeBootstrap] =
@@ -1604,7 +1604,7 @@ class LocalMediatorReference(consoleEnvironment: ConsoleEnvironment, val name: S
   override def config: MediatorNodeConfig =
     consoleEnvironment.environment.config.mediatorsByString(name)
 
-  private[console] val nodes: MediatorNodes = consoleEnvironment.environment.mediators
+  protected[console] val nodes: MediatorNodes = consoleEnvironment.environment.mediators
 
   override protected[console] def runningNode: Option[MediatorNodeBootstrap] =
     nodes.getRunning(name)

@@ -95,6 +95,7 @@ class LedgerApiServer(
     with NamedLogging
 
 object LedgerApiServer {
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def initialize(
       ledgerApiIndexService: LedgerApiIndexService,
       adminParty: Party,

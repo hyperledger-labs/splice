@@ -21,10 +21,9 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
   *   making ports unique or some other specialization for the particular tests you're running)
   */
 abstract class BaseEnvironmentDefinition[
-    C
-      <: SharedCantonConfig[
-        C
-      ],
+    C <: SharedCantonConfig[
+      C
+    ],
     E <: Environment[C],
 ](
     val baseConfig: C,

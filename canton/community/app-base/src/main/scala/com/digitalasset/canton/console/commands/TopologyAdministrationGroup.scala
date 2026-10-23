@@ -8,6 +8,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.base.error.RpcError
+import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
 import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, TopologyAdminCommands}
 import com.digitalasset.canton.admin.api.client.data.topology.*
@@ -18,12 +19,11 @@ import com.digitalasset.canton.admin.api.client.data.{
 }
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
-import com.digitalasset.canton.console.CommandErrors.{CommandError, GenericCommandError}
+import com.digitalasset.canton.console.CommandErrors.GenericCommandError
 import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   CommandErrors,
-  CommandSuccessful,
   ConsoleCommandResult,
   ConsoleEnvironment,
   ConsoleMacros,
@@ -250,7 +250,7 @@ class TopologyAdministrationGroup(
       waitForReady,
     )
 
-  private def getIdCommand(): ConsoleCommandResult[UniqueIdentifier] =
+  private def getIdCommand(): ConsoleCommandResult[GetIdResult] =
     adminCommand(TopologyAdminCommands.Init.GetId())
 
   // small cache to avoid repetitive calls to fetchId (as the id is immutable once set)
@@ -263,15 +263,13 @@ class TopologyAdministrationGroup(
   private[console] def idHelper[T](
       apply: UniqueIdentifier => T
   ): T =
-    apply(idCache.get() match {
-      case Some(v) => v
-      case None =>
-        val r = consoleEnvironment.run {
-          getIdCommand()
-        }
-        idCache.set(Some(r))
-        r
-    })
+    maybeIdHelper(apply).getOrElse(
+      throw Status.UNAVAILABLE
+        .withDescription(
+          s"Node does not have an Id assigned yet."
+        )
+        .asRuntimeException()
+    )
 
   private[console] def maybeIdHelper[T](
       apply: UniqueIdentifier => T
@@ -279,14 +277,11 @@ class TopologyAdministrationGroup(
     (idCache.get() match {
       case Some(v) => Some(v)
       case None =>
-        consoleEnvironment.run {
-          CommandSuccessful(getIdCommand() match {
-            case CommandSuccessful(v) =>
-              idCache.set(Some(v))
-              Some(v)
-            case _: CommandError => None
-          })
+        val r = consoleEnvironment.run {
+          getIdCommand()
         }
+        r.uniqueIdentifier.foreach(id => idCache.set(Some(id)))
+        r.uniqueIdentifier
     }).map(apply)
 
   @Help.Summary("Topology synchronisation helpers", FeatureFlag.Preview)
@@ -3205,9 +3200,9 @@ class TopologyAdministrationGroup(
               (
                 serial.increment,
                 // first filter out all existing packages that either get re-added (i.e. modified) or removed
-                item.packages.filter(vp => !allChangedPackageIds.contains(vp.packageId))
-                // now we can add all the adds the also haven't been in the remove set
-                  ++ adds,
+                item.packages.filter(vp =>
+                  !allChangedPackageIds.contains(vp.packageId)
+                ) /* now we can add all the adds the also haven't been in the remove set */ ++ adds,
               )
             case Some(
                   ListVettedPackagesResult(
@@ -3368,7 +3363,7 @@ class TopologyAdministrationGroup(
           adminCommand(
             TopologyAdminCommands.Read.ListMediatorSynchronizerState(
               BaseQuery(
-                synchronizerId,
+                synchronizerId.map(TopologyStoreId.Synchronizer(_)),
                 proposals,
                 timeQuery,
                 operation,

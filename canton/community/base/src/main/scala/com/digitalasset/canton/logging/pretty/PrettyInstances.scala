@@ -124,14 +124,7 @@ trait PrettyInstances {
     _.toString.substring(2).replaceAll("(\\d[HMS])(?!$)", "$1 ").toLowerCase
   )
 
-  implicit def prettyDuration: Pretty[Duration] = {
-    case fduration: FiniteDuration =>
-      import scala.jdk.DurationConverters.ScalaDurationOps
-      prettyJDuration.treeOf(
-        fduration.toJava
-      )
-    case infDuration: Duration.Infinite => Tree.Literal(infDuration.toString)
-  }
+  implicit def prettyDuration: Pretty[Duration] = prettyOfString(_.toString)
 
   implicit def prettyURI: Pretty[URI] = prettyOfString(_.toString)
 

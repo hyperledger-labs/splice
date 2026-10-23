@@ -24,6 +24,7 @@ import org.slf4j.event.Level
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.DurationConverters.*
 import scala.util.control.NonFatal
 import scala.util.{Failure, Try}
 
@@ -99,6 +100,7 @@ abstract class RetryWithDelay(
     actionable: Option[String], // How to mitigate the error
     initialDelay: FiniteDuration,
     totalMaxRetries: Int,
+    resetRetriesAfter: Option[FiniteDuration],
     hasSynchronizeWithClosing: HasSynchronizeWithClosing,
     retryLogLevel: Option[Level],
     suspendRetries: Eval[FiniteDuration],
@@ -169,6 +171,9 @@ abstract class RetryWithDelay(
 
     import LoggerUtil.logOnThrow
 
+    val clock = java.time.Clock.systemUTC()
+    import java.time.Duration as JDuration, clock.instant as now
+
     def runTask(): Future[T] = Future.fromTry(Try(task)).flatten
 
     def run(
@@ -178,7 +183,9 @@ abstract class RetryWithDelay(
         retriesOfLastErrorKind: Int,
         delay: FiniteDuration,
     ): Future[RetryOutcome[T]] = logOnThrow {
+      val startedAt = now()
       previousResult.transformWith { x =>
+        val finishedAt = now()
         logOnThrow(
           x match {
             case succ @ util.Success(result) if success.predicate(result) =>
@@ -252,7 +259,10 @@ abstract class RetryWithDelay(
                   }
                   LoggerUtil.logAtLevel(
                     level,
-                    messageOfOutcome(outcome, show"${change}Retrying after $delay."),
+                    messageOfOutcome(
+                      outcome,
+                      show"${change}Retrying after a number of $retriesOfErrorKind failures, and after $delay.",
+                    ),
                     // No need to log the exception in the outcome, as this has been logged by retryable.retryOk.
                   )
 
@@ -282,13 +292,22 @@ abstract class RetryWithDelay(
                             // and therefore yield the termination reason `Shutdown`.
                             Future.fromTry(outcome)
                           }
+                        import scala.math.Ordering.Implicits.*
+                        val (nextTotalRetries, nextDelayIs) =
+                          if (
+                            resetRetriesAfter
+                              .fold(false)(_.toJava <= JDuration.between(startedAt, finishedAt))
+                          )
+                            (0, initialDelay)
+                          else
+                            (totalRetries + 1, nextDelay(totalRetries + 1, delay))
                         FutureUnlessShutdown.outcomeF(
                           run(
                             previousResult = nextRunF,
-                            totalRetries = totalRetries + 1,
+                            totalRetries = nextTotalRetries,
                             lastErrorKind = Some(errorKind),
                             retriesOfLastErrorKind = retriesOfErrorKind + 1,
-                            delay = nextDelay(totalRetries + 1, delay),
+                            delay = nextDelayIs,
                           )
                         )(executionContext)
                       }
@@ -403,6 +422,7 @@ final case class Directly(
       None,
       Duration.Zero,
       maxRetries,
+      resetRetriesAfter = None,
       hasSynchronizeWithClosing,
       retryLogLevel,
       suspendRetries,
@@ -429,6 +449,7 @@ final case class Pause(
       actionable,
       delay,
       maxRetries,
+      resetRetriesAfter = None,
       hasSynchronizeWithClosing,
       retryLogLevel,
       suspendRetries,
@@ -477,6 +498,7 @@ final case class Backoff(
     initialDelay: FiniteDuration,
     maxDelay: Duration,
     operationName: String,
+    resetRetriesAfter: Option[FiniteDuration] = None,
     longDescription: String = "",
     actionable: Option[String] = None,
     retryLogLevel: Option[Level] = None,
@@ -489,6 +511,7 @@ final case class Backoff(
       actionable,
       initialDelay,
       maxRetries,
+      resetRetriesAfter,
       hasSynchronizeWithClosing,
       retryLogLevel,
       suspendRetries,
@@ -515,6 +538,7 @@ object Backoff {
     config.initialDelay.underlying,
     config.maxDelay.unwrap,
     operationName,
+    None,
     longDescription,
     actionable,
     retryLogLevel,

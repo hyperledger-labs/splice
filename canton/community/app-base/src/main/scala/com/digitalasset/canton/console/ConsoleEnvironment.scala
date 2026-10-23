@@ -109,7 +109,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
     * return a int for the instance (typically just a static value based on type), and then the
     * console will start these instances for lower to higher values.
     */
-  private def startupOrderPrecedence(instance: LocalInstanceReference): Int =
+  def startupOrderPrecedence(instance: LocalInstanceReference): Int =
     instance match {
       case _: LocalSequencerReference =>
         1 // everything depends on a sequencer so start that first
@@ -321,7 +321,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
           Help.Summary("Help with console commands"),
           Help.Description("Type help(\"<command>\") for detailed help for <command>."),
           Help.Topic(Help.defaultTopLevelTopic),
-        ),
+        )
       ) :+
       (Help.Item(
         "exit",
