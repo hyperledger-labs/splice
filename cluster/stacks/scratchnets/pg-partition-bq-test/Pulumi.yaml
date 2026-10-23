@@ -1,0 +1,4 @@
+name: pg-partition-bq-test
+runtime: nodejs
+description: Throwaway CloudSQL partitioned table -> Datastream -> BigQuery pipeline for validating #6312
+main: "../../../pulumi/pg-partition-bq-test/src/index.ts"
