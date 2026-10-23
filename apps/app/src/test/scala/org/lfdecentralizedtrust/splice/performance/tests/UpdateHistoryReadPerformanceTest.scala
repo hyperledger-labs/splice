@@ -2,7 +2,12 @@ package org.lfdecentralizedtrust.splice.performance.tests
 
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
+import com.digitalasset.canton.config.{
+  NonNegativeFiniteDuration,
+  ProcessingTimeout,
+  QueryCostMonitoringConfig,
+  StorageConfig,
+}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
@@ -56,6 +61,13 @@ class UpdateHistoryReadPerformanceTest(
     ) {
 
   override type Store = UpdateHistory
+
+  // This test issues only a handful of queries per operation, so enabling Canton's query-cost
+  // tracking (a stack-trace capture per query) is cheap and lets us attribute each DB sample to the
+  // calling method (e.g. `UpdateHistory.getUpdate`) via its `callsite`. `every` is far out so the
+  // periodic cost-report logging never fires during the test.
+  override protected def logQueryCost: Option[QueryCostMonitoringConfig] =
+    Some(QueryCostMonitoringConfig(every = NonNegativeFiniteDuration.ofMinutes(60)))
 
   override protected def mkStore(storage: DbStorage): Future[UpdateHistory] = {
     implicit val initTc: TraceContext = TraceContext.empty

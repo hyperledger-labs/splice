@@ -5,7 +5,11 @@ import com.daml.metrics.api.MetricHandle.Timer
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.daml.metrics.api.{HistogramInventory, MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
+import com.digitalasset.canton.config.{
+  ProcessingTimeout,
+  QueryCostMonitoringConfig,
+  StorageConfig,
+}
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.metrics.{DbStorageHistograms, DbStorageMetrics}
@@ -44,6 +48,16 @@ object BaseStorePerformanceTest {
     */
   private val PerfMainLockCounter: DbLockCounter = DbLockCounter(108)
   private val PerfPoolLockCounter: DbLockCounter = DbLockCounter(109)
+
+  /** Extracts the connection-pool name (e.g. "general" for reads, "write" for the locked write
+    * pool) from a DbStorageMetrics timer name like
+    * `store.perftest.db-storage.general.executor.exectime`.
+    */
+  def poolOf(timerName: String): String = {
+    val parts = timerName.split('.')
+    val idx = parts.indexOf("executor")
+    if (idx > 0) parts(idx - 1) else timerName
+  }
 }
 
 /** Shared base class for store ingestion and read performance tests.
@@ -87,8 +101,12 @@ abstract class BaseStorePerformanceTest(
       count = window.size.toLong,
       totalNanos = window.map(_.nanos).sum,
       maxNanos = window.map(_.nanos).maxOption.getOrElse(0L),
+      // Key the breakdown by connection pool (read "general" vs write) plus the query callsite. The
+      // pool separates the method's own SELECTs (read pool) from background advisory-lock traffic
+      // (write pool). The callsite is the real caller stack frame (e.g. `UpdateHistory.getUpdate`)
+      // when `logQueryCost` is enabled, or the constant `"query-tracking-disabled"` otherwise.
       breakdown = window
-        .groupBy(_.callsite)
+        .groupBy(s => s"${BaseStorePerformanceTest.poolOf(s.timerName)} ${s.callsite}")
         .view
         .mapValues(ss => (ss.size.toLong, ss.map(_.nanos).sum))
         .toMap,
@@ -105,6 +123,21 @@ abstract class BaseStorePerformanceTest(
     * `false` to measure the unlocked `DbStorageSingle` path for comparison.
     */
   protected def instanceLockEnabled: Boolean = true
+
+  /** Optional Canton query-cost monitoring config.
+    *
+    * When set (`Some`), Canton tags every query's metrics context with the real caller stack frame
+    * (the first non-framework frame, e.g. `UpdateHistory.getUpdate(...)`), which is what populates
+    * the `callsite` of each [[DbQuerySample]]. When `None` the callsite is the constant
+    * `"query-tracking-disabled"`.
+    *
+    * Defaults to `None`: enabling it makes Canton capture a stack trace per query, which is cheap
+    * for read tests that issue a handful of queries but would skew ingestion tests that run millions
+    * of inserts. Override to `Some(...)` only in low-query-count tests that want per-method
+    * attribution. `every` only controls Canton's periodic cost-report logging, so set it far out to
+    * avoid log spam during the test.
+    */
+  protected def logQueryCost: Option[QueryCostMonitoringConfig] = None
 
   protected def initializeStorage(): DbStorage = {
     val metrics = new DbStorageMetrics(
@@ -126,7 +159,7 @@ abstract class BaseStorePerformanceTest(
       ) { storageFactory =>
         storageFactory.tryCreate(
           connectionPoolForParticipant = false,
-          None,
+          logQueryCost,
           new WallClock(timeouts, loggerFactory),
           None,
           metrics,
