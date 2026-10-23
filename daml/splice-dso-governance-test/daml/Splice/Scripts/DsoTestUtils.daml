@@ -291,6 +291,10 @@ runNextIssuanceD app amuletPrice appActivityRoundTotal = do
           totalUnfeaturedAppRewardCoupons = totalUnfeaturedCoupons
           totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
           optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons + length validatorLivenessActivityRecords)
+          optTotalFeaturedAssetRewardCoupons = None
+          optIssuancePerFeaturedAssetRewardCoupon = None
+          optIssuancePerFeaturedAppRewardCoupon = None
+          optUnclaimedAppRewards = None
 
     -- create issuing mining round
     submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_StartIssuing with

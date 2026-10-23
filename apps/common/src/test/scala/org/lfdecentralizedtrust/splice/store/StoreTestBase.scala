@@ -325,6 +325,7 @@ abstract class StoreTestBase
       Instant.now().truncatedTo(ChronoUnit.MICROS),
       Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(600),
       java.util.Optional.of(numeric(1.0)), // optIssuancePerValidatorFaucetCoupon
+      Optional.empty(), // optIssuancePerFeaturedAssetRewardCoupon (CIP-0104)
     )
 
     contract(
@@ -723,6 +724,8 @@ abstract class StoreTestBase
       dsoParty.toProtoPrimitive,
       providerParty.toProtoPrimitive,
       activityWeight.map(_.bigDecimal).toJava,
+      Optional.empty(),
+      Optional.empty(),
     )
     contract(
       FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID,

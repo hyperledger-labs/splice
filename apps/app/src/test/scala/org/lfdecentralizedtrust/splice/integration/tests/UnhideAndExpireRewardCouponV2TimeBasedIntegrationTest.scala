@@ -524,6 +524,8 @@ class UnhideAndExpireRewardCouponV2TimeBasedIntegrationTest
             dsoParty.toProtoPrimitive,
             aliceParty.toProtoPrimitive,
             java.util.Optional.empty(),
+            java.util.Optional.empty(),
+            java.util.Optional.empty(),
           ).create,
         ),
     )(

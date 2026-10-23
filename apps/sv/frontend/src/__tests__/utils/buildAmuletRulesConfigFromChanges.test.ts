@@ -301,6 +301,9 @@ describe('buildAmuletRulesConfigFromChanges', () => {
       batchSize: '200',
       rewardCouponTimeToLive: { microseconds: '259200000000' },
       appRewardCouponThreshold: '1.0',
+      extraFeaturedAssetActivityWeight: null,
+      maxExtraFeaturedAssetActivityWeightPerAsset: null,
+      dsoAppActivityWeight: null,
     });
   });
 
