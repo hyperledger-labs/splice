@@ -367,18 +367,18 @@ class DbValidatorStoreTest
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    val store = new DbValidatorStore(
-      key = storeKey,
-      storage = storage,
-      loggerFactory = loggerFactory,
-      retryProvider =
-        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId,
-      participantId = mkParticipantId("ValidatorStoreTest"),
-      IngestionConfig(),
-      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-    )
     for {
+      store <- DbValidatorStore.create(
+        key = storeKey,
+        storage = storage,
+        loggerFactory = loggerFactory,
+        retryProvider =
+          RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+        domainMigrationId,
+        participantId = mkParticipantId("ValidatorStoreTest"),
+        IngestionConfig(),
+        defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+      )
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- store.multiDomainAcsStore.testIngestionSink
         .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)

@@ -5,7 +5,6 @@ package com.digitalasset.canton.integration.plugins
 
 import com.daml.tls.TlsClientConfig
 import com.digitalasset.canton
-import com.digitalasset.canton.UniquePortGenerator
 import com.digitalasset.canton.admin.api.client.data.SequencingParameters
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
@@ -34,8 +33,13 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.Bft
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.BftBlockOrderingP2PSendDelayConfig.DelayByRecipients
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.{
   BftBlockOrderingP2PSendDelayConfig,
+  BftBlockOrderingStandaloneComputeDelayConfig,
   BftBlockOrderingStandalonePeerConfig,
   BftBlockOrderingStandaloneTopologyDelayConfig,
+  DefaultAvailabilityDisseminationPatience,
+  DefaultConsensusExtraAllowedRetransmissionRequestsPerSecond,
+  DefaultConsensusWindowSizeForRetransmissionOfCommitCertificates,
+  DefaultConsensusWindowSizeForStateTransferOfCommitCertificates,
   DefaultDedicatedExecutionContextDivisor,
   DefaultDelayedInitQueueMaxSize,
   DefaultEpochStateTransferTimeout,
@@ -53,6 +57,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.Bft
   DefaultSendBlacklistTtl,
   P2PConnectionManagementConfig,
   P2PNetworkConfig,
+  P2PTransportMetricsConfig,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.BlacklistLeaderSelectionPolicyConfig
@@ -65,6 +70,7 @@ import com.digitalasset.canton.synchronizer.sequencer.{
 }
 import com.digitalasset.canton.topology.{Namespace, SequencerId}
 import com.digitalasset.canton.util.SingleUseCell
+import com.digitalasset.canton.{UniquePortGenerator, config}
 import monocle.macros.GenLens
 import monocle.macros.syntax.lens.*
 import org.scalatest.EitherValues
@@ -104,11 +110,19 @@ final class UseBftSequencer(
     // Use a shorter empty block creation timeout by default to speed up tests that stop sequencing
     //  and use `GetTime` to await an effective time to be reached on the synchronizer.
     consensusEmptyBlockCreationTimeout: FiniteDuration = 250.millis,
+    consensusWindowSizeForRetransmissionOfCommitCertificates: Option[PositiveInt] =
+      DefaultConsensusWindowSizeForRetransmissionOfCommitCertificates,
+    consensusWindowSizeForStateTransferOfCommitCertificates: Option[PositiveInt] =
+      DefaultConsensusWindowSizeForStateTransferOfCommitCertificates,
+    consensusExtraAllowedRetransmissionRequestsPerSecond: Int =
+      DefaultConsensusExtraAllowedRetransmissionRequestsPerSecond,
     // Use a longer topology warn timeout in tests to avoid flakes under concurrent CI load.
     consensusNewEpochTopologyWarnTimeout: FiniteDuration = 10.seconds,
     sequencingParameters: Option[topology.SequencingParameters] = None,
     minRequestsInBatch: Short = DefaultMinRequestsInBatch,
     maxBatchCreationInterval: FiniteDuration = DefaultMaxBatchCreationInterval,
+    availabilityDisseminationPatience: Option[FiniteDuration] =
+      DefaultAvailabilityDisseminationPatience,
     availabilityMinProposalCreationDelay: FiniteDuration = 50.millis,
     dedicatedExecutionContextDivisor: Option[Int] = DefaultDedicatedExecutionContextDivisor,
     sequencerCoreSubscriptionConfig: BftBlockOrdererConfig.SequencerCoreSubscriptionConfig =
@@ -148,6 +162,7 @@ final class UseBftSequencer(
     p2pClientChannelParams: ClientChannelParams =
       ClientChannelParams.Default.copy(flowControlWindow = None),
     p2pConnectionManagementConfig: P2PConnectionManagementConfig = P2PConnectionManagementConfig(),
+    p2pTransportMetrics: P2PTransportMetricsConfig = P2PTransportMetricsConfig(),
 ) extends EnvironmentSetupPlugin
     with EitherValues {
 
@@ -203,9 +218,16 @@ final class UseBftSequencer(
                     ),
                     consensusEmptyBlockCreationTimeout = consensusEmptyBlockCreationTimeout,
                     consensusNewEpochTopologyWarnTimeout = consensusNewEpochTopologyWarnTimeout,
+                    consensusWindowSizeForRetransmissionOfCommitCertificates =
+                      consensusWindowSizeForRetransmissionOfCommitCertificates,
+                    consensusWindowSizeForStateTransferOfCommitCertificates =
+                      consensusWindowSizeForStateTransferOfCommitCertificates,
+                    consensusExtraAllowedRetransmissionRequestsPerSecond =
+                      consensusExtraAllowedRetransmissionRequestsPerSecond,
                     minRequestsInBatch = minRequestsInBatch,
                     maxBatchCreationInterval = maxBatchCreationInterval,
                     availabilityMinProposalCreationDelay = availabilityMinProposalCreationDelay,
+                    availabilityDisseminationPatience = availabilityDisseminationPatience,
                     dedicatedExecutionContextDivisor = dedicatedExecutionContextDivisor,
                     standalone = standaloneOpt,
                     storage = Option.when(shouldUseMemoryStorageForBftOrderer)(Memory()),
@@ -342,6 +364,7 @@ final class UseBftSequencer(
             ),
             overwriteStoredEndpoints = shouldOverwriteStoredEndpoints,
             connectionManagementConfig = p2pConnectionManagementConfig,
+            transportMetrics = p2pTransportMetrics,
           )
           val standaloneOpt = createStandaloneConfig(selfInstanceName, otherInitialNames)
           val blockSequencerConfig = {
@@ -370,9 +393,14 @@ final class UseBftSequencer(
               ),
               consensusEmptyBlockCreationTimeout = consensusEmptyBlockCreationTimeout,
               consensusNewEpochTopologyWarnTimeout = consensusNewEpochTopologyWarnTimeout,
+              consensusWindowSizeForRetransmissionOfCommitCertificates =
+                consensusWindowSizeForRetransmissionOfCommitCertificates,
+              consensusExtraAllowedRetransmissionRequestsPerSecond =
+                consensusExtraAllowedRetransmissionRequestsPerSecond,
               minRequestsInBatch = minRequestsInBatch,
               maxBatchCreationInterval = maxBatchCreationInterval,
               availabilityMinProposalCreationDelay = availabilityMinProposalCreationDelay,
+              availabilityDisseminationPatience = availabilityDisseminationPatience,
               dedicatedExecutionContextDivisor = dedicatedExecutionContextDivisor,
               standalone = standaloneOpt,
               storage = Option.when(shouldUseMemoryStorageForBftOrderer)(Memory()),
@@ -446,9 +474,9 @@ final class UseBftSequencer(
           config.entries
             .find(_.sources.contains(PositiveInt.tryCreate(suffixDigits.toInt)))
             .map(_.config)
-            .map(instanceIndexToName(otherInitialNames.map(_.unwrap), _))
+            .map(getP2PDelayConfig(otherInitialNames.map(_.unwrap), _))
         }
-      val topologyDelayConfig = standaloneConfig.testSlowdown
+      val topologyDelayConfigO = standaloneConfig.testSlowdown
         .flatMap(_.topologyDelay)
         .flatMap { config =>
           Option.when(
@@ -456,14 +484,22 @@ final class UseBftSequencer(
               .contains(PositiveInt.tryCreate(suffixDigits.toInt))
           )(config.delay)
         }
+      val computeDelayConfig =
+        standaloneConfig.testSlowdown.flatMap(_.computeDelay).flatMap { config =>
+          Option.when(
+            suffixDigits.nonEmpty && config.nodesToDelay
+              .contains(PositiveInt.tryCreate(suffixDigits.toInt))
+          )(config.delay)
+        }
       val testSlowdownConfigO = if (
-        postOrderingDelayConfigO.isDefined || p2pSendDelayConfigO.isDefined || topologyDelayConfig.isDefined
+        postOrderingDelayConfigO.isDefined || p2pSendDelayConfigO.isDefined || topologyDelayConfigO.isDefined || computeDelayConfig.isDefined
       )
         Some(
           BftBlockOrdererConfig.BftBlockOrderingStandaloneTestSlowdownConfig(
             postOrderingDelay = postOrderingDelayConfigO,
             sendDelay = p2pSendDelayConfigO,
-            topologyDelay = topologyDelayConfig,
+            topologyDelay = topologyDelayConfigO,
+            computeDelay = computeDelayConfig,
           )
         )
       else None
@@ -473,10 +509,14 @@ final class UseBftSequencer(
         signingPublicKeyProtoFile = pubKeyFile.toJava,
         segmentLength = standaloneConfig.segmentLength,
         pbftViewChangeTimeout = standaloneConfig.pbftViewChangeTimeout.underlying,
+        pbftViewChangeTimeoutStep = standaloneConfig.pbftViewChangeTimeoutStep,
+        pbftViewChangeTimeoutUpperBound = standaloneConfig.pbftViewChangeTimeoutUpperBound,
         blacklistLeaderSelectionPolicyConfig =
           standaloneConfig.blacklistLeaderSelectionPolicyConfig,
         maxRequestsInBatch = standaloneConfig.maxRequestsInBatch,
         maxBatchesPerBlockProposal = standaloneConfig.maxBatchesPerBlockProposal,
+        stricterDetectionOfRequestsPotentiallyChangingOrderingTopology =
+          standaloneConfig.stricterDetectionOfRequestsPotentiallyChangingOrderingTopology,
         peers = otherInitialNames
           .map { otherInitialInstanceName =>
             BftBlockOrderingStandalonePeerConfig(
@@ -489,7 +529,7 @@ final class UseBftSequencer(
       )
     }
 
-  private def instanceIndexToName(
+  private def getP2PDelayConfig(
       otherInstanceNames: Seq[String],
       config: BftBlockOrderingP2PSendDelayConfig,
   ): BftBlockOrderingP2PSendDelayConfig =
@@ -498,12 +538,14 @@ final class UseBftSequencer(
             sources,
             delayDistribution,
             probabilityOfGrpcSendSuccess,
+            probabilityOfGrpcSendReachingRecipient,
             probabilityOfGrpcReady,
           ) =>
         DelayByRecipients(
           sources.flatMap(idx => otherInstanceNames.find(oin => idx == getSuffixDigits(oin))),
           delayDistribution,
           probabilityOfGrpcSendSuccess,
+          probabilityOfGrpcSendReachingRecipient,
           probabilityOfGrpcReady,
         )
     })
@@ -544,6 +586,11 @@ object UseBftSequencer {
       delay: BftBlockOrderingStandaloneTopologyDelayConfig,
   )
 
+  final case class ComputeDelayConfig(
+      nodesToDelay: Set[PositiveInt],
+      delay: BftBlockOrderingStandaloneComputeDelayConfig,
+  )
+
   /** Configuration to simulate artificial slowdowns in standalone mode for testing purposes.
     *
     * @param postOrderingDelay
@@ -555,14 +602,18 @@ object UseBftSequencer {
       postOrderingDelay: Option[PostOrderingDelayConfig],
       p2pSendDelay: Option[P2PSendDelayConfig],
       topologyDelay: Option[TopologyDelayConfig],
+      computeDelay: Option[ComputeDelayConfig],
   )
 
   final case class UseStandaloneConfig(
       pbftViewChangeTimeout: PositiveFiniteDuration,
+      pbftViewChangeTimeoutStep: config.NonNegativeFiniteDuration,
+      pbftViewChangeTimeoutUpperBound: config.NonNegativeFiniteDuration,
       segmentLength: Long,
       blacklistLeaderSelectionPolicyConfig: BlacklistLeaderSelectionPolicyConfig,
       maxRequestsInBatch: Short,
       maxBatchesPerBlockProposal: Short,
+      stricterDetectionOfRequestsPotentiallyChangingOrderingTopology: Boolean,
       testSlowdown: Option[TestSlowdownConfig],
   )
 }

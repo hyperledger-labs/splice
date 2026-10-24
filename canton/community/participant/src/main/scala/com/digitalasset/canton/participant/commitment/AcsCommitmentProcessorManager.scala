@@ -30,10 +30,12 @@ import com.digitalasset.canton.participant.commitment.SynchronizerCommitmentStat
 }
 import com.digitalasset.canton.participant.metrics.CommitmentMetrics
 import com.digitalasset.canton.participant.sync.CantonSyncService
+import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.signalling.{EventSignaller, LocalEventSignaller}
+import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.Done
 import org.apache.pekko.stream.{KillSwitch, Materializer}
 
@@ -65,7 +67,8 @@ class AcsCommitmentProcessorManager(
 
   def health: HealthComponent = healthComponent
 
-  private val synchronizers =
+  @VisibleForTesting
+  private[canton] val synchronizers =
     mutable.Map[SynchronizerId, SynchronizerCommitmentState]()
 
   private val lock = new Mutex()
@@ -122,6 +125,21 @@ class AcsCommitmentProcessorManager(
           state
         },
       )
+    }
+
+  /** Closes the acs commitment pipeline for the given `synchronizerId`.
+    */
+  def closePipelineForSynchronizer(synchronizerId: SynchronizerId): Unit =
+    lock.exclusive {
+      // The call to close must be in the lock, so that it's not possible to spawn a
+      // new pipeline for the same synchronizer while the old pipeline is still being
+      // shut down, which can lead to data corruption.
+      LifeCycle.close(
+        synchronizers
+          .remove(synchronizerId)
+          .toList
+          .flatMap(state => closeSynchronizerCommitmentState((synchronizerId, state)))
+      )(logger)
     }
 
   private def createSignallerHealth(
@@ -202,7 +220,14 @@ class AcsCommitmentProcessorManager(
       state.matcherF
         .flatMap { case (killSwitch, doneF) =>
           killSwitch.shutdown()
-          FutureUnlessShutdown.outcomeF(doneF.void)
+          FutureUnlessShutdown.outcomeF(
+            doneF.void.recover {
+              // The storage became passive while the stream was running, so its DB operations were rejected.
+              // This is expected when the replica transitions to passive and the failure has already been
+              // reported via the matcher's health, so we treat it as a normal termination of the stream.
+              case _: PassiveInstanceException => ()
+            }
+          )
         }
         .onShutdown(()),
       timeouts.shutdownProcessing,

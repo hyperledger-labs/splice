@@ -40,7 +40,6 @@ import com.digitalasset.canton.topology.{Member, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
 import com.digitalasset.canton.util.{EitherTUtil, Mutex}
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.nonempty.NonEmpty
 import com.github.benmanes.caffeine.cache.Scheduler
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
@@ -81,12 +80,6 @@ class SyncCryptoSignerWithSessionKeys(
     extends SyncCryptoSigner
     with FlagCloseable
     with HasCloseContext {
-
-  // session signing keys can only be used with PV35+
-  require(
-    staticSynchronizerParameters.protocolVersion >= ProtocolVersion.v35,
-    s"Session signing keys are only supported in protocol versions 35 and above. Found PV: ${staticSynchronizerParameters.protocolVersion}",
-  )
 
   private val scheduledExecutorService = Threading.singleThreadScheduledExecutor(
     "session-signing-key-cache",
@@ -356,7 +349,7 @@ class SyncCryptoSignerWithSessionKeys(
       val pendingSessionKeys = pendingRequests.toMap
       val keysInCache = sessionSigningKeysCache.asMap().values.toSeq
 
-      // Filter the cache for session keys whose validity period fully covers the required intervaland whose
+      // Filter the cache for session keys whose validity period fully covers the required interval and whose
       // delegation key matches our current activeLongTermKey. Session keys with stale delegation keys are ignored.
       val validUsableSessionKeysInCache = keysInCache.filter { skD =>
         isUsableDelegation(

@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.store.db
 
+import com.digitalasset.canton.tracing.TraceContext
+
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
@@ -10,7 +12,6 @@ import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnles
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -23,9 +24,11 @@ abstract class DbTxLogAppStore[TXE](
     interfaceViewsTableNameOpt: Option[String],
     acsStoreDescriptor: StoreDescriptor,
     txLogStoreDescriptor: StoreDescriptor,
+    storeIds: DbMultiDomainAcsStore.StoreIds,
     migrationId: Long,
     ingestionConfig: IngestionConfig,
     acsArchiveConfigOpt: Option[AcsArchiveConfig] = None,
+    additionalIngestionSinks: Seq[AdditionalIngestionSink] = Seq.empty,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -35,6 +38,7 @@ abstract class DbTxLogAppStore[TXE](
       acsTableName = acsTableName,
       interfaceViewsTableNameOpt = interfaceViewsTableNameOpt,
       acsStoreDescriptor = acsStoreDescriptor,
+      storeIds = storeIds,
       migrationId = migrationId,
       ingestionConfig = ingestionConfig,
       acsArchiveConfigOpt = acsArchiveConfigOpt,
@@ -49,6 +53,7 @@ abstract class DbTxLogAppStore[TXE](
       interfaceViewsTableNameOpt,
       acsStoreDescriptor,
       Some(txLogStoreDescriptor),
+      storeIds,
       loggerFactory,
       acsContractFilter,
       txLogConfig,
@@ -58,6 +63,7 @@ abstract class DbTxLogAppStore[TXE](
       handleIngestionSummary,
       defaultLimit = defaultLimit,
       acsArchiveConfigOpt = acsArchiveConfigOpt,
+      additionalIngestionSinks = additionalIngestionSinks,
     )
 }
 
@@ -66,6 +72,7 @@ abstract class DbAppStore(
     acsTableName: String,
     interfaceViewsTableNameOpt: Option[String],
     acsStoreDescriptor: StoreDescriptor,
+    storeIds: DbMultiDomainAcsStore.StoreIds,
     migrationId: Long,
     ingestionConfig: IngestionConfig,
     acsArchiveConfigOpt: Option[AcsArchiveConfig] = None,
@@ -88,6 +95,7 @@ abstract class DbAppStore(
       interfaceViewsTableNameOpt,
       acsStoreDescriptor,
       None,
+      storeIds,
       loggerFactory,
       acsContractFilter,
       TxLogStore.Config.empty,

@@ -755,21 +755,23 @@ class DbMultiDomainAcsStoreTest
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    new DbMultiDomainAcsStore(
-      storage,
-      acsTableName,
-      txLogTableName,
-      interfaceViewsTableNameOpt,
-      storeDescriptor(acsId, participantId),
-      txLogId.map(storeDescriptor(_, participantId)),
-      loggerFactory,
-      filter,
-      testTxLogConfig,
-      migrationId,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      IngestionConfig(),
-      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-    )
+    DbMultiDomainAcsStore
+      .create(
+        storage,
+        acsTableName,
+        txLogTableName,
+        interfaceViewsTableNameOpt,
+        storeDescriptor(acsId, participantId),
+        txLogId.map(storeDescriptor(_, participantId)),
+        loggerFactory,
+        filter,
+        testTxLogConfig,
+        migrationId,
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+        IngestionConfig(),
+        defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+      )
+      .futureValue
   }
 
   override protected def cleanDb(

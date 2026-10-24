@@ -41,6 +41,7 @@ org.lfdecentralizedtrust.splice.scan.store.bulk.ZstdTest
 org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.BftBulkObjectListingTest
 org.lfdecentralizedtrust.splice.scan.store.bulk.backfilling.KvBackfillingProgressTest
 org.lfdecentralizedtrust.splice.scan.store.db.CheckMetaVersionsTest
+org.lfdecentralizedtrust.splice.scan.store.db.DbVotesStoreTest
 org.lfdecentralizedtrust.splice.scan.store.historystart.HistoryReadinessTest
 org.lfdecentralizedtrust.splice.scan.store.historystart.ScanHistoryStartTest
 org.lfdecentralizedtrust.splice.store.DbUnavailablePartiesStoreTest

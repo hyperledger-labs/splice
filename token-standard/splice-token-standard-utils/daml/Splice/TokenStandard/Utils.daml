@@ -68,12 +68,14 @@ module Splice.TokenStandard.Utils (
   receiverMetaKey,
   reasonFromMeta,
   reasonToMeta,
+  reasonIsCipMemo,
   mkMetaTransferFrom,
   v1HistoryTagAsUnlockV1,
 
   -- * Missing Time utilities
   -- TODO(#4865): upstream these to the Daml stdlib
   maxTime,
+  parseIso8601UtcTime,
 
   -- * Missing TextMap utilities
 
@@ -238,6 +240,7 @@ module Splice.TokenStandard.Utils (
 
 
 import Splice.TokenStandard.Utils.Internal.Conversions
+import Splice.TokenStandard.Utils.Internal.Conversions.Iso8601
 import Splice.TokenStandard.Utils.Internal.Choices
 import Splice.TokenStandard.Utils.Internal.Events
 import Splice.TokenStandard.Utils.Internal.Transfers

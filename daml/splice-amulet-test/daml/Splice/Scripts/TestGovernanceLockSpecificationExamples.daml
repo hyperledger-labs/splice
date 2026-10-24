@@ -1,0 +1,316 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Replicates the examples of the "Compatibility Mode" section of the CIP that specifies governance locks.
+--
+-- The parties `A`, `B` and `X` of the examples are allocated with exactly these names, so that the memo
+-- strings are copied verbatim from the CIP. This checks the parsers and encoders against the actual strings.
+module Splice.Scripts.TestGovernanceLockSpecificationExamples where
+
+import DA.Assert ((===))
+import DA.Date (Month(..), date)
+import DA.Time
+
+import Daml.Script
+import Splice.Amulet
+import Splice.Api.Token.TransferInstructionV1 qualified as V1
+import Splice.Expiry (TimeLock(..))
+import Splice.GovernanceLock
+import Splice.GovernanceLock.Request
+import Splice.Scripts.TestGovernanceLocks
+import Splice.Scripts.TokenStandard.TestAmuletTokenStandardTestEnv
+import Splice.Testing.Registries.AmuletRegistryV2 qualified as AmuletRegistryV2
+import Splice.Testing.TokenStandard.WalletClientV2 qualified as WalletClientV2
+import Splice.Testing.Utils
+import Splice.TokenStandard.Utils (basicAccount, downcast, reasonFromMeta)
+
+-- | The receiver of all lock requests, as written in the CIP.
+lockManager : Text
+lockManager = "cip-127_lock-manager::1220000000000000000000000000000000000000000000000000000000000000abcd"
+
+-- | The parties of the examples: the funds owners `A` and `B`, and the app provider `X`.
+data ExampleParties = ExampleParties with
+  a : Party
+  b : Party
+  x : Party
+
+-- | Allocates the parties of the examples, with the names that the CIP uses.
+setupExampleParties : Script ExampleParties
+setupExampleParties = do
+  a <- allocatePartyExact "A"
+  b <- allocatePartyExact "B"
+  x <- allocatePartyExact "X"
+  partyToText a === "A"
+  partyToText b === "B"
+  partyToText x === "X"
+  WalletClientV2.createBatchingUtility a
+  WalletClientV2.createBatchingUtility b
+  pure ExampleParties with ..
+
+-- | A pending TSv1 transfer as a wallet displays it.
+data DisplayedTransfer = DisplayedTransfer with
+  sender : Text
+  receiver : Text
+  amount : Decimal
+  memo : Text
+    deriving (Eq, Show)
+
+-- | Checks how `party`'s wallet displays the pending transfer instruction.
+checkDisplayedAs' : V1.TransferInstructionView -> DisplayedTransfer -> Script ()
+checkDisplayedAs' view expected =
+  DisplayedTransfer with
+      sender = partyToText view.transfer.sender
+      receiver = partyToText view.transfer.receiver
+      amount = view.transfer.amount
+      memo = reasonFromMeta view.transfer.meta
+    === expected
+
+-- | Checks how `party`'s wallet displays the pending transfer instruction `cid`.
+checkDisplayedAs : Party -> ContractId V1.TransferInstruction -> DisplayedTransfer -> Script ()
+checkDisplayedAs party cid expected = do
+  Some view <- queryInterfaceContractId party cid
+  checkDisplayedAs' view expected
+
+-- | Submits a TSv1 lock request of `sender` with the memo `memo`.
+-- Funded with all unlocked holdings of `sender` if `amount` is positive, and with no holdings otherwise.
+submitMemo : TestEnv -> Party -> Decimal -> Text -> Script V1.TransferInstructionResult
+submitMemo env sender amount memo = do
+  let registry = env.registriesEnv.amuletV2
+  inputs <- if amount > 0.0
+    then WalletClientV2.listUnlockedHoldingCidsFor (basicAccount sender) sender registry.instrumentId
+    else pure []
+  request <- lockRequestV1 registry sender amount memo
+  expectSuccess $ submitLockRequestV1 env.registries request with inputHoldingCids = downcast <$> inputs
+
+-- | Creates the 5M FA lock of `A` for `X` with the memo of the "Creating Locks" example.
+createExampleLock : TestEnv -> ExampleParties -> Script (ContractId V1.TransferInstruction)
+createExampleLock env ExampleParties{a} = do
+  AmuletRegistryV2.tapFaucet env.registriesEnv.amuletV2 a 5000000.0
+  tsv1Operations.expectPendingTransfer =<< submitMemo env a 5000000.0
+    "cip-127/memo:request=create-lock&lock-kind=fa-lock&lock-subject=X"
+
+-- | The pending transfer that displays the FA lock of `owner` for `X`.
+displayedFaLock : Text -> Decimal -> DisplayedTransfer
+displayedFaLock owner amount = DisplayedTransfer with
+  sender = owner
+  receiver = lockManager
+  amount
+  memo = "cip-127/memo:lock-kind=fa-lock&lock-subject=X&lock-status=locked"
+
+-- | Checks that `owner` has exactly one governance lock, with the given amount, and returns it.
+expectSingleFaLock : Party -> Decimal -> Script (ContractId V1.TransferInstruction)
+expectSingleFaLock owner amount = do
+  [(lockCid, lock)] <- governanceLocksOf owner
+  lock.amount === amount
+  checkLockedHolding owner lockCid amount
+  let cid = toInterfaceContractId @V1.TransferInstruction lockCid
+  checkDisplayedAs owner cid $ displayedFaLock (partyToText owner) amount
+  pure cid
+
+-- Lock Display in Wallets
+--------------------------
+
+-- | The vesting FA lock that was created at the start of the Unix epoch.
+test_example_lockDisplay : Script ()
+test_example_lockDisplay = do
+  TestEnv{..} <- setupTest
+  ExampleParties{..} <- setupExampleParties
+  let dso = instrId.admin
+      epoch = time (date 1970 Jan 1) 0 0 0
+      vestingPeriod = days 60
+      endTime = epoch `addRelTime` vestingPeriod
+
+  lockedAmulet <- AmuletRegistryV2.createLockedAmulet registriesEnv.amuletV2 a 1000000.0 TimeLock with
+    expiresAt = endTime
+    holders = [dso]
+    optContext = None
+  let lock = GovernanceLock with
+        dso
+        owner = a
+        amount = 1000000.0
+        lockedAmulet = coerceContractId lockedAmulet
+        specification = GLS_VestingLock VestingLockSpecification with
+          kind = GLK_FeaturedApp x
+          vestingPeriod
+          endTime
+        originalLockCid = None
+        requestedAt = epoch
+
+  checkDisplayedAs' (view $ toInterface @V1.TransferInstruction lock) DisplayedTransfer with
+    sender = "A"
+    receiver = lockManager
+    amount = 1000000.0
+    memo = "cip-127/memo:lock-kind=fa-lock&lock-subject=X&lock-status=vesting&lock-vesting-duration-micros=5184000000000&lock-vesting-end-time-micros=5184000000000&lock-vesting-info=\"vesting for 60.0 days until 1970-03-02T00:00:00Z\""
+
+-- Creating Locks
+-----------------
+
+test_example_createLock : Script ()
+test_example_createLock = do
+  env@TestEnv{..} <- setupTest
+  parties@ExampleParties{..} <- setupExampleParties
+
+  lockCid <- createExampleLock env parties
+
+  Some lock <- queryContractId a (fromInterfaceContractId @GovernanceLock lockCid)
+  lock.owner === a
+  lock.specification === GLS_FullLock FullLockSpecification with kind = GLK_FeaturedApp x
+  lock.amount === 5000000.0
+  checkDisplayedAs a lockCid $ displayedFaLock "A" 5000000.0
+  -- The lock subject `X` observes the lock
+  Some _ <- queryContractId x (fromInterfaceContractId @GovernanceLock lockCid)
+  checkBalances env a (0.0, 5000000.0)
+
+-- Unlocking Locks and Withdrawing from Vesting Locks
+-----------------------------------------------------
+
+test_example_unlockAndWithdraw : Script ()
+test_example_unlockAndWithdraw = do
+  env@TestEnv{..} <- setupTest
+  parties@ExampleParties{..} <- setupExampleParties
+  createExampleLock env parties
+
+  -- The transfer must be submitted before the vesting start time, but at most 24h before it.
+  setTime $ time (date 2029 Dec 31) 12 0 0
+
+  -- `A` can unlock 1M from this lock, starting vesting at `2030-01-01T00:00:00Z`
+  unlockResult <- submitMemo env a 0.0
+    "cip-127/memo:request=unlock-and-start-vesting&unlock-amount=1000000&vesting-start-time=2030-01-01T00:00:00Z&lock-kind=fa-lock&lock-subject=X"
+  unlockResult.senderChangeCids === []
+  vestingLockCid <- tsv1Operations.expectPendingTransfer unlockResult
+
+  -- The result is a 1M vesting lock, and the FA lock keeps the remaining 4M
+  checkDisplayedAs a vestingLockCid DisplayedTransfer with
+    sender = "A"
+    receiver = lockManager
+    amount = 1000000.0
+    memo = "cip-127/memo:lock-kind=fa-lock&lock-subject=X&lock-status=vesting&lock-vesting-duration-micros=5184000000000&lock-vesting-end-time-micros=1898640000000000&lock-vesting-info=\"vesting for 60.0 days until 2030-03-02T00:00:00Z\""
+  checkLockedHolding a (fromInterfaceContractId @GovernanceLock vestingLockCid) 1000000.0
+  expectSingleFaLock a 4000000.0
+
+  -- After `2030-01-16T00:00:00Z` party `A` can withdraw the 250,000 vested in the first 15 days
+  setTime $ time (date 2030 Jan 16) 12 0 0
+  withdrawResult <- submitMemo env a 0.0
+    "cip-127/memo:request=withdraw-vested-funds&vested-until-time=2030-01-16T00:00:00Z&lock-kind=fa-lock&lock-subject=X&lock-status=vesting&lock-vesting-duration-micros=5184000000000&lock-vesting-end-time-micros=1898640000000000"
+
+  -- The result is a payout of 250,000 to `A` and an updated vesting lock of 750,000
+  [payoutCid] <- pure withdrawResult.senderChangeCids
+  checkHolding' a ((coerceContractId payoutCid : ContractId Amulet)) 250000.0
+  checkBalances env a (250000.0, 4750000.0)
+  newVestingLockCid <- tsv1Operations.expectPendingTransfer withdrawResult
+  checkDisplayedAs a newVestingLockCid DisplayedTransfer with
+    sender = "A"
+    receiver = lockManager
+    amount = 750000.0
+    memo = "cip-127/memo:lock-kind=fa-lock&lock-subject=X&lock-status=vesting&lock-vesting-duration-micros=3888000000000&lock-vesting-end-time-micros=1898640000000000&lock-vesting-info=\"vesting for 45.0 days until 2030-03-02T00:00:00Z\""
+  checkLockedHolding a (fromInterfaceContractId @GovernanceLock newVestingLockCid) 750000.0
+  [_] <- vestingLocksOf a
+  expectSingleFaLock a 4000000.0
+  pure ()
+
+-- | Provisional FA locks do not vest, so unlocking them does not need a vesting start time.
+test_spec_unlockProvisionalLockWithoutVestingStartTime : Script ()
+test_spec_unlockProvisionalLockWithoutVestingStartTime = do
+  env@TestEnv{..} <- setupTest
+  ExampleParties{..} <- setupExampleParties
+  AmuletRegistryV2.tapFaucet registriesEnv.amuletV2 a 5000000.0
+  tsv1Operations.expectPendingTransfer =<< submitMemo env a 5000000.0
+    "cip-127/memo:request=create-lock&lock-kind=provisional-fa-lock&lock-subject=X"
+
+  -- A partial unlock pays out the unlocked funds immediately
+  partialResult <- submitMemo env a 0.0
+    "cip-127/memo:request=unlock-and-start-vesting&unlock-amount=1000000&lock-kind=provisional-fa-lock&lock-subject=X"
+  [] <- tsv1Operations.expectCompletedTransfer partialResult
+  [payoutCid] <- pure partialResult.senderChangeCids
+  checkHolding' a ((coerceContractId payoutCid : ContractId Amulet)) 1000000.0
+  [(remainingLockCid, remainingLock)] <- governanceLocksOf a
+  remainingLock.amount === 4000000.0
+  checkLockedHolding a remainingLockCid 4000000.0
+
+  -- A full unlock leaves no lock
+  fullResult <- submitMemo env a 0.0
+    "cip-127/memo:request=unlock-and-start-vesting&unlock-amount=4000000&lock-kind=provisional-fa-lock&lock-subject=X"
+  [] <- tsv1Operations.expectCompletedTransfer fullResult
+  remainingLocks <- governanceLocksOf a
+  remainingLocks === []
+  vestingLocks <- vestingLocksOf a
+  vestingLocks === []
+  checkBalances env a (5000000.0, 0.0)
+
+-- | Locks that vest need the vesting start time.
+test_spec_unlockFaLockNeedsVestingStartTime : Script ()
+test_spec_unlockFaLockNeedsVestingStartTime = do
+  env@TestEnv{..} <- setupTest
+  parties@ExampleParties{..} <- setupExampleParties
+  lockCid <- createExampleLock env parties
+  Some lock <- queryContractId a (fromInterfaceContractId @GovernanceLock lockCid)
+
+  request <- lockRequestV1 registriesEnv.amuletV2 a 0.0
+    "cip-127/memo:request=unlock-and-start-vesting&unlock-amount=1000000&lock-kind=fa-lock&lock-subject=X"
+  expectFailureContaining (missingMetadataMessage vestingStartTimeMetaKey) =<< submitLockRequestV1 registries request
+  checkLockUntouched a (fromInterfaceContractId @GovernanceLock lockCid) lock
+
+-- Substituting Locks
+---------------------
+
+test_example_substituteLock : Script ()
+test_example_substituteLock = do
+  env@TestEnv{..} <- setupTest
+  parties@ExampleParties{..} <- setupExampleParties
+  createExampleLock env parties
+  AmuletRegistryV2.tapFaucet registriesEnv.amuletV2 b 1000000.0
+
+  -- Party `B` can propose substituting 1M of this lock
+  substitutionCid <- tsv1Operations.expectPendingTransfer =<< submitMemo env b 1000000.0
+    "cip-127/memo:request=substitute-lock&target-lock-owner=A&lock-kind=fa-lock&lock-subject=X&lock-status=locked"
+
+  -- This creates a pending transfer instruction for `A` to accept, which both `A` and `B` see
+  let displayedSubstitution = DisplayedTransfer with
+        sender = "B"
+        receiver = "A"
+        amount = 1000000.0
+        memo = "cip-127/memo:request=accept-to-substitute-lock&lock-kind=fa-lock&lock-subject=X&lock-status=locked"
+  checkDisplayedAs a substitutionCid displayedSubstitution
+  checkDisplayedAs b substitutionCid displayedSubstitution
+
+  -- If `A` accepts, then 1M is paid out to `A`, the existing FA lock for `A` is reduced to 4M,
+  -- and a new FA lock for `B` is created with subject `X` and amount 1M
+  acceptResult <- expectSuccess $ tsv1Operations.acceptInstruction env substitutionCid a
+  [payoutCid] <- tsv1Operations.expectCompletedTransfer acceptResult
+  checkHolding' a ((coerceContractId payoutCid : ContractId Amulet)) 1000000.0
+  checkBalances env a (1000000.0, 4000000.0)
+  expectSingleFaLock a 4000000.0
+  expectSingleFaLock b 1000000.0
+  checkBalances env b (0.0, 1000000.0)
+
+-- Transferring Locks
+---------------------
+
+test_example_transferLock : Script ()
+test_example_transferLock = do
+  env@TestEnv{..} <- setupTest
+  parties@ExampleParties{..} <- setupExampleParties
+  createExampleLock env parties
+
+  -- Party `A` can propose transferring 2M of this lock to party `B`
+  transferResult <- submitMemo env a 0.0
+    "cip-127/memo:request=transfer-lock&new-lock-owner=B&transfer-amount=2000000&lock-kind=fa-lock&lock-subject=X&lock-status=locked"
+  transferResult.senderChangeCids === []
+  transferCid <- tsv1Operations.expectPendingTransfer transferResult
+
+  -- This creates a pending transfer instruction for `B` to accept, which both `A` and `B` see
+  let displayedTransfer = DisplayedTransfer with
+        sender = "A"
+        receiver = "B"
+        amount = 2000000.0
+        memo = "cip-127/memo:request=accept-to-transfer-lock&lock-kind=fa-lock&lock-subject=X&lock-status=locked"
+  checkDisplayedAs a transferCid displayedTransfer
+  checkDisplayedAs b transferCid displayedTransfer
+
+  -- If `B` accepts, the existing FA lock remains with `A` and is reduced to 3M,
+  -- and a new FA lock for `B` is created with subject `X` and amount 2M
+  [] <- tsv1Operations.expectCompletedTransfer =<< expectSuccess (tsv1Operations.acceptInstruction env transferCid b)
+  expectSingleFaLock a 3000000.0
+  expectSingleFaLock b 2000000.0
+  checkBalances env a (0.0, 3000000.0)
+  checkBalances env b (0.0, 2000000.0)

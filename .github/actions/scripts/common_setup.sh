@@ -15,6 +15,11 @@ trap 'echo "total elapsed: $((SECONDS - start_time))s"' EXIT
 
 current_commit=$(git rev-parse HEAD)
 
+FETCH_TIMEOUT_SECONDS=${FETCH_TIMEOUT_SECONDS:-300}
+git_fetch() {
+  timeout --kill-after=30 "$FETCH_TIMEOUT_SECONDS" git fetch "$@"
+}
+
 git config --global --add safe.directory "$(pwd)"
 echo "FETCHING ORIGIN MAIN"
 echo "GITHUB_HEAD_REF: ${GITHUB_HEAD_REF:-}"
@@ -24,7 +29,7 @@ if [ -n "${GITHUB_HEAD_REF:-}" ] && [ "$GITHUB_HEAD_REF" != "main" ]; then
 fi
 for attempt in {1..3}; do
   # On PRs from forks, GITHUB_HEAD_REF is the name of the branch in the forked repo, so we cannot actually fetch that branch directly.
-  if git fetch --no-tags --force origin "${refspecs[@]}" || git fetch --no-tags --force origin 'refs/heads/main:refs/remotes/origin/main'; then
+  if git_fetch --no-tags --force origin "${refspecs[@]}" || git_fetch --no-tags --force origin 'refs/heads/main:refs/remotes/origin/main'; then
     break
   else
     echo "Fetch attempt $attempt failed. Retrying..."
@@ -45,7 +50,7 @@ fi
 echo "FETCHING LATEST RELEASE LINE"
 latest_release=$(cat LATEST_RELEASE)
 for attempt in {1..3}; do
-  if git fetch origin "refs/heads/release-line-${latest_release}:refs/remotes/origin/release-line-${latest_release}" --force; then
+  if git_fetch origin "refs/heads/release-line-${latest_release}:refs/remotes/origin/release-line-${latest_release}" --force; then
     break
   else
     echo "Fetch attempt $attempt for release line ${latest_release} failed. Retrying..."

@@ -157,6 +157,16 @@ export const allValidatorsConfig: ValidatorsConfig = ValidatorsConfigSchema.pars
   clusterSubConfig('validators')
 );
 
+// Runbook validators are served at <app>.<ingress name>.<cluster hostname>.
+// The ingress name is the namespace for now; keep that assumption here only.
+export function validatorIngressName(validator: ValidatorConfig): string {
+  return validator.namespace;
+}
+
+export const allValidatorIngressNames: string[] = [
+  ...new Set(Object.values(allValidatorsConfig).map(validatorIngressName)),
+];
+
 const allValidators = Object.keys(allValidatorsConfig);
 export const deployedValidators = DeployValidatorRunbook
   ? allValidators

@@ -504,7 +504,7 @@ class TrafficBasedRewardsSvAppTimeBasedIntegrationTest
             s"Reset sv2's earliest-ingested round to $round", {
               val sv2Db = sv2ScanBackend.appState.storage match {
                 case db: DbStorage => db
-                case other => fail(s"Expected DbStorage")
+                case _ => fail(s"Expected DbStorage")
               }
               implicit val closeContext: CloseContext = CloseContext(sv2Db)
               sv2Db
@@ -1007,6 +1007,7 @@ class TrafficBasedRewardsSvAppTimeBasedIntegrationTest
       existing.developmentFundManagerBlacklist,
       existing.minDevelopmentFundMintingDelay,
       existing.amuletSwitchOverTimes,
+      existing.governanceLockConfig,
     )
     setAmuletConfig(Seq((None, newConfig, existing)))
     eventually() {

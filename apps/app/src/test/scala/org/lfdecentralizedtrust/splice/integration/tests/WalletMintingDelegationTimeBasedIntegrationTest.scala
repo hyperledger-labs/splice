@@ -198,15 +198,17 @@ class WalletMintingDelegationTimeBasedIntegrationTest
         createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiaryParty)
 
         clue("After hosting, beneficiaryHosted should be true in delegations") {
-          val delegations = aliceValidatorWalletClient.listMintingDelegations()
-          val beneficiaryDelegation = delegations.delegations
-            .find(
-              _.contract.payload.hcursor
-                .get[String]("beneficiary")
-                .contains(beneficiaryParty.party.toProtoPrimitive)
-            )
-            .value
-          beneficiaryDelegation.beneficiaryHosted shouldBe true
+          eventually() {
+            val delegations = aliceValidatorWalletClient.listMintingDelegations()
+            val beneficiaryDelegation = delegations.delegations
+              .find(
+                _.contract.payload.hcursor
+                  .get[String]("beneficiary")
+                  .contains(beneficiaryParty.party.toProtoPrimitive)
+              )
+              .value
+            beneficiaryDelegation.beneficiaryHosted shouldBe true
+          }
         }
 
         // Test 2: Creates a proposal and test reject
@@ -267,7 +269,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             },
           )
 
-          val (delegationCid, _) = actAndCheck(
+          actAndCheck(
             "Validator accepts the proposal",
             aliceValidatorWalletClient.acceptMintingDelegationProposal(proposal2Cid),
           )(
@@ -306,7 +308,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             },
           )
 
-          val (newDelegationCid, _) = actAndCheck(
+          actAndCheck(
             "Validator accepts new proposal",
             aliceValidatorWalletClient.acceptMintingDelegationProposal(proposal3Cid),
           )(

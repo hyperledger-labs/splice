@@ -18,6 +18,7 @@ import {
 } from '@canton-network/splice-pulumi-common';
 import { infraKubernetesScheduling } from '@canton-network/splice-pulumi-common';
 import { svConfigsBasic } from '@canton-network/splice-pulumi-common-sv/src/svConfigsBasic';
+import { allValidatorIngressNames } from '@canton-network/splice-pulumi-common-validator';
 
 import { gcpDnsProject } from './config';
 
@@ -197,7 +198,7 @@ function clusterCertificate(
       [
         `${dnsName}`,
         `*.${dnsName}`,
-        `*.validator.${dnsName}`,
+        ...allValidatorIngressNames.map(ingress => `*.${ingress}.${dnsName}`),
         `*.validator1.${dnsName}`,
         `*.splitwell.${dnsName}`,
         `*.sv.${dnsName}`,

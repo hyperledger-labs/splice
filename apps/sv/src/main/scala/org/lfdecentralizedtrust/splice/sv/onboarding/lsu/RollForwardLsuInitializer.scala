@@ -117,7 +117,7 @@ class RollForwardLsuInitializer(
         rollForwardConfig.newPhysicalSynchronizerSerial,
         rollForwardConfig.newPhysicalSynchronizerProtocolVersion,
       )
-      (topologyExportTime, trafficExportTime, upgradeTime) <- rollForwardConfig.exportTimes match {
+      (_, _, upgradeTime) <- rollForwardConfig.exportTimes match {
         case Some(config) =>
           val resolved = (
             config.topologyExportTime.getTimestamp(),

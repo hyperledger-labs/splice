@@ -61,7 +61,7 @@ class TimeBasedTreasuryIntegrationTest
   )
 
   "automatically merge transfer inputs when the automation is triggered" in { implicit env =>
-    val (alice, bob) = onboardAliceAndBob()
+    val (alice, _) = onboardAliceAndBob()
     waitForWalletUser(aliceValidatorWalletClient)
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
@@ -160,7 +160,7 @@ class TimeBasedTreasuryIntegrationTest
   }
 
   "merge also amulet that should be expired" in { implicit env =>
-    val (_, _) = onboardAliceAndBob()
+    onboardAliceAndBob()
     val aliceUserName = aliceWalletClient.config.ledgerApiUser
     val mergeAmuletsTrigger = aliceValidatorBackend
       .userWalletAutomation(aliceUserName)

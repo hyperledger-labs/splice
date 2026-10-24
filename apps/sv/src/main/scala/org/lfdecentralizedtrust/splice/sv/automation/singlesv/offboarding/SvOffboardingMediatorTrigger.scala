@@ -73,7 +73,7 @@ class SvOffboardingMediatorTrigger(
           .filterNot(e => dsoRulesCurrentMediators.contains(e))
         if (mediatorsToRemove.nonEmpty)
           logger.info {
-            show"Planning to remove sequencers $mediatorsToRemove to match $rulesAndStates"
+            show"Planning to remove sequencers ${mediatorsToRemove.map(_.uid)} to match $rulesAndStates"
           }
         mediatorsToRemove
       }

@@ -125,18 +125,18 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.UpdateHistoryBulkStorage.
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.{
+  ActiveVotesStore,
   AppStore,
   AppStoreWithIngestion,
+  HistoricalVotesStore,
   PageLimit,
   TimestampWithMigrationId,
+  UpdateHistory,
   VoteResultsFilters,
-  VotesStore,
 }
 import org.lfdecentralizedtrust.splice.store.S3BucketConnection.ObjectKeyAndChecksum
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
-import org.lfdecentralizedtrust.splice.store.UpdateHistory
 
-import java.lang.IllegalStateException
 import scala.collection.immutable.SortedMap
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanAppRewardsStore
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes.StoreMemberId
@@ -175,6 +175,7 @@ class HttpScanHandler(
     appActivityStore: AppActivityStore,
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
+    historicalVotesStore: HistoricalVotesStore,
     bulkStorage: Option[BulkStorageReader],
     scanApiMetrics: ScanHttpApiMetrics,
     dsoAnsResolver: DsoAnsResolver,
@@ -203,7 +204,7 @@ class HttpScanHandler(
   private val store = storeWithIngestion.store
 
   override protected val workflowId: String = this.getClass.getSimpleName
-  override protected val votesStore: VotesStore = store
+  override protected val activeVotesStore: ActiveVotesStore = store
   override protected val validatorLicensesStore: AppStore = store
 
   private val initializedBftSequencersCache
@@ -230,24 +231,45 @@ class HttpScanHandler(
   )()(extracted: TraceContext): Future[v0.ScanResource.GetDsoInfoResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getDsoInfo") { _ => _ =>
-      for {
-        latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
-        amuletRules <- store.getAmuletRulesWithState()
-        rulesAndStates <- store.getDsoRulesWithStateWithSvNodeStates()
-        dsoRules = rulesAndStates.dsoRules
-      } yield DsoInfo(
-        svUser = svUserName,
-        svParty = svParty,
-        dsoParty = store.key.dsoParty,
-        votingThreshold = Thresholds.requiredNumVotes(dsoRules),
-        latestMiningRound = latestOpenMiningRound.toContractWithState,
-        amuletRules = amuletRules,
-        dsoRules = dsoRules,
-        svNodeStates = rulesAndStates.svNodeStates,
-        initialRound = Some(initialRound),
-      ).toHttp
+      lookupDsoInfo().map(_.toHttp)
     }
   }
+
+  def getDsoInfoV1(
+      respond: v0.ScanResource.GetDsoInfoV1Response.type
+  )()(extracted: TraceContext): Future[v0.ScanResource.GetDsoInfoV1Response] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getDsoInfoV1") { _ => _ =>
+      lookupDsoInfo().map(_.toV1.toHttp)
+    }
+  }
+
+  def getSvInfo(
+      respond: v0.ScanResource.GetSvInfoResponse.type
+  )()(extracted: TraceContext): Future[v0.ScanResource.GetSvInfoResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getSvInfo") { _ => _ =>
+      Future.successful(definitions.GetSvInfoResponse(svUserName, svParty.toProtoPrimitive))
+    }
+  }
+
+  private def lookupDsoInfo()(implicit tc: TraceContext): Future[DsoInfo] =
+    for {
+      latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
+      amuletRules <- store.getAmuletRulesWithState()
+      rulesAndStates <- store.getDsoRulesWithStateWithSvNodeStates()
+      dsoRules = rulesAndStates.dsoRules
+    } yield DsoInfo(
+      svUser = svUserName,
+      svParty = svParty,
+      dsoParty = store.key.dsoParty,
+      votingThreshold = Thresholds.requiredNumVotes(dsoRules),
+      latestMiningRound = latestOpenMiningRound.toContractWithState,
+      amuletRules = amuletRules,
+      dsoRules = dsoRules,
+      svNodeStates = rulesAndStates.svNodeStates,
+      initialRound = Some(initialRound),
+    )
 
   def getOpenAndIssuingMiningRounds(
       response: v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse.type
@@ -2113,7 +2135,7 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.listAmuletPriceVotes") { _ => _ =>
       for {
-        amuletPriceVotes <- votesStore.listAmuletPriceVotes()
+        amuletPriceVotes <- activeVotesStore.listAmuletPriceVotes()
       } yield ScanResource.ListAmuletPriceVotesResponse.OK(
         definitions.ListAmuletPriceVotesResponse(
           amuletPriceVotes.map(_.toHttp).toVector
@@ -2140,7 +2162,7 @@ class HttpScanHandler(
       val limit = PageLimit.tryCreate(body.limit.intValue)
       val after = body.pageToken.map(_.longValue)
       for {
-        page <- votesStore.listVoteRequestResults(
+        page <- historicalVotesStore.listVoteRequestResults(
           VoteResultsFilters(
             body.actionName,
             body.accepted,
@@ -2182,7 +2204,7 @@ class HttpScanHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.countVoteRequestResults") { _ => _ =>
       for {
-        count <- votesStore.countVoteRequestResults(
+        count <- historicalVotesStore.countVoteRequestResults(
           VoteResultsFilters(
             body.actionName,
             body.accepted,

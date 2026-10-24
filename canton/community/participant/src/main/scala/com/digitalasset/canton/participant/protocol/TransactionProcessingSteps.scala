@@ -108,7 +108,7 @@ import com.digitalasset.canton.util.{
   LoggerUtil,
   RoseTree,
 }
-import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
+import com.digitalasset.canton.version.ProtocolVersionValidation
 import com.digitalasset.canton.{
   LedgerSubmissionId,
   LfPartyId,
@@ -230,20 +230,8 @@ class TransactionProcessingSteps(
           recentSnapshot.ipsSnapshot
             .findDynamicSynchronizerParametersOrDefault(protocolVersion)
             .map { synchronizerParameters =>
-              val maxSequencingTimeFromLET = CantonTimestamp(transactionMeta.ledgerEffectiveTime)
+              CantonTimestamp(transactionMeta.ledgerEffectiveTime)
                 .add(synchronizerParameters.ledgerTimeRecordTimeTolerance.unwrap)
-              // For PV34 we didn't want to change the protocol so used adjusted the max sequencing time
-              // not to exceed the max record time if provided. For PV35 onwards we do this checking in phase 3
-              // so we restore the pre-existing.
-              if (protocolVersion >= ProtocolVersion.v35) {
-                maxSequencingTimeFromLET
-              } else {
-                submitterInfo.externallySignedSubmission
-                  .flatMap(_.maxRecordTime)
-                  .map(CantonTimestamp.apply)
-                  .map(_.min(maxSequencingTimeFromLET))
-                  .getOrElse(maxSequencingTimeFromLET)
-              }
             }
         )
       tracked = new TrackedTransactionSubmission(
@@ -418,7 +406,6 @@ class TransactionProcessingSteps(
 
         confirmationRequestTimer = metrics.protocolMessages.confirmationRequestCreation
         protocolLimits = staticSynchronizerParameters.synchronizerLimits.transactionProtocolLimits
-        limitConfig = TransactionViewLimitConfig(protocolLimits)
         // Perform phase 1 of the protocol that produces a transaction confirmation request
         request <- confirmationRequestTimer.timeEitherFUS(
           confirmationRequestFactory
@@ -434,7 +421,7 @@ class TransactionProcessingSteps(
                 .lookupContractsWithDisclosed(disclosedContracts, contractLookup),
               maxSequencingTime,
               protocolVersion,
-              limitConfig,
+              protocolLimits,
             )
             .leftMap[TransactionSubmissionTrackingData.RejectionCause] {
               case TransactionTreeFactoryError(UnknownPackageError(unknownTo)) =>
@@ -631,6 +618,7 @@ class TransactionProcessingSteps(
       ViewMessageDecrypter(
         participantId,
         sessionKeyStore,
+        withTransparencyChecks = staticSynchronizerParameters.enableTransparencyChecks,
         protocolVersion,
         futureSupervisor,
         loggerFactory,
@@ -712,7 +700,6 @@ class TransactionProcessingSteps(
         lens,
         protocolVersion,
         crypto.pureCrypto,
-        topLevelOnly = true,
         decryptedViewsWithMetadata,
       )
 

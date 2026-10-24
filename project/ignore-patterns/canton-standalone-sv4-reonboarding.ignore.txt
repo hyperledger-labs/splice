@@ -25,6 +25,6 @@ Member MED::sv4SvReonboarding.* access is disabled
 
 Request failed for server-DefaultSequencer-0.*sv4
 
-SEQUENCER_SUBMISSION_REQUEST_MALFORMED.*MED::sv4SvReonboarding.* is not part of the mediator group
+SEQUENCER_SUBMISSION_REQUEST_MALFORMED.*MED::sv4SvReonboarding.*(is not part of the mediator group|Validation of aggregation rule failed)
 
 Request failed for server.*Sequencer.* Is the server running?

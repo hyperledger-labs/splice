@@ -240,7 +240,7 @@ object AsymmetricEncrypted extends HasVersionedMessageCompanion[AsymmetricEncryp
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v34,
+      ProtocolVersion.v36,
       supportedProtoVersion(v30.AsymmetricEncrypted)(fromProtoV30),
       _.toProtoV30,
     )
@@ -555,7 +555,7 @@ object SymmetricKey extends HasVersionedMessageCompanion[SymmetricKey] {
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v34,
+      ProtocolVersion.v36,
       supportedProtoVersion(v30.SymmetricKey)(fromProtoV30),
       _.toProtoV30,
     )
@@ -697,8 +697,6 @@ final case class EncryptionPublicKey private (
 
   override protected def toProtoPublicKeyKeyV30: Either[String, v30.PublicKey.Key] =
     v30.PublicKey.Key.EncryptionPublicKey(toProtoV30).asRight
-  override protected def toProtoPublicKeyKeyV31: Either[String, v31.PublicKey.Key] =
-    v31.PublicKey.Key.EncryptionPublicKey(toProtoV30).asRight
 
   override def prettyCompanion: PrettyPrintingCompanion[EncryptionPublicKey] = EncryptionPublicKey
 
@@ -741,7 +739,7 @@ object EncryptionPublicKey
   override def name: String = "encryption public key"
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v34,
+      ProtocolVersion.v36,
       supportedProtoVersion(v30.EncryptionPublicKey)(fromProtoV30),
       _.toProtoV30,
     )
@@ -887,7 +885,7 @@ final case class EncryptionPrivateKey private (
 object EncryptionPrivateKey extends HasVersionedMessageCompanion[EncryptionPrivateKey] {
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v34,
+      ProtocolVersion.v36,
       supportedProtoVersion(v30.EncryptionPrivateKey)(fromProtoV30),
       _.toProtoV30,
     )

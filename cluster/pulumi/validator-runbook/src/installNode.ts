@@ -80,8 +80,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const xns = exactNamespace(validatorConfig.namespace, true);
 
-  auth0Client.reuseNamespaceConfig('validator', xns.logicalName);
-
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
       xns,

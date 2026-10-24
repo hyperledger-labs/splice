@@ -30,7 +30,6 @@ import com.digitalasset.canton.logging.{
   NamedLogging,
   NamedLoggingContext,
 }
-import com.digitalasset.canton.util.BatchN.{CatchUpMode, MaximizeConcurrency}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.SingletonTraverse.syntax.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
@@ -79,7 +78,7 @@ import org.apache.pekko.stream.{
 }
 import org.apache.pekko.{Done, NotUsed}
 
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
 import java.util.{Timer, TimerTask}
 import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
@@ -940,6 +939,15 @@ object PekkoUtil extends HasLoggerName {
       }
     }
 
+  def optionalTake[A, Mat](
+      graph: FlowOps[A, Mat],
+      limit: Option[Long],
+  ): graph.Repr[A] =
+    limit match {
+      case Some(l) => graph.take(l)
+      case None => graph.via(Flow.apply[A])
+    }
+
   val noOpKillSwitch = new KillSwitch {
     override def shutdown(): Unit = ()
     override def abort(ex: Throwable): Unit = ()
@@ -1140,20 +1148,17 @@ object PekkoUtil extends HasLoggerName {
       )(implicit loggingContext: NamedLoggingContext): U#Repr[B] =
         PekkoUtil.mapAsyncAndDrainUS(graph, parallelism)(f)
 
-      def batchN(
+      def batchNForMaxConcurrency(
           maxBatchSize: Int,
           maxBatchCount: Int,
-          catchUpMode: CatchUpMode = MaximizeConcurrency,
       ): U#Repr[Iterable[A]] =
-        graph.via(BatchN(maxBatchSize, maxBatchCount, catchUpMode))
+        graph.via(BatchN.forMaxConcurrency(maxBatchSize, maxBatchCount))
 
-      def batchNWeighted(
-          maxBatchWeight: Long,
+      def batchNForMaxBatchSize(
+          maxBatchSize: Int,
           maxBatchCount: Int,
-          catchUpMode: CatchUpMode = MaximizeConcurrency,
-          weightFn: A => Long,
       ): U#Repr[Iterable[A]] =
-        graph.via(BatchN.weighted(maxBatchWeight, maxBatchCount, catchUpMode)(weightFn))
+        graph.via(BatchN.forMaxBatchSize(maxBatchSize, maxBatchCount))
 
       def dropIf(count: Int)(condition: A => Boolean): U#Repr[A] =
         PekkoUtil.dropIf(graph, count, condition)
@@ -1188,6 +1193,11 @@ object PekkoUtil extends HasLoggerName {
           onStuck: (A, B) => Option[A]
       ): U#Repr[A] =
         PekkoUtil.gateKeeper(graph, gate)(by)(onStuck)
+
+      def optionalTake(
+          limit: Option[Long]
+      ): U#Repr[A] =
+        PekkoUtil.optionalTake(graph, limit)
     }
 
     // Use separate implicit conversions for Sources and Flows to help IntelliJ
@@ -1483,6 +1493,7 @@ object PekkoUtil extends HasLoggerName {
       consumerFactory: Commit => ShutdownInProgress => Future[Future[FutureQueueConsumer[T]]],
       consumerName: String,
       healthStateChanged: StateChangedCallback,
+      defaultLogLevelIsInfo: Throwable => Boolean,
   ) extends RecoveringFutureQueue[T] {
 
     assert(maxBlockedOffer > 0)
@@ -1507,6 +1518,7 @@ object PekkoUtil extends HasLoggerName {
     private val timer: Timer = new Timer()
     private val shuttingDown: AtomicBoolean = new AtomicBoolean(false)
     private var shuttingDownTimerCancelled: Boolean = false
+    private val consecutiveFailuresWithoutProgress: AtomicInteger = new AtomicInteger(0)
     private val donePromise: Promise[Done] = Promise()
     private val firstSuccessfulConsumerInitializationPromise: Promise[Unit] = Promise()
     donePromise.future.onComplete(_ =>
@@ -1596,6 +1608,7 @@ object PekkoUtil extends HasLoggerName {
 
     private def commitProxy(consumerHealthStatus: AtomicReference[HealthStatus]): Commit = commit =>
       {
+        consecutiveFailuresWithoutProgress.set(0)
         val oldStatus = consumerHealthStatus.getAndSet(HealthStatus.healthy)
         if (oldStatus != HealthStatus.healthy) {
           healthStateChanged()
@@ -1643,7 +1656,9 @@ object PekkoUtil extends HasLoggerName {
               "Consumer initialized, but since shutdown already in progress, consumer shutdown initiated"
             )
             queueConsumer.futureQueue.shutdown()
-            queueConsumer.futureQueue.done.onComplete(consumerTerminated)(directEC)
+            queueConsumer.futureQueue.done.onComplete(consumerTerminated(_, consumerHealthStatus))(
+              directEC
+            )
           } else {
             logger.info("Consumer initialized")
             if (!haveUncommittedElements) { // If there are no outstanding uncommitted elements, we assume healthy, so idle indexer is healthy
@@ -1660,7 +1675,7 @@ object PekkoUtil extends HasLoggerName {
             )
             healthStateChanged()
             consumer.ifInitialized(
-              _.done.onComplete(consumerTerminated)(directEC)
+              _.done.onComplete(consumerTerminated(_, consumerHealthStatus))(directEC)
             )
           }
 
@@ -1677,8 +1692,10 @@ object PekkoUtil extends HasLoggerName {
             val logMessage =
               s"Consumer initialization failed (attempt #$attempt), retrying after $waitMillis millis"
             if (attempt > retryAttemptErrorThreshold) logger.error(logMessage, failure)
-            else if (attempt > retryAttemptWarnThreshold) logger.warn(logMessage, failure)
-            else logger.info(logMessage, failure)
+            else if (attempt <= retryAttemptWarnThreshold && defaultLogLevelIsInfo(failure))
+              logger.info(logMessage, failure)
+            else
+              logger.warn(logMessage, failure)
             consumer = Consumer.WaitingForRetry
             healthStateChanged()
             if (!shuttingDownTimerCancelled) {
@@ -1693,12 +1710,18 @@ object PekkoUtil extends HasLoggerName {
       }
     }
 
-    private def consumerTerminated(result: Try[Done]): Unit = blockingSynchronized {
+    private def consumerTerminated(
+        result: Try[Done],
+        healthStatus: AtomicReference[HealthStatus],
+    ): Unit = blockingSynchronized {
       result match {
         case Success(_) =>
           logger.info("Consumer successfully terminated")
-        case Failure(failure) =>
+        case Failure(failure)
+            if healthStatus.get() == HealthStatus.healthy && defaultLogLevelIsInfo(failure) =>
           logger.info("Consumer terminated with a failure", failure)
+        case Failure(failure) =>
+          logger.warn("Consumer terminated with a failure", failure)
       }
       if (shuttingDown.get()) {
         logger.info("Terminated (consumer terminated), shutdown complete")
@@ -2368,8 +2391,24 @@ object PekkoUtil extends HasLoggerName {
       else elc.info(logMessage, throwable)
       result
     }
-  }
 
+    def pause(
+        delay: FiniteDuration,
+        streamName: String,
+        warnLoggingAttemptThreshold: Int = Int.MaxValue, // by default always log on INFO
+        errorLoggingAttemptThreshold: Int = Int.MaxValue, // by default always log on INFO
+        failingAttemptThreshold: Int = Int.MaxValue, // by default always retry
+    )(recoverable: Throwable => Boolean): RecoveryStrategy =
+      // by setting initial and max delay of the exponential backoff to the same value, we get constant pausing behavior
+      exponentialBackoff(
+        initialDelay = delay,
+        maxDelay = delay,
+        streamName = streamName,
+        warnLoggingAttemptThreshold = warnLoggingAttemptThreshold,
+        errorLoggingAttemptThreshold = errorLoggingAttemptThreshold,
+        failingAttemptThreshold = failingAttemptThreshold,
+      )(recoverable)
+  }
   def recoveringSource[A, Mat, Point](
       init: Point,
       recoveryStrategy: RecoveryStrategy,

@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.validator.config
 
 import cats.data.NonEmptyList
-import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.config.*
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
@@ -49,8 +48,6 @@ object ValidatorOnboardingConfig {
     config.copy(secret = hidden)
   }
 }
-
-final case class InitialInstalledApp(appUrl: Uri)
 
 final case class BuyExtraTrafficConfig(
     /** target throughput in bytes per second

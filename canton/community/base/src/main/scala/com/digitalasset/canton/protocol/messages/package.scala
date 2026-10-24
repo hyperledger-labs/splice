@@ -12,23 +12,15 @@ import com.digitalasset.canton.sequencing.protocol.{AllMembersOfSynchronizer, Op
   */
 package object messages {
 
-  type TransactionSingleViewMessage = EncryptedSingleViewMessage[TransactionViewType]
-
-  type TransactionMultiViewMessage = EncryptedMultipleViewsMessage[TransactionViewType]
-
   type TransactionViewMessage = EncryptedViewMessage[TransactionViewType]
 
   type DefaultOpenEnvelope = OpenEnvelope[ProtocolMessage]
 
   object DefaultOpenEnvelopesFilter {
 
-    /** @param withExplicitTopologyTimestamp
-      *   Whether the event contained a prescribed topology timestamp.
-      */
     def containsTopology(
-        envelopes: Seq[DefaultOpenEnvelope],
-        withExplicitTopologyTimestamp: Boolean,
-    ): Boolean = !withExplicitTopologyTimestamp && envelopes.exists { envelope =>
+        envelopes: Seq[DefaultOpenEnvelope]
+    ): Boolean = envelopes.exists { envelope =>
       val broadcastO = ProtocolMessage.select[TopologyTransactionsBroadcast](envelope)
       val envelopeIsValidBroadcast =
         broadcastO.exists(_.recipients.allRecipients.contains(AllMembersOfSynchronizer))

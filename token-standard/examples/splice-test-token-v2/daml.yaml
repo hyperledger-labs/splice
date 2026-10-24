@@ -1,7 +1,7 @@
 sdk-version: 3.5.2
 name: splice-test-token-v2
 source: daml
-version: 1.0.1
+version: 1.0.2
 dependencies:
   - daml-prim
   - daml-stdlib
@@ -20,7 +20,7 @@ data-dependencies:
 
 build-options:
   - --explicit-serializable=yes
-  - --target=2.1
+  - --target=2.3
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
 codegen:

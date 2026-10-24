@@ -78,7 +78,7 @@ class HttpSvPublicHandler(
   private val svParty = dsoStore.key.svParty
   private val dsoParty = dsoStore.key.dsoParty
 
-  override protected val votesStore: ActiveVotesStore = dsoStore
+  override protected val activeVotesStore: ActiveVotesStore = dsoStore
   override protected val workflowId: String = this.getClass.getSimpleName
 
   /** Intended use: Other validators call this endpoint to onboard themselves,

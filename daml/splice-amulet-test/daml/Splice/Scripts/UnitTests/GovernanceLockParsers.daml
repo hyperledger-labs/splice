@@ -1,0 +1,482 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Unit tests for the parsers of the governance lock metadata.
+module Splice.Scripts.UnitTests.GovernanceLockParsers where
+
+import DA.Assert
+import DA.Date (Month(..), date)
+import DA.NonEmpty qualified as NonEmpty
+import DA.Optional
+import DA.Text qualified as Text
+import DA.TextMap qualified as TextMap
+import DA.Time (days, time)
+import DA.Validation
+
+import Daml.Script
+
+import Splice.Amulet.TokenApiUtils (reasonMetaKey)
+import Splice.Api.Token.MetadataV1
+import Splice.GovernanceLock
+import Splice.GovernanceLock.Request
+
+-- Test parties and helpers
+---------------------------
+
+testParty : Text -> Party
+testParty = fromSomeNote "invalid test party" . partyFromText
+
+alice : Party
+alice = testParty "alice"
+
+bob : Party
+bob = testParty "bob"
+
+charlie : Party
+charlie = testParty "charlie"
+
+testProvider : Party
+testProvider = testParty "provider"
+
+-- | Text that `partyFromText` rejects.
+invalidParty : Text
+invalidParty = "bad$party"
+
+invalidSVName : Text
+invalidSVName = "bad$SV"
+
+mkMeta : [(Text, Text)] -> Metadata
+mkMeta = Metadata . TextMap.fromList
+
+expectSuccess : (Eq o, Show o) => o -> Validation Text o -> Script ()
+expectSuccess expected result = case result of
+  Success actual -> actual === expected
+  Errors errors -> fail $ "Expected success, but got errors: " <> show errors
+
+expectErrors : Show o => [Text] -> Validation Text o -> Script ()
+expectErrors expected result = case result of
+  Errors errors -> NonEmpty.toList errors === expected
+  Success actual -> fail $ "Expected errors, but got success: " <> show actual
+
+invalidPartyError : Text -> Text -> Text
+invalidPartyError key p = "Invalid party in metadata field '" <> key <> "': " <> p
+
+mkTestErrors' : Int -> [Text]
+mkTestErrors' 0 = []
+mkTestErrors' numErrors = ("e" <> show numErrors) :: mkTestErrors' (numErrors - 1)
+
+mkTestErrors : Int -> [Text]
+mkTestErrors numErrors = reverse $ mkTestErrors' numErrors
+
+testParserWithErrors : Int -> Parser () ()
+testParserWithErrors numErrors =
+  Parser \_ -> Errors $ fromSome $ NonEmpty.nonEmpty $ mkTestErrors numErrors
+
+test_assertParsed : Script ()
+test_assertParsed = do
+    run (testParserWithErrors 1) === Left (errorsText 1)
+    run (testParserWithErrors 2) === Left ("Found 2 parsing errors:\n\n" <> errorsText 2)
+    run (testParserWithErrors 5) === Left ("Found 5 parsing errors:\n\n" <> errorsText 5)
+    run (testParserWithErrors 6) === Left ("Found 6 parsing errors. First five errors:\n\n" <> errorsText 5)
+  where
+    run : Parser () () -> Either Text ()
+    run parser = assertParsed parser ()
+
+    errorsText : Int -> Text
+    errorsText numErrors = Text.intercalate "\n" (mkTestErrors numErrors)
+
+-- Lock kind parser
+-------------------
+
+test_governanceLockTagParser : Script ()
+test_governanceLockTagParser = do
+  -- `GovernanceLockTag` has no `Show` instance, so compare the tags by their text
+  let run t = runParser governanceLockTagParser (mkMeta [(lockKindMetaKey, t)])
+      expectTag tag = expectSuccess (governanceLockTagToText tag) . fmap governanceLockTagToText
+
+  expectTag GLT_FeaturedApp $ run "fa-lock"
+  expectTag GLT_ProvisionalFeaturedApp $ run "provisional-fa-lock"
+  expectTag GLT_SuperValidator $ run "sv-lock"
+
+  -- The tag must be known, and the TSv1 receiver party format is not accepted
+  expectErrors ["Invalid lock kind: 'unknown-lock'"] $ governanceLockTagToText <$> run "unknown-lock"
+  expectErrors ["Invalid lock kind: 'cip-127_sv-lock'"] $ governanceLockTagToText <$> run "cip-127_sv-lock"
+
+test_governanceLockKindParser : Script ()
+test_governanceLockKindParser = do
+  let run entries = runParser governanceLockKindParser (mkMeta entries)
+      kind' k = (lockKindMetaKey, k)
+      kind k = kind' $ governanceLockTagToText k
+      subject s = (lockSubjectMetaKey, s)
+
+  expectSuccess (GLK_FeaturedApp testProvider) $ run [kind GLT_FeaturedApp, subject "provider"]
+  expectSuccess (GLK_ProvisionalFeaturedApp testProvider) $ run [kind GLT_ProvisionalFeaturedApp, subject "provider"]
+  expectSuccess (GLK_SuperValidatorRightsOwner "someSv") $ run [kind GLT_SuperValidator, subject "someSv"]
+
+  -- Kind and subject are required; a missing kind is reported before the subject is checked
+  expectErrors ["Missing metadata field '" <> lockSubjectMetaKey <> "'"] $ run [kind GLT_FeaturedApp]
+  expectErrors ["Missing metadata field '" <> lockSubjectMetaKey <> "'"] $ run [kind GLT_SuperValidator]
+  expectErrors ["Missing metadata field '" <> lockKindMetaKey <> "'"] $ run [subject "provider"]
+  expectErrors ["Missing metadata field '" <> lockKindMetaKey <> "'"] $ run []
+
+  -- The lock kind must be known
+  expectErrors ["Invalid lock kind: 'unknown-lock'"] $ run [kind' "unknown-lock", subject "provider"]
+
+  -- The subject of a featured app lock must be a party
+  expectErrors ["Invalid provider for fa-lock: " <> invalidParty] $
+    run [kind GLT_FeaturedApp, subject invalidParty]
+  expectErrors ["Invalid provider for provisional-fa-lock: " <> invalidParty] $
+    run [kind GLT_ProvisionalFeaturedApp, subject invalidParty]
+
+  -- The subject of an SV lock must only contain alphanumeric characters or hyphens
+  expectErrors ["Invalid SV name for sv-lock: " <> invalidSVName] $
+    run [kind GLT_SuperValidator, subject invalidSVName]
+
+-- Metadata parser
+------------------
+
+test_governanceLockMetadataParser : Script ()
+test_governanceLockMetadataParser = do
+  let run entries = runParser governanceLockMetadataParser (mkMeta entries)
+      reason r = (reasonMetaKey, cipMemoPrefix <> r)
+      otherEntry = ("other-key", "other-value")
+      pairError l = "Unable to map a key value pair, from list: " <> show l
+      dropMetaPrefix = Text.dropPrefix cipMetaPrefix
+      lockSubjectMetaKeyNoPrefix = dropMetaPrefix lockSubjectMetaKey
+
+  -- Without a reason field, empty metadata is returned
+  expectSuccess (mkMeta []) $ run []
+  expectSuccess (mkMeta []) $ run [otherEntry, (lockSubjectMetaKey, "provider")]
+
+  -- A reason without the `cipMemoPrefix` prefix is not parsed, and empty metadata is returned
+  expectSuccess (mkMeta []) $ run [(reasonMetaKey, lockSubjectMetaKeyNoPrefix <> "=provider")]
+
+  -- A single pair is prefixed with `cipMetaPrefix` and added to the metadata, and the reason field is removed
+  expectSuccess (mkMeta [(lockSubjectMetaKey, "provider")]) $
+    run [reason $ lockSubjectMetaKeyNoPrefix <> "=provider"]
+
+  -- Keys that already contain `cipMetaPrefix` are prefixed again
+  expectSuccess (mkMeta [(cipMetaPrefix <> lockSubjectMetaKey, "provider")]) $
+    run [reason $ lockSubjectMetaKey <> "=provider"]
+
+  -- `&` separates the pairs, and the other metadata fields are ignored
+  expectSuccess
+    (mkMeta [(lockSubjectMetaKey, "provider")])
+    $ run [otherEntry, reason $ lockSubjectMetaKeyNoPrefix <> "=provider"]
+
+  -- An empty value is allowed
+  expectSuccess (mkMeta [(lockSubjectMetaKey, "")]) $
+    run [reason $ lockSubjectMetaKeyNoPrefix <> "="]
+
+  -- A pair without `=`
+  expectErrors [pairError [lockSubjectMetaKeyNoPrefix]] $ run [reason lockSubjectMetaKeyNoPrefix]
+
+  -- A pair with more than one `=`
+  expectErrors [pairError [lockSubjectMetaKeyNoPrefix, "provider", "x"]] $
+    run [reason $ lockSubjectMetaKeyNoPrefix <> "=provider=x"]
+
+  -- An empty reason, and an empty pair after a trailing `&`
+  expectErrors [pairError [""]] $ run [reason ""]
+  expectErrors [pairError [""]] $ run [reason $ lockSubjectMetaKeyNoPrefix <> "=provider&"]
+
+  -- All invalid pairs are reported
+  expectErrors [pairError ["a"], pairError ["b", "c", "d"]] $
+    run [reason $ "a&" <> lockSubjectMetaKeyNoPrefix <> "=provider&b=c=d"]
+
+-- Lock specification parser
+----------------------------
+
+test_fullLockSpecificationParser'
+  :  (Text -> [(Text, Text)] -> Validation Text FullLockSpecification)
+  -> Script ()
+test_fullLockSpecificationParser' run = do
+  let fullSpecification = FullLockSpecification with
+        kind = GLK_FeaturedApp testProvider
+  expectSuccess fullSpecification $
+    run (governanceLockTagToText GLT_FeaturedApp) [(lockSubjectMetaKey, "provider")]
+
+  expectSuccess (FullLockSpecification with kind = GLK_SuperValidatorRightsOwner "someSv") $
+    run (governanceLockTagToText GLT_SuperValidator) [(lockSubjectMetaKey, "someSv")]
+
+  -- Invalid field
+  expectErrors ["Invalid provider for fa-lock: " <> invalidParty] $
+    run (governanceLockTagToText GLT_FeaturedApp) [(lockSubjectMetaKey, invalidParty)]
+
+-- | The lock kind is read from the `lockKindMetaKey` field.
+test_fullLockSpecificationParser : Script ()
+test_fullLockSpecificationParser =
+  test_fullLockSpecificationParser' \kind entries ->
+    runParser fullLockSpecificationParser (mkMeta $ (lockKindMetaKey, kind) :: entries)
+
+-- TSv1 request parser
+----------------------
+
+-- | `GovernanceLockRequest` has no `Eq` or `Show` instance, so the tests match on the parsed request.
+expectRequest : Validation Text GovernanceLockRequest -> (GovernanceLockRequest -> Script ()) -> Script ()
+expectRequest result check = case result of
+  Success request -> check request
+  Errors errors -> fail $ "Expected success, but got errors: " <> show errors
+
+expectRequestErrors : [Text] -> Validation Text GovernanceLockRequest -> Script ()
+expectRequestErrors expected result = case result of
+  Errors errors -> NonEmpty.toList errors === expected
+  Success _ -> fail "Expected errors, but got success"
+
+test_governanceLockRequestTSv1Parser : Script ()
+test_governanceLockRequestTSv1Parser = do
+  let run receiver entries = runParser (governanceLockRequestTSv1Parser testAdmin receiver None) (mkMeta entries)
+      request r = (requestMetaKey, r)
+      faLock = [(lockKindMetaKey, governanceLockTagToText GLT_FeaturedApp), (lockSubjectMetaKey, "provider")]
+      faSpecification = FullLockSpecification with kind = GLK_FeaturedApp testProvider
+      invalidReceiverError p = "Invalid receiver: '" <> show p <> "'"
+
+  -- Create a lock: the specification is parsed
+  expectRequest (run lockManagerParty $ request "create-lock" :: (unlockAmountMetaKey, "1.0") :: faLock) \case
+    GLR_CreateGovernanceLock{fullSpecification} -> fullSpecification === faSpecification
+    _ -> fail "Expected GLR_CreateGovernanceLock"
+
+  -- Create a lock
+  expectRequest (run lockManagerParty $ request "create-lock" :: faLock) \case
+    GLR_CreateGovernanceLock{fullSpecification} ->
+      fullSpecification === faSpecification
+    _ -> fail "Expected GLR_CreateGovernanceLock"
+
+  -- Unlock with all fields set
+  expectRequest
+    (run lockManagerParty $
+      request "unlock-and-start-vesting"
+        :: (unlockAmountMetaKey, "10000.0")
+        :: (vestingStartTimeMetaKey, "2026-01-01T00:00:00Z")
+        :: faLock)
+    \case
+      GLR_UnlockGovernanceLock{fullSpecification, unlockAmount, vestingStartTime} -> do
+        fullSpecification === faSpecification
+        unlockAmount === 10000.0
+        vestingStartTime === Some (time (date 2026 Jan 1) 0 0 0)
+      _ -> fail "Expected GLR_UnlockGovernanceLock"
+
+  -- Unlock without the vesting start time
+  expectRequestErrors [missingMetadataMessage vestingStartTimeMetaKey] $
+    run lockManagerParty (request "unlock-and-start-vesting" :: (unlockAmountMetaKey, "10000.0") :: faLock)
+
+  -- Provisional featured app locks do not vest, so their unlock ignores the vesting start time
+  let provisionalFaLock = [(lockKindMetaKey, governanceLockTagToText GLT_ProvisionalFeaturedApp), (lockSubjectMetaKey, "provider")]
+      expectProvisionalUnlock entries = expectRequest (run lockManagerParty entries) \case
+        GLR_UnlockGovernanceLock{fullSpecification, unlockAmount, vestingStartTime} -> do
+          fullSpecification === FullLockSpecification with kind = GLK_ProvisionalFeaturedApp testProvider
+          unlockAmount === 10000.0
+          vestingStartTime === None
+        _ -> fail "Expected GLR_UnlockGovernanceLock"
+  expectProvisionalUnlock $ request "unlock-and-start-vesting" :: (unlockAmountMetaKey, "10000.0") :: provisionalFaLock
+  expectProvisionalUnlock $
+    request "unlock-and-start-vesting"
+      :: (unlockAmountMetaKey, "10000.0")
+      :: (vestingStartTimeMetaKey, "not-a-time")
+      :: provisionalFaLock
+
+  -- Transfer a lock: the new owner is read from the metadata
+  expectRequest
+    (run lockManagerParty $
+      request "transfer-lock"
+        :: (newLockOwnerMetaKey, "alice")
+        :: (transferAmountMetaKey, "1.0")
+        :: faLock)
+    \case
+      GLR_TransferLock{specification, newOwner, transferAmount} -> do
+        specification === GLS_FullLock faSpecification
+        newOwner === alice
+        transferAmount === 1.0
+      _ -> fail "Expected GLR_TransferLock"
+
+  -- Withdraw vested funds: the vesting lock key and the vested-until time are read from the metadata
+  expectRequest
+    (run lockManagerParty $
+      request "withdraw-vested-funds"
+        :: (vestedUntilTimeMetaKey, "2025-12-01T00:00:00Z")
+        -- 60 days in microseconds
+        :: (lockVestingDurationMetaKey, "5184000000000")
+        -- 2026-01-01T00:00:00Z in microseconds since the epoch
+        :: (lockVestingEndTimeMetaKey, "1767225600000000")
+        :: faLock)
+    \case
+      GLR_WithdrawVestingLock{vestingSpecification, vestedUntilTime} -> do
+        vestingSpecification === VestingLockSpecification with
+          kind = GLK_FeaturedApp testProvider
+          vestingPeriod = days 60
+          endTime = time (date 2026 Jan 1) 0 0 0
+        vestedUntilTime === time (date 2025 Dec 1) 0 0 0
+      _ -> fail "Expected GLR_WithdrawVestingLock"
+
+  expectRequest
+    (run lockManagerParty $
+      request "withdraw-vested-funds"
+        :: (vestedUntilTimeMetaKey, "2025-12-01T00:00:00Z")
+        :: (lockVestingDurationMetaKey, "5184000000000")
+        :: (lockVestingEndTimeMetaKey, "1767225600000000")
+        :: faLock)
+    \case
+      GLR_WithdrawVestingLock{} -> pure ()
+      _ -> fail "Expected GLR_WithdrawVestingLock"
+
+  -- Withdraw without the vested-until time and the vesting lock key
+  expectRequestErrors
+    [ missingMetadataMessage lockVestingDurationMetaKey
+    , missingMetadataMessage lockVestingEndTimeMetaKey
+    , missingMetadataMessage vestedUntilTimeMetaKey
+    ]
+    $ run lockManagerParty (request "withdraw-vested-funds" :: faLock)
+
+  -- The request is required and must be known; the value has no `cipMetaPrefix`
+  expectRequestErrors [missingMetadataMessage requestMetaKey] $ run lockManagerParty faLock
+  expectRequestErrors ["Invalid request: 'unlock'"] $ run lockManagerParty (request "unlock" :: faLock)
+  expectRequestErrors ["Invalid request: '" <> cipMetaPrefix <> "create-lock'"] $
+    run lockManagerParty (request (cipMetaPrefix <> "create-lock") :: faLock)
+
+  -- Creating, unlocking and transferring a lock needs the lock manager as the receiver
+  expectRequestErrors [invalidReceiverError alice] $ run alice (request "create-lock" :: faLock)
+  expectRequestErrors [invalidReceiverError alice, missingMetadataMessage unlockAmountMetaKey] $
+    run alice (request "unlock-and-start-vesting" :: faLock)
+  expectRequestErrors [invalidReceiverError alice, missingMetadataMessage newLockOwnerMetaKey, missingMetadataMessage transferAmountMetaKey] $
+    run alice (request "transfer-lock" :: faLock)
+  expectRequestErrors
+    [ invalidReceiverError alice
+    , missingMetadataMessage lockVestingDurationMetaKey
+    , missingMetadataMessage lockVestingEndTimeMetaKey
+    , missingMetadataMessage vestedUntilTimeMetaKey
+    ]
+    $ run alice (request "withdraw-vested-funds" :: faLock)
+  -- Substituting a lock also needs the lock manager as the receiver; all errors are reported
+  expectRequestErrors [invalidReceiverError alice, missingMetadataMessage targetLockOwnerMetaKey] $
+    run alice (request "substitute-lock" :: faLock)
+
+  -- All invalid fields are reported
+  expectRequestErrors
+    [ invalidReceiverError alice
+    , "Invalid provider for fa-lock: " <> invalidParty
+    , "Invalid decimal in " <> unlockAmountMetaKey <> " metadata field: 'not-a-decimal'"
+    ]
+    $ run alice
+        [ request "unlock-and-start-vesting"
+        , (lockKindMetaKey, governanceLockTagToText GLT_FeaturedApp)
+        , (lockSubjectMetaKey, invalidParty)
+        , (unlockAmountMetaKey, "not-a-decimal")
+        ]
+
+-- Substitution parser
+----------------------
+
+-- | Registry admin passed to `governanceLockRequestTSv2Parser`.
+testAdmin : Party
+testAdmin = testParty "registry-admin"
+
+-- | Parses a substitution request and returns its substitution.
+-- Arguments: registry admin. Input: metadata to be converted to a compat mode memo.
+substitutionTSv1Parser : Party -> Parser Metadata GovernanceLockKey
+substitutionTSv1Parser admin = governanceLockRequestTSv1Parser admin lockManagerParty None >>= \case
+  GLR_SubstituteLock{target} -> pure target
+  result -> assertFail $ "Expected GLR_SubstituteLock but got: " <> show result
+
+-- | The metadata entry that requests a substitution.
+substitutionRequest : (Text, Text)
+substitutionRequest = (requestMetaKey, governanceLockRequestTagToText GLRT_SubstituteLock)
+
+-- | Examples of the `allocation.meta` of an `AllocationFactory_Allocate` call that proposes a substitution.
+--
+-- The metadata keys are written out on purpose, so that these tests also serve as examples of how to call the API.
+-- The `cip-127/request` key selects the substitution.
+-- `cip-127/target-lock-owner`, `cip-127/lock-kind`, and `cip-127/lock-status` specify the owner, kind, and state of the target lock.
+test_substitutionTSv1Parser_examples : Script ()
+test_substitutionTSv1Parser_examples = do
+  let run entries = runParser (substitutionTSv1Parser testAdmin) (mkMeta entries)
+
+  -- Minimal example: bob substitutes funds of the SV lock of alice for "someSv", for example a lock that alice
+  -- created in compatibility mode.
+  let
+    testLockedSvLock : [(Text, Text)] -> Script ()
+    testLockedSvLock moreEntries =
+      expectSuccess
+        (GovernanceLockKey with
+          dso = testAdmin
+          owner = alice
+          specification = GLS_FullLock FullLockSpecification with kind = GLK_SuperValidatorRightsOwner "someSv")
+        $ run $
+            [ ("cip-127/request", "substitute-lock")
+            , ("cip-127/lock-kind", "sv-lock")
+            , ("cip-127/lock-subject", "someSv")
+            , ("cip-127/target-lock-owner", "alice")
+            ] <> moreEntries
+
+  -- Leaving out `lock-status` defaults to a full lock
+  testLockedSvLock []
+  -- Including an explicit `lock-status=locked` parses a full lock
+  testLockedSvLock [("cip-127/lock-status", "locked")]
+
+  -- Staking app example: alice locks funds for the featured app "provider", and a staking app (charlie) can
+  -- approve substitutions together with the provider. Bob substitutes funds of that lock with a lock whose
+  -- substitutions charlie can approve together with either bob or the provider.
+  expectSuccess
+    (GovernanceLockKey with
+      dso = testAdmin
+      owner = alice
+      specification = GLS_FullLock FullLockSpecification with
+        kind = GLK_FeaturedApp testProvider)
+    $ run
+        [ ("cip-127/request", "substitute-lock")
+        , ("cip-127/lock-kind", "fa-lock")
+        , ("cip-127/lock-subject", "provider")
+        , ("cip-127/target-lock-owner", "alice")
+        ]
+
+  -- Vesting lock example: bob substitutes funds of a vesting lock of alice. A vesting target is selected with
+  -- the state `vesting`, and must name its vesting period (60 days, in microseconds) and its end time
+  -- (2026-01-01T00:00:00Z, in microseconds since the epoch).
+  expectSuccess
+    (GovernanceLockKey with
+      dso = testAdmin
+      owner = alice
+      specification = GLS_VestingLock VestingLockSpecification with
+        kind = GLK_SuperValidatorRightsOwner "someSv"
+        vestingPeriod = days 60
+        endTime = time (date 2026 Jan 1) 0 0 0)
+    $ run
+        [ ("cip-127/request", "substitute-lock")
+        , ("cip-127/lock-kind", "sv-lock")
+        , ("cip-127/lock-subject", "someSv")
+        , ("cip-127/target-lock-owner", "alice")
+        , ("cip-127/lock-status", "vesting")
+        , ("cip-127/lock-vesting-duration-micros", "5184000000000")
+        , ("cip-127/lock-vesting-end-time-micros", "1767225600000000")
+        ]
+
+test_substitutionTSv1Parser_failures : Script ()
+test_substitutionTSv1Parser_failures = do
+  let run' entries = runParser (substitutionTSv1Parser testAdmin) (mkMeta $ substitutionRequest :: entries)
+      run entries = run' $ (lockKindMetaKey, governanceLockTagToText GLT_SuperValidator) :: entries
+      subject = (lockSubjectMetaKey, "someSv")
+      targetOwner = (targetLockOwnerMetaKey, "alice")
+
+  -- The target owner is required and must be a party
+  expectErrors ["Missing metadata field '" <> targetLockOwnerMetaKey <> "'"] $ run [subject]
+  expectErrors [invalidPartyError targetLockOwnerMetaKey invalidParty] $
+    run [subject, (targetLockOwnerMetaKey, invalidParty)]
+
+  -- The kind must name a known lock kind
+  expectErrors ["Invalid lock kind: 'unknown'"] $
+    run' [(lockKindMetaKey, "unknown"), subject, targetOwner]
+
+  -- The target state must be `locked` or `vesting`; an invalid state and an invalid owner are both reported
+  expectErrors
+    [ "Invalid value in " <> lockStatusMetaKey <> " metadata field: 'unlocking'"
+    , invalidPartyError targetLockOwnerMetaKey invalidParty
+    ]
+    $ run [subject, (lockStatusMetaKey, "unlocking"), (targetLockOwnerMetaKey, invalidParty)]
+
+  -- The new lock needs a lock subject
+  expectErrors ["Missing metadata field '" <> lockSubjectMetaKey <> "'"] $ run [targetOwner]
+
+  -- A vesting target needs a vesting period and end time
+  expectErrors
+    [ "Missing metadata field '" <> lockVestingDurationMetaKey <> "'"
+    , "Missing metadata field '" <> lockVestingEndTimeMetaKey <> "'"
+    ]
+    $ run [subject, targetOwner, (lockStatusMetaKey, lockStateToText LS_Vesting)]

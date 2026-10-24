@@ -440,7 +440,7 @@ class WalletTxLogTimeBasedIntegrationTest
               new TransferInstruction.ContractId(value.transferInstructionCid)
           }
 
-          val (aliceTxs, bobTxs) = clue("Alice and Bob parse all tx log entries") {
+          val (aliceTxs, _) = clue("Alice and Bob parse all tx log entries") {
             eventually() {
               val aliceTxs = aliceWalletClient.listTransactions(None, 1000)
               // tap + lock + transfer instruction

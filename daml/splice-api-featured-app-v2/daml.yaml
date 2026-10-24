@@ -9,7 +9,7 @@ data-dependencies:
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
-  - --target=2.1
+  - --target=2.3
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java

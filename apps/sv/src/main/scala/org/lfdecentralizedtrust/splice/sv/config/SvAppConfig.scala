@@ -12,7 +12,9 @@ import com.digitalasset.canton.admin.api.client.data.{
   SequencerConnectionPoolDelays,
   SubmissionRequestAmplification,
   SubscriptionLivenessLimits,
+  AcsCommitmentLimits,
   SynchronizerLimits,
+  TopologyLimits,
   TransactionProtocolLimits,
 }
 import com.digitalasset.canton.config.*
@@ -134,6 +136,7 @@ object SvOnboardingConfig {
           SwitchOverTimes.NoFeaturedAppChoiceContext -> CantonTimestamp.MinValue
         )
       ),
+      initialProtocolVersion: ProtocolVersion = ProtocolVersion.v37,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -669,7 +672,6 @@ final case class SvSynchronizerNodeConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
     cometBftConfig: Option[SvCometBftConfig] = None,
-    protocolVersion: ProtocolVersion = ProtocolVersion.v37,
     serial: Option[NonNegativeInt],
     // We want to be able to override this for simtime tests
     topologyChangeDelayDuration: NonNegativeFiniteDuration =
@@ -695,7 +697,11 @@ object SvSynchronizerNodeConfig {
       maxTransactionRootViews = PositiveInt.tryCreate(1_000_000),
       maxTransactionSubViews = PositiveInt.tryCreate(10_000_000),
       maxTransactionTreeDepth = PositiveInt.MaxValue,
-    )
+      maxSignaturesPerEnvelope = TransactionProtocolLimits.default.maxSignaturesPerEnvelope,
+      maxQuorumSize = TransactionProtocolLimits.default.maxQuorumSize,
+    ),
+    topologyLimits = TopologyLimits.default,
+    acsCommitmentLimits = AcsCommitmentLimits.default,
   )
 }
 

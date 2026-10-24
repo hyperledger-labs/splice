@@ -23,4 +23,4 @@ Could not send a time-advancing message
 
 Request failed for sequencer.* Is the server running.*Causes: finishConnect.*
 
-SEQUENCER_SUBMISSION_REQUEST_MALFORMED.*MED::sv4SvReonboarding.*is not part of the mediator group
+SEQUENCER_SUBMISSION_REQUEST_MALFORMED.*MED::sv4SvReonboarding.*(is not part of the mediator group|Validation of aggregation rule failed)

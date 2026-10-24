@@ -37,7 +37,7 @@ export const buildSvMock = (svUrl: string): HttpHandler[] => [
     return new HttpResponse(null, { status: 200 });
   }),
 
-  dsoInfoHandler(svUrl, '/v1/dso'),
+  dsoInfoHandler(svUrl),
 
   http.get(`${svUrl}/v0/admin/sv/voterequests`, () => {
     return HttpResponse.json<ListDsoRulesVoteRequestsResponse>(voteRequests);

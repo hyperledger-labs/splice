@@ -1283,7 +1283,6 @@ lazy val `apps-common` =
           "com.google.api.grpc",
           "proto-google-common-protos",
         )),
-        kubernetes_client,
         Dependencies.daml_lf_validation,
         scalatestScalacheck % Test,
         CantonDependencies.pekko_http_testkit % Test,
@@ -2484,7 +2483,6 @@ lazy val `apps-app`: Project =
       libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.44.0" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       libraryDependencies += auth0,
-      libraryDependencies += kubernetes_client,
       libraryDependencies += "com.monovore" %% "decline" % "2.5.0" % "test",
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(

@@ -4,10 +4,12 @@ import { useAmuletPriceVotes } from './useAmuletPriceVotes';
 import { useDsoInfos } from './useDsoInfos';
 import { useListVoteRequestResult, useListDsoRulesVoteRequests } from './useListVoteRequests';
 import { useListVotes } from './useListVotes';
+import { useSvInfo } from './useSvInfo';
 import { useVoteRequest } from './useVoteRequest';
 
 export {
   useDsoInfos,
+  useSvInfo,
   useListVoteRequestResult,
   useListDsoRulesVoteRequests,
   useListVotes,

@@ -35,7 +35,7 @@ class WalletAppConnectivityIntegrationTest
   registerPlugin(toxiproxy)
 
   "wallet should recover after a disconnect from the Scan HTTP API" in { implicit env =>
-    val (_, _) = onboardAliceAndBob()
+    onboardAliceAndBob()
 
     // we deliberately retry tap(2) until it fails because there could be cached results.
     actAndCheck(

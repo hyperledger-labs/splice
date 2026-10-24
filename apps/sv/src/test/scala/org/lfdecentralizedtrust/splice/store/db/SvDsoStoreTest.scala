@@ -2353,17 +2353,17 @@ class DbSvDsoStoreTest
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    val store = new DbSvDsoStore(
-      SvStore.Key(storeSvParty, dsoParty),
-      storage,
-      loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId,
-      participantId = mkParticipantId("SvDsoStoreTest"),
-      IngestionConfig(),
-      defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
-    )(parallelExecutionContext, implicitly, implicitly)
     for {
+      store <- DbSvDsoStore.create(
+        SvStore.Key(storeSvParty, dsoParty),
+        storage,
+        loggerFactory,
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+        domainMigrationId,
+        participantId = mkParticipantId("SvDsoStoreTest"),
+        IngestionConfig(),
+        defaultLimit = HardLimit.tryCreate(Limit.DefaultMaxPageSize),
+      )(parallelExecutionContext, implicitly, implicitly, implicitly)
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- store.multiDomainAcsStore.testIngestionSink
         .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)

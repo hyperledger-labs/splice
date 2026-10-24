@@ -22,13 +22,13 @@
       "http://wallet.localhost"
     ],
     "crossOriginAuth": false,
-    "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet UI for the validator runbook",
+    "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet UI for validator validator",
     "grantTypes": [
       "authorization_code",
       "implicit",
       "refresh_token"
     ],
-    "name": "Wallet UI (Pulumi managed, test-stack)",
+    "name": "Wallet UI (validator) (Pulumi managed, test-stack)",
     "oidcConformant": true,
     "refreshToken": {
       "expirationType": "expiring",

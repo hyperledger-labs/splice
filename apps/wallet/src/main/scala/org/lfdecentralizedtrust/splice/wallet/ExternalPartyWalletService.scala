@@ -3,18 +3,15 @@
 
 package org.lfdecentralizedtrust.splice.wallet
 
-import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable, LifeCycle}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.ParticipantId
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.DomainTimeSynchronization
-import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import org.lfdecentralizedtrust.splice.wallet.automation.ExternalPartyWalletAutomationService
 import org.lfdecentralizedtrust.splice.wallet.config.RewardSharingConfig
 import org.lfdecentralizedtrust.splice.wallet.store.ExternalPartyWalletStore
@@ -25,15 +22,12 @@ import scala.util.control.NonFatal
 /** A service managing the treasury, automation, and store for an external party's wallet. */
 class ExternalPartyWalletService(
     ledgerClient: SpliceLedgerClient,
-    key: ExternalPartyWalletStore.Key,
+    val store: ExternalPartyWalletStore,
     automationConfig: AutomationConfig,
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
-    storage: DbStorage,
     override protected[this] val retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
-    migrationId: Long,
-    participantId: ParticipantId,
     params: SpliceParametersConfig,
     scanConnection: BftScanConnection,
     packageVersionSupport: PackageVersionSupport,
@@ -42,23 +36,9 @@ class ExternalPartyWalletService(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-    templateJsonDecoder: TemplateJsonDecoder,
-    close: CloseContext,
 ) extends RetryProvider.Has
     with FlagCloseable
     with NamedLogging {
-
-  val store: ExternalPartyWalletStore =
-    ExternalPartyWalletStore(
-      key,
-      storage,
-      loggerFactory,
-      retryProvider,
-      migrationId,
-      participantId,
-      automationConfig.ingestion,
-      params.defaultLimit,
-    )
 
   val automation =
     try {

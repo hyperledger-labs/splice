@@ -3,6 +3,7 @@
 import {
   AmuletPriceVote,
   DsoInfo,
+  SvInfo,
   SvVote,
   VotesHooks,
   VotesHooksContext,
@@ -24,6 +25,10 @@ export const SvAppVotesHooksProvider: React.FC<React.PropsWithChildren> = ({ chi
   const hooks: VotesHooks = {
     isReadOnly: false,
     useDsoInfos(): UseQueryResult<DsoInfo> {
+      return svAppUseDsoInfos();
+    },
+    useSvInfo(): UseQueryResult<SvInfo> {
+      // The sv-app has both DsoInfo and SvInfo in a single endpoint
       return svAppUseDsoInfos();
     },
     useListDsoRulesVoteRequests(): UseQueryResult<Contract<VoteRequest>[]> {
