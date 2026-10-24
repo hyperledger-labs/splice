@@ -349,6 +349,16 @@ object SpliceTests extends LazyLogging with HasRetryProvider {
         actionExpr: => T,
     )(check: String, checkFun: T => U): (T, U) = actAndCheck()(action, actionExpr)(check, checkFun)
 
+    def checkAction[U](
+        timeUntilSuccess: FiniteDuration = 20.seconds,
+        maxPollInterval: FiniteDuration = 5.seconds,
+    )(action: String, check: String, checkThunk: => U): U =
+      withClue(s"Check $check for $action") {
+        clue(s"(check) $check") {
+          eventually(timeUntilSuccess, maxPollInterval)(checkThunk)
+        }
+      }
+
     /** A function abstracting the common pattern of acting and then waiting for the action to
       * eventually have its expected results.
       */
@@ -361,14 +371,7 @@ object SpliceTests extends LazyLogging with HasRetryProvider {
     )(check: String, checkFun: T => U): (T, U) = {
       {
         val x = clue(s"(act) $action")(actionExpr)
-        withClue(s"Check $check for $action") {
-          clue(s"(check) $check") {
-            eventually(timeUntilSuccess, maxPollInterval) {
-              val y = checkFun(x)
-              (x, y)
-            }
-          }
-        }
+        (x, checkAction(timeUntilSuccess, maxPollInterval)(action, check, checkFun(x)))
       }
     }
 

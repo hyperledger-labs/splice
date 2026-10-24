@@ -56,44 +56,48 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
       advanceTimeBeforeExecute: Option[Duration] = None,
       description: Option[String] = None,
+      // Whether to wait for the input holdings to be consumed. Setting this to false is necessary
+      // for transfers where the inputs are ignored, e.g. governance lock unlocks and withdrawals
+      wait: Boolean = true,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ) = {
-    actAndCheck(
-      s"Instructing transfer of $amount amulets via token standard from $sender to $receiver", {
-        val (factoryChoice, senderHoldingCids) = transferViaTokenStandardCommands(
-          participant,
-          sender.partyId,
-          receiver,
-          amount,
-          expectedKind,
-          timeToLife,
-          description,
+    val action =
+      s"Instructing transfer of $amount amulets via token standard from $sender to $receiver"
+    clue(action) {
+      val (factoryChoice, senderHoldingCids) = transferViaTokenStandardCommands(
+        participant,
+        sender.partyId,
+        receiver,
+        amount,
+        expectedKind,
+        timeToLife,
+        description,
+      )
+      participant.ledger_api_extensions.commands
+        .submitJavaExternalOrLocal(
+          sender,
+          commands = factoryChoice.factoryId
+            .exerciseTransferFactory_Transfer(factoryChoice.args)
+            .commands
+            .asScala
+            .toSeq,
+          disclosedContracts = factoryChoice.disclosedContracts,
+          expectedTimeBounds = expectedTimeBounds,
+          advanceTimeBeforeExecute = advanceTimeBeforeExecute,
         )
-        participant.ledger_api_extensions.commands
-          .submitJavaExternalOrLocal(
-            sender,
-            commands = factoryChoice.factoryId
-              .exerciseTransferFactory_Transfer(factoryChoice.args)
-              .commands
-              .asScala
-              .toSeq,
-            disclosedContracts = factoryChoice.disclosedContracts,
-            expectedTimeBounds = expectedTimeBounds,
-            advanceTimeBeforeExecute = advanceTimeBeforeExecute,
-          )
-        senderHoldingCids.head
-      },
-    )(
-      // Prepared tx execution does not wait for the tx being committed.
-      // We thus wait here, as otherwise multiple transfer commands will use the same input holdings.
-      "Wait until we see at least one of the input holdings being consumed",
-      trackingHoldingCid => {
-        participant.ledger_api.event_query
-          .by_contract_id(trackingHoldingCid.contractId, requestingParties = Seq(sender.partyId))
-          .archived should not be empty withClue "archived holding"
-      },
-    )
+      senderHoldingCids.headOption.filter(_ => wait).foreach { trackingHoldingCid =>
+        // Prepared tx execution does not wait for the tx being committed.
+        // We thus wait here, as otherwise multiple transfer commands will use the same input holdings.
+        checkAction()(
+          action,
+          "Wait until we see at least one of the input holdings being consumed",
+          participant.ledger_api.event_query
+            .by_contract_id(trackingHoldingCid.contractId, requestingParties = Seq(sender.partyId))
+            .archived should not be empty withClue "archived holding",
+        )
+      }
+    }
   }
 
   def transferViaTokenStandardCommands(

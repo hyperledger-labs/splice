@@ -39,7 +39,12 @@ import org.lfdecentralizedtrust.splice.store.{
   TxLogAppStore,
   UpdateHistory,
 }
-import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  ContractWithState,
+  GovernanceLockUtil,
+  TemplateJsonDecoder,
+}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -495,6 +500,34 @@ object ScanStore {
               Some(Timestamp.assertFromInstant(contract.payload.transfer.executeBefore)),
           )
         },
+        mkFilter(splice.governancelock.GovernanceLock.COMPANION)(
+          co => co.payload.dso == dso,
+          versionGuard = { case (pkgVersionSupport, now) =>
+            (tc) => pkgVersionSupport.supportsGovernanceLock(Seq(key.dsoParty), now)(tc)
+          },
+        ) { contract =>
+          val (lockType, lockSubject) =
+            GovernanceLockUtil.governanceLockTypeAndSubject(contract.payload)
+          ScanAcsStoreRowData(
+            contract = contract,
+            contractExpiresAt = GovernanceLockUtil
+              .getVestingLockSpecification(contract.payload)
+              .map(v => Timestamp.assertFromInstant(v.endTime)),
+            governanceLockType = Some(lockType.storeValue),
+            governanceLockSubject = Some(lockSubject),
+          )
+        },
+        mkFilter(splice.governancelock.substitution.GovernanceLockSubstitution.COMPANION)(
+          co => co.payload.target.dso == dso,
+          versionGuard = { case (pkgVersionSupport, now) =>
+            (tc) => pkgVersionSupport.supportsGovernanceLock(Seq(key.dsoParty), now)(tc)
+          },
+        )(contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
+        ),
         mkFilter(splice.externalpartyconfigstate.ExternalPartyConfigState.COMPANION)(
           co => co.payload.dso == dso,
           versionGuard = { case (pkgVersionSupport, now) =>
