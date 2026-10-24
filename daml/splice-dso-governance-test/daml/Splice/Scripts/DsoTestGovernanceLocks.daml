@@ -130,6 +130,8 @@ setupGovernanceLock kind = do
     dso = app.dso
     provider = alice.primaryParty
     activityWeight = None
+    appKind = None
+    opsParties = None
 
   pure GovernanceLockEnv with ..
 
@@ -325,6 +327,8 @@ testDsoRulesConvertProvisionalFeaturedAppLockWrongFeaturedAppRight = do
     dso = env.app.dso
     provider = env.sv1
     activityWeight = None
+    appKind = None
+    opsParties = None
 
   submitMustFail (actAs env.sv1 <> readAs env.app.dso) $
     exerciseCmd env.dsoRulesCid DsoRules_GovernanceLock_ConvertProvisionalFeaturedAppLock with
@@ -348,6 +352,8 @@ testDsoRulesConvertProvisionalFeaturedAppLockRejectsForeignDso = do
     dso = env.sv1
     provider = env.alice.primaryParty
     activityWeight = None
+    appKind = None
+    opsParties = None
 
   actionMustFail (expectMessageContains "Contract group identifier mismatch") do
     r <- trySubmit (actAs env.sv1 <> readAs env.app.dso) $
