@@ -38,6 +38,7 @@ import Splice.Ans
 import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
+import Splice.DSO.Instruction
 import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
@@ -125,6 +126,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create BootstrapExternalPartyConfigStateInstruction
   | SRARC_UpdateFeaturedAppRight DsoRules_UpdateFeaturedAppRight
     -- ^ Update a specific featured app right.
+  | SRARC_CreateFeaturedAppConfigUpdateInstruction DsoRules_CreateFeaturedAppConfigUpdateInstruction
+    -- ^ Voted action to change to a featured app right's config.
   deriving (Eq, Show, Serializable)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -237,6 +240,17 @@ data DsoRules_RevokeFeaturedAppRightResult = DsoRules_RevokeFeaturedAppRightResu
 
 data DsoRules_UpdateFeaturedAppRightResult = DsoRules_UpdateFeaturedAppRightResult with
     result : FeaturedAppRight_UpdateResult
+  deriving (Serializable)
+
+data DsoRules_CreateFeaturedAppConfigUpdateInstructionResult = DsoRules_CreateFeaturedAppConfigUpdateInstructionResult with
+    instructionCids : [ContractId FeaturedAppConfigUpdateInstruction]
+  deriving (Serializable)
+
+data DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult = DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult with
+    result : FeaturedAppRight_UpdateConfigResult
+  deriving (Serializable)
+
+data DsoRules_ExpireFeaturedAppConfigUpdateInstructionResult = DsoRules_ExpireFeaturedAppConfigUpdateInstructionResult
   deriving (Serializable)
 
 data DsoRules_OnboardValidatorResult = DsoRules_OnboardValidatorResult with
@@ -1089,12 +1103,16 @@ template DsoRules with
       with
         provider : Party
         activityWeight : Optional Decimal
+        appKind : Optional FeaturedAppKind
+        opsParties : Optional [Party]
       controller dso
       do
         featuredAppRight <- create FeaturedAppRight with
           dso
           provider
           activityWeight
+          appKind
+          opsParties
         return DsoRules_GrantFeaturedAppRightResult with ..
 
     nonconsuming choice DsoRules_RevokeFeaturedAppRight : DsoRules_RevokeFeaturedAppRightResult
@@ -1116,6 +1134,46 @@ template DsoRules with
         void $ fetchChecked (ForDso with dso) rightCid
         result <- exercise rightCid update
         return DsoRules_UpdateFeaturedAppRightResult with result
+
+    nonconsuming choice DsoRules_CreateFeaturedAppConfigUpdateInstruction : DsoRules_CreateFeaturedAppConfigUpdateInstructionResult
+      with
+        updates : [(Party, FeaturedAppRight_UpdateConfig)]
+      controller dso
+      do
+        now <- getTime
+        let expiresAt = now `addRelTime` config.voteRequestTimeout
+        -- We don't check for duplicate provider here as that would prevent vote execution.
+        -- The sequence of execution of update instructions is not guaranteed,
+        -- and thus more than one update for a provider should be avoided.
+        instructionCids <- forA updates $ \(provider, update) ->
+          create FeaturedAppConfigUpdateInstruction with
+            dso; provider; update; expiresAt
+        pure DsoRules_CreateFeaturedAppConfigUpdateInstructionResult with
+          instructionCids
+
+    nonconsuming choice DsoRules_ExecuteFeaturedAppConfigUpdateInstruction : DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult
+      with
+        instructionCid : ContractId FeaturedAppConfigUpdateInstruction
+        rightCid : ContractId FeaturedAppRight
+        sv : Party
+      controller sv
+      do
+        void $ getAndValidateSvParty this (Some sv)
+        instruction <- fetchAndArchive (ForDso dso) instructionCid
+        void $ fetchChecked (ForOwner with dso; owner = instruction.provider) rightCid
+        result <- exercise rightCid instruction.update
+        pure DsoRules_ExecuteFeaturedAppConfigUpdateInstructionResult with result
+
+    nonconsuming choice DsoRules_ExpireFeaturedAppConfigUpdateInstruction : DsoRules_ExpireFeaturedAppConfigUpdateInstructionResult
+      with
+        instructionCid : ContractId FeaturedAppConfigUpdateInstruction
+        sv : Party
+      controller sv
+      do
+        void $ getAndValidateSvParty this (Some sv)
+        void $ fetchChecked (ForDso dso) instructionCid
+        void $ exercise instructionCid FeaturedAppConfigUpdateInstruction_Expire
+        pure DsoRules_ExpireFeaturedAppConfigUpdateInstructionResult
 
 
     -- Validator onboarding
@@ -1943,6 +2001,7 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateBootstrapExternalPartyConfigStateInstruction choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_CreateFeaturedAppConfigUpdateInstruction choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
